@@ -100,6 +100,22 @@ Notes:
   through `cmd` both produce the same dump and the same verdict (task 208's run: a
   135,029-byte dump reading `RESULT ALL PASS pass=2100 fail=0`; both numbers move as suites
   grow, so treat them as that run's figures and not as today's expected output). (task 208)
+- **Step 2's `cmd /c` line is written for a POSIX shell that does not mangle it — from an
+  MSYS/Git-Bash prompt it silently runs nothing and leaves an OLD dump in place.** Two
+  independent hazards, and the first is the dangerous one. (a) MSYS argument conversion
+  rewrites the leading `/c` as a path, so `cmd` never sees a switch: it opens interactively,
+  prints its banner and prompt, **exits 0**, and writes no file. (b) Even with the switch
+  intact (`//c`, or `MSYS_NO_PATHCONV=1`), a `"%TEMP%\out.html"` redirect target fails with
+  "The filename, directory name, or volume label syntax is incorrect"; a literal
+  `C:\…\out.html` works. So a Bash-tool caller gets **exit 0 and no dump written** — and then
+  reads whichever file the last run left at that path, which has a plausible size and a
+  plausible `RESULT ALL PASS` for a *different* page. That defeats the "check the dump's size
+  first" guard above, which only catches an empty capture, never a stale one. Two fixes, both
+  verified: run step 2 from a **PowerShell** prompt as written, or skip `cmd` altogether with
+  `Start-Process chrome.exe -ArgumentList … -RedirectStandardOutput "$env:TEMP\fl-dump.html"
+  -NoNewWindow -Wait`, which hands the process a real handle directly. Either way **delete the
+  target first and check its `LastWriteTime` after** — a missing file is unambiguous where a
+  stale one is not.
 - **A leftover `http.server` on :8848 serves a stale tree and reports a confident false
   pass.** Python sets `allow_reuse_address`, so on Windows a *second* `python -m http.server
   8848` binds without complaint while the older process keeps answering — the suite then runs

@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-218 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **219 is open** — file new work under the
-priority bucket that fits, and record the pass in the Review log.
+220 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **219, which is still open** — file new
+work under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -26,6 +26,7 @@ records each audit pass and is where new work is filed.
 - [x] 217. A visit-box redirect below the section head still leaves both exits live (book1/91)
 - [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
 - [ ] 219. `<sold>` fires on a sale but its documented twin `<bought>` does nothing on a purchase
+- [x] 220. The documented headless-dump command runs nothing from an MSYS shell, so a stale dump reads as a pass
 
 **Done**
 
@@ -252,10 +253,11 @@ this order.*
 - [x] 216. `<if ticks="N">` after an in-section `<tick>` reads the pre-tick count, so "now ticked" branches never fire
 - [x] 217. A visit-box redirect below the section head still leaves both exits live (book1/91)
 - [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
+- [x] 220. The documented headless-dump command runs nothing from an MSYS shell, so a stale dump reads as a pass
 
 ---
 
-> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–217 are still below, awaiting the next re-archive pass; the open task 218 and the Review log follow them.
+> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–218 and 220 are still below, awaiting the next re-archive pass; the open task 219 and the Review log follow them.
 
 ---
 
@@ -755,6 +757,49 @@ hook must be idempotent or the action it wraps must tolerate repeats (`addCodewo
 `suite-economy` is the natural home for the coverage: a market-level `<bought>` that fires only for
 the matching row, a row-level one that fires for its own article, neither firing on a *sale* of the
 same goods, and a `quantity="3"` row firing its hook on each of the three buys.
+
+---
+
+## 220. The documented headless-dump command runs nothing from an MSYS shell, so a stale dump reads as a pass
+
+**Priority: LOW — a documentation gap, not a code defect. But it produces the one failure mode the
+build+test loop is least able to survive: a confident, plausible, *wrong* `RESULT ALL PASS`.**
+
+*(Filed and fixed 2026-08-08, hit twice in one session while running the loop from a POSIX shell.)*
+Task 208 added step 2's `cmd`-mediated redirect because a GUI-subsystem `chrome.exe` launched
+straight from PowerShell inherits no stdout handle. That fix is correct **for a PowerShell caller**,
+which is the only caller the note imagined. Run the same line from an MSYS/Git-Bash prompt and it
+does something worse than fail: it runs nothing, reports success, and leaves whatever file the last
+run wrote sitting at the redirect target.
+
+Two independent hazards, both reproduced in isolation:
+
+- **The switch is path-mangled.** MSYS argument conversion rewrites a lone `/c` as a path, so
+  `cmd` never sees a switch. It opens *interactively*, prints its banner and prompt to stdout,
+  **exits 0**, and writes no file. `cmd /c 'echo hello > "%TEMP%\q.txt"'` and the full Chrome line
+  behave identically — banner, exit 0, no file.
+- **The redirect target then fails anyway.** With the switch preserved (`//c`, or
+  `MSYS_NO_PATHCONV=1`), `> "%TEMP%\out.html"` fails with *"The filename, directory name, or volume
+  label syntax is incorrect"* and exit 1. A literal `> C:\…\out.html` works and exits 0.
+
+The first hazard is the dangerous one, because the caller's next step is
+`Select-String -Path "$env:TEMP\fl-dump.html" -Pattern 'RESULT'` — which happily reads a **leftover
+dump from an earlier run**. That file has a plausible size and a plausible `RESULT ALL PASS`, for a
+different page, possibly from a different session. Task 208's own guard ("check the dump's size
+first, since that failure is silent") catches an *empty* capture and cannot catch a *stale* one: the
+byte count is the reassuring part.
+
+Fixed in `AGENTS.md` beside task 208's note rather than by changing the command, since the command
+is right for the shell it was written for. The note now records both hazards, the two verified ways
+to get a real handle — run step 2 from PowerShell as written, or skip `cmd` entirely with
+`Start-Process chrome.exe -ArgumentList … -RedirectStandardOutput "$env:TEMP\fl-dump.html"
+-NoNewWindow -Wait` — and the guard that distinguishes the two failures: **delete the target before
+the run and check its `LastWriteTime` after**, because a missing file is unambiguous where a stale
+one is not.
+
+This is a sibling of the leftover-`http.server` note already in `AGENTS.md`: both are ways the loop
+reports green while measuring something other than the tree under test, and in both the tell is a
+timestamp older than the session.
 
 ---
 
