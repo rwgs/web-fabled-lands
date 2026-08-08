@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 218 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **nothing is open** — file new work under the
+misdiagnosis (see the Review log); **219 is open** — file new work under the
 priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -25,6 +25,7 @@ records each audit pass and is where new work is filed.
 - [x] 215. A self-closing effect tag renders no words, so published sentences print with a hole
 - [x] 217. A visit-box redirect below the section head still leaves both exits live (book1/91)
 - [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
+- [ ] 219. `<sold>` fires on a sale but its documented twin `<bought>` does nothing on a purchase
 
 **Done**
 
@@ -716,6 +717,44 @@ caps, wildcard/empty → `''`); a book6/159-shaped sheet chipping `Safety from S
 and `MAGIC` with no chip starting "storm", while `data.blessings` still reads `storm,magic` and
 `hasBlessing('storms')` still matches; §6.171's real pick buttons; and the reroll offer's exact
 two lines.
+
+---
+
+## 219. `<sold>` fires on a sale but its documented twin `<bought>` does nothing on a purchase
+
+**Priority: LOW — no shipped book uses it, so nothing is broken today; it is a half-implemented
+tag that leaves "mark this when the player BUYS X" with no vocabulary at all.**
+
+*(Filed 2026-08-08 during conversion work on an unpublished book, whose market must record that a
+particular item was just purchased.)* `rules/JaFL-XML-Tags.md` documents `<bought>` and `<sold>`
+together, as one pair with identical *item attributes*: both may sit directly inside a `<market>`
+(matching by attributes) or inside one `<trade>`/`<item>` row (firing for that article), and both
+carry an action that runs when they activate.
+
+The port implements only half of it. `render-market.js`'s `runSoldHooks` is called from the **Sell**
+button's commit path and consults the row's own `:scope > sold` plus the market-level `<sold>`
+filters; the **Buy** button's click handler (`buyTrade` → `story.rerender()`) fires no hook of any
+kind. `<bought>` is not read anywhere, and `build/validate-source.ps1`'s child allowlist carries
+`'sold' = 'item tags'` with no `bought` entry — so a book that wrote one would fail the source gate
+before it ever reached the renderer.
+
+Evidence that the implemented half works and shows the shape the missing half needs: `book3/318`
+(a market-level `<sold item="?" tags="318.free">` marking a codeword when a *free* item is resold)
+and `book3/86` (a row-level `<sold>` on the pirate captain's head). Both are sale-side; the corpus
+contains **no** `<bought>`, which is why the gap has never surfaced.
+
+The fix is symmetric with `runSoldHooks` and small: fire a `runBoughtHooks` from the Buy click
+after `buyTrade` succeeds, matching the row's own `:scope > bought` and any market-level `<bought>`
+whose *item attributes* match the goods actually bought, then add `'bought' = 'item tags'` to the
+allowlist in the same change (task 199). Two details differ from the sale side and are worth
+pinning: a purchase has no *existing* possession to match against, so the filter must read the
+**goods descriptor** (and the `buytags=` the row stamps on the new item), not a pre-owned item's
+tags; and a `quantity=` row can fire the hook more than once per visit, where a sale cannot, so the
+hook must be idempotent or the action it wraps must tolerate repeats (`addCodeword` already does).
+
+`suite-economy` is the natural home for the coverage: a market-level `<bought>` that fires only for
+the matching row, a row-level one that fires for its own article, neither firing on a *sale* of the
+same goods, and a `quantity="3"` row firing its hook on each of the three buys.
 
 ---
 
