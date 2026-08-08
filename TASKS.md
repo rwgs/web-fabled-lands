@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-217 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **218 is open**, an Adventure Sheet display
-gap task 215 surfaced.
+218 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **nothing is open** — file new work under the
+priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -24,7 +24,7 @@ records each audit pass and is where new work is filed.
 
 - [x] 215. A self-closing effect tag renders no words, so published sentences print with a hole
 - [x] 217. A visit-box redirect below the section head still leaves both exits live (book1/91)
-- [ ] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
+- [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
 
 **Done**
 
