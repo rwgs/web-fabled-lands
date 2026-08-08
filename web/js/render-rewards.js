@@ -19,7 +19,7 @@ import {
   defaultEffectWords,
 } from './render-rules.js';
 import { aggregateFightOutcome } from './render-gates.js';
-import { titleCase, bonusSuffix } from './render-util.js';
+import { titleCase, bonusSuffix, blessingLabel } from './render-util.js';
 
 // Is the words span about to open a new sentence? JaFL capitalises a default label there
 // (Document.isNewSentence) — book4/184's whole paragraph is "<tick codeword='Dismal'/>.".
@@ -547,8 +547,10 @@ function rewardLabel(node) {
   if (txt) return txt;
   // A bare shards tick ("<tick shards='500' flag='x'/>") — book1/597's 500 Shards.
   if (tag === 'tick' && node.getAttribute('shards') != null) return `${node.getAttribute('shards')} Shards`;
+  // The blessing by the name the book prints ("Safety from Storms"), not its stored key
+  // ("storm"); a wildcard selector names nothing, so it falls through to 'Choose'. (task 218)
   const bl = node.getAttribute('blessing');
-  if (bl) return titleCase(bl);
+  if (bl && blessingLabel(bl)) return blessingLabel(bl);
   const af = node.getAttribute('curse') || node.getAttribute('disease') || node.getAttribute('poison');
   if (af) return af;
   return 'Choose';

@@ -5,7 +5,7 @@ import { parseXml } from './data.js';
 // The canonical string/label helpers live in the dependency-free render-util (task 170), so the
 // sheet/shell and the view modules share one titleCase/escapeHtml/bonus-text implementation
 // instead of drifting copies. escapeHtml is re-exported for app.js, which imports it from here.
-import { titleCase, escapeHtml, bonusSuffix } from './render-util.js';
+import { titleCase, escapeHtml, bonusSuffix, blessingLabel } from './render-util.js';
 export { escapeHtml };
 
 // ---- dice animation --------------------------------------------------------
@@ -329,10 +329,13 @@ export function renderSheet(state, container, opts = {}) {
   if (d.blessings.length) {
     // Mark a permanent blessing (book6/159 Safety from Storms) so it reads distinctly
     // from an ordinary, single-use one. (task 76)
+    // Chipped by the name the book prints, not the key it is stored under, so the Sheet and
+    // the section that sent the player here say the same thing. (task 218)
     const canonB = (b) => { const k = String(b).trim().toLowerCase(); return k === 'storms' ? 'storm' : k; };
     const perm = new Set((d.permanentBlessings || []).map(canonB));
+    const bLabel = (b) => blessingLabel(b) || String(b);
     container.appendChild(sectionTitle('Blessings'));
-    container.appendChild(chipList(d.blessings.map((b) => perm.has(canonB(b)) ? `${b} (permanent)` : b)));
+    container.appendChild(chipList(d.blessings.map((b) => perm.has(canonB(b)) ? `${bLabel(b)} (permanent)` : bLabel(b))));
   }
   // Afflictions chip by their own name (fall back to the type), and diseases/poisons
   // get their own sections — a hidden penalty must be visible on the sheet (task 57).

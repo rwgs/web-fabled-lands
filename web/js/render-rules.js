@@ -10,6 +10,7 @@
 import { boolAttr, isDiceExpr, resolveValue, matchRange } from './engine.js';
 import { normalize, currencyAward, isShardsCurrency, splitItemName } from './state.js';
 import { bookAvailable } from './edition.js'; // the DOM-free registry, never data.js (task 195)
+import { blessingLabel } from './render-util.js'; // pure label formatting, no DOM (task 218)
 import {
   isRollGate, isDeferredEscapeClear, isDeferredTagCleanup, aggregateFightOutcome, ITEM_FAMILY_TAGS,
   hasAncestorTag,
@@ -887,21 +888,6 @@ export function classifyPassive(node, view) {
 const LABELLED_EFFECT_TAGS = new Set(['tick', 'gain', 'lose']);
 const SILENT_CONTENT_WRAP = new Set(['group', 'effect']);
 
-// JaFL prints a blessing's description where the XML names only its key
-// (Blessing.getContentString): the six ability blessings show the ability in caps, the rest
-// their printed name. Keyed on the canonical spellings state.js folds the aliases into.
-const BLESSING_WORDS = {
-  storm: 'Safety from Storms', storms: 'Safety from Storms',
-  disease: 'Immunity to Disease/Poison', poison: 'Immunity to Disease/Poison',
-  defence: 'Defence through Faith', injury: 'Immunity to Injury',
-  luck: 'Luck', travel: 'Safe Travel', wrath: 'Divine Wrath',
-};
-function blessingWords(spec) {
-  const k = normalize(spec);
-  if (!k || k === '*' || k === '?') return ''; // a wildcard names no blessing to print
-  return BLESSING_WORDS[k] || k.toUpperCase(); // an ability blessing — MAGIC, SCOUTING…
-}
-
 export function defaultEffectWords(node, state, atSentenceStart = false) {
   const tag = node.tagName.toLowerCase();
   if (!LABELLED_EFFECT_TAGS.has(tag)) return '';
@@ -927,7 +913,7 @@ export function defaultEffectWords(node, state, atSentenceStart = false) {
   }
   if (get('curse') != null) return get('curse');
   if (get('title') != null) return get('title');
-  if (get('blessing') != null) return blessingWords(get('blessing'));
+  if (get('blessing') != null) return blessingLabel(get('blessing'));
   // A bare visit-box tick — no attribute that routes it elsewhere, only an optional count=
   // multiplier. JaFL's "put a tick there now"; the port's wording since task 70.
   if (tag === 'tick' && node.getAttributeNames().every((a) => a.toLowerCase() === 'count')) return 'tick the box';

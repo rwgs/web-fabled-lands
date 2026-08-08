@@ -13,7 +13,7 @@ import { branchPlan, blessingSpendForReroll, isRollGate, viewPendingVars, provis
 // renderChoices (render-choices) is reached through story.dispatchChoices, not a direct
 // import, so render-rolls and render-choices no longer form an ES-module cycle. (task 163)
 import { animateDice } from './ui.js';
-import { diceWord } from './render-util.js';
+import { diceWord, blessingLabel } from './render-util.js';
 
 // ---- shared widgets --------------------------------------------------------
 
@@ -82,7 +82,9 @@ export function appendRerollControls(story, widget, blessings, stored, reroll) {
   // sit inside an untaken branch that renders no way to keep or reroll it.
   story.pendingRerollDecision = true;
   for (const name of blessings) {
-    const label = name === 'luck' ? 'Luck' : name === 'travel' ? 'Safe Travel' : name.toUpperCase();
+    // Same printed names as the prose and the Sheet — this used to carry its own copy of
+    // the table, identical for the reroll set (abilities + Luck + Safe Travel). (task 218)
+    const label = blessingLabel(name);
     const btn = document.createElement('button');
     btn.className = 'btn-secondary blessing-reroll';
     btn.textContent = `Use your blessing of ${label} to reroll`;

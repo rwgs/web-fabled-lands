@@ -8,9 +8,10 @@ import * as rules from '../js/render-rules.js';
 import { fightRound } from '../js/combat.js';
 import { buyOptions, payChoiceCost } from '../js/market.js';
 import { Story } from '../js/render.js';
+import { appendRerollControls } from '../js/render-rolls.js';
 import { Narrator } from '../js/tts.js';
-import { modal } from '../js/ui.js';
-import { titleCase, escapeHtml, bonusSuffix, itemLabel } from '../js/render-util.js';
+import { modal, renderSheet } from '../js/ui.js';
+import { titleCase, escapeHtml, bonusSuffix, itemLabel, blessingLabel } from '../js/render-util.js';
 
 export async function run(ctx) {
   const { ok, parse } = ctx;
@@ -1296,5 +1297,62 @@ export async function run(ctx) {
       ok('task217: §1.91 still offers the bet and its roll on the empty-box visit',
          !!c91.querySelector('.money-cache') && !!c91.querySelector('.btn-roll:not([disabled])'),
          `cache=${!!c91.querySelector('.money-cache')} roll=${!!c91.querySelector('.btn-roll:not([disabled])')}`);
+    }
+
+    // --- task 218: one blessing name, printed the same wherever it shows -------------
+    // Blessings are STORED under the canonical key the XML uses (storm/disease/magic) — saves,
+    // <if blessing=…> and the alias folding all key on it. Task 215 gave the section prose the
+    // names the books print, leaving the Adventure Sheet chipping the raw key: "Write Safety
+    // from Storms in the Blessings box" sent the player to a sheet reading "storm". The table
+    // now lives in render-util and every display goes through it.
+    {
+      ok('task218: the printed name is used, not the key',
+         blessingLabel('storm') === 'Safety from Storms' && blessingLabel('disease') === 'Immunity to Disease/Poison',
+         `${blessingLabel('storm')} / ${blessingLabel('disease')}`);
+      ok('task218: an alias spelling prints the same name',
+         blessingLabel('storms') === 'Safety from Storms' && blessingLabel('poison') === 'Immunity to Disease/Poison');
+      ok('task218: an ability blessing is the ability in caps',
+         blessingLabel('magic') === 'MAGIC' && blessingLabel('scouting') === 'SCOUTING');
+      ok('task218: a wildcard/empty selector names nothing',
+         blessingLabel('*') === '' && blessingLabel('?') === '' && blessingLabel(null) === '');
+
+      // The Sheet chips the printed name, and task 76's "(permanent)" mark survives it.
+      const g218 = GameState.create({ name: 'B218', gender: 'm', profession: 'Warrior', book: 6, adv });
+      g218.data.blessings = []; g218.data.permanentBlessings = [];
+      g218.addBlessing('storms', true); // book6/159, stored canonically as 'storm'
+      g218.addBlessing('magic');
+      const sheet218 = document.createElement('div');
+      renderSheet(g218, sheet218, {});
+      const chips218 = Array.from(sheet218.querySelectorAll('.chip')).map((c) => c.textContent.trim());
+      ok('task218: the Sheet chips the blessing by its printed name, not "storm"',
+         chips218.includes('Safety from Storms (permanent)') && !chips218.some((c) => /^storm/.test(c)),
+         chips218.join(' | '));
+      ok('task218: an ability blessing chips as the ability in caps', chips218.includes('MAGIC'), chips218.join(' | '));
+      ok('task218: the stored key is untouched by the display change',
+         g218.data.blessings.join(',') === 'storm,magic' && g218.hasBlessing('storms'), g218.data.blessings.join(','));
+
+      // A choose-one reward button reads the same way (rewardLabel). §6.171's six wordless
+      // <tick blessing=… flag="y"/> picks used to read titleCase ("Charisma"), disagreeing
+      // with the prose beside them; the book writes the ability in caps.
+      const g218b = GameState.create({ name: 'C218', gender: 'm', profession: 'Warrior', book: 6, adv });
+      const c218 = document.createElement('div');
+      g218b.data.book = 6; g218b.data.section = '171';
+      new Story(c218, g218b, { navigate() {}, onDeath() {}, notify() {} })
+        .begin(await data.getSection(6, '171'), 6, '171');
+      const picks218 = Array.from(c218.querySelectorAll('.reward-pick')).map((b) => b.textContent.trim());
+      ok('task218: §6.171 choose-one buttons print the ability in caps, not "Charisma"',
+         picks218.includes('CHARISMA') && picks218.includes('THIEVERY') && !picks218.includes('Charisma'),
+         picks218.join(' | '));
+
+      // A reroll offer names the blessing the same way (it carried its own copy of the table).
+      const g218c = GameState.create({ name: 'R218', gender: 'm', profession: 'Warrior', book: 1, adv });
+      g218c.data.blessings = ['combat', 'luck', 'travel']; g218c.data.permanentBlessings = [];
+      const w218 = document.createElement('div');
+      appendRerollControls({ inactive: false, state: g218c, rerender() {} }, w218,
+                           g218c.rerollBlessings({ ability: 'combat', success: false, kind: 'check' }), {}, () => {});
+      const rerolls218 = Array.from(w218.querySelectorAll('.blessing-reroll')).map((b) => b.textContent.trim());
+      ok('task218: a reroll offer names the blessing through the shared table',
+         rerolls218.join(' | ') === 'Use your blessing of COMBAT to reroll | Use your blessing of Luck to reroll',
+         rerolls218.join(' | '));
     }
 }

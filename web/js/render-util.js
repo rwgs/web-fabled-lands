@@ -35,3 +35,23 @@ export function bonusSuffix(kind, bonus, ability) {
 export function itemLabel(it) {
   return titleCase(it.name || it.kind || 'item') + bonusSuffix(it.kind, it.bonus, it.ability);
 }
+
+// The name a book prints for a blessing the XML (and the save) names only by its canonical
+// key. JaFL's Blessing.getContentString: the six ability blessings show the ability in caps,
+// the rest their printed name. Keyed on the canonical spellings state.js folds the aliases
+// into, and on the aliases themselves so a raw XML spelling ("storms", "poison") reads the
+// same. The single canonical blessing-label builder — section prose, the Adventure Sheet, a
+// choose-one reward and a reroll offer all print through it, so they cannot drift apart.
+// The STORED key never changes (saves, `<if blessing=…>` and the alias folding all key on
+// it); only the display does. (task 215, shared in task 218)
+const BLESSING_WORDS = {
+  storm: 'Safety from Storms', storms: 'Safety from Storms',
+  disease: 'Immunity to Disease/Poison', poison: 'Immunity to Disease/Poison',
+  defence: 'Defence through Faith', injury: 'Immunity to Injury',
+  luck: 'Luck', travel: 'Safe Travel', wrath: 'Divine Wrath',
+};
+export function blessingLabel(spec) {
+  const k = String(spec == null ? '' : spec).trim().toLowerCase();
+  if (!k || k === '*' || k === '?') return ''; // a wildcard names no blessing to print
+  return BLESSING_WORDS[k] || k.toUpperCase(); // an ability blessing — MAGIC, SCOUTING…
+}

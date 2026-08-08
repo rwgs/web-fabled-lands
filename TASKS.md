@@ -250,7 +250,7 @@ this order.*
 - [x] 215. A self-closing effect tag renders no words, so published sentences print with a hole
 - [x] 216. `<if ticks="N">` after an in-section `<tick>` reads the pre-tick count, so "now ticked" branches never fire
 - [x] 217. A visit-box redirect below the section head still leaves both exits live (book1/91)
-- [ ] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
+- [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
 
 ---
 
@@ -694,6 +694,28 @@ pass: `rewardLabel`'s choose-one button, which shows `titleCase(blessing)` ("Sto
 the `(permanent)` suffix the Sheet appends (book6/159), which must survive the rename. The stored
 key must NOT change — saves, `<if blessing=…>` and the alias folding all key on it; only the
 display does.
+
+Fixed exactly that way. The table and its lookup moved to `render-util.js` as an exported
+`blessingLabel(spec)` — the module's dependency-free rule is kept by normalising with a plain
+trim/lower-case (which is what `state.js`'s `canonBlessing` does anyway) instead of importing
+`normalize`. `render-rules.js` now imports it; the Sheet, `rewardLabel` and the reroll offer
+call it too, so all four displays print one table.
+
+The reroll button in `render-rolls.js` turned out to be a **third** copy of the same rule
+(`name === 'luck' ? 'Luck' : name === 'travel' ? 'Safe Travel' : name.toUpperCase()`), output-
+identical over the reroll-eligible set — abilities plus Luck and Safe Travel — so folding it in
+changed nothing on screen but removed the drift the task is about. Two displays did change:
+the Sheet chip (`storm` → `Safety from Storms`, `magic` → `MAGIC`), and the choose-one pick
+button, which was `titleCase` — §6.171's six picks now read `CHARISMA`…`THIEVERY` rather than
+`Charisma`…`Thievery`, agreeing with the prose beside them. A wildcard `blessing="*"` labels
+nothing, so `rewardLabel` falls through to its `Choose` default rather than showing an empty
+button. `(permanent)` is appended to the new label, and the stored key is untouched.
+
+`suite-render` pins all of it: the four lookup rules (printed name, alias spelling, ability in
+caps, wildcard/empty → `''`); a book6/159-shaped sheet chipping `Safety from Storms (permanent)`
+and `MAGIC` with no chip starting "storm", while `data.blessings` still reads `storm,magic` and
+`hasBlessing('storms')` still matches; §6.171's real pick buttons; and the reroll offer's exact
+two lines.
 
 ---
 
