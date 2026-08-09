@@ -779,8 +779,11 @@ export function losePaymentPlan(el, state) {
   const openForm = (spec) => spec === '?' || spec == null || String(spec).trim() === '';
   // `count` is how many the forfeit takes (a multiple= loss demands that many): the plan is
   // met once that many qualify, and only a surplus leaves the player anything to choose.
+  // It is reported so the picker can collect exactly that many answers — a chooser naming
+  // one item where the section demands two would under-charge, since applyLose slices the
+  // chooser's own array to count. (tasks 226, 228)
   const plan = (kind, spec, candidates, count = 1) => ({
-    present: true, kind, candidates,
+    present: true, kind, candidates, count,
     eligible: candidates.length >= count,
     needsChoice: openForm(spec) && candidates.length > count,
   });

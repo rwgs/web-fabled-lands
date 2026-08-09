@@ -1721,6 +1721,57 @@ export async function run(ctx) {
            names226(g152) === 'ivory horn' && g152.getFlag('curse1') === true,
            names226(g152) + ' armed=' + g152.getFlag('curse1'));
       }
+
+      // --- task 228: a multiple= forfeit must collect as many answers as it takes ---
+      // Task 226's needsChoice is `openForm(spec) && candidates.length > count`, so multiple="2"
+      // over three possessions offers a picker — but a chooser naming ONE item under-charged,
+      // because applyLose slices the chooser's own array to count and the price flag armed
+      // anyway. The picker now counts up to plan.count before it commits.
+      {
+        const multiXml = '<section><p><lose item="?" multiple="2" price="k">Give up two possessions</lose> for <gain shards="40" flag="k"/>.</p></section>';
+        const { g, c } = mk226(multiXml, [makeItem('item', 'rope'), makeItem('item', 'lantern'), makeItem('item', 'flask')]);
+        const label228 = () => (c.querySelector('.forfeit-choice') || {}).textContent || '';
+        const pay = c.querySelector('.pay-action');
+        ok('task228: a two-item forfeit over three possessions is live and unpicked',
+           !!pay && pay.disabled === false && picks226(c).length === 0);
+        pay.click();
+        ok('task228: it offers every candidate and counts from zero',
+           picks226(c).length === 3 && /\(0 of 2 chosen\)/.test(label228()), `picks=${picks226(c).length} lbl=${label228().slice(0, 40)}`);
+        picks226(c).find((b) => /lantern/i.test(b.textContent)).click();
+        ok('task228: the first pick commits nothing — it strikes that item off and counts up',
+           g.data.items.length === 3 && g.data.shards === 0
+           && picks226(c).length === 2 && !picks226(c).some((b) => /lantern/i.test(b.textContent))
+           && /\(1 of 2 chosen\)/.test(label228()),
+           `${names226(g)} sh=${g.data.shards} picks=${picks226(c).length} lbl=${label228().slice(0, 40)}`);
+        picks226(c).find((b) => /flask/i.test(b.textContent)).click();
+        ok('task228: the second pick takes BOTH named possessions and pays out once',
+           names226(g) === 'rope' && g.data.shards === 40, `${names226(g)} sh=${g.data.shards}`);
+      }
+
+      // Two possessions of the same name are distinct answers (the picker tracks indices, not
+      // identity), so naming both takes both rather than striking the pair off together.
+      {
+        const multiXml = '<section><p><lose item="?" multiple="2" price="k">Give up two</lose> for <gain shards="40" flag="k"/>.</p></section>';
+        const { g, c } = mk226(multiXml, [makeItem('item', 'coin'), makeItem('item', 'coin'), makeItem('item', 'rope')]);
+        c.querySelector('.pay-action').click();
+        picks226(c).find((b) => /coin/i.test(b.textContent)).click();
+        ok('task228: naming one of two identical items leaves the other on offer',
+           picks226(c).length === 2 && picks226(c).filter((b) => /coin/i.test(b.textContent)).length === 1,
+           picks226(c).map((b) => b.textContent).join('|'));
+        picks226(c).find((b) => /coin/i.test(b.textContent)).click();
+        ok('task228: both coins leave and the rope is kept', names226(g) === 'rope' && g.data.shards === 40,
+           `${names226(g)} sh=${g.data.shards}`);
+      }
+
+      // (planner) the count the picker collects is the count the forfeit takes.
+      {
+        const g228 = GameState.create({ name:'T228p', gender:'m', profession:'Warrior', book:1, adv });
+        g228.data.items = []; ['a', 'b', 'c'].forEach((n) => g228.addItem(makeItem('item', n)));
+        const plan228 = (xml) => eng.losePaymentPlan(parse(xml), g228);
+        ok('task228: an ordinary forfeit reports count 1', plan228('<lose item="?"/>').count === 1);
+        ok('task228: a multiple= forfeit reports its own count', plan228('<lose item="?" multiple="2"/>').count === 2);
+        ok('task228: the equipment kinds keep count 1', plan228('<lose weapon="?"/>').count === 1);
+      }
     }
 
     // --- task 118: choice/equipment losses respect the keep tag ---

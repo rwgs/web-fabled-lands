@@ -35,7 +35,7 @@ records each audit pass and is where new work is filed.
 - [x] 224. A `price=`/`flag=` key strips an open ability loss of its chooser, so the engine picks which ability the player forfeits
 - [x] 225. The "pay to spin" cost is the third payment path that commits an open ability loss with no chooser
 - [x] 227. A wordless `<curse>`/`<disease>`/`<poison>` prints no name, so its printed sentence has a hole
-- [ ] 228. `showForfeitPicker` can only answer for one item, so a `multiple=` forfeit it offers would under-charge
+- [x] 228. `showForfeitPicker` can only answer for one item, so a `multiple=` forfeit it offers would under-charge
 
 **Done**
 
@@ -1396,6 +1396,31 @@ option is the second; the first is what the books actually ask for.
 `suite-actions` beside task 226's block: a `<lose item="?" multiple="2" price="k">` fixture over
 three possessions must take **two** — the assertion fails today whichever way `needsChoice` is
 read, because a picker is offered and only one item leaves.
+
+Closed the first way — the count-aware picker — on the user's call, so the picker's capability
+matches what the books ask rather than the promise being narrowed to fit it. Two small changes.
+`losePaymentPlan`'s `plan()` helper (`engine.js`) now reports `count` alongside the verdict it
+already derived from it, so the view knows how many answers it owes. `showForfeitPicker`
+(`render-rewards.js`) collects that many before committing: each click strikes its candidate off
+the remaining buttons and redraws with a running "(1 of 2 chosen)" count, and only the last one
+calls `commit`. At `count === 1` the first click still commits immediately and the lead-in is the
+unchanged "Give up which? ", so tasks 117 and 226 are untouched in both behaviour and wording.
+
+The engine half again needed nothing: `applyLose` already passes `count` to the chooser and
+slices the chooser's own array to it, so an array of `count` items is exactly what it wanted.
+Choices are held as **indices** into `plan.candidates`, not as the candidates themselves — with
+identity the two Units of one cargo good, or two possessions of the same name, would be struck
+off together and one click would answer for both. That costs nothing and removes the trap.
+
+Nine `suite-actions` assertions beside task 226's block: a `multiple="2"` forfeit over three
+possessions offers all three and counts from zero; the first pick takes nothing, strikes that item
+off and counts up; the second takes **both** named possessions and pays out once; naming one of two
+identically-named items leaves the other on offer and naming it too takes both; and the plan reports
+count 1 for an ordinary forfeit and for the equipment kinds, 2 for `multiple="2"`.
+
+Note book4/131's "up to six items (your choice)" is now reachable in the picker, but still not
+offered: it has no `<goto force="f">`, so `view.hasDecline` is false and `classifyPassive` never
+returns `'payment'` for it. That is the same gap the task recorded and is untouched here.
 
 ---
 

@@ -431,18 +431,37 @@ function renderOptionalPay(story, container, node, path, key) {
 
 // Reveal a "give up which?" picker for an open "?" possession/equipment/cargo forfeit, so the
 // exact item/cargo the player chooses is what leaves — not whatever the engine finds first.
-// Each button commits the loss with a chooser bound to that candidate. (tasks 117, 226)
+// A <lose multiple="N"> forfeit takes N of them, so the picker collects N answers before it
+// commits, striking each choice off the remaining buttons and counting up as it goes — a
+// chooser naming one item where the section demands two would under-charge, because applyLose
+// slices the chooser's own array to count and the price flag arms regardless. Choices are held
+// as INDICES, so two identical candidates (cargo Units of the same good) stay distinct.
+// (tasks 117, 226, 228)
 function showForfeitPicker(story, container, plan, commit) {
   const box = document.createElement('div');
   box.className = 'ship-choice forfeit-choice';
-  box.appendChild(document.createTextNode('Give up which? '));
-  plan.candidates.forEach((cand) => {
-    const b = document.createElement('button');
-    b.className = 'btn-mini';
-    b.textContent = plan.kind === 'cargo' ? String(cand) : (cand.name + (cand.bonus ? ` (${cand.bonus >= 0 ? '+' : ''}${cand.bonus})` : ''));
-    b.addEventListener('click', () => commit(() => [cand]));
-    box.appendChild(b);
-  });
+  const chosen = [];
+  const label = (cand) => (plan.kind === 'cargo' ? String(cand)
+    : cand.name + (cand.bonus ? ` (${cand.bonus >= 0 ? '+' : ''}${cand.bonus})` : ''));
+  const draw = () => {
+    box.textContent = '';
+    box.appendChild(document.createTextNode(plan.count > 1
+      ? `Give up which? (${chosen.length} of ${plan.count} chosen) `
+      : 'Give up which? '));
+    plan.candidates.forEach((cand, i) => {
+      if (chosen.includes(i)) return;
+      const b = document.createElement('button');
+      b.className = 'btn-mini';
+      b.textContent = label(cand);
+      b.addEventListener('click', () => {
+        chosen.push(i);
+        if (chosen.length >= plan.count) commit(() => chosen.map((n) => plan.candidates[n]));
+        else draw();
+      });
+      box.appendChild(b);
+    });
+  };
+  draw();
   container.appendChild(box);
 }
 
