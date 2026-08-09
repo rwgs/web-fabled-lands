@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-220 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **221 is the only open item** — file new work
+223 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **224 is the only open item** — file new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -30,6 +30,7 @@ records each audit pass and is where new work is filed.
 - [x] 221. A single flag-linked `<resurrection>` ignores the payment and renders a free Arrange button
 - [x] 222. `ownsSoleLinkedBlessing` reads a linked `<lose blessing>` as a purchase, so a payment that STRIPS a blessing is refused
 - [x] 223. A choose-one cost is payable when every linked reward is refused, so the payment is deferred rather than spent
+- [ ] 224. A `price=`/`flag=` key strips an open ability loss of its chooser, so the engine picks which ability the player forfeits
 
 **Done**
 
@@ -1059,6 +1060,81 @@ refused a Shards-priced item (the Shards stay in the purse) and a deal-holder is
 deal, while the same deal-holder may still pay a menu that also offers a takeable item, and a
 FULL-packed player still trades pearls for the magic trident at §4.634 — pearls out, trident in,
 pack still full. That last one fails against the naive guard this task was originally filed with.
+
+---
+
+## 224. A `price=`/`flag=` key strips an open ability loss of its chooser, so the engine picks which ability the player forfeits
+
+**Priority: LOW — latent in books 1–6, and saved by the same routing accident task 222 turned on.
+The one shipped section carrying an open ability loss (book2/157) keeps its picker only because its
+key arms a `<random>`; move that key to a plain price and the picker is gone. The bug is in the
+order of `classifyPassive`'s cascade, not in any book.**
+
+*(Filed 2026-08-09 during conversion work on an unpublished book, whose two resurrection sites are
+each bought with an ability point the player is told to choose.)*
+
+`<lose ability="?">` means "lose 1 point from **any** ability — you choose which". Two separate
+mechanisms exist so the player, not the engine, names what leaves: `needsAbilityChoice` →
+`renderAbilityChoice` for abilities (task 75), and `losePaymentPlan.needsChoice` →
+`showForfeitPicker` for possessions (task 117). **A payment reaches only the second.**
+
+`classifyPassive` (`web/js/render-rules.js`) tests `price=` and `flag=` well before it asks whether
+the node needs a chooser:
+
+```js
+if (price != null) {
+  return { mode: isRollGate(view.sectionEl, price) ? 'roll-payment' : 'optional-pay', key: price };
+}
+...
+if (flag != null && view.sectionEl && view.sectionEl.querySelector(`[price="${flag}"]`)
+    && !isRollGate(view.sectionEl, flag)) {
+  ...
+  return { mode: 'inert', showWords: !hidden };   // applies with the linked cost
+}
+...
+if (!hidden && needsAbilityChoice(node)) return { mode: 'ability-choice' };   // never reached
+```
+
+So an open ability loss carrying either half of the price/flag idiom never reaches
+`needsAbilityChoice`. Both landing paths then call the engine with no chooser —
+`renderOptionalPay`'s `commit(null)` and `renderChooseOnePay`'s `applyEffect(node, story.state, {})`
+— and `abilityTargets` (`engine.js`) falls back to the first candidate:
+
+```js
+const picked = opts.chooser ? opts.chooser(cands, 1, 'ability') : null;
+const chosen = (picked && picked.length) ? picked[0] : cands[0];
+```
+
+`cands` is `ABILITIES` order filtered to those above 1, so the forfeit is silently taken from
+CHARISMA for almost every character. Task 117's picker cannot cover for it either: `losePaymentPlan`
+enumerates `item`/`weapon`/`armour`/`tool`/`cargo`/`ship` and falls through to
+`{ present: false, needsChoice: false }` for an ability, which is correct for its own purpose
+(shards/god/blessing/crew are not possession payments) and simply means no ability ever asks for a
+picker there.
+
+Measured in books 1–6, all four legs on a real `GameState`: book2/157's
+`<lose ability="?" amount="1" flag="x">` classifies `ability-choice` and renders its picker — but
+only because its key also arms `<random dice="1" flag="x"/>`, so the `flag=` branch above is skipped
+by `!isRollGate`. The same tag re-keyed to a plain `<lose shards="20" price="k"/>` classifies
+`inert`, renders no `.ability-pick` at all, and paying docks CHARISMA. Used as the *cost* node
+itself (`<lose ability="?" amount="1" price="k">`) it classifies `optional-pay`, same result. This
+is the identical margin task 222 recorded on the identical section — one routing decision, not one
+book — which is why the two are worth reading together.
+
+The fix is to let an open ability spec ask for its chooser on the payment paths rather than to
+reorder the cascade (`price=` must keep winning: the payment has to arm its key). The natural shape
+is the ability twin of `showForfeitPicker` — when the cost or an inert linked node satisfies
+`needsAbilityChoice`, reveal `abilityChoiceOptions(spec, state, /*forLoss*/ true)` as pick buttons
+and bind each to `commit(() => [ability])`, exactly as the possession forfeit already does. Note
+`abilityChoiceOptions`'s `forLoss` already drops anything at 1, which is the printed "you cannot
+choose an ability that already has a value of 1", so the eligibility rule needs no new code.
+
+`suite-economy` is the natural home: a `<lose ability="?" amount="1" price="k">` offers one pick
+button per eligible ability and none for an ability already at 1; picking COMBAT takes the point
+from COMBAT and from nothing else; the linked reward is granted on that pick and not before; the
+same shape as a `flag=`-linked loss behaves identically; and book2/157's wheel still resolves its
+range-1 outcome through `renderAbilityChoice` unchanged, which is the regression the current
+routing provides for free.
 
 ---
 
