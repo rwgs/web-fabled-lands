@@ -2684,6 +2684,60 @@ export async function run(ctx) {
          scores224(g157c) === '7,7,7,6,7,7', scores224(g157c));
     }
 
+    // --- task 225: the "pay to spin" cost is the third path that commits an open ability loss ---
+    { // block-scoped
+      // classifyPassive routes a price= whose key arms a <random> to 'roll-payment', and
+      // renderRollPayment armed it with applyEffect(node, state, {}) — so "give up a point of
+      // any ability to spin" docked whatever abilityTargets found first. It asks now, the same
+      // way the other two payment paths do; and because the roll CONSUMES the flag rather than
+      // memoising it, the picker must be gone after the pick and offered fresh next round.
+      const ABS225 = ['charisma','combat','magic','sanctity','scouting','thievery'];
+      const scores225 = (g) => ABS225.map((a) => g.abilityNatural(a)).join(',');
+      const picks225 = (c) => Array.from(c.querySelectorAll('.ability-pick'));
+      const xml225 = '<section><p>Spin the wheel at a cost of <lose ability="?" amount="1" price="k">a point of any ability</lose>. <random dice="1" flag="k"/> for the outcome.</p>'
+        + '<outcomes><outcome range="1-3" flag="k"><gain shards="10" flag="k">Gain 10 Shards</gain></outcome>'
+        + '<outcome range="4-6" flag="k">Nothing happens</outcome></outcomes></section>';
+      const g225 = GameState.create({ name:'Spin', gender:'f', profession:'Warrior', book:2, adv });
+      g225.data.shards = 0;
+      ABS225.forEach((a) => { g225.data.abilities[a] = a === 'magic' ? 1 : 7; }); // MAGIC at its minimum
+      const c225 = document.createElement('div');
+      new Story(c225, g225, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xml225), 2, 'x225');
+      const pay225 = () => c225.querySelector('.pay-action');
+      const roll225 = () => c225.querySelector('.roll .btn-roll');
+      ok('task225: the spin cost is live, the roll gated, and no picker shown yet',
+         !!pay225() && pay225().disabled === false && !!roll225() && roll225().disabled === true
+         && picks225(c225).length === 0,
+         `pay=${pay225() && pay225().disabled} roll=${roll225() && roll225().disabled} picks=${picks225(c225).length}`);
+      pay225().click();
+      ok('task225: clicking the spin cost asks WHICH ability — one per ability above 1',
+         picks225(c225).length === 5 && !picks225(c225).some((b) => /Magic/.test(b.textContent)),
+         picks225(c225).map((b) => b.textContent.trim()).join('|'));
+      ok('task225: nothing is taken and the roll is still gated before the pick',
+         scores225(g225) === '7,7,1,7,7,7' && !!roll225() && roll225().disabled === true,
+         `ab=${scores225(g225)} roll=${roll225() && roll225().disabled}`);
+      picks225(c225).find((b) => /Combat/.test(b.textContent)).click();
+      ok('task225: picking COMBAT takes the point from COMBAT and from nothing else',
+         scores225(g225) === '7,6,1,7,7,7', scores225(g225));
+      ok('task225: the pick arms the roll and leaves no picker behind',
+         !!roll225() && roll225().disabled === false && picks225(c225).length === 0,
+         `roll=${roll225() && roll225().disabled} picks=${picks225(c225).length}`);
+      const _rnd225 = Math.random; Math.random = () => 0; // every d6 reads 1 → outcome range 1-3
+      roll225().click(); await settle();
+      Math.random = _rnd225;
+      ok('task225: the roll then resolves normally — one outcome, its reward granted',
+         c225.querySelectorAll('.branch').length === 1 && g225.data.shards === 10,
+         `branches=${c225.querySelectorAll('.branch').length} sh=${g225.data.shards}`);
+      // The pay↔roll cycle repeats: the spent flag re-enables the cost, which must ask again
+      // rather than reuse (or skip) the answer the last round gave.
+      ok('task225: the spin cost re-enables for another round with no stale picker',
+         !!pay225() && pay225().disabled === false && picks225(c225).length === 0,
+         `pay=${pay225() && pay225().disabled} picks=${picks225(c225).length}`);
+      pay225().click();
+      picks225(c225).find((b) => /Scouting/.test(b.textContent)).click();
+      ok('task225: the second round takes only the ability it newly named',
+         scores225(g225) === '7,6,1,7,6,7', scores225(g225));
+    }
+
     // --- task 134: a sell with several non-identical matches must ask which one leaves ---
     const shipRow = () => goodsFrom(parse('<trade ship="brigantine" sell="800"/>'), 'ship', 'brigantine', 0);
     {

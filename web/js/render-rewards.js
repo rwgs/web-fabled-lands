@@ -635,6 +635,17 @@ function renderRollPayment(story, container, node, path, key) {
     btn.disabled = true; btn.title = 'Not enough Shards';
   } else if (item != null && item !== '?' && item !== '*' && !story.state.hasItem(item)) {
     btn.disabled = true; btn.title = `You need the ${titleCase(item)}`;
+  } else if (needsAbilityChoice(node)) {
+    // An open ability spec buys the spin ("give up a point of any ability to roll"): the
+    // player names which point leaves, then the arming happens with that answer — the third
+    // payment path that would otherwise commit it blind. (task 225)
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      showAbilityPicker(story, container, node, (chooser) => {
+        applyEffect(node, story.state, { chooser }); // deduct the named point + set flag key
+        story.rerender();
+      });
+    });
   } else {
     btn.addEventListener('click', () => {
       applyEffect(node, story.state, {}); // deduct the cost + set flag key (arms the roll)

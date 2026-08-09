@@ -33,7 +33,7 @@ records each audit pass and is where new work is filed.
 - [x] 222. `ownsSoleLinkedBlessing` reads a linked `<lose blessing>` as a purchase, so a payment that STRIPS a blessing is refused
 - [x] 223. A choose-one cost is payable when every linked reward is refused, so the payment is deferred rather than spent
 - [x] 224. A `price=`/`flag=` key strips an open ability loss of its chooser, so the engine picks which ability the player forfeits
-- [ ] 225. The "pay to spin" cost is the third payment path that commits an open ability loss with no chooser
+- [x] 225. The "pay to spin" cost is the third payment path that commits an open ability loss with no chooser
 - [ ] 227. A wordless `<curse>`/`<disease>`/`<poison>` prints no name, so its printed sentence has a hole
 - [ ] 228. `showForfeitPicker` can only answer for one item, so a `multiple=` forfeit it offers would under-charge
 
@@ -1202,6 +1202,25 @@ Left open rather than folded into task 224 because it is a separate landing path
 regression surface (`renderRollPayment` is the repeatable pay↔roll cycle — the flag is consumed by
 the roll, not memoised — so its picker must not survive into the next round), and the workflow
 files findings instead of widening the task in hand.
+
+Fixed as described, and task 224's fix really did transfer verbatim: `needsAbilityChoice(node)` as a
+branch above `renderRollPayment`'s plain arming click, revealing `showAbilityPicker` and arming with
+`{ chooser }` once the player answers. Both helpers already existed in the right modules and
+`render-rewards.js` already imported them, so the branch is the only new code — eleven lines,
+no signature change anywhere.
+
+The repeatable-cycle worry it was filed for turned out to need no code of its own: the picker is
+appended to the payment's own container and every commit ends in `story.rerender()`, so the pick
+that arms the roll takes the picker with it and the next round's cost builds a fresh one. Both
+halves are pinned by assertions rather than left to inspection.
+
+Eight `suite-economy` assertions beside task 224's block, on a synthetic
+`<lose ability="?" amount="1" price="k">` + `<random dice="1" flag="k"/>`: the spin cost is live
+with the roll gated and no picker yet; clicking it offers one button per ability above 1 (MAGIC at
+its minimum is absent) while the roll stays gated and nothing is taken; picking COMBAT docks COMBAT
+alone, arms the roll and leaves no picker behind; the roll then resolves one outcome and grants it;
+and the spent flag re-enables the cost, which asks again and takes only the ability the second round
+newly named.
 
 ---
 
