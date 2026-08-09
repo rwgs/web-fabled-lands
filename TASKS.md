@@ -1000,7 +1000,7 @@ Shards on hand, or a matching possession for an item forfeit. It never asks whet
 reward is currently takeable, which is precisely the question `rewardWasteReason` (`render-rules.js`)
 already answers for the pick side: a full 12-slot pack refuses an item Take with "No room", and a
 held deal refuses a resurrection pick with "You already have a resurrection deal." So a player with
-a full pack can hand over §3.346's trophy and find the medallion Take disabled; a player already
+a full pack can pay 250 Shards for §1.342's potion and find the Take disabled; a player already
 holding a deal can pay a temple and find the pick disabled.
 
 The resurrection case is the sharper of the two because `addResurrection` REPLACES the standard deal
@@ -1013,13 +1013,30 @@ in three separate ways — `plan.present && !plan.eligible`, `ownsSoleLinkedBles
 check — while the choose-one cost, which is the one whose reward is deferred to a second click,
 checks the least.
 
-The fix is one clause in `renderChooseOnePay`: when `linkedRewards(sectionEl, key)` is non-empty and
-`rewardWasteReason` refuses every one of them, disable the cost and title it with that reason (the
-first one, or a shared "You cannot take any of these rewards yet."). A menu with one takeable option
-left must stay live, so the test is "every", never "some". `suite-economy` is the natural home,
-alongside tasks 125's and 221's coverage: a full pack cannot pay §3.346's trophy; a deal-holder
-cannot pay a lone priced resurrection; and §1.597's three-way pick stays payable for a deal-holder
-because the wand and the 500 Shards are still takeable.
+The obvious fix is one clause in `renderChooseOnePay` — when `linkedRewards(sectionEl, key)` is
+non-empty and `rewardWasteReason` refuses every one of them, disable the cost — and it is **wrong as
+stated**, which is the part worth recording before anyone writes it. **A possession forfeit frees the
+slot it is refused for.** §4.634's barter is "give one, take one": a player carrying twelve items
+including the bag of pearls is refused the magic trident by `rewardWasteReason` *today*, yet handing
+over the pearls frees a slot and the Take then works — exactly as it should, and as the existing
+coverage asserts. A naive "every reward refused ⇒ disable" guard would break that live, shipped
+barter to fix a case no book reaches.
+
+So the guard must refuse only a reason the payment itself cannot clear:
+
+- a carry-limit refusal is clearable when the cost gives up a possession — `losePaymentPlan(node,
+  state)` reporting `present` with an item/weapon/armour/tool `kind` and `eligible` true;
+- "You already have a resurrection deal." is never clearable by paying (no cost arranges or spends a
+  deal), and neither is a blessing/affliction reason.
+
+`suite-economy` is the natural home, alongside tasks 125's and 221's: a full pack cannot pay
+§1.342's 250 Shards for the potion; a deal-holder cannot pay a lone priced resurrection; a full pack
+CAN still trade at §4.634 because the forfeit frees the slot (the regression guard); and a synthetic
+menu of `<resurrection>` + `<item>` stays payable for a deal-holder because the item is still
+takeable — the "every, never some" rule.
+
+Weigh the added branching against the payoff before taking it: nothing is lost today, no shipped
+section reaches the unclearable case, and the cost of getting it wrong is breaking §4.634.
 
 ---
 
