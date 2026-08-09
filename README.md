@@ -340,15 +340,19 @@ Two behaviours follow the original Java app rather than a simpler "hide it" appr
 fighting), and renders **every section of every published book** (today's six) to confirm
 none throw — the scan reads the book list out of `meta.json`, so it follows `books.ini`'s
 `Published=` line rather than a hardcoded 1–6. Serve the repo root and open
-`/web/_test.html`, or run it headlessly:
+`/web/_test.html`, or run the whole thing headlessly with one command:
 
 ```powershell
-cmd /c '"C:\Program Files\Google\Chrome\Application\chrome.exe" --headless=new --disable-gpu --no-sandbox --dump-dom --virtual-time-budget=60000 --user-data-dir="%TEMP%\fl-test-profile" http://localhost:8848/web/_test.html > "%TEMP%\fl-dump.html"'
-Select-String -Path "$env:TEMP\fl-dump.html" -Pattern 'RESULT'
+pwsh -ExecutionPolicy Bypass -File build/run-tests.ps1            # whole harness
+pwsh -ExecutionPolicy Bypass -File build/run-tests.ps1 -Suite actions,economy
 ```
 
-`--dump-dom` writes to stdout, and the redirect through `cmd` is what gives it somewhere to
-go — see the capture note below. The first line of the dumped `#results` reads
+It serves the tree through [`build/serve.py`](build/serve.py), drives Chrome headless, prints
+the verdict and **exits 0 only on `RESULT ALL PASS`**; on a failure it prints the first 25
+`FAIL`/`FATAL` lines and keeps the dumped DOM, naming its path. It also closes the loop's
+false-pass traps rather than leaving them to be remembered — see the notes below.
+
+The first line of the dumped `#results` reads
 `RESULT ALL PASS …` when healthy (page title
 `TESTS_OK`); any failure, or any uncaught async error / unhandled promise rejection captured
 during the run, reports `RESULT FAILURES`/`RESULT FATAL` and title `TESTS_FAIL` — the fatal
@@ -371,16 +375,29 @@ own fixtures so it runs in isolation. They execute in this order (the six-book s
 Append `?suite=<name>` (or a comma list, e.g. `?suite=combat,economy`) to run a focused
 subset in the same harness — handy for iterating on one area.
 
-> Use a **fresh `--user-data-dir`** (as above) so the service worker can't serve a stale
-> cached copy of the app — otherwise an old bundle can mask your changes and report a
-> false pass.
+> **A green run can be a lie in three ways, which is why the runner exists.** Each of these
+> produces a well-formed `RESULT ALL PASS`, so none is caught by the sticky-fatal reporter —
+> a run that never executed your code has nothing to throw.
+>
+> 1. **A warm browser profile.** `python -m http.server` sends `Last-Modified` but no
+>    `Cache-Control` and no `ETag`, so Chrome applies *heuristic* freshness and serves the ES
+>    modules from its disk cache **without revalidating**. Reuse a `--user-data-dir` from an
+>    earlier session and you run that session's `web/tests/*.js` — the assertions you just
+>    wrote never execute, and the count silently drops. `serve.py` sends `no-store` and the
+>    runner mints a GUID-named profile per run, deleting it afterwards.
+> 2. **A forgotten server.** Python sets `allow_reuse_address`, so a second
+>    `python -m http.server 8848` binds happily while the *older* process keeps answering from
+>    whatever tree it was started in. `serve.py` turns that off: a second bind fails loudly.
+> 3. **A mistyped `?suite=`.** No suite matches, none runs, and the reporter prints
+>    `RESULT ALL PASS pass=0 fail=0`. The runner fails any `pass=0` run.
 
 > **An empty dump means the capture failed, not that the tests did.** `chrome.exe` and
 > `msedge.exe` are Windows GUI-subsystem binaries: launched directly from PowerShell they
 > inherit no stdout handle, so `$dump = & chrome.exe … --dump-dom …` comes back empty even
 > though the suites ran and passed. Confirm it in a second with `chrome.exe --version` from
-> the same prompt — that prints nothing either. The redirect through `cmd` above gives the
-> process a real handle. Either browser works; both fail the same way without the redirect.
+> the same prompt — that prints nothing either. The runner uses
+> `Start-Process -RedirectStandardOutput`, which hands the process a real handle, and treats a
+> missing or empty dump as a failure. Either browser works; both fail the same way without it.
 
 ### The DOM-free seam, checked in Node
 

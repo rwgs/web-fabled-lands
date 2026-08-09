@@ -35,6 +35,9 @@ combat, markets, ships, live adventure sheet). Plain HTML/CSS/ES modules —
   reconciliation of a withdrawn book's outputs — lives in `release.ps1`, driven over
   fixtures (including a real build of a temp tree) by `release-selftest.ps1`, also run by
   CI. Both self-tests touch nothing under `books/` or `web/`.
+  The test loop is `run-tests.ps1` (serve, drive Chrome, read the verdict, clean up) over
+  `serve.py`, the one non-PowerShell script here — a no-cache static server, because the
+  browser's own HTTP cache is what made a stale bundle report a false pass (task 235).
   **`TASKS.md`** — the backlog (see workflow below).
 
 ## Architecture invariant — keep the rules out of the view
@@ -73,21 +76,43 @@ itself* still has no runtime dependencies; only the offline build step needs pws
    `'web\data'` literal becomes a *file* named `web\data` on Linux). (task 197)
 2. Run the headless smoke test (serves `web/`, exercises the engine, and renders
    **every section of every published book** — six today — to confirm none throw):
-   - Serve from the repo root: `python -m http.server 8848`
-   - Dump to a **file, redirected through `cmd`** — `--dump-dom` writes to stdout, and a
-     browser launched straight from PowerShell has no stdout to write to (see the capture
-     note below), so don't try to capture it into a variable:
-     `cmd /c '"C:\Program Files\Google\Chrome\Application\chrome.exe" --headless=new --disable-gpu --no-sandbox --dump-dom --virtual-time-budget=90000 --user-data-dir="%TEMP%\fl-test-profile" http://localhost:8848/web/_test.html > "%TEMP%\fl-dump.html"'`
-   - Read the verdict out of that file:
-     `Select-String -Path "$env:TEMP\fl-dump.html" -Pattern 'RESULT'`
-   - Chrome's own USB/GCM chatter on stderr is unrelated noise; the redirect captures
-     stdout only, so the file stays clean.
-3. Healthy when the dumped `#results` starts with **`RESULT ALL PASS`** (the page
-   title becomes `TESTS_OK`).
+   `pwsh -ExecutionPolicy Bypass -File build/run-tests.ps1`
+   Add `-Suite actions` (comma list ok) for a focused subset. It serves the tree through
+   `build/serve.py`, drives Chrome headless, prints the verdict, and **exits 0 only on
+   `RESULT ALL PASS`** — so a caller can branch on the exit code instead of reading a dump.
+   On a failure it prints the first 25 `FAIL`/`FATAL` lines and keeps the dump, naming its
+   path. Chrome's own USB/GCM chatter on stderr is unrelated noise.
+3. Healthy when the runner prints **`RESULT ALL PASS`** and exits 0 (the page title
+   becomes `TESTS_OK`).
+
+**Every trap in the notes below is one the runner now closes mechanically** (task 235): a
+GUID-named profile per run deleted afterwards, `Cache-Control: no-store` on every response,
+a server that refuses to share the port, `-RedirectStandardOutput` for a real stdout handle,
+the dump deleted first and size-checked after, and a vacuous `pass=0` run treated as a
+failure. They are kept because they say *why* — and because a hand-run command still has
+every one of them. **Prefer the runner; reach for the raw commands only to debug it.**
 
 Notes:
-- Use a **fresh `--user-data-dir`** so a stale service-worker cache can't serve an
-  old bundle and report a false pass.
+- **A warm browser profile serves a day-old bundle and reports a false `ALL PASS`.** This is
+  the one that is invisible: `python -m http.server` sends `Last-Modified` but no
+  `Cache-Control` and no `ETag`, so Chrome applies *heuristic* freshness (~10% of the file's
+  age) and serves the ES modules from its disk cache **without revalidating**. Point a
+  `--user-data-dir` at a profile from an earlier session and the run executes that session's
+  `web/tests/*.js`: the suites it no longer contains simply do not run, nothing throws, and
+  the reporter prints a well-formed `RESULT ALL PASS` — for a *smaller* assertion count than
+  the tree deserves. Task 235's run: a suite of 545 assertions reported `pass=476 fail=0`
+  because the profile predated tasks 226–231, and the missing 69 were invisible without
+  diffing counts against a known-good run. The sticky-fatal reporter cannot catch it (a stale
+  file throws nothing) and the dump-size check cannot either (the dump is full-size and
+  well-formed). `build/serve.py` sends `no-store`, and the runner never reuses a profile.
+  **CI was never exposed** — `.github/workflows/smoke.yml` mints its profile with `mktemp -d`.
+- **A mistyped `?suite=` name runs nothing and still says `ALL PASS`.** `main()` skips every
+  suite not named in the query, so `?suite=action` (for `actions`) matches none of the seven
+  and the reporter, with nothing to report, prints `RESULT ALL PASS pass=0 fail=0` and sets
+  `TESTS_OK`. The runner fails a `pass=0` run for this reason; reading a verdict by hand,
+  **check the count, not just the words**. (task 235)
+- Use a **fresh `--user-data-dir`** so neither a stale service-worker cache nor the HTTP
+  cache above can serve an old bundle and report a false pass.
 - **An empty dump is a capture failure, not a page-load failure.** `chrome.exe` and
   `msedge.exe` are Windows GUI-subsystem binaries: launched directly from PowerShell they
   inherit no stdout handle, so `$dump = & chrome.exe … --dump-dom …` yields an empty string
@@ -126,7 +151,9 @@ Notes:
   `Get-CimInstance Win32_Process -Filter "ProcessId=<pid>"` — a `CreationDate` older than
   your session is the tell. A one-line `curl` of a file you just edited
   (`curl -s http://localhost:8848/web/tests/suite-corpus.js`) confirms what is really being
-  served. (task 209)
+  served. (task 209) `build/serve.py` turns `allow_reuse_address` **off**, so a second bind
+  fails loudly (`exit 2`, "something is already listening there") instead of shadowing — but
+  only for servers started through it. (task 235)
 - Give it a virtual-time budget **≥ 60s** — the every-section scan is CPU-heavy.
 - Pure-logic modules (`engine.js`, `combat.js`, `market.js`, `state.js`) can also
   be imported and unit-checked directly in Node for fast feedback. That seam is itself

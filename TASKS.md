@@ -4,9 +4,10 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 232 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **233 and 234 are the open items** — file
-new work under the priority bucket that fits, and record the pass in the
-Review log.
+misdiagnosis (see the Review log), and 235, filed and closed out of order because
+it is the loop everything else is verified through; **233 and 234 are the open
+items** — file new work under the priority bucket that fits, and record the pass
+in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -29,6 +30,7 @@ phase is picked up from there rather than from the buckets below.
 - [x] 230. A collapsed `<group>` drops its `<adjustmoney>` child, so §2.134's whole gamble pays nothing
 - [x] 231. A plain `<lose item="?">` effect commits with no picker, so six printed "(your choice)" instructions are ignored
 - [x] 232. The same bare-hazard picker is missing on `<lose cargo="?">` and a `group=`-narrowed forfeit, so 13 more printed choices are ignored
+- [x] 235. A warm Chrome profile serves a day-old test bundle, so the headless loop reports a false `ALL PASS`
 - [ ] 233. §5.578's donation applies against an empty pool and memoises the no-op, so the Brotherhood's cut is never taken
 - [ ] 234. §6.36 strips "your **best** armour, your **best** weapon" and the engine takes the first of each instead
 
@@ -1821,6 +1823,64 @@ so the two are equivalent in effect and differ in what a future section inherits
 Note this is deliberately *not* the task-231/232 picker: the page states a rule, so the player
 does not choose. `suite-actions`: book6/36 with a +0 and a +3 weapon (and likewise armour) must
 lose the +3 of each, and a single piece of a kind must still be taken.
+
+---
+
+## 235. A warm Chrome profile serves a day-old test bundle, so the headless loop reports a false `ALL PASS`
+
+**Priority: MEDIUM — every task in this file is verified through this loop, and the failure is silent.**
+
+*(Filed 2026-08-09, out of order and closed the same day: it is the loop 233 and 234 will be
+verified through. Observed live during task 231's negative check.)*
+
+A focused run reported `RESULT ALL PASS pass=476 fail=0` while the entire tasks 226–231 block —
+69 assertions — never executed. An identical rerun minutes later, same server and same tree,
+correctly reported `RESULT FAILURES pass=308 fail=2`. The difference was the **profile**:
+`%TEMP%\fl-test-profile2` had been created at 22:28 the previous evening, before any of those
+tasks existed.
+
+`python -m http.server` sends `Last-Modified` but no `Cache-Control` and no `ETag`, so a browser
+falls back to **heuristic freshness** (roughly 10% of the file's age) and serves the ES modules
+from its disk cache **without revalidating**. The run therefore executed the previous session's
+`web/tests/*.js`. No service worker was involved — only `app.js` registers one and `_test.html`
+never loads it.
+
+**Why every existing guard missed it.** The sticky-fatal reporter catches *errors*, and a stale
+but perfectly valid file throws none. The "check the dump's size first" rule (task 220) catches
+an empty capture, not an old one — the dump was full-size and well-formed. The suite ran, passed,
+and reported honestly on the code it was given. The only tell was an assertion count 69 lower
+than the tree deserved, which nothing was comparing. AGENTS.md's "use a fresh `--user-data-dir`"
+already named this hazard; it was an operator rule with nothing enforcing it, and a run that
+picks a profile name which happens to already exist violates it silently.
+
+**CI was never exposed:** `.github/workflows/smoke.yml` mints its profile with `mktemp -d`. This
+was a local-loop defect only, which is why it survived so long.
+
+**Done 2026-08-09.** Two new scripts, and no change to the harness or any suite:
+
+- **`build/serve.py`** — the static server for the loop, with caching off. `Cache-Control:
+  no-store` on every response closes the vector for *every* run whatever profile is in use, and
+  covers app modules, suites, `data/*.json` and the `fetch('./sw.js')` source assertions in
+  `suite-economy`. It also sets `allow_reuse_address = False`, so a second bind **fails loudly**
+  (`exit 2`) instead of shadowing a forgotten server — task 209's trap, closed at the source.
+- **`build/run-tests.ps1`** — serve, drive Chrome, read the verdict, clean up. A GUID-named
+  profile per run, deleted afterwards, so there is never a warm one to reuse; the dump deleted
+  first and size-checked after; `-RedirectStandardOutput` for a real stdout handle (task 208);
+  the verdict read from the FIRST `RESULT` line (task 142); the server stopped on every exit
+  path. **Exit 0 only on `RESULT ALL PASS`**, so a caller can branch on the code.
+
+**A second false-pass shape found while testing the first, and closed with it:** a mistyped
+`?suite=` name matches none of the seven, `main()` skips them all, and the reporter — with
+nothing to report — prints `RESULT ALL PASS pass=0 fail=0` and sets `TESTS_OK`. Verified live
+with `-Suite nosuchsuite`. The runner now fails any `pass=0` run.
+
+Verified: `no-store` present on a served suite file; a second `serve.py` on a held port exits 2
+with its own message; `-Suite nosuchsuite` exits 1 ("No assertions ran"); the runner leaves no
+`fl-test-<guid>` profile and no listener on 8848; and the full suite through it reads
+`RESULT ALL PASS pass=2359 fail=0`, exit 0. `AGENTS.md` step 2 and `README.md`'s Testing section
+now lead with the runner; the hard-won trap notes are kept, marked as what the runner closes,
+because a hand-run command still has every one of them. `.github/workflows/smoke.yml` is
+deliberately untouched — it is already immune, and the one green gate is not worth the churn.
 
 ---
 
