@@ -5,7 +5,8 @@
 	discover that while you were sleeping an invisible thief stole 1-6
 	of your possessions.
 	(<random dice="1" var="x">Roll a die</random> to find out how many.
-	<lose item="?" multiple="x">Possessions are stolen</lose>
+	<!-- choose="f": the page names the order, so this forfeit is a sweep and not a pick -->
+	<lose item="?" multiple="x" choose="f">Possessions are stolen</lose>
 	in the order they were written down on
 	your Adventure Sheet.)
 	<choices>

@@ -69,7 +69,7 @@ $script:FL_TAG_ATTRS = @{
     'failure' = 'book section var'
     # -- rewards, costs and state --
     'gain' = 'ability amount blessing codeword crew flag force hidden price shards title'
-    'lose' = 'ability amount armour blessing bonus cache cargo chance codeword crew curse disease fatal flag force god group hidden item itemAt multiple poison price resurrection shards ship stamina staminato tags title using weapon'
+    'lose' = 'ability amount armour blessing bonus cache cargo chance choose codeword crew curse disease fatal flag force god group hidden item itemAt multiple poison price resurrection shards ship stamina staminato tags title using weapon'
     'tick' = 'ability addbonus addtag amount blessing bonus cache cargo codeword count crew effect flag force god hidden item name permanent price profession quantity removetag shards special tags title titleAdjust titlePattern titleValue using weapon'
     'set' = 'cache codeword dock force hidden item modifier tags value var weapon'
     'adjust' = 'ability amount codeword crew default god greaterthan item modifier name profession ship tags title titleVal value'
@@ -109,8 +109,11 @@ $script:FL_TAG_ATTRS = @{
 }
 
 # Attributes whose value is a JaFL truth flag. The books write both letters and words.
+# choose= is this port's own marker (task 231): choose="f" on an open <lose item="?"> pins it
+# as a sweep the engine picks, for the three pages that state the order the items go in.
 $script:FL_BOOL_ATTRS = @('force', 'hidden', 'dead', 'not', 'using', 'sail', 'start', 'revisit',
-                          'cumulative', 'permanent', 'supplemental', 'visit', 'playerFirst', 'fatal')
+                          'cumulative', 'permanent', 'supplemental', 'visit', 'playerFirst', 'fatal',
+                          'choose')
 $script:FL_BOOL_VALUES = @('t', 'f', 'true', 'false')
 
 # Closed value sets, mirroring the engine's own canonical lists (web/js/rules.js ABILITIES /

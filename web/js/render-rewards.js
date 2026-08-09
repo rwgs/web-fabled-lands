@@ -251,6 +251,7 @@ export function renderPassive(story, container, node, path) {
     case 'payment':           return renderPayment(story, container, node, path);
     case 'ability-choice':    return renderAbilityChoice(story, container, node, path);
     case 'equipment-choice':  return renderEquipmentChoice(story, container, node, path);
+    case 'forfeit-choice':    return renderForfeitChoice(story, container, node, path);
     case 'profession-choice': return renderProfessionChoice(story, container, node, path);
     default: { // 'apply' — the plain effect, memoised per-visit
       const key = 'fx@' + path;
@@ -319,6 +320,26 @@ function renderEquipmentChoice(story, container, node, path) {
   });
   container.appendChild(box);
   return box;
+}
+
+// A bare <lose item="?"> hazard row: print its words, then stand the picker where the effect
+// would have applied, so the possession the player names is the one that leaves rather than
+// whatever came first in the pack. The picker is the shared showForfeitPicker, so a multiple=
+// forfeit collects that many answers (§6.373's rolled 1-6). The memo is the SAME fx@ key the
+// plain path uses — marking it applied before the pick commits would void the loss on the
+// re-render, and sharing it means a forfeit that stops needing a choice (one candidate left)
+// falls back through 'apply' already applied. (task 231)
+function renderForfeitChoice(story, container, node, path) {
+  const memo = 'fx@' + path;
+  appendFxWords(story, container, node, path);
+  if (story.ctx.applied.has(memo)) return null; // already chosen this visit
+  showForfeitPicker(story, container, losePaymentPlan(node, story.state), (chooser) => {
+    const note = applyEffect(node, story.state, { chooser });
+    story.ctx.applied.add(memo);
+    if (note) story.notify(note);
+    story.rerender();
+  });
+  return null;
 }
 
 function renderProfessionChoice(story, container, node, path) {

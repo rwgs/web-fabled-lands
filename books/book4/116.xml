@@ -5,9 +5,7 @@
 	</p>
 	<p>
 		When you manage to pull yourself up on the bank, you discover you have lost some possessions.
-		<lose item="?">Cross</lose>
-		<lose item="?">three</lose>
-		<lose item="?">items</lose>
+		<lose item="?" multiple="3">Cross three items</lose>
 		(your choice) off your Adventure Sheet.
 	</p>
 	<p><goto section="676"/>.</p>

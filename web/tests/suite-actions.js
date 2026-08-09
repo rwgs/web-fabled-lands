@@ -1924,6 +1924,174 @@ export async function run(ctx) {
           window.__FL_INSTANT_DICE__ = false;
         }
       }
+
+      // --- task 231: a bare <lose item="?"> hazard must ask which possession leaves ---
+      // The five payment paths ask (tasks 117/226/228/229); the ORDINARY passive effect —
+      // no price=, no flag=, no force="f", no <group> — consulted no plan and committed with
+      // the chooser explicitly nulled, so applyLose took the first in pack order. Six published
+      // pages print the choice in so many words. The rule is the narrowing: an unmarked open
+      // forfeit is the player's pick, a tags=/bonus=/using=/group= one is the filter's, and the
+      // three sweeps whose pages state the order carry choose="f" in the source.
+      {
+        const bare231 = (attrs = '') => `<section><p>A thief. <lose item="?"${attrs}>steals one item</lose> (your choice)</p></section>`;
+
+        // Two possessions: one button each, nothing taken until one is clicked.
+        {
+          const { g, c } = mk226(bare231(), [makeItem('item', 'rope'), makeItem('item', 'lantern')]);
+          ok('task231: a bare open forfeit asks which possession leaves, taking nothing yet',
+             picks226(c).length === 2 && g.data.items.length === 2,
+             `picks=${picks226(c).length} ${names226(g)}`);
+          ok('task231: the effect still prints its own words', /steals one item/.test(c.textContent), c.textContent.trim().slice(0, 60));
+          picks226(c).find((b) => /lantern/i.test(b.textContent)).click();
+          ok('task231: the possession named is the one taken (rope kept)', names226(g) === 'rope', names226(g));
+        }
+
+        // The commit is durable across the re-render: the picker is gone and nothing else goes.
+        {
+          const { g, c } = mk226(bare231(), [makeItem('item', 'rope'), makeItem('item', 'lantern'), makeItem('item', 'flask')]);
+          picks226(c).find((b) => /flask/i.test(b.textContent)).click();
+          ok('task231: the pick is spent — no second picker and no second loss',
+             picks226(c).length === 0 && names226(g) === 'rope,lantern', `picks=${picks226(c).length} ${names226(g)}`);
+        }
+
+        // A lone possession is no choice at all: it commits on entry, exactly as before.
+        {
+          const { g, c } = mk226(bare231(), [makeItem('item', 'rope')]);
+          ok('task231: a lone possession commits with no picker',
+             picks226(c).length === 0 && g.data.items.length === 0, `picks=${picks226(c).length} ${names226(g)}`);
+        }
+
+        // A tags= narrowing IS the choice — the candle burns (§1.164, §2.440, §3.25 …) must
+        // not start asking which candle, and a hidden forfeit has no control to hang a picker on.
+        {
+          const candles = () => [makeItem('item', 'candle', 0, null, ['light', 'useonce']),
+                                 makeItem('item', 'candle', 0, null, ['light', 'useonce']),
+                                 makeItem('item', 'rope')];
+          const { g, c } = mk226(bare231(' tags="light,useonce"'), candles());
+          ok('task231: a tags=-narrowed forfeit asks nothing and burns the first match',
+             picks226(c).length === 0 && names226(g) === 'candle,rope', `picks=${picks226(c).length} ${names226(g)}`);
+          const hid = mk226('<section><p><lose hidden="t" item="?"/></p></section>',
+                            [makeItem('item', 'rope'), makeItem('item', 'lantern')]);
+          ok('task231: a hidden forfeit asks nothing',
+             picks226(hid.c).length === 0 && names226(hid.g) === 'lantern', `picks=${picks226(hid.c).length} ${names226(hid.g)}`);
+        }
+
+        // multiple= on this path IS a choice (§4.131 "up to six items (your choice)"): the
+        // shared picker collects that many answers before it commits.
+        {
+          const { g, c } = mk226(bare231(' multiple="2"'),
+            [makeItem('item', 'rope'), makeItem('item', 'lantern'), makeItem('item', 'flask')]);
+          const lbl = () => (c.querySelector('.forfeit-choice') || {}).textContent || '';
+          ok('task231: a multiple= hazard offers every candidate and counts from zero',
+             picks226(c).length === 3 && /\(0 of 2 chosen\)/.test(lbl()), `picks=${picks226(c).length} lbl=${lbl().slice(0, 40)}`);
+          picks226(c).find((b) => /lantern/i.test(b.textContent)).click();
+          ok('task231: the first pick takes nothing yet', g.data.items.length === 3 && /\(1 of 2 chosen\)/.test(lbl()),
+             `${names226(g)} lbl=${lbl().slice(0, 40)}`);
+          picks226(c).find((b) => /flask/i.test(b.textContent)).click();
+          ok('task231: the second pick takes BOTH named possessions', names226(g) === 'rope', names226(g));
+        }
+
+        // choose="f" pins a sweep the page states the order of — nothing else in the markup
+        // separates §2.248's "the ones listed first" from §4.131's "(your choice)".
+        {
+          const { g, c } = mk226(bare231(' multiple="2" choose="f"'),
+            [makeItem('item', 'rope'), makeItem('item', 'lantern'), makeItem('item', 'flask')]);
+          ok('task231: a choose="f" forfeit stays a sweep — the first two, no picker',
+             picks226(c).length === 0 && names226(g) === 'flask', `picks=${picks226(c).length} ${names226(g)}`);
+        }
+
+        // (planner) the rule, DOM-free: unmarked open forfeits ask, narrowed and marked ones
+        // don't, and the equipment/cargo kinds keep their old behaviour on this path.
+        {
+          const g231 = GameState.create({ name:'T231p', gender:'f', profession:'Warrior', book:1, adv });
+          g231.data.items = [];
+          [makeItem('item', 'a'), makeItem('item', 'b'), makeItem('weapon', 'axe', 1), makeItem('weapon', 'club')]
+            .forEach((it) => g231.addItem(it));
+          const needs = (xml) => rules.needsForfeitChoice(parse(xml), g231);
+          ok('task231: an unmarked open forfeit with a spare candidate asks', needs('<lose item="?"/>') === true);
+          ok('task231: a blank spec is the same open form', needs('<lose item=""/>') === true);
+          ok('task231: a named forfeit never asks', needs('<lose item="a"/>') === false);
+          ok('task231: the item="*" sweep never asks', needs('<lose item="*"/>') === false);
+          ok('task231: choose="f" never asks', needs('<lose item="?" choose="f"/>') === false);
+          ok('task231: a tags=/bonus=/group= narrowing never asks',
+             needs('<lose item="?" tags="light"/>') === false && needs('<lose item="?" bonus="2"/>') === false
+             && needs('<lose item="?" group="5.578"/>') === false);
+          ok('task231: an open weapon forfeit is out of scope on this path', needs('<lose weapon="?"/>') === false);
+          ok('task231: a multiple= forfeit taking every possession has nothing to ask',
+             needs('<lose item="?" multiple="4"/>') === false);
+        }
+
+        // §4.468 for real: the villa thief takes one of the STORED possessions, and the
+        // carried pack is never offered — the cache pool makes a wrong pick most visible.
+        {
+          window.__FL_INSTANT_DICE__ = true;
+          const rnd231 = Math.random;
+          const settle231 = () => new Promise((r) => setTimeout(r, 30));
+          const g468 = GameState.create({ name:'Villa', gender:'m', profession:'Warrior', book:4, adv });
+          g468.data.items = [];
+          g468.addItem(makeItem('item', 'carried rope'));
+          g468.cacheAddItem('4.468', makeItem('item', 'jade idol'));
+          g468.cacheAddItem('4.468', makeItem('item', 'silver torc'));
+          const c468 = document.createElement('div');
+          new Story(c468, g468, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(4, '468'), 4, '468');
+          Math.random = () => 0.99; // 6+6 = 12 → "A thief."
+          c468.querySelector('.btn-roll').click();
+          await settle231();
+          const offered = picks226(c468).map((b) => b.textContent).join('|');
+          ok('task231: §4.468 asks which STORED possession the thief takes',
+             picks226(c468).length === 2 && !/carried rope/i.test(offered), `picks=${picks226(c468).length} ${offered}`);
+          picks226(c468).find((b) => /silver torc/i.test(b.textContent)).click();
+          ok('task231: §4.468 takes the stored possession named and leaves the pack alone',
+             g468.cacheItems('4.468').map((i) => i.name).join(',') === 'jade idol' && names226(g468) === 'carried rope',
+             `${g468.cacheItems('4.468').map((i) => i.name).join(',')} / ${names226(g468)}`);
+
+          // §6.373: the count is the die, so the picker asks for exactly x of them.
+          const g373 = GameState.create({ name:'Windy', gender:'f', profession:'Warrior', book:6, adv });
+          g373.data.items = [];
+          ['a', 'b', 'c', 'd', 'e'].forEach((n) => g373.addItem(makeItem('item', n)));
+          const c373 = document.createElement('div');
+          new Story(c373, g373, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(6, '373'), 6, '373');
+          ok('task231: §6.373 asks nothing until the die that sets the count is rolled', picks226(c373).length === 0);
+          Math.random = () => 0.5; // 1 + floor(0.5*6) = 4
+          c373.querySelector('.btn-roll').click();
+          await settle231();
+          const lbl373 = () => (c373.querySelector('.forfeit-choice') || {}).textContent || '';
+          ok('task231: §6.373 asks for as many possessions as the die came to',
+             picks226(c373).length === 5 && /\(0 of 4 chosen\)/.test(lbl373()),
+             `picks=${picks226(c373).length} lbl=${lbl373().slice(0, 40)}`);
+          ['e', 'd', 'c', 'b'].forEach((n) => picks226(c373).find((b) => b.textContent === n).click());
+          ok('task231: §6.373 tears away the four named and leaves the one held on to',
+             names226(g373) === 'a', names226(g373));
+
+          // §2.248 for real: "the items stolen are the ones listed first" — still a sweep.
+          const g248 = GameState.create({ name:'Elfin', gender:'m', profession:'Warrior', book:2, adv });
+          g248.data.items = [];
+          ['a', 'b', 'c'].forEach((n) => g248.addItem(makeItem('item', n)));
+          const c248 = document.createElement('div');
+          new Story(c248, g248, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(2, '248'), 2, '248');
+          Math.random = () => 0.2; // 1 + floor(0.2*6) = 2
+          c248.querySelector('.btn-roll').click();
+          await settle231();
+          ok('task231: §2.248 still takes the ones listed first, with no picker',
+             picks226(c248).length === 0 && names226(g248) === 'c', `picks=${picks226(c248).length} ${names226(g248)}`);
+
+          // §4.116 is ONE three-item pick, not three one-item pickers for one printed sentence.
+          const g116 = GameState.create({ name:'Kelpie', gender:'f', profession:'Warrior', book:4, adv });
+          g116.data.items = [];
+          ['a', 'b', 'c', 'd'].forEach((n) => g116.addItem(makeItem('item', n)));
+          const c116 = document.createElement('div');
+          new Story(c116, g116, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(4, '116'), 4, '116');
+          const lbl116 = () => (c116.querySelector('.forfeit-choice') || {}).textContent || '';
+          ok('task231: §4.116 asks once for the three items its page says are the player\'s choice',
+             c116.querySelectorAll('.forfeit-choice').length === 1 && /\(0 of 3 chosen\)/.test(lbl116()),
+             `boxes=${c116.querySelectorAll('.forfeit-choice').length} lbl=${lbl116().slice(0, 40)}`);
+          ['d', 'c', 'b'].forEach((n) => picks226(c116).find((b) => b.textContent === n).click());
+          ok('task231: §4.116 crosses off exactly the three named', names226(g116) === 'a', names226(g116));
+
+          Math.random = rnd231;
+          window.__FL_INSTANT_DICE__ = false;
+        }
+      }
     }
 
     // --- task 118: choice/equipment losses respect the keep tag ---

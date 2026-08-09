@@ -796,6 +796,30 @@ export function needsEquipmentChoice(node, state) {
   return candidates.length > 1;
 }
 
+// Does a bare <lose item="?"> ask the player WHICH possession leaves? Five paths already
+// ask — the plain and optional/forced payments, the choose-one menu and the <group> click
+// (tasks 117, 226, 228, 229) — and every one of them routes through losePaymentPlan. The
+// sixth is the ordinary passive effect, the path a hazard row is written on, which consulted
+// no plan at all and let applyLose take whatever came first in pack order. Six published
+// pages print the choice in so many words: §1.259, §4.116, §4.131, §4.468, §5.66, §6.373.
+//
+// The rule is the NARROWING. An open "?"/blank forfeit that names no filter offers the whole
+// pack, so which one leaves is the player's; one narrowed by tags=/bonus=/using=/group= has
+// been chosen BY the filter ("cross off a candle", "a +2 item") and asks nothing. Nothing in
+// the markup otherwise separates §4.131's "up to six items (your choice)" from the sweeps
+// whose pages state the order — "the items stolen are the ones listed first" (§2.248, §2.521,
+// §3.640) — so those three carry an explicit choose="f" in the source and an unmarked open
+// forfeit is a choice. Equipment/cargo forfeits keep their old behaviour on this path. (task 231)
+const FORFEIT_NARROWERS = ['tags', 'bonus', 'using', 'group'];
+
+export function needsForfeitChoice(node, state) {
+  if (node.tagName.toLowerCase() !== 'lose' || node.getAttribute('item') == null) return false;
+  const marked = node.getAttribute('choose');
+  if (marked != null && !boolAttr(marked)) return false;
+  if (FORFEIT_NARROWERS.some((a) => node.getAttribute(a) != null)) return false;
+  return losePaymentPlan(node, state).needsChoice; // open form, with a candidate to spare
+}
+
 // A <tick profession="a|b|c"> asks the player to choose a new profession. (task 75)
 export function needsProfessionChoice(node) {
   if (node.tagName.toLowerCase() !== 'tick') return false;
@@ -828,6 +852,7 @@ export function isFightHeld(view, node) {
 //                                            single linked reward to grant now, or null
 //   { mode:'roll-payment'|'optional-pay'|'choose-one-reward', key }
 //   { mode:'forced-optional'|'payment'|'ability-choice'|'equipment-choice'|'profession-choice' }
+//   { mode:'forfeit-choice' }              — an open possession forfeit: pick which leaves
 //   { mode:'apply', showWords, setVarName, rollOwned, rerunnable } — the plain effect;
 //     rollOwned freezes a <set> whose var a roll owns (task 61), rerunnable re-evaluates
 //     an absolute <set value=…> every render.
@@ -929,6 +954,12 @@ export function classifyPassive(node, view) {
   // effect (task 69): hold it until the fight resolves, then apply only on the branch
   // actually taken.
   if (isFightHeld(view, node)) return { mode: 'inert', showWords: !hidden };
+
+  // An open possession forfeit with a candidate to spare is the player's pick, not the
+  // engine's first-in-pack default (task 231). It sits BELOW the fight gate on purpose: a
+  // forfeit written after a <fight> must stay held until that fight resolves, rather than
+  // committing the loss through a picker on a branch that may never be taken.
+  if (!hidden && needsForfeitChoice(node, view.state)) return { mode: 'forfeit-choice' };
 
   const setVarName = tag === 'set' ? node.getAttribute('var') : null;
   // A roll this visit has taken ownership of this var: freeze the <set> so it can

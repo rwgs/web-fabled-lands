@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-230 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **231 is the one open item** — file
+231 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **232 is the one open item** — file
 new work under the priority bucket that fits, and record the pass in the
 Review log.
 Completed detail sections are archived in
@@ -27,7 +27,8 @@ phase is picked up from there rather than from the buckets below.
 - [x] 226. An open `<lose item="?">` forfeit is taken with no picker, so the engine chooses which possession leaves
 - [x] 229. A `<group>` commits an open `<lose item="?">` with no picker, so a printed "decide which item" is ignored
 - [x] 230. A collapsed `<group>` drops its `<adjustmoney>` child, so §2.134's whole gamble pays nothing
-- [ ] 231. A plain `<lose item="?">` effect commits with no picker, so six printed "(your choice)" instructions are ignored
+- [x] 231. A plain `<lose item="?">` effect commits with no picker, so six printed "(your choice)" instructions are ignored
+- [ ] 232. The same bare-hazard picker is missing on `<lose cargo="?">` and a `group=`-narrowed forfeit, so 13 more printed choices are ignored
 
 **LOW**
 
@@ -1660,6 +1661,77 @@ today; `tags=`-narrowed and `hidden="t"` forfeits still ask nothing; a `multiple
 collects two answers; and book4/468 really asks which stored possession the thief takes while
 leaving the carried pack alone, book6/373 asks for `x` of them after its die lands, and book2/248
 still takes the ones listed first.
+
+**Done 2026-08-09.** A sixth `classifyPassive` verdict, `'forfeit-choice'`, decided by
+`needsForfeitChoice` (`render-rules.js`) and built by `renderForfeitChoice` (`render-rewards.js`)
+out of the same `showForfeitPicker` the other five paths use — so a `multiple=` forfeit collects
+that many answers here too. The memo stays `fx@<path>` and is only added **on commit**, so the
+loss is not voided by the re-render, and a forfeit that stops needing a choice falls back through
+`'apply'` already applied.
+
+**The rule picked is the narrowing, and the three sweeps are pinned in the source.** An open
+`"?"`/blank `item=` forfeit that names no filter offers the whole pack, so which one leaves is the
+player's; one narrowed by `tags=`/`bonus=`/`using=`/`group=` has been chosen BY the filter (the
+candle burns, §4.456's "+2 item"), so it asks nothing. Nothing in the markup separates §4.131's
+"up to six items (your choice)" from the sweeps whose pages state the order, so book2/248,
+book2/521 and book3/640 now carry an explicit **`choose="f"`** — a new port attribute, added to
+`validate-source.ps1`'s `<lose>` allowlist and its truth-flag list in the same change (task 199).
+The verdict also sits **below** the fight gate, unlike its `'ability-choice'`/`'equipment-choice'`
+siblings: a forfeit written after a `<fight>` must stay held until that fight resolves rather than
+committing a loss on a branch that may never be taken.
+
+**book4/116 is now one node.** Its three consecutive `<lose item="?">` tags printed one sentence
+("Cross three items (your choice)") and would have stood up three separate one-item pickers, so
+they are merged into a single `<lose item="?" multiple="3">Cross three items</lose>` — identical
+printed text, one three-item pick.
+
+27 new `task231` assertions in `suite-actions`, including book4/468, book6/373, book2/248 and
+book4/116 end to end. Full suite `RESULT ALL PASS pass=2347 fail=0` (title `TESTS_OK`), Node
+import suite `pass=35 fail=0`, validator self-test `pass=23 fail=0`.
+
+Filed **232**: the same bare-hazard path leaves `<lose cargo="?">` and the one `group=`-narrowed
+possession forfeit engine-chosen, in 13 further published sections that print the choice.
+
+---
+
+## 232. The same bare-hazard picker is missing on `<lose cargo="?">` and a `group=`-narrowed forfeit, so 13 more printed choices are ignored
+
+**Priority: MEDIUM — 13 published sections, 12 of which print the choice in so many words.**
+
+*(Filed 2026-08-09 while implementing task 231, whose scope was deliberately `item=` only.)*
+
+Task 231 gave the ordinary passive `<lose>` a which-one picker but scoped `needsForfeitChoice` to
+`item=` — the attribute its six sections use — so the same bare hazard row still commits with no
+picker in two other shapes:
+
+- **`<lose cargo="?">` on the plain path (12 sections).** book1/67, book1/70, book1/83,
+  book1/397, book1/530, book1/583, book4/106, book4/358, book4/386, book4/453 and book4/489 all
+  print "you lose 1 Cargo Unit, if you had any, **of your choice**"; book2/534 spells it out
+  further — "(If you had several cargo units, **you choose** which was lost.)". `losePaymentPlan`
+  already reports `kind:'cargo'` with `needsChoice`, and `showForfeitPicker` already labels a
+  cargo candidate, so the five payment paths ask — this one does not. Which Unit leaves is an
+  economic decision (the goods sell for different prices per port), so the engine taking the
+  first aboard is not neutral. book3/231, book3/581, book3/616, book3/670 and book3/718 print
+  only "Lose 1 Cargo Unit (if you have any cargo)" and name no choice: decide whether those get
+  the picker too, or a `choose="f"` marker like task 231's sweeps.
+- **book5/578, the one `group=`-narrowed possession forfeit.** Task 231 treats a narrowing filter
+  as the choice, and `group=` is one — but `group=` narrows by *provenance*, not by a property
+  the sentence names, so it can still leave a genuine choice among like candidates. §5.578 is
+  exactly that: the Brotherhood's cut is "**one of the items** you found" out of the three that
+  mission awarded (a silver holy symbol, a fine sabre and an Uttakin telescope), and the page
+  ends "Note **which items you want to keep** on your Adventure Sheet." The engine hands over the
+  holy symbol every time. Either drop `group` from `FORFEIT_NARROWERS` (it is the only such node
+  in the corpus, so nothing else moves) or state why provenance is a filter.
+
+`<lose weapon="?">`/`<lose armour="?">` on this path need no change and are the useful contrast:
+book6/36 ("she strips you of your **best** armour, your **best** weapon"), book1/370 and
+book6/135 (`using="t"` — the one you are wielding) and book5/386 (`tags="Tz"`) each name what
+leaves, which is the same narrowing rule task 231 settled on.
+
+`suite-actions` beside task 231's block: a synthetic section whose bare `<lose cargo="?">` sits
+over a two-Unit manifest must offer one button per Unit and move only the one clicked; a one-Unit
+ship commits with no picker; and book5/578 really asks which of its three rewards the Brotherhood
+takes while the rest of the pack stays out of the offer.
 
 ---
 
