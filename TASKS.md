@@ -32,7 +32,8 @@ phase is picked up from there rather than from the buckets below.
 - [x] 232. The same bare-hazard picker is missing on `<lose cargo="?">` and a `group=`-narrowed forfeit, so 13 more printed choices are ignored
 - [x] 235. A warm Chrome profile serves a day-old test bundle, so the headless loop reports a false `ALL PASS`
 - [x] 233. §5.578's donation applies against an empty pool and memoises the no-op, so the Brotherhood's cut is never taken
-- [ ] 234. §6.36 strips "your **best** armour, your **best** weapon" and the engine takes the first of each instead
+- [x] 234. §6.36 strips "your **best** armour, your **best** weapon" and the engine takes the first of each instead
+- [ ] 236. A virtual-time budget that runs out reports as a suite FAILURE, with nothing saying it was the clock
 
 **LOW**
 
@@ -1861,6 +1862,34 @@ Note this is deliberately *not* the task-231/232 picker: the page states a rule,
 does not choose. `suite-actions`: book6/36 with a +0 and a +3 weapon (and likewise armour) must
 lose the +3 of each, and a single piece of a kind must still be taken.
 
+**Done 2026-08-09.** Settled as the **source marker**, `choose="best"` on both loses in
+`books/book6/36.xml` — the first of the two shapes, taken because it is the one the repo already
+has: `choose=` is this port's marker for "the page states which possession leaves, so the player
+does not", and `"best"` sits beside task 231's `"f"` (the "the items stolen are the ones listed
+first" sweeps) as a second way a page can state it. The general rule was rejected on what a
+future section inherits: an unnarrowed `<lose weapon="?">` that meant "she grabs a weapon" would
+silently start taking the best, and the marker makes the page's own wording the reason.
+
+`loseEquipmentCandidates` sorts by descending bonus when the marker is present, so the ordering
+lands once and the plan, the picker and the commit cannot disagree about what "best" is; `sort`
+is stable, so equal bonuses keep acquisition order, and `applyKeepRule` runs first, so the white
+sword (§4.103) is still spared. `loseEquipment` is untouched — it takes `cands[0]` as before.
+
+The marker moves out of `validate-source.ps1`'s `FL_BOOL_ATTRS` into `FL_ENUMS` as
+`t f true false best` (task 199: a new attribute VALUE is added to the allowlist in the same
+change). The truth spellings stay legal, so the three `choose="f"` sweeps are unaffected, and a
+misspelled `choose="worst"` now fails the gate through the same enum path the ability/cargo/crew
+fixtures already cover.
+
+Scope check: §6.36 is the only unnarrowed open equipment forfeit in the corpus — every other
+`<lose weapon|armour|tool="?">` carries `using="t"` (§1.370, §2.290, §6.135), a `bonus=`/`tags=`
+filter (§1.354, §5.386) or a `price=` that already routes through the task-226 picker (§2.90).
+None of them gains the marker, so none of them changes.
+
+7 new `task234` assertions in `suite-actions`. Verified as real cover: disabling the sort leaves
+§6.36's victim holding `runeblade,dwarf mail` — the rusty sword and the leather jerkin taken
+instead. Full suite `RESULT ALL PASS pass=2382 fail=0`, validator self-test `pass=23 fail=0`.
+
 ---
 
 ## 235. A warm Chrome profile serves a day-old test bundle, so the headless loop reports a false `ALL PASS`
@@ -1938,6 +1967,37 @@ runs while leaving the three non-profile `fl-*` files alone; and the full suite 
 now lead with the runner; the hard-won trap notes are kept, marked as what the runner closes,
 because a hand-run command still has every one of them. `.github/workflows/smoke.yml` is
 deliberately untouched — it is already immune, and the one green gate is not worth the churn.
+
+---
+
+## 236. A virtual-time budget that runs out reports as a suite FAILURE, with nothing saying it was the clock
+
+**Priority: LOW — it fails loudly and a rerun passes, but the message names the wrong culprit.**
+
+*(Filed 2026-08-09 during task 234, observed live: one run of an unchanged tree reported
+`RESULT FAILURES pass=2061 fail=1` / `FATAL [economy] TypeError: Failed to fetch`, and an
+immediate rerun of the same tree reported `RESULT ALL PASS pass=2382 fail=0`.)*
+
+`run-tests.ps1` passes `--virtual-time-budget=90000`. When that budget expires Chrome dumps the
+DOM and tears down immediately, aborting whatever `fetch` is in flight — which surfaces as an
+ordinary suite failure (`TypeError: Failed to fetch`, whichever suite happened to be loading a
+section) rather than as "the run was cut short". The Chrome stderr in that run said so
+(`Can't perform OS integration while the browser is shutting down`), but that channel is the
+same place the unrelated USB/GCM chatter lives, so it reads as noise.
+
+Nothing here is unsound — the run fails, the runner exits 1, and no false pass is possible. The
+cost is diagnosis: the first reading is "task 234 broke the economy suite", and the assertion
+count is the only tell (`pass=2061` against a tree that owes 2382). That tell needs a known-good
+number to compare against, which is exactly what task 235 established nobody has.
+
+The budget is also a fixed 90s against a suite that has grown ~700 assertions since it was set,
+with the every-section corpus scan the heaviest part, so this will bite more often.
+
+Worth weighing: raise the budget (cheap, and buys time rather than fixing the reading); have the
+reporter print the suite count it *expected* so a short run is obvious in the verdict line; or
+have the runner treat a `Failed to fetch` FATAL as a distinct "run cut short — rerun" message. A
+budget expiry and a real network failure look identical from inside the page, so any fix that
+distinguishes them has to come from the runner, not the harness.
 
 ---
 

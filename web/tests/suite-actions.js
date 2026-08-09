@@ -2248,6 +2248,64 @@ export async function run(ctx) {
              pending('<lose item="?"/>') === false);
         }
       }
+
+      // --- task 234: choose="best" — §6.36 strips the BEST weapon and armour ---
+      // "She strips you of your best armour, your best weapon": loseEquipmentCandidates applied
+      // no ordering, so loseEquipment took cands[0] — the first of that kind in acquisition
+      // order — and a player carrying a rusty sword and a +3 blade lost the rusty one. The page
+      // states the rule, so this is NOT the task-231/232 picker: it is the choose= marker that
+      // names what leaves, with "best" taking its place beside the existing "f".
+      {
+        const mk234 = (items) => {
+          const g = GameState.create({ name:'T234', gender:'m', profession:'Warrior', book:6, adv });
+          g.data.items = []; g.data.shards = 120; items.forEach((it) => g.addItem(it));
+          return g;
+        };
+        const gear234 = () => [makeItem('weapon', 'rusty sword', 0), makeItem('weapon', 'runeblade', 3),
+                               makeItem('armour', 'leather jerkin', 1), makeItem('armour', 'dwarf mail', 4)];
+        const kit234 = (g) => g.data.items.map((i) => i.name).join(',');
+
+        // §6.36 for real: the worst of each kind is what the player keeps.
+        {
+          const g36 = mk234(gear234());
+          const c36 = document.createElement('div');
+          new Story(c36, g36, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(6, '36'), 6, '36');
+          ok('task234: §6.36 takes the BEST weapon and the BEST armour, not the first of each',
+             kit234(g36) === 'rusty sword,leather jerkin', kit234(g36));
+          ok('task234: §6.36 still empties the purse and asks nothing',
+             g36.data.shards === 0 && c36.querySelectorAll('.forfeit-choice').length === 0,
+             `shards=${g36.data.shards} picks=${c36.querySelectorAll('.forfeit-choice').length}`);
+        }
+
+        // A single piece of a kind is still taken, and a kind the player lacks is left alone.
+        {
+          const g1 = mk234([makeItem('weapon', 'rusty sword', 0)]);
+          const c1 = document.createElement('div');
+          new Story(c1, g1, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(6, '36'), 6, '36');
+          ok('task234: §6.36 takes a lone weapon and passes over the armour the player lacks',
+             kit234(g1) === '', kit234(g1));
+        }
+
+        // (planner) the marker, DOM-free: it orders the shared candidate list, ties keep
+        // acquisition order, and an unmarked forfeit is untouched.
+        {
+          const g234 = mk234(gear234());
+          const cands = (xml) => eng.losePaymentPlan(parse(xml), g234).candidates.map((i) => i.name).join(',');
+          ok('task234: choose="best" puts the highest bonus first',
+             cands('<lose weapon="?" choose="best"/>') === 'runeblade,rusty sword',
+             cands('<lose weapon="?" choose="best"/>'));
+          ok('task234: an unmarked equipment forfeit keeps acquisition order',
+             cands('<lose weapon="?"/>') === 'rusty sword,runeblade', cands('<lose weapon="?"/>'));
+          const gTie = mk234([makeItem('weapon', 'first axe', 2), makeItem('weapon', 'second axe', 2)]);
+          ok('task234: equal bonuses keep the order they were acquired in',
+             eng.losePaymentPlan(parse('<lose weapon="?" choose="best"/>'), gTie)
+               .candidates.map((i) => i.name).join(',') === 'first axe,second axe');
+          ok('task234: a kept possession is still spared by the best-of rule',
+             eng.losePaymentPlan(parse('<lose weapon="?" choose="best"/>'),
+                                 mk234([makeItem('weapon', 'rusty sword', 0), makeItem('weapon', 'white sword', 3, null, ['keep'])]))
+               .candidates.map((i) => i.name).join(',') === 'rusty sword');
+        }
+      }
     }
 
     // --- task 118: choice/equipment losses respect the keep tag ---

@@ -109,11 +109,8 @@ $script:FL_TAG_ATTRS = @{
 }
 
 # Attributes whose value is a JaFL truth flag. The books write both letters and words.
-# choose= is this port's own marker (task 231): choose="f" on an open <lose item="?"> pins it
-# as a sweep the engine picks, for the three pages that state the order the items go in.
 $script:FL_BOOL_ATTRS = @('force', 'hidden', 'dead', 'not', 'using', 'sail', 'start', 'revisit',
-                          'cumulative', 'permanent', 'supplemental', 'visit', 'playerFirst', 'fatal',
-                          'choose')
+                          'cumulative', 'permanent', 'supplemental', 'visit', 'playerFirst', 'fatal')
 $script:FL_BOOL_VALUES = @('t', 'f', 'true', 'false')
 
 # Closed value sets, mirroring the engine's own canonical lists (web/js/rules.js ABILITIES /
@@ -122,6 +119,13 @@ $script:FL_BOOL_VALUES = @('t', 'f', 'true', 'false')
 $script:FL_ENUMS = @{
     'ability'        = 'charisma combat magic sanctity scouting thievery rank stamina defence'
     'abilityDamaged' = 'charisma combat magic sanctity scouting thievery rank stamina defence'
+    # choose= is this port's own marker on an open <lose>: it names WHICH possession leaves
+    # when the page states the rule instead of leaving it to the player. "f" pins a sweep to
+    # the order the page lists (task 231, the three "the items stolen are the ones listed
+    # first" pages); "best" pins it to the highest bonus (task 234, section 6.36's "your best
+    # armour, your best weapon"). The truth values stay legal - "t" is the explicit spelling
+    # of the default, an unmarked open item/cargo forfeit asking the player.
+    'choose'         = 't f true false best'
     # A blessing is an opaque named token to the engine, but the set is small and fixed: a
     # misspelling would silently never be granted, tested or spent. storms/storm and
     # poison/disease are the same blessing under two spellings (state.js BLESSING_ALIASES).

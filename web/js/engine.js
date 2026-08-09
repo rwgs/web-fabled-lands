@@ -736,7 +736,19 @@ function loseEquipmentCandidates(el, state, kind) {
     const eq = kind === 'weapon' ? state.wieldedWeapon() : (kind === 'armour' ? state.wornArmour() : null);
     cands = eq ? [eq] : cands.slice(0, 1);
   }
-  return applyKeepRule(cands, el.getAttribute(kind));
+  const kept = applyKeepRule(cands, el.getAttribute(kind));
+  // choose="best" pins WHICH piece goes when the page names it rather than leaving it to the
+  // engine's first-in-pack default: §6.36's bridge troll strips "your BEST armour, your BEST
+  // weapon", so a player carrying a rusty sword and a +3 blade must lose the blade. It is the
+  // sibling of choose="f", which pins a sweep to the order the page lists (task 231) — this
+  // port's marker for "the page states the rule, so the player does not choose". Ordering the
+  // shared candidate list (rather than the take) keeps the plan, the picker and the commit
+  // agreeing on what "best" is; sort is stable, so equal bonuses keep acquisition order.
+  // §6.36 is the only "best" wording on a <lose> in the corpus. (task 234)
+  if (normalize(el.getAttribute('choose')) === 'best') {
+    return kept.slice().sort((a, b) => (b.bonus || 0) - (a.bonus || 0));
+  }
+  return kept;
 }
 
 /** Lose a weapon/armour/tool. spec "*" = all of that kind; "?"/name = one (via
