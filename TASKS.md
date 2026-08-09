@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 220 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), so **the backlog is empty** — file new work
+misdiagnosis (see the Review log); **221 is the only open item** — file new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -27,6 +27,7 @@ records each audit pass and is where new work is filed.
 - [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
 - [x] 219. `<sold>` fires on a sale but its documented twin `<bought>` does nothing on a purchase
 - [x] 220. The documented headless-dump command runs nothing from an MSYS shell, so a stale dump reads as a pass
+- [ ] 221. A single flag-linked `<resurrection>` ignores the payment and renders a free Arrange button
 
 **Done**
 
@@ -821,6 +822,57 @@ one is not.
 This is a sibling of the leftover-`http.server` note already in `AGENTS.md`: both are ways the loop
 reports green while measuring something other than the tree under test, and in both the tell is a
 timestamp older than the session.
+
+---
+
+## 221. A single flag-linked `<resurrection>` ignores the payment and renders a free Arrange button
+
+**Priority: LOW — no shipped book hits it, because every book 1–6 resurrection is either free or
+priced in Shards via the tag's own `shards=`. It is latent, and it is the resurrection-shaped
+instance of the leak task 125 closed for the item family.**
+
+*(Filed 2026-08-08 during conversion work on an unpublished book, whose temples charge something
+other than money to arrange a deal.)*
+
+`renderResurrection` (`web/js/render-market.js`) reads `flag=` exactly once, at the top:
+
+```js
+const resFlag = node.getAttribute('flag');
+if (resFlag != null && isChooseOne(story.sectionEl, resFlag)) return renderChoosableReward(...);
+```
+
+`isChooseOne` (`render-rules.js`) requires **two or more** rewards on the key. So `flag=` works only
+inside a multi-reward pick — book1/597's amber wand | 500 Shards | resurrection is the corpus's
+only use, and it works. A **single** `<lose … price="x"/>` + `<resurrection … flag="x">` pair falls
+straight past that line into the ordinary visible-offer path below, whose only guard is
+`btn.disabled = done || (cost > 0 && story.state.data.shards < cost)` — with no `shards=` on the
+tag, `cost` is 0, so the button is **enabled regardless of whether the flag was ever set**. The
+player can arrange the deal without paying, and paying is separately a silent no-op because nothing
+ever consumes the flag.
+
+This is exactly the shape task 125 fixed for items: `isPricedItemAward` was added precisely because
+a *single* priced item reward "otherwise renders a free Take button and grants nothing when paid".
+`<resurrection>` is a `CHOOSE_ONE_TAGS` member and `grantChosenReward` already knows how to grant
+one and clear its key — the arm-then-take path simply never routes to it.
+
+`<group>` is not an available workaround, and it is worth stating so the fix is not deferred to it:
+`groupPlan`'s effect list is `lose, tick, gain, set, curse, transfer`, and its `resNode` handling
+sets `isRevival` only for a **no-`section=`** resurrection (the death-revival trigger). A
+`<resurrection book= section=>` child of a group is therefore neither applied as an effect nor
+recognised as a revival — the group would charge its `<lose>` and arrange nothing at all.
+
+The fix mirrors task 125: extend the arm-then-take predicate (or add a `isPricedResurrection`
+sibling) to cover a lone flag-linked `<resurrection>` carrying a `[price=key]` cost elsewhere in the
+section, render it as a `renderChoosableReward` so it draws "Pay first to choose this." until the
+flag is set, and let `grantChosenReward`'s existing resurrection branch do the granting and clear
+the key. Note the payment need not be money: `<lose ability="?" amount="1" price="x">` already
+renders an ability chooser that applies on click, which is the case that surfaced this.
+
+`suite-economy` is the natural home for the coverage, alongside task 125's: a lone
+`<resurrection section= flag="x">` behind a `<lose shards="N" price="x">` is LOCKED before payment,
+arms on payment, grants exactly one deal pointing at the right book/section, and is spent
+afterwards; the same behind a `<lose ability="?" amount="1" price="x">`; and book1/597's three-way
+pick still behaves as it does today.
 
 ---
 
