@@ -414,8 +414,8 @@ function renderOptionalPay(story, container, node, path, key) {
   } else if (cost && story.state.data.shards < cost) {
     btn.disabled = true; btn.title = 'Not enough Shards';
   } else if (plan && plan.needsChoice) {
-    // Open "?" weapon/armour/cargo with more than one candidate: reveal a picker so the
-    // player names the exact forfeit rather than the engine silently taking the first.
+    // Open "?" possession/weapon/armour/cargo with more than one candidate: reveal a picker
+    // so the player names the exact forfeit rather than the engine silently taking the first.
     btn.addEventListener('click', () => { btn.disabled = true; showForfeitPicker(story, container, plan, commit); });
   } else if (abilityNode) {
     btn.addEventListener('click', () => {
@@ -429,9 +429,9 @@ function renderOptionalPay(story, container, node, path, key) {
   return btn;
 }
 
-// Reveal a "give up which?" picker for an open "?" equipment/cargo forfeit, so the exact
-// item/cargo the player chooses is what leaves — not whatever the engine finds first.
-// Each button commits the loss with a chooser bound to that candidate. (task 117)
+// Reveal a "give up which?" picker for an open "?" possession/equipment/cargo forfeit, so the
+// exact item/cargo the player chooses is what leaves — not whatever the engine finds first.
+// Each button commits the loss with a chooser bound to that candidate. (tasks 117, 226)
 function showForfeitPicker(story, container, plan, commit) {
   const box = document.createElement('div');
   box.className = 'ship-choice forfeit-choice';
@@ -512,6 +512,10 @@ function renderChooseOnePay(story, container, node, path, key) {
   // no carry slot and no forfeit to free one): refuse the click rather than take the payment
   // for a reward whose pick would then be disabled. (task 223)
   const wasted = menuWasteReason(node, key, story.sectionEl, story.state);
+  // An open "?" possession/equipment forfeit buys the menu here too (§5.152 Holyamu takes
+  // "any object with a +1 or greater bonus" for a curse): the player names which one leaves
+  // before it is taken, exactly as on the other two payment paths. (task 226)
+  const armPlan = node.tagName.toLowerCase() === 'lose' ? losePaymentPlan(node, story.state) : null;
   if (armed) {
     btn.disabled = true; btn.title = 'Paid — now choose your reward.';
   } else if (wasted) {
@@ -520,6 +524,14 @@ function renderChooseOnePay(story, container, node, path, key) {
     btn.disabled = true; btn.title = 'Not enough Shards';
   } else if (item != null && !story.state.hasItemMatch(item, node.getAttribute('tags'))) {
     btn.disabled = true; btn.title = 'You have nothing to give.';
+  } else if (armPlan && armPlan.needsChoice) {
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      showForfeitPicker(story, container, armPlan, (chooser) => {
+        applyEffect(node, story.state, { chooser });
+        story.rerender();
+      });
+    });
   } else if (needsAbilityChoice(node)) {
     // An open ability spec buys the menu ("give up a point of any ability"): the player names
     // which point leaves, then the arming happens with that answer. (task 224)

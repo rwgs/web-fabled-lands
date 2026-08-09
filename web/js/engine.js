@@ -771,30 +771,33 @@ function loseCargoCandidates(el, state) {
  *  the player can currently meet it (task 117). `present` is true when the lose gives up a
  *  tangible possession (so its price flag / linked reward must wait until it is actually
  *  taken); `eligible` is whether a qualifying candidate exists now; `needsChoice` marks an
- *  open "?" equipment/cargo forfeit with more than one candidate, so the view offers a
- *  picker instead of silently taking the first. shards/god/blessing/crew losses are not a
- *  possession payment (present=false) and arm unconditionally, as before. */
+ *  open "?" possession/equipment/cargo forfeit with more candidates than it takes, so the
+ *  view offers a picker instead of silently taking the first. shards/god/blessing/crew
+ *  losses are not a possession payment (present=false) and arm unconditionally, as before. */
 export function losePaymentPlan(el, state) {
   const g = (a) => el.getAttribute(a);
   const openForm = (spec) => spec === '?' || spec == null || String(spec).trim() === '';
-  const plan = (kind, spec, candidates) => ({
+  // `count` is how many the forfeit takes (a multiple= loss demands that many): the plan is
+  // met once that many qualify, and only a surplus leaves the player anything to choose.
+  const plan = (kind, spec, candidates, count = 1) => ({
     present: true, kind, candidates,
-    eligible: candidates.length > 0,
-    needsChoice: openForm(spec) && candidates.length > 1,
+    eligible: candidates.length >= count,
+    needsChoice: openForm(spec) && candidates.length > count,
   });
   if (g('item') != null) {
     if (g('item') === '*') {
       // "Lose all your possessions" spares keep items — mirror applyLose so the eligibility
-      // gate agrees with what is actually takeable. (tasks 117, 118)
+      // gate agrees with what is actually takeable. It is a sweep, not a choice. (tasks 117, 118)
       const pool = (g('cache') != null ? state.cacheItems(g('cache')) : state.data.items).filter((it) => !isKeep(it));
       return { present: true, kind: 'item', candidates: pool, eligible: pool.length > 0, needsChoice: false };
     }
-    const cands = loseItemMatches(el, state);
     // Quantity-aware eligibility (task 117 spec / task 160): a multiple= loss demands that
     // many matching items, so the plan is only met when at least `count` exist — mirrors
     // applyLose's take of up to `count`. (multiple= and price= never co-occur today.)
+    // A possession forfeit asks which one leaves on the same terms as the equipment kinds:
+    // an open "?"/blank spec with a spare candidate gets a picker, a named one never. (task 226)
     const count = g('multiple') ? resolveValue(state, g('multiple')) : 1;
-    return { present: true, kind: 'item', candidates: cands, eligible: cands.length >= count, needsChoice: false };
+    return plan('item', g('item'), loseItemMatches(el, state), count);
   }
   for (const kind of ['weapon', 'armour', 'tool']) {
     if (g(kind) != null) return plan(kind, g(kind), loseEquipmentCandidates(el, state, kind));

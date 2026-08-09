@@ -3,9 +3,10 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-224 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **225, 226 and 227 are the open items** — file
-new work under the priority bucket that fits, and record the pass in the Review log.
+228 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and the open items; **225, 227 and 228 are the open
+items** — file new work under the priority bucket that fits, and record the pass in the
+Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -19,7 +20,7 @@ records each audit pass and is where new work is filed.
 - [x] 213. The post-fight gate does not hold an item award, so loot is takeable before the fight
 - [x] 214. A visit-box redirect does not hold the section body, so a one-time reward is re-takeable
 - [x] 216. `<if ticks="N">` after an in-section `<tick>` reads the pre-tick count, so "now ticked" branches never fire
-- [ ] 226. An open `<lose item="?">` forfeit is taken with no picker, so the engine chooses which possession leaves
+- [x] 226. An open `<lose item="?">` forfeit is taken with no picker, so the engine chooses which possession leaves
 
 **LOW**
 
@@ -34,6 +35,7 @@ records each audit pass and is where new work is filed.
 - [x] 224. A `price=`/`flag=` key strips an open ability loss of its chooser, so the engine picks which ability the player forfeits
 - [ ] 225. The "pay to spin" cost is the third payment path that commits an open ability loss with no chooser
 - [ ] 227. A wordless `<curse>`/`<disease>`/`<poison>` prints no name, so its printed sentence has a hole
+- [ ] 228. `showForfeitPicker` can only answer for one item, so a `multiple=` forfeit it offers would under-charge
 
 **Done**
 
@@ -1253,6 +1255,30 @@ the one clicked; with a single possession it commits without a picker as it does
 `<lose item="…">` still takes that item with no picker; and book4/456 still filters to genuinely +2
 items, which is the regression the current routing provides for free.
 
+Fixed as described. `losePaymentPlan`'s `plan()` helper (`engine.js`) grew a fourth parameter —
+`count`, how many the forfeit takes, defaulting to 1 — so `eligible` is `candidates.length >= count`
+and `needsChoice` is `openForm(spec) && candidates.length > count`. At the default those are exactly
+the old `> 0` / `> 1`, so weapon/armour/tool/cargo are byte-for-byte unchanged; the `item` branch now
+returns `plan('item', g('item'), loseItemMatches(el, state), count)` and inherits the picker. The
+`item="*"` sweep keeps its own branch above (it is a sweep, not a choice, and carries the keep-item
+filter), and a named pattern keeps `openForm` false.
+
+The engine half really was already there — `applyLose` consults `opts.chooser` whenever
+`matches.length > count` — so `renderPayment` and `renderOptionalPay` needed no change at all. But
+**book5/152 lands on neither**: its seven `flag="curse1"` lifts make the cost a `isChooseOne` menu,
+so it renders through `renderChooseOnePay`, which consulted no plan. That path now computes the plan
+for a `<lose>` cost and reveals `showForfeitPicker` between the item-availability check and
+`needsAbilityChoice` — the same place and the same shape task 224 used for the ability twin. Without
+it one of the two sections this task was filed for would still have committed blind.
+
+Sixteen `suite-actions` assertions beside task 117's block: the synthetic open forfeit asks with two
+possessions and takes only the one clicked (granting the linked reward with it), commits with no
+picker on a lone possession, and asks nothing for a named `<lose item="rope">`; the DOM-free plan
+keeps `item="*"` choiceless and only asks for a `multiple=` loss with a spare, with task 160's
+eligibility threshold pinned unchanged; §4.456's +2 offering still filters a +1 charm out of the
+pool it offers and arms outcome flag `2` with the item named; and §5.152's Holyamu asks which object
+he takes before the curse menu arms.
+
 ---
 
 ## 227. A wordless `<curse>`/`<disease>`/`<poison>` prints no name, so its printed sentence has a hole
@@ -1296,6 +1322,41 @@ appear beside the Take button.
 `suite-render` beside task 215's default-words block is the natural home — a wordless
 `<curse name="X"/>` prints "X", a `hidden="t"` one prints nothing, book4/78's sentence reads whole,
 and book5/238's bracelet award still shows one button and no stray curse name.
+
+---
+
+## 228. `showForfeitPicker` can only answer for one item, so a `multiple=` forfeit it offers would under-charge
+
+**Priority: LOW — latent: no section in the six published books can reach it today.**
+
+*(Filed 2026-08-09 while working task 226, which is what makes the shape reachable at all.)*
+
+Task 226 routed the possession forfeit through `plan()`, whose `needsChoice` is
+`openForm(spec) && candidates.length > count`. With `multiple="2"` and three candidates that is
+true — but `showForfeitPicker` (`render-rewards.js`) builds one button per candidate and commits
+`() => [cand]`, a chooser naming exactly **one** item. `applyLose` then does
+`toLose.slice(0, count)` over that single-element array and takes **one** item where the section
+demands two, so the player under-pays and the price flag arms anyway.
+
+Nothing in the corpus reaches it. `multiple=` and `price=` never co-occur (so `renderOptionalPay`
+and `renderChooseOnePay` are out), and the eight sections carrying an open `multiple=` item loss —
+book2/248, book2/521, book3/273, book3/629, book3/640, book4/131, book6/373 (plus the 248temp
+sibling) — none carry a `<goto force="f">`, so `view.hasDecline` is false and `classifyPassive`
+never returns `'payment'` for them. They auto-apply as plain effects, where no picker is built.
+Two of them (book2/248 "the ones listed first on your Adventure Sheet", book3/640 "take the first
+two possessions listed") are explicitly *not* choices; book4/131's "up to six items (your choice)"
+is one the app does not currently offer at all.
+
+Two ways to close it, and the choice is the task: either make `showForfeitPicker` count-aware
+(accumulate `count` picks before committing, with a running "2 of 6 chosen" label — which would
+also let book4/131 honour "your choice" if it ever gained a decline route), or keep the picker
+single-answer and add `count === 1` to `needsChoice`, which makes the plan's promise and the
+picker's capability agree at the cost of leaving a multi-item forfeit engine-chosen. The cheap
+option is the second; the first is what the books actually ask for.
+
+`suite-actions` beside task 226's block: a `<lose item="?" multiple="2" price="k">` fixture over
+three possessions must take **two** — the assertion fails today whichever way `needsChoice` is
+read, because a picker is offered and only one item leaves.
 
 ---
 

@@ -1613,6 +1613,116 @@ export async function run(ctx) {
       }
     }
 
+    // --- task 226: an open possession forfeit must ask WHICH possession leaves ---
+    // Task 117's which-one picker reached weapon/armour/tool/cargo but not <lose item="?">:
+    // that branch hard-coded needsChoice:false, so applyLose took the first item in the pack.
+    // Routing it through the same plan() helper asks the question — while a NAMED forfeit and
+    // the item="*" sweep stay choiceless, and a multiple= loss only asks with a spare to spare.
+    {
+      const mk226 = (xml, items) => {
+        const g = GameState.create({ name:'T226', gender:'f', profession:'Warrior', book:4, adv });
+        g.data.items = []; g.data.shards = 0; items.forEach((it) => g.addItem(it));
+        const c = document.createElement('div');
+        new Story(c, g, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xml), 4, 'x226');
+        return { g, c };
+      };
+      const picks226 = (c) => Array.from(c.querySelectorAll('.forfeit-choice .btn-mini'));
+      const names226 = (g) => g.data.items.map((i) => i.name).join(',');
+      const openXml = '<section><p><lose item="?" price="k">Give up a possession</lose> for <gain shards="40" flag="k"/>.</p></section>';
+
+      // Two possessions: the payment asks which, takes only the one clicked, then pays out.
+      {
+        const { g, c } = mk226(openXml, [makeItem('item', 'rope'), makeItem('item', 'lantern')]);
+        const pay = c.querySelector('.pay-action');
+        ok('task226: an open possession forfeit renders a live pay button and no picker yet',
+           !!pay && pay.disabled === false && picks226(c).length === 0,
+           pay ? `dis=${pay.disabled} picks=${picks226(c).length}` : 'no pay button');
+        pay.click();
+        ok('task226: two possessions prompt WHICH one leaves', picks226(c).length === 2, 'picks=' + picks226(c).length);
+        ok('task226: nothing is taken or granted before the pick',
+           g.data.items.length === 2 && g.data.shards === 0, names226(g) + ' sh=' + g.data.shards);
+        picks226(c).find((b) => /lantern/i.test(b.textContent)).click();
+        ok('task226: the chosen possession is the one taken (rope kept)',
+           names226(g) === 'rope' && g.data.shards === 40, names226(g) + ' sh=' + g.data.shards);
+      }
+
+      // A lone qualifying possession is no choice at all: it commits straight away, as before.
+      {
+        const { g, c } = mk226(openXml, [makeItem('item', 'rope')]);
+        c.querySelector('.pay-action').click();
+        ok('task226: a lone possession commits with no picker',
+           picks226(c).length === 0 && g.data.items.length === 0 && g.data.shards === 40,
+           names226(g) + ' sh=' + g.data.shards);
+      }
+
+      // A NAMED forfeit is not a choice: it takes that exact item, no question asked.
+      {
+        const namedXml = '<section><p><lose item="rope" price="k">Hand over the rope</lose> for <gain shards="40" flag="k"/>.</p></section>';
+        const { g, c } = mk226(namedXml, [makeItem('item', 'lantern'), makeItem('item', 'rope')]);
+        c.querySelector('.pay-action').click();
+        ok('task226: a named forfeit takes that item with no picker',
+           picks226(c).length === 0 && names226(g) === 'lantern' && g.data.shards === 40, names226(g));
+      }
+
+      // The DOM-free plan: the "lose everything" sweep is never a choice, and a multiple= loss
+      // asks only when it leaves a spare — its task-160 eligibility threshold is unchanged.
+      {
+        const g226 = GameState.create({ name:'T226p', gender:'m', profession:'Warrior', book:1, adv });
+        g226.data.items = []; ['a', 'b', 'c'].forEach((n) => g226.addItem(makeItem('item', n)));
+        const plan226 = (xml) => eng.losePaymentPlan(parse(xml), g226);
+        ok('task226: item="*" stays a sweep, never a choice', plan226('<lose item="*"/>').needsChoice === false);
+        ok('task226: a multiple= loss taking every match asks nothing',
+           plan226('<lose item="?" multiple="3"/>').needsChoice === false);
+        ok('task226: a multiple= loss with a spare candidate asks which',
+           plan226('<lose item="?" multiple="2"/>').needsChoice === true);
+        ok('task226: quantity-aware eligibility is unchanged',
+           plan226('<lose item="?" multiple="4"/>').eligible === false
+           && plan226('<lose item="?" multiple="3"/>').eligible === true);
+      }
+
+      // §4.456 Tambu: the bonus= filter still narrows the pool the picker offers — a +1 item is
+      // not a valid answer to the "+2 item" offering (the regression the old routing gave free).
+      {
+        const g456 = GameState.create({ name:'Tambu', gender:'f', profession:'Warrior', book:4, adv });
+        g456.data.items = [];
+        [makeItem('item', 'bronze charm', 1), makeItem('item', 'jade idol', 2), makeItem('item', 'silver torc', 2)]
+          .forEach((it) => g456.addItem(it));
+        const c456 = document.createElement('div');
+        new Story(c456, g456, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(4, '456'), 4, '456');
+        const pay456 = Array.from(c456.querySelectorAll('.pay-action')).find((b) => /\+2 item/.test(b.textContent));
+        ok('task226: §4.456 the +2 offering is live with two +2 items', !!pay456 && pay456.disabled === false);
+        pay456.click();
+        const offered = picks226(c456).map((b) => b.textContent);
+        ok('task226: §4.456 the +2 offering only offers genuinely +2 items',
+           offered.length === 2 && !offered.some((t) => /bronze charm/i.test(t)), offered.join('|'));
+        picks226(c456).find((b) => /silver torc/i.test(b.textContent)).click();
+        ok('task226: §4.456 the +2 item named is the one offered up, and it arms the outcome',
+           names226(g456) === 'bronze charm,jade idol' && g456.getFlag('2') === true,
+           names226(g456) + ' armed=' + g456.getFlag('2'));
+      }
+
+      // §5.152 Holyamu lifts a curse for "any object with a +1 or greater bonus" — the same open
+      // forfeit on the choose-one landing, where the menu is armed rather than granted.
+      {
+        const g152 = GameState.create({ name:'Holy', gender:'m', profession:'Warrior', book:5, adv });
+        g152.data.items = [];
+        [makeItem('item', 'opal ring', 1), makeItem('item', 'ivory horn', 2)].forEach((it) => g152.addItem(it));
+        g152.addCurse('Curse of Ugliness');
+        const c152 = document.createElement('div');
+        new Story(c152, g152, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(5, '152'), 5, '152');
+        const pay152 = Array.from(c152.querySelectorAll('.pay-action')).find((b) => /\+1 or greater/.test(b.textContent));
+        ok('task226: §5.152 the object offering is live with two bonus items', !!pay152 && pay152.disabled === false);
+        pay152.click();
+        ok('task226: §5.152 the curse-lift offering asks which object Holyamu takes',
+           picks226(c152).length === 2 && g152.getFlag('curse1') === false,
+           'picks=' + picks226(c152).length + ' armed=' + g152.getFlag('curse1'));
+        picks226(c152).find((b) => /opal ring/i.test(b.textContent)).click();
+        ok('task226: §5.152 the object named is the one given up, and the menu is then armed',
+           names226(g152) === 'ivory horn' && g152.getFlag('curse1') === true,
+           names226(g152) + ' armed=' + g152.getFlag('curse1'));
+      }
+    }
+
     // --- task 118: choice/equipment losses respect the keep tag ---
     // A "keep" possession (royal ring §1.385, white sword §4.103 — "cannot be lost or
     // stolen") is spared by the open item="?"/multiple= and weapon/armour ?/* forfeits, and
