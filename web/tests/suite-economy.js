@@ -6,7 +6,7 @@ import * as eng from '../js/engine.js';
 import { fightRound } from '../js/combat.js';
 import { goodsFrom, buyTrade, sellTrade, sellPlan, applyInlineBuy, sellInlineItem, canUpgradeCrew, payChoiceCost } from '../js/market.js';
 import { Story } from '../js/render.js';
-import { isRollGate } from '../js/render-rules.js';
+import { isRollGate, isChooseOne, isPricedResurrection } from '../js/render-rules.js';
 import { renderGoto } from '../js/render-choices.js';
 import { renderMarket, renderRest } from '../js/render-market.js';
 // app.js only auto-boots when a #app element exists (task 65), so importing its exported
@@ -2394,6 +2394,69 @@ export async function run(ctx) {
       ok('task98: §123 revival erases possessions, money and ship', g123.itemCount() === 0 && g123.data.shards === 0 && g123.data.ships.length === 0, `items=${g123.itemCount()} sh=${g123.data.shards} ships=${g123.data.ships.length}`);
       ok('task98: §123 revival consumes the deal and revives to full Stamina (task 159)', g123.data.resurrections.length === 0 && g123.data.stamina === 20, `res=${g123.data.resurrections.length} stam=${g123.data.stamina}`);
       ok('task98: §123 revival turns to the deal section (3/351)', nav123 && nav123.b === 3 && String(nav123.s) === '351', JSON.stringify(nav123));
+    }
+
+    // --- task 221: a LONE flag-linked <resurrection> gates on its payment -------
+    { // block-scoped
+      // isChooseOne needs TWO or more linked rewards, so a single priced deal used to fall
+      // past it into the ordinary offer path: with no shards= of its own the Arrange button
+      // cost 0 and was live whether or not the flag was ever set, while the payment granted
+      // nothing (no applier consumes a <resurrection>). It now arms-then-takes, exactly as
+      // task 125 made a single priced item award behave.
+      const xmlPact = '<section><p>The temple will strike a bargain. <lose shards="30" price="pact">Pay 30 Shards</lose> to <resurrection book="2" section="60" flag="pact">arrange a pact</resurrection>.</p></section>';
+      const g221 = GameState.create({ name:'Pact', gender:'m', profession:'Warrior', book:2, adv });
+      g221.data.resurrections = []; g221.data.shards = 100;
+      const c221 = document.createElement('div');
+      const st221 = new Story(c221, g221, { navigate(){}, onDeath(){}, notify(){} });
+      st221.begin(parse(xmlPact), 2, 'x221');
+      const pick221 = () => c221.querySelector('.reward-pick');
+      const pay221 = () => c221.querySelector('.pay-action');
+      ok('task221: a lone priced deal renders a LOCKED pick, not a free Arrange button',
+         !!pick221() && pick221().disabled === true && pick221().title === 'Pay first to choose this.',
+         pick221() ? `dis=${pick221().disabled} title=${pick221().title}` : 'no pick rendered');
+      ok('task221: nothing is arranged on entry, and the payment is live',
+         !g221.hasResurrection() && !!pay221() && pay221().disabled === false, `res=${g221.hasResurrection()}`);
+      pay221().click();
+      ok('task221: paying charges the 30 Shards and arranges nothing yet',
+         g221.data.shards === 70 && !g221.hasResurrection(), `sh=${g221.data.shards} res=${g221.hasResurrection()}`);
+      ok('task221: the deal pick is armed by the payment', !!pick221() && pick221().disabled === false);
+      pick221().click();
+      ok('task221: taking it arranges exactly one deal, at the right book/section',
+         g221.data.resurrections.length === 1 && g221.data.resurrections[0].book === 2 && String(g221.data.resurrections[0].section) === '60',
+         JSON.stringify(g221.data.resurrections));
+      ok('task221: the pick spends its key and no further Shards move',
+         g221.getFlag('pact') === false && g221.data.shards === 70 && pick221().disabled === true,
+         `flag=${g221.getFlag('pact')} sh=${g221.data.shards}`);
+
+      // The payment need not be money — a temple may charge an ability point. The cost
+      // arms the same way, so the deal is still locked until it is actually paid.
+      const xmlOath = '<section><p><lose ability="?" amount="1" price="oath">Give up a point</lose> to <resurrection book="2" section="61" flag="oath">swear the oath</resurrection>.</p></section>';
+      const g221b = GameState.create({ name:'Oath', gender:'f', profession:'Warrior', book:2, adv });
+      g221b.data.resurrections = [];
+      const abTotal221 = () => ['charisma','combat','magic','sanctity','scouting','thievery'].reduce((n, a) => n + g221b.abilityNatural(a), 0);
+      const ab0221 = abTotal221();
+      const c221b = document.createElement('div');
+      const st221b = new Story(c221b, g221b, { navigate(){}, onDeath(){}, notify(){} });
+      st221b.begin(parse(xmlOath), 2, 'x221b');
+      const pick221b = () => c221b.querySelector('.reward-pick');
+      ok('task221: an ability-priced deal is locked before the ability is given up',
+         !!pick221b() && pick221b().disabled === true && !g221b.hasResurrection());
+      c221b.querySelector('.pay-action').click();
+      ok('task221: paying costs one ability point and arranges nothing yet',
+         abTotal221() === ab0221 - 1 && !g221b.hasResurrection(), `ab=${abTotal221()}/${ab0221} res=${g221b.hasResurrection()}`);
+      pick221b().click();
+      ok('task221: swearing the oath grants exactly one deal (2/61)',
+         g221b.data.resurrections.length === 1 && String(g221b.data.resurrections[0].section) === '61',
+         JSON.stringify(g221b.data.resurrections));
+
+      // The boundary: §1.597's three-way pick is a choose-one menu, not a lone priced deal,
+      // so it keeps routing through isChooseOne (its behaviour is asserted in suite-inventory).
+      const s597 = await data.getSection(1, '597');
+      ok('task221: §597 stays a choose-one menu, not a priced lone resurrection',
+         isChooseOne(s597, 'x') === true && isPricedResurrection(s597, 'x') === false);
+      // A section-less <resurrection> is the death-revival trigger, never an offer to arrange.
+      ok('task221: a section-less linked resurrection is not a priced award',
+         isPricedResurrection(parse('<section><lose shards="5" price="r"/><resurrection flag="r"/></section>'), 'r') === false);
     }
 
     // --- task 134: a sell with several non-identical matches must ask which one leaves ---

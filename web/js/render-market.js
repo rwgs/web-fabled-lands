@@ -12,7 +12,7 @@ import { normalize, parseTags, splitItemName, isShardsCurrency } from './state.j
 import { canonCargo } from './rules.js';
 import { modal } from './ui.js';
 import { MARKET_TITLES, titleCase, escapeHtml, itemLabel, bonusSuffix } from './render-util.js';
-import { isChooseOne } from './render-rules.js';
+import { isChooseOne, isPricedResurrection } from './render-rules.js';
 import { renderChoosableReward } from './render-rewards.js';
 
 export function renderMarket(story, container, node, path) {
@@ -746,6 +746,10 @@ export function renderResurrection(story, container, node, path) {
   // pick (book1/597: taking it consumes the single choice). (task 63)
   const resFlag = node.getAttribute('flag');
   if (resFlag != null && isChooseOne(story.sectionEl, resFlag)) return renderChoosableReward(story, container, node, path, resFlag);
+  // A LONE flag-linked deal behind a [price=key] cost gates the same way (task 125's
+  // arm-then-take, for the resurrection family): the payment arms the key and this pick
+  // arranges the deal and consumes it — never a free Arrange button. (task 221)
+  if (resFlag != null && isPricedResurrection(story.sectionEl, resFlag)) return renderChoosableReward(story, container, node, path, resFlag);
   const section = node.getAttribute('section');
   const shards = node.getAttribute('shards');
   const supplemental = boolAttr(node.getAttribute('supplemental'));

@@ -27,8 +27,9 @@ records each audit pass and is where new work is filed.
 - [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
 - [x] 219. `<sold>` fires on a sale but its documented twin `<bought>` does nothing on a purchase
 - [x] 220. The documented headless-dump command runs nothing from an MSYS shell, so a stale dump reads as a pass
-- [ ] 221. A single flag-linked `<resurrection>` ignores the payment and renders a free Arrange button
+- [x] 221. A single flag-linked `<resurrection>` ignores the payment and renders a free Arrange button
 - [ ] 222. `ownsSoleLinkedBlessing` reads a linked `<lose blessing>` as a purchase, so a payment that STRIPS a blessing is refused
+- [ ] 223. A choose-one cost is payable when every linked reward is refused, so the payment is deferred rather than spent
 
 **Done**
 
@@ -875,6 +876,26 @@ arms on payment, grants exactly one deal pointing at the right book/section, and
 afterwards; the same behind a `<lose ability="?" amount="1" price="x">`; and book1/597's three-way
 pick still behaves as it does today.
 
+Fixed with the sibling predicate rather than by widening `isPricedItemAward`, since the two families
+grant through different code: `isPricedResurrection(sectionEl, key)` (`render-rules.js`) is true for
+a `[price=key]` cost whose linked rewards are all `<resurrection>`. `renderResurrection` consults it
+directly after its `isChooseOne` line, and `renderOptionalPay` joins it to the routing that sends a
+cost to `renderChooseOnePay` — so the payment only ARMS the key and `grantChosenReward`'s existing
+resurrection branch does the arranging and clears it. Nothing else about the ordinary visible-offer
+path changed, so §4.428's free arrange and §3.351's hidden auto-registration are untouched.
+
+Two details worth recording. The predicate requires `section=` on every linked node: a section-less
+`<resurrection>` is the death-revival trigger (task 98), and routing one through the pick would
+arrange a deal pointing nowhere. And `rewardLabel` now names a wordless `<resurrection section=…/>`
+"Arrange resurrection" instead of falling through to a bare `Choose` — the same hole task 215 closed
+for self-closing effect tags; a node with words (§1.597's "resurrection deal") is unaffected.
+
+`classifyPassive`'s hidden-price `fireReward` was deliberately left alone: it excludes the item
+family but not a resurrection, and firing one through `applyEffect` is a no-op (there is no
+`resurrection` entry in `EFFECT_APPLIERS`), so it neither grants the deal nor disturbs the key the
+new pick reads. Eleven `suite-economy` assertions cover the two payment shapes, the §1.597 boundary
+and the section-less guard.
+
 ---
 
 ## 222. `ownsSoleLinkedBlessing` reads a linked `<lose blessing>` as a purchase, so a payment that STRIPS a blessing is refused
@@ -937,6 +958,44 @@ N on the click and removes the blessing; a `<lose shards="N" price="x">` linked 
 holder and live for everyone else (the existing behaviour, unchanged); and book2/157's wheel is
 still spinnable by a blessed player, which is the regression the routing accident currently
 provides for free.
+
+---
+
+## 223. A choose-one cost is payable when every linked reward is refused, so the payment is deferred rather than spent
+
+**Priority: LOW — nothing is lost. `state.data.flags` is never bulk-cleared (no section entry, no
+save round-trip resets it), so the armed key survives and the reward can still be claimed once the
+blocker lifts. What the player gets is a payment taken now for a reward they cannot collect now,
+with no warning that this is what the click does.**
+
+*(Filed 2026-08-09 while fixing task 221, which routes a lone priced `<resurrection>` down the same
+path. Pre-existing: it applies to task 125's item family exactly as much.)*
+
+`renderChooseOnePay` (`web/js/render-rewards.js`) gates its cost button on affordability alone —
+Shards on hand, or a matching possession for an item forfeit. It never asks whether any linked
+reward is currently takeable, which is precisely the question `rewardWasteReason` (`render-rules.js`)
+already answers for the pick side: a full 12-slot pack refuses an item Take with "No room", and a
+held deal refuses a resurrection pick with "You already have a resurrection deal." So a player with
+a full pack can hand over §3.346's trophy and find the medallion Take disabled; a player already
+holding a deal can pay a temple and find the pick disabled.
+
+The resurrection case is the sharper of the two because `addResurrection` REPLACES the standard deal
+rather than stacking it (task 98), so "you already have one" is not a reason to refuse a *better*
+deal at all — the player would be trading up. It stays refused until the held deal is spent by dying.
+
+Note the asymmetry that makes this a real gap rather than a stylistic one: a *single-reward*
+purchase (`renderOptionalPay`'s ordinary path) already refuses an unaffordable or ineligible click
+in three separate ways — `plan.present && !plan.eligible`, `ownsSoleLinkedBlessing`, and the Shards
+check — while the choose-one cost, which is the one whose reward is deferred to a second click,
+checks the least.
+
+The fix is one clause in `renderChooseOnePay`: when `linkedRewards(sectionEl, key)` is non-empty and
+`rewardWasteReason` refuses every one of them, disable the cost and title it with that reason (the
+first one, or a shared "You cannot take any of these rewards yet."). A menu with one takeable option
+left must stay live, so the test is "every", never "some". `suite-economy` is the natural home,
+alongside tasks 125's and 221's coverage: a full pack cannot pay §3.346's trophy; a deal-holder
+cannot pay a lone priced resurrection; and §1.597's three-way pick stays payable for a deal-holder
+because the wand and the 500 Shards are still takeable.
 
 ---
 

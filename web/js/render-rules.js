@@ -150,6 +150,20 @@ export function isPricedItemAward(sectionEl, key) {
   return rewards.length > 0 && rewards.every((n) => ITEM_FAMILY_TAGS.has(n.tagName.toLowerCase()));
 }
 
+// The resurrection-shaped twin of isPricedItemAward: a LONE flag-linked <resurrection>
+// whose payment lives elsewhere in the section ([price=key] cost). isChooseOne needs two
+// or more rewards (book1/597's wand | Shards | deal is the corpus's only use), so a single
+// priced deal otherwise renders a free Arrange button and grants nothing when paid — the
+// arm-then-take path grants it and clears the key. A section= is required: a section-less
+// <resurrection> is the death-revival trigger, not an offer to arrange. (task 221)
+export function isPricedResurrection(sectionEl, key) {
+  if (key == null || key === '' || !sectionEl) return false;
+  if (!sectionEl.querySelector(`[price="${key}"]`)) return false;
+  const rewards = linkedRewards(sectionEl, key);
+  return rewards.length > 0
+    && rewards.every((n) => n.tagName.toLowerCase() === 'resurrection' && n.getAttribute('section') != null);
+}
+
 // Is there a player-facing (non-hidden) cost for this choose-one key? A hidden price arms
 // the choice for free (an earned "choose your reward" — book1/597).
 export function hasVisiblePay(sectionEl, key) {

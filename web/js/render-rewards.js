@@ -14,7 +14,7 @@ import { makeItem, parseTags, currencyAward, splitItemName } from './state.js';
 import { applyInlineBuy, buyOptions } from './market.js';
 import {
   classifyPassive, groupPlan, groupRollDefers, ownsSoleLinkedBlessing, ITEM_FAMILY_TAGS,
-  linkedRewards, isCounterReward, isChooseOne, isPricedItemAward, hasVisiblePay,
+  linkedRewards, isCounterReward, isChooseOne, isPricedItemAward, isPricedResurrection, hasVisiblePay,
   rewardWasteReason, forcedChoiceGroup, pendingRollVar, viewPendingVars, isFightHeld,
   defaultEffectWords,
 } from './render-rules.js';
@@ -371,7 +371,8 @@ function renderOptionalPay(story, container, node, path, key) {
   // button, so the payment must only ARM the flag — never fire the reward here, or a
   // single payment would over-grant the whole menu and double with the Take button.
   // (tasks 43, 125)
-  if (isChooseOne(story.sectionEl, key) || isPricedItemAward(story.sectionEl, key)) return renderChooseOnePay(story, container, node, path, key);
+  if (isChooseOne(story.sectionEl, key) || isPricedItemAward(story.sectionEl, key)
+      || isPricedResurrection(story.sectionEl, key)) return renderChooseOnePay(story, container, node, path, key);
   const rewards = linkedRewards(story.sectionEl, key);
   const repeatable = rewards.some((r) => isCounterReward(r));
   const memo = 'pay@' + path;
@@ -553,6 +554,9 @@ function rewardLabel(node) {
   if (bl && blessingLabel(bl)) return blessingLabel(bl);
   const af = node.getAttribute('curse') || node.getAttribute('disease') || node.getAttribute('poison');
   if (af) return af;
+  // A wordless <resurrection section=…/> names itself the way the ordinary offer button
+  // does, rather than falling through to a bare "Choose". (task 221)
+  if (tag === 'resurrection') return 'Arrange resurrection';
   return 'Choose';
 }
 
