@@ -31,7 +31,7 @@ phase is picked up from there rather than from the buckets below.
 - [x] 231. A plain `<lose item="?">` effect commits with no picker, so six printed "(your choice)" instructions are ignored
 - [x] 232. The same bare-hazard picker is missing on `<lose cargo="?">` and a `group=`-narrowed forfeit, so 13 more printed choices are ignored
 - [x] 235. A warm Chrome profile serves a day-old test bundle, so the headless loop reports a false `ALL PASS`
-- [ ] 233. §5.578's donation applies against an empty pool and memoises the no-op, so the Brotherhood's cut is never taken
+- [x] 233. §5.578's donation applies against an empty pool and memoises the no-op, so the Brotherhood's cut is never taken
 - [ ] 234. §6.36 strips "your **best** armour, your **best** weapon" and the engine takes the first of each instead
 
 **LOW**
@@ -1797,6 +1797,43 @@ which one the Brotherhood receives and that exactly that one leaves; and a synth
 `<lose item="?"/>` over an empty pack must not lock itself out of a possession gained later in
 the same section. Check the reverse too: an effect that legitimately takes nothing must still not
 re-fire on every render.
+
+**Done 2026-08-09.** Settled as a **deferral, not a conditional memo**: `classifyPassive` gains a
+`forfeitPoolPending` gate that returns `'inert'` — words only, nothing applied and nothing
+memoised — while an open forfeit's pool is not yet the pool the section describes. It is the same
+shape as the pending-roll-var deferral directly above it (task 181: an effect whose input has not
+arrived must not bank a 0), which is why it beat the "memoise only when something was taken"
+candidate: reporting `itemTaken` back to the view would leave a *combined* node (a `<lose>` that
+also spends Stamina, or arms a `price=`) re-applying its other halves on every render. Nothing in
+`engine.js` moved.
+
+Two clauses, both needed, and §5.578 is both at once:
+- **The pool is empty.** A forfeit that took nothing has not happened. `cache=` is excluded —
+  book4/468's villa thief takes what was left there *before* the roll ("lose one possession, if
+  any, that you left here"), so a deposit made after the theft rolled must not be swept up by a
+  loss left standing open.
+- **A `group=` forfeit whose award is still untaken.** Needed on its own: with only the first
+  clause, taking the silver holy symbol makes the pool eligible with one candidate, so the node
+  falls straight through to `'apply'` and donates that one unasked, never seeing the other two.
+  Scoped by `group=`, it reaches exactly this section — the corpus has two `<lose group=>` and
+  book3/132's names its item, so it is not an open forfeit. Matching *any* award in the section
+  would have broken book1/259, whose helmet sits in a mutually exclusive `<outcome>` and would
+  hold the thief's theft for ever.
+
+`needsForfeitChoice`'s shape test is extracted as `isOpenForfeit` and shared, so the two gates
+cannot drift on what "open" means. Once the cut is paid, clause two reads pending again (the
+donated item has left the pack) — harmless: the node carries its `fx@` memo by then and renders
+the same inert words either way, so nothing re-fires and nothing asks twice.
+
+The 12-item carry cap can still strand it: a player with fewer than three free slots cannot take
+all three, so the donation never fires. That is exactly today's outcome for every player, so it is
+a corner left uncovered rather than a regression.
+
+14 new `task233` assertions in `suite-actions` (book5/578 end to end, the synthetic empty-pack
+forfeit, the `item="*"`/named no-ops that must stay spent, and the planner). Verified as real
+cover: disabling the one gate line fails "§5.578 asks which of the three the Brotherhood receives"
+with `picks=0` and the pack still reading `silver holy symbol,fine sabre,Uttakin telescope`. Full
+suite `RESULT ALL PASS pass=2375 fail=0`, Node import suite `pass=35 fail=0`.
 
 ---
 

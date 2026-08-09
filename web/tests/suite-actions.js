@@ -2165,6 +2165,89 @@ export async function run(ctx) {
           ok('task232: choose="f" still pins a cargo sweep', needs232('<lose cargo="?" choose="f"/>') === false);
         }
       }
+
+      // --- task 233: an open forfeit must not settle against a pool still being filled ---
+      // §5.578 awards three items behind Take buttons and then charges "one of the items you
+      // found" as the Brotherhood's cut. On the render that walked the <lose> the pack held
+      // none of them: applyLose took nothing and the 'apply' memo banked that no-op, so the
+      // player kept all three and paid only the 100 Shards. An open forfeit therefore waits
+      // while its pool is empty, or while an award of its own group= is still untaken.
+      {
+        const takes233 = (c) => Array.from(c.querySelectorAll('.take-item')).filter((b) => !b.disabled);
+        const mk233 = (xml, items) => {
+          const g = GameState.create({ name:'T233', gender:'m', profession:'Warrior', book:1, adv });
+          g.data.items = []; items.forEach((it) => g.addItem(it));
+          const c = document.createElement('div');
+          new Story(c, g, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xml), 1, 'x233');
+          return { g, c };
+        };
+
+        // §5.578 end to end: nothing is settled until the loot is actually in the pack.
+        {
+          const g578 = GameState.create({ name:'Thief', gender:'f', profession:'Warrior', book:5, adv });
+          g578.data.items = []; g578.data.shards = 500;
+          const c578 = document.createElement('div');
+          new Story(c578, g578, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(5, '578'), 5, '578');
+          ok('task233: §5.578 asks nothing while its three items sit behind Take buttons',
+             picks226(c578).length === 0 && takes233(c578).length === 3,
+             `picks=${picks226(c578).length} takes=${takes233(c578).length}`);
+          for (let i = 0; i < 3 && takes233(c578).length; i++) takes233(c578)[0].click();
+          ok('task233: §5.578 asks which of the three the Brotherhood receives once all are taken',
+             picks226(c578).length === 3 && g578.data.items.length === 3,
+             `picks=${picks226(c578).length} ${names226(g578)}`);
+          picks226(c578).find((b) => /sabre/i.test(b.textContent)).click();
+          ok('task233: §5.578 hands over exactly the item named and keeps the other two',
+             names226(g578) === 'silver holy symbol,Uttakin telescope', names226(g578));
+          ok('task233: §5.578 charges the 100 Shards on top of the donated item',
+             g578.data.shards === 600, 'shards=' + g578.data.shards);
+        }
+
+        // A bare forfeit over an empty pack must not lock itself out — the possession the
+        // section hands over afterwards still owes it.
+        {
+          const { g, c } = mk233('<section><p>Find a <item name="rope"/>. A thief <lose item="?">steals one item</lose>.</p></section>', []);
+          ok('task233: an open forfeit over an empty pack takes nothing and asks nothing',
+             picks226(c).length === 0 && g.data.items.length === 0 && /steals one item/.test(c.textContent),
+             `picks=${picks226(c).length} ${names226(g)}`);
+          c.querySelector('.take-item').click();
+          ok('task233: the possession gained later in the same section still answers the forfeit',
+             g.data.items.length === 0, names226(g));
+        }
+
+        // The reverse: an effect that legitimately takes nothing is still spent, so it cannot
+        // stand open and eat what the section hands over next.
+        {
+          const sweep = mk233('<section><p><lose item="*">Lose all your possessions</lose>. Then find a <item name="rope"/>.</p></section>', []);
+          sweep.c.querySelector('.take-item').click();
+          ok('task233: an item="*" sweep over an empty pack stays spent', names226(sweep.g) === 'rope', names226(sweep.g));
+          const named = mk233('<section><p><lose item="rope">Cross off the rope</lose>. Then find a <item name="rope"/>.</p></section>', []);
+          named.c.querySelector('.take-item').click();
+          ok('task233: a named forfeit that matched nothing stays spent too', names226(named.g) === 'rope', names226(named.g));
+        }
+
+        // (planner) the rule, DOM-free: which open forfeits wait, and until when.
+        {
+          const g233 = GameState.create({ name:'T233p', gender:'m', profession:'Warrior', book:5, adv });
+          g233.data.items = [];
+          const sec578 = await data.getSection(5, '578');
+          const view233 = (sec = null) => ({ state: g233, sectionEl: sec, ctx: visit.newCtx() });
+          const pending = (xml) => rules.forfeitPoolPending(parse(xml), view233());
+          const cut = () => rules.forfeitPoolPending(sec578.querySelector('lose[item="?"]'), view233(sec578));
+          ok('task233: an open forfeit over an empty pack is held', pending('<lose item="?"/>') === true);
+          ok('task233: the item="*" sweep is never held', pending('<lose item="*"/>') === false);
+          ok('task233: a named forfeit is never held', pending('<lose item="rope"/>') === false);
+          ok('task233: a cache= forfeit settles against what was left there, empty or not',
+             pending('<lose item="?" cache="4.468"/>') === false);
+          ok('task233: §5.578 holds its cut while the loot is untaken', cut() === true);
+          g233.addItem(makeItem('tool', 'silver holy symbol', 2, 'sanctity', [], [], '5.578'));
+          ok('task233: §5.578 still holds after ONE item — it would donate that one unasked', cut() === true);
+          g233.addItem(makeItem('weapon', 'fine sabre', 2, null, [], [], '5.578'));
+          g233.addItem(makeItem('item', 'Uttakin telescope', 0, null, [], [], '5.578'));
+          ok('task233: §5.578 releases its cut once all three are in the pack', cut() === false);
+          ok('task233: an open forfeit over a pack with something in it is never held',
+             pending('<lose item="?"/>') === false);
+        }
+      }
     }
 
     // --- task 118: choice/equipment losses respect the keep tag ---

@@ -821,13 +821,58 @@ export function needsEquipmentChoice(node, state) {
 // §6.36's "your BEST armour, your BEST weapon", which is a rule of its own and not a choice.
 const FORFEIT_NARROWERS = ['tags', 'bonus', 'using'];
 
-export function needsForfeitChoice(node, state) {
+// The shape of that rule on its own, without asking whether a candidate is to spare: a
+// <lose item|cargo> whose spec is the open "?"/blank form, carrying none of the narrowings
+// and none of the choose="f" marks. Shared with the pool gate below, which holds such a
+// forfeit while its pool is not yet the pool the section describes. (task 233)
+function isOpenForfeit(node) {
   if (node.tagName.toLowerCase() !== 'lose') return false;
-  if (node.getAttribute('item') == null && node.getAttribute('cargo') == null) return false;
+  const spec = node.getAttribute('item') != null ? node.getAttribute('item') : node.getAttribute('cargo');
+  if (spec == null) return false;
+  if (spec !== '?' && String(spec).trim() !== '') return false; // a name, or the "*" sweep
   const marked = node.getAttribute('choose');
   if (marked != null && !boolAttr(marked)) return false;
-  if (FORFEIT_NARROWERS.some((a) => node.getAttribute(a) != null)) return false;
+  return !FORFEIT_NARROWERS.some((a) => node.getAttribute(a) != null);
+}
+
+export function needsForfeitChoice(node, state) {
+  if (!isOpenForfeit(node)) return false;
   return losePaymentPlan(node, state).needsChoice; // open form, with a candidate to spare
+}
+
+// Is this open forfeit's pool still unsettled — would applying it NOW bank a no-op, or the
+// wrong pick, in the fx@ memo for the rest of the visit? §5.578 is both shapes at once: it
+// awards three items behind Take buttons and then charges "one of the items you found" as
+// the Brotherhood's cut, so on the render that walks the <lose> the pack holds none of them.
+// applyLose takes nothing, the memo goes down, and the donation is a permanent no-op. (task 233)
+//
+//   (a) The pool is EMPTY. A forfeit that took nothing has not happened, so it must not
+//       memoise: a possession arriving later in the same section still owes it. A cache=
+//       forfeit is excluded — §4.468's villa thief takes what was left there BEFORE the roll
+//       ("lose one possession, if any, that you left here"), so a deposit made after the
+//       theft rolled must not be swept up by a loss still standing open.
+//   (b) A group= forfeit names an award's provenance, and an item-family award of that group
+//       is still untaken. Its pool is not the one the sentence means until the finding is
+//       done: releasing it earlier would donate §5.578's first item the moment it was taken,
+//       never asking, and never seeing the other two.
+//
+// A held node renders as inert words and re-classifies on the next render, so the loss lands
+// as soon as the pool is real. Once it has, (b) reads pending again — the donated item has
+// left the pack — but by then the node carries its memo and renders those same words either
+// way, so nothing re-fires and nothing asks twice.
+export function forfeitPoolPending(node, view) {
+  if (!isOpenForfeit(node)) return false;
+  if (!losePaymentPlan(node, view.state).candidates.length && node.getAttribute('cache') == null) return true;
+  const group = node.getAttribute('group');
+  if (!group || !view.sectionEl) return false;
+  const awards = Array.from(view.sectionEl.querySelectorAll(`[group="${group}"]`))
+    .filter((n) => ITEM_FAMILY_TAGS.has(n.tagName.toLowerCase()));
+  if (!awards.length) return false;
+  // A "choose up to N" controller caps what the section is really offering, so the wait ends
+  // at N picks rather than at every row (which the player was never entitled to).
+  const limit = view.ctx && view.ctx.groupLimits ? view.ctx.groupLimits.get(group) : null;
+  const offered = limit != null ? Math.min(limit, awards.length) : awards.length;
+  return view.state.data.items.filter((it) => it.group === group).length < offered;
 }
 
 // A <tick profession="a|b|c"> asks the player to choose a new profession. (task 75)
@@ -964,6 +1009,11 @@ export function classifyPassive(node, view) {
   // effect (task 69): hold it until the fight resolves, then apply only on the branch
   // actually taken.
   if (isFightHeld(view, node)) return { mode: 'inert', showWords: !hidden };
+
+  // An open forfeit whose pool is not yet the pool the section describes waits: applying it
+  // now would bank a no-op (an empty pack) or the wrong pick (§5.578's cut, charged before
+  // its three Take buttons have been pressed) in a memo the visit can never undo. (task 233)
+  if (!hidden && forfeitPoolPending(node, view)) return { mode: 'inert', showWords: true };
 
   // An open possession forfeit with a candidate to spare is the player's pick, not the
   // engine's first-in-pack default (task 231). It sits BELOW the fight gate on purpose: a
