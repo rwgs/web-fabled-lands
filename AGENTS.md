@@ -112,7 +112,13 @@ Notes:
   `TESTS_OK`. The runner fails a `pass=0` run for this reason; reading a verdict by hand,
   **check the count, not just the words**. (task 235)
 - Use a **fresh `--user-data-dir`** so neither a stale service-worker cache nor the HTTP
-  cache above can serve an old bundle and report a false pass.
+  cache above can serve an old bundle and report a false pass. **Prefix any by-hand profile or
+  dump `fl-` under `%TEMP%`** and the runner collects it: on the way *in* it sweeps `fl-*`
+  directories that are browser profiles (they carry a `Default\` child) and `fl-*.html` dumps
+  older than 12h — matched by shape, so it keeps up with whatever name you invent, and leaves
+  an `fl-*` file that is neither. Sweeping on entry means a run killed mid-flight is collected
+  by the next one. 266 such leftovers had accumulated before this existed, and a 22-hour-old
+  one is what served the day-old bundle. (task 235)
 - **An empty dump is a capture failure, not a page-load failure.** `chrome.exe` and
   `msedge.exe` are Windows GUI-subsystem binaries: launched directly from PowerShell they
   inherit no stdout handle, so `$dump = & chrome.exe … --dump-dom …` yields an empty string

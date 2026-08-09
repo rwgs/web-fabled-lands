@@ -87,6 +87,36 @@ function Find-Browser {
     throw 'No Chrome or Edge found - pass -Browser <path to chrome.exe>.'
 }
 
+# Collect what earlier runs left behind. This run cleans up after itself, but only the paths
+# it controls: a hard-killed browser, a crashed shell, a hand-run chrome.exe from the raw
+# commands in AGENTS.md, or a kept dump from a failing run all leave artifacts nothing owns.
+# Left alone they accumulate silently - 117 profiles and 16 dumps (0.38 GB) had built up in
+# %TEMP% by the time task 235 went looking, and one of them was old enough to serve a day-old
+# test bundle and report a false pass. Sweeping on the way IN (not out) means a run that dies
+# badly is still collected by the next one. Only this project's own names, only when stale,
+# so a concurrent run is never touched. (task 235)
+function Clear-StaleArtifacts([int]$OlderThanHours = 12) {
+    $cutoff = (Get-Date).AddHours(-$OlderThanHours)
+    $tmpDir = [System.IO.Path]::GetTempPath()
+    # Matched by SHAPE, not by an enumerated list of names. Every session that ran the browser
+    # by hand invented its own prefix - fl-udd*, fl-suite*, fl-163-*, fl-review*, fl-probe* -
+    # so a name list would go stale the first time someone typed a new one. What they all have
+    # in common is what they ARE: a Chromium user-data-dir always carries a Default\ child, and
+    # a dumped DOM is always an .html. That pair is narrow enough that an unrelated fl-* temp
+    # file (not a browser profile, not an .html) is never touched.
+    $stale = @()
+    $stale += Get-ChildItem $tmpDir -Directory -Filter 'fl-*' -ErrorAction SilentlyContinue |
+        Where-Object { Test-Path (Join-Path $_.FullName 'Default') }
+    $stale += Get-ChildItem $tmpDir -File -Filter 'fl-*.html' -ErrorAction SilentlyContinue
+    $stale += Get-ChildItem $tmpDir -File -Filter 'fl-serve-*.log' -ErrorAction SilentlyContinue
+    $stale = @($stale | Where-Object { $_.LastWriteTime -lt $cutoff })
+    if (-not $stale.Count) { return }
+    $stale | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "Swept $($stale.Count) stale test artifact(s) older than ${OlderThanHours}h from TEMP."
+}
+
+Clear-StaleArtifacts
+
 $python  = Find-Python
 $browser = Find-Browser
 

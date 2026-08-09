@@ -1874,9 +1874,29 @@ was a local-loop defect only, which is why it survived so long.
 nothing to report — prints `RESULT ALL PASS pass=0 fail=0` and sets `TESTS_OK`. Verified live
 with `-Suite nosuchsuite`. The runner now fails any `pass=0` run.
 
+**The artifacts are swept, not just avoided.** Cleaning up after itself only covers the paths
+this run controls — a hard-killed browser, a crashed shell, a by-hand `chrome.exe` from the raw
+commands, or a dump deliberately kept from a failing run all leave litter nothing owns. By the
+time this task went looking, `%TEMP%` held **266 leftovers** going back to 2026-07-28, and it
+was a 22-hour-old member of that pile that served the day-old bundle. So the runner sweeps them
+**on the way in**, which means a run that dies badly is collected by the next one rather than
+never.
+
+**Matched by shape, not by name.** The first cut enumerated `fl-test-*`/`fl-dump*`/`fl-probe*`
+and immediately proved itself wrong: every session that drove the browser by hand had invented
+its own prefix — `fl-udd*` (54 of them), `fl-suite*`, `fl-163-*`, `fl-review*`, `fl-final*` — so
+a name list goes stale the first time someone types a new one. What they have in common is what
+they *are*: a Chromium user-data-dir always carries a `Default\` child, and a dumped DOM is
+always an `.html`. The sweep takes `fl-*` directories with that child plus `fl-*.html` files,
+over 12h old. Narrow enough that `fl-validate.ps1` and two `fl-shard-*.txt` scratch files sat
+untouched through a sweep that removed 149 items around them, and the 12h floor means a
+concurrent run is never touched. `AGENTS.md` now asks only that a by-hand profile start `fl-`.
+
 Verified: `no-store` present on a served suite file; a second `serve.py` on a held port exits 2
 with its own message; `-Suite nosuchsuite` exits 1 ("No assertions ran"); the runner leaves no
-`fl-test-<guid>` profile and no listener on 8848; and the full suite through it reads
+`fl-test-<guid>` profile and no listener on 8848; the sweep removed a planted 3-day-old profile
+and dump while keeping a freshly-made one, then collected the real 266-item backlog across two
+runs while leaving the three non-profile `fl-*` files alone; and the full suite through it reads
 `RESULT ALL PASS pass=2359 fail=0`, exit 0. `AGENTS.md` step 2 and `README.md`'s Testing section
 now lead with the runner; the hard-won trap notes are kept, marked as what the runner closes,
 because a hand-run command still has every one of them. `.github/workflows/smoke.yml` is
