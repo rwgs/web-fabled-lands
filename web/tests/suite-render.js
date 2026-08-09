@@ -1256,6 +1256,38 @@ export async function run(ctx) {
       ok('task215: §1.186 hands over 75 Shards in the printed sentence', /hands you over 75 Shards/.test(s186), s186.slice(0, 200));
       const s26 = await shown(4, '26');
       ok('task215: §4.26 prints its lone codeword paragraph', /Tick the codeword Dread\./.test(s26), s26.slice(0, 200));
+
+      // --- task 227: an affliction tag names itself the same way ---
+      // Task 215's LABELLED_EFFECT_TAGS was tick/gain/lose, so <curse>/<disease>/<poison>
+      // returned '' and every wordless one printed a hole. JaFL gives them the same default
+      // ("the name of the curse will be used for the default text, if present").
+      ok('task227: a wordless <curse> prints its name', label('<curse name="Blight of Nagil"/>') === 'Blight of Nagil', label('<curse name="Blight of Nagil"/>'));
+      ok('task227: <disease> and <poison> do the same',
+         label('<disease name="Red Ague"/>') === 'Red Ague' && label('<poison name="poisoned"/>') === 'poisoned',
+         `${label('<disease name="Red Ague"/>')} / ${label('<poison name="poisoned"/>')}`);
+      ok('task227: a name-like label is printed as written, not sentence-capitalised',
+         rules.defaultEffectWords(parse(sec('<p><poison name="poisoned"/></p>')).querySelector('poison'), g215, true) === 'poisoned');
+      const tAfHid = rulesText(sec('<p>Nothing happens.<curse name="Curse of Ugliness" hidden="t"/></p>'));
+      ok('task227: a hidden affliction stays wordless', tAfHid.indexOf('Curse of Ugliness') < 0, tAfHid);
+      const tAfWords = rulesText(sec('<p>You <disease name="Leprosy">contract the disease</disease>.</p>'));
+      ok('task227: an affliction with its own words keeps them (§2.136 shape)',
+         /You contract the disease\./.test(tAfWords) && tAfWords.indexOf('Leprosy') < 0, tAfWords);
+
+      // (end to end) §4.78's sentence, behind its codeword gate, must read whole.
+      const g78 = GameState.create({ name: 'S78', gender: 'm', profession: 'Warrior', book: 4, adv });
+      g78.addCodeword('UndeadDamage');
+      const c78 = document.createElement('div');
+      new Story(c78, g78, { navigate() {}, onDeath() {}, notify() {} }).begin(await data.getSection(4, '78'), 4, '78');
+      const s78 = c78.textContent.replace(/\s+/g, ' ');
+      ok('task227: §4.78 names the Blight of Nagil in the middle of its sentence',
+         /Note you have the Blight of Nagil, and reduce your CHARISMA/.test(s78), s78.slice(0, 300));
+
+      // The regression: §5.238's stone bracelet carries the corpus's only affliction nested
+      // in an item award. applyItemAward applies it on pickup, so it is never walked as a
+      // passive — the name must not appear beside the Take button.
+      const s238 = await shown(5, '238');
+      ok('task227: §5.238 shows the bracelet as one Take button with no stray curse name',
+         s238.indexOf('Curse of Blighted Magic') < 0 && /Take Stone Bracelet/.test(s238), s238.slice(0, 400));
     }
 
     // --- task 217: a visit-box redirect below the section head halts the section too ---

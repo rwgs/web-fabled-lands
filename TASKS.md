@@ -34,7 +34,7 @@ records each audit pass and is where new work is filed.
 - [x] 223. A choose-one cost is payable when every linked reward is refused, so the payment is deferred rather than spent
 - [x] 224. A `price=`/`flag=` key strips an open ability loss of its chooser, so the engine picks which ability the player forfeits
 - [x] 225. The "pay to spin" cost is the third payment path that commits an open ability loss with no chooser
-- [ ] 227. A wordless `<curse>`/`<disease>`/`<poison>` prints no name, so its printed sentence has a hole
+- [x] 227. A wordless `<curse>`/`<disease>`/`<poison>` prints no name, so its printed sentence has a hole
 - [ ] 228. `showForfeitPicker` can only answer for one item, so a `multiple=` forfeit it offers would under-charge
 
 **Done**
@@ -1341,6 +1341,26 @@ appear beside the Take button.
 `suite-render` beside task 215's default-words block is the natural home — a wordless
 `<curse name="X"/>` prints "X", a `hidden="t"` one prints nothing, book4/78's sentence reads whole,
 and book5/238's bracelet award still shows one button and no stray curse name.
+
+Fixed as described, in `defaultEffectWords` (`render-rules.js`): the three tags join
+`LABELLED_EFFECT_TAGS` and a new `AFFLICTION_TAGS` branch returns `get('name')`. The branch sits
+*above* the attribute cascade rather than inside it, because an affliction names itself off its own
+`name=` and shares none of the `codeword`/`item`/`shards` keys the cascade reads — and the
+allowlist confirms it, permitting only `cumulative`/`lift`/`name` on `<curse>` and `name` alone on
+the other two. It returns the name as written rather than `cap`-ing it, matching the `<lose curse=>`
+attribute form directly below: `cap` is for the two verb-led labels, not for a name.
+
+The two guards really did carry over untouched, and the `<item>` regression needed no guard at all —
+`renderItemAward` builds its own Take button and never walks the node's children, so book5/238's
+nested curse was already silent there. No book XML changed and no allowlist entry was needed: the
+14 nodes were correctly written all along.
+
+Seven `suite-render` assertions beside task 215's block: a wordless `<curse>` prints its name and
+`<disease>`/`<poison>` do the same; the label is printed as written even at a sentence start; a
+`hidden="t"` affliction stays wordless; §2.136's counter-example — an affliction that *has* words —
+keeps them and does not gain the name as well; §4.78 reads "Note you have the Blight of Nagil, and
+reduce your CHARISMA…" behind its codeword gate; and §5.238's bracelet still shows one Take button
+with no stray curse name.
 
 ---
 

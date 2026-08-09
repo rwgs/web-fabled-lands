@@ -953,7 +953,13 @@ export function classifyPassive(node, view) {
 // Returns '' when the tag has no default (an ability/god/special/profession effect, a wildcard
 // selector), so a wordless tag this rule does not know still prints nothing rather than having
 // wording invented for it.
-const LABELLED_EFFECT_TAGS = new Set(['tick', 'gain', 'lose']);
+// The affliction tags carry the same JaFL default as <lose curse=> below — "the name of the
+// curse will be used for the default text, if present" (rules/JaFL-XML-Tags.md, under <lose>
+// and again under <curse>) — and the corpus writes 14 of them around the tag, so a wordless
+// one left a hole mid-sentence: book4/78's "Note you have the , and reduce your CHARISMA…".
+// (task 227)
+const LABELLED_EFFECT_TAGS = new Set(['tick', 'gain', 'lose', 'curse', 'disease', 'poison']);
+const AFFLICTION_TAGS = new Set(['curse', 'disease', 'poison']);
 const SILENT_CONTENT_WRAP = new Set(['group', 'effect']);
 
 export function defaultEffectWords(node, state, atSentenceStart = false) {
@@ -965,6 +971,9 @@ export function defaultEffectWords(node, state, atSentenceStart = false) {
   // Only the two verb-led labels need it, but JaFL capitalises any default that opens a
   // sentence (isNewSentence) — book4/184's whole paragraph is the tag plus a full stop.
   const cap = (s) => (atSentenceStart && s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+  // An affliction names itself, exactly as the <lose curse=> attribute form does below: a
+  // name-like label, so it is printed as written rather than sentence-capitalised. (task 227)
+  if (AFFLICTION_TAGS.has(tag)) return node.getAttribute('name') || '';
   const losing = tag === 'lose';
   if (get('codeword') != null) return cap(`${losing ? 'erase' : 'tick'} the codeword ${get('codeword')}`);
   if (losing && get('stamina') != null) {
