@@ -2442,6 +2442,9 @@ export async function run(ctx) {
       ok('task221: an ability-priced deal is locked before the ability is given up',
          !!pick221b() && pick221b().disabled === true && !g221b.hasResurrection());
       c221b.querySelector('.pay-action').click();
+      // An open "?" cost names no ability, so paying now asks which point leaves before it
+      // arms the key (task 224) — the total still moves by exactly one.
+      Array.from(c221b.querySelectorAll('.ability-pick')).find((b) => /Combat/.test(b.textContent)).click();
       ok('task221: paying costs one ability point and arranges nothing yet',
          abTotal221() === ab0221 - 1 && !g221b.hasResurrection(), `ab=${abTotal221()}/${ab0221} res=${g221b.hasResurrection()}`);
       pick221b().click();
@@ -2590,6 +2593,95 @@ export async function run(ctx) {
       ok('task223: §634 the trade completes — pearls out, trident in, pack still full',
          g634b.findItems('bag of pearls').length === 0 && g634b.findItems('magic trident').length === 1 && g634b.freeSlots() === 0,
          `pearls=${g634b.findItems('bag of pearls').length} trident=${g634b.findItems('magic trident').length} free=${g634b.freeSlots()}`);
+    }
+
+    // --- task 224: a price=/flag= key must not strip an open ability loss of its chooser ---
+    { // block-scoped
+      // classifyPassive tests price= and flag= long before needsAbilityChoice, so "lose 1
+      // point from ANY ability" carrying either half of the idiom never routes to
+      // 'ability-choice'. The payment paths now ask the question themselves; without it the
+      // engine took the first candidate above 1 — CHARISMA for almost every character.
+      const ABS224 = ['charisma','combat','magic','sanctity','scouting','thievery'];
+      const scores224 = (g) => ABS224.map((a) => g.abilityNatural(a)).join(',');
+      const picks224 = (c) => Array.from(c.querySelectorAll('.ability-pick'));
+      const setAbs224 = (g, at1) => ABS224.forEach((a) => { g.data.abilities[a] = a === at1 ? 1 : 7; });
+
+      // The cost node IS the open loss ('optional-pay'): §157's shape re-keyed to a price.
+      const xmlCost224 = '<section><p><lose ability="?" amount="1" price="k">Give up a point of any ability</lose> and <gain shards="50" flag="k"/> is yours.</p></section>';
+      const gCost224 = GameState.create({ name:'Ab', gender:'f', profession:'Warrior', book:2, adv });
+      gCost224.data.shards = 0; setAbs224(gCost224, 'magic'); // MAGIC already at its minimum
+      const cCost224 = document.createElement('div');
+      new Story(cCost224, gCost224, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlCost224), 2, 'x224a');
+      const payCost224 = cCost224.querySelector('.pay-action');
+      ok('task224: an open ability cost renders a live pay button and no picker yet',
+         !!payCost224 && payCost224.disabled === false && picks224(cCost224).length === 0,
+         payCost224 ? `dis=${payCost224.disabled} picks=${picks224(cCost224).length}` : 'no pay button');
+      payCost224.click();
+      ok('task224: clicking it asks WHICH ability — one button per ability above 1',
+         picks224(cCost224).length === 5 && !picks224(cCost224).some((b) => /Magic/.test(b.textContent)),
+         picks224(cCost224).map((b) => b.textContent.trim()).join('|'));
+      ok('task224: nothing is taken or granted before the pick',
+         gCost224.data.shards === 0 && scores224(gCost224) === '7,7,1,7,7,7',
+         `sh=${gCost224.data.shards} ab=${scores224(gCost224)}`);
+      picks224(cCost224).find((b) => /Combat/.test(b.textContent)).click();
+      ok('task224: picking COMBAT takes the point from COMBAT and from nothing else',
+         scores224(gCost224) === '7,6,1,7,7,7', scores224(gCost224));
+      ok('task224: and the linked reward is granted with that pick', gCost224.data.shards === 50, `sh=${gCost224.data.shards}`);
+
+      // The same open loss on the OTHER half of the link: a flag= effect the payment applies.
+      const xmlFlag224 = '<section><p><lose shards="10" price="f">Pay 10 Shards</lose> and <lose ability="?" amount="1" flag="f">lose a point from any ability</lose>.</p></section>';
+      const gFlag224 = GameState.create({ name:'Ab2', gender:'m', profession:'Warrior', book:2, adv });
+      gFlag224.data.shards = 30; setAbs224(gFlag224, null);
+      const cFlag224 = document.createElement('div');
+      new Story(cFlag224, gFlag224, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlFlag224), 2, 'x224b');
+      const payFlag224 = cFlag224.querySelector('.pay-action');
+      ok('task224: a flag-linked open loss shows no picker until the cost is clicked',
+         !!payFlag224 && payFlag224.disabled === false && picks224(cFlag224).length === 0);
+      payFlag224.click();
+      ok('task224: the flag-linked shape asks the same question', picks224(cFlag224).length === 6,
+         String(picks224(cFlag224).length));
+      picks224(cFlag224).find((b) => /Thievery/.test(b.textContent)).click();
+      ok('task224: the point leaves the named ability and the cost is paid once',
+         gFlag224.data.shards === 20 && scores224(gFlag224) === '7,7,7,7,7,6',
+         `sh=${gFlag224.data.shards} ab=${scores224(gFlag224)}`);
+
+      // The choose-one landing (here a priced resurrection) armed its menu with no chooser
+      // too — the shape the unpublished-book conversion hit: a pact bought with a point.
+      const xmlPact224 = '<section><p><lose ability="?" amount="1" price="p">Give up a point of any ability</lose> to <resurrection book="2" section="60" flag="p">arrange a pact</resurrection>.</p></section>';
+      const gPact224 = GameState.create({ name:'Pact', gender:'f', profession:'Warrior', book:2, adv });
+      gPact224.data.resurrections = []; setAbs224(gPact224, null);
+      const cPact224 = document.createElement('div');
+      new Story(cPact224, gPact224, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlPact224), 2, 'x224c');
+      cPact224.querySelector('.pay-action').click();
+      ok('task224: a priced-resurrection cost asks which ability before it arms the menu',
+         picks224(cPact224).length === 6 && gPact224.hasResurrection() === false,
+         `picks=${picks224(cPact224).length} deal=${gPact224.hasResurrection()}`);
+      picks224(cPact224).find((b) => /Scouting/.test(b.textContent)).click();
+      ok('task224: the arming point leaves SCOUTING only', scores224(gPact224) === '7,7,7,7,6,7', scores224(gPact224));
+      cPact224.querySelector('.reward-pick').click();
+      ok('task224: and the pact is then collectable', gPact224.hasResurrection() === true);
+
+      // The regression the current routing gives for free: §2.157's key arms a <random>, so
+      // isRollGate keeps its range-1 open loss on the 'ability-choice' path. Its picker must
+      // still come from renderAbilityChoice, not from the payment.
+      const g157c = GameState.create({ name:'Wheel', gender:'m', profession:'Warrior', book:2, adv });
+      g157c.data.shards = 100; setAbs224(g157c, null);
+      const c157c = document.createElement('div');
+      const st157c = new Story(c157c, g157c, { navigate(){}, onDeath(){}, notify(){} });
+      st157c.begin(await data.getSection(2, '157'), 2, '157');
+      c157c.querySelector('.pay-action').click();
+      ok('task224: §2.157 the wheel cost takes its 20 Shards and asks no ability question',
+         g157c.data.shards === 80 && picks224(c157c).length === 0,
+         `sh=${g157c.data.shards} picks=${picks224(c157c).length}`);
+      const _rnd224 = Math.random; Math.random = () => 0; // every d6 reads 1 → outcome range 1
+      c157c.querySelector('.btn-roll').click();
+      await new Promise((r) => setTimeout(r, 30));
+      Math.random = _rnd224;
+      ok('task224: §2.157 rolling 1 still offers the ability picker (renderAbilityChoice)',
+         picks224(c157c).length === 6, String(picks224(c157c).length));
+      picks224(c157c).find((b) => /Sanctity/.test(b.textContent)).click();
+      ok('task224: §2.157 the wheel takes the point the player named',
+         scores224(g157c) === '7,7,7,6,7,7', scores224(g157c));
     }
 
     // --- task 134: a sell with several non-identical matches must ask which one leaves ---

@@ -761,6 +761,18 @@ export function needsAbilityChoice(node) {
   return s === '?' || s.includes('|');
 }
 
+// Which node of a price/flag purchase asks the player to name an ability — the cost itself,
+// or a linked effect the payment applies with it — else null. classifyPassive tests price=
+// and flag= long before it reaches needsAbilityChoice, so an open ability spec carrying either
+// half of the idiom never routes to 'ability-choice'; without this the payment commits it with
+// no chooser and abilityTargets falls back to the first candidate above 1 (CHARISMA for almost
+// every character). The payment view offers the picker instead of the cascade being reordered:
+// price= must keep winning, because the payment has to arm its key. (task 224)
+export function openAbilityNode(costNode, rewards = []) {
+  if (costNode && needsAbilityChoice(costNode)) return costNode;
+  return rewards.find((r) => needsAbilityChoice(r)) || null;
+}
+
 // Does a <tick …="?" addbonus|addtag|removetag> ask the player to choose WHICH
 // possession is enchanted? Only when the target is an open "?"/blank of a kind with
 // more than one candidate — a name/all, a tags=/using= narrowing, or a cache target

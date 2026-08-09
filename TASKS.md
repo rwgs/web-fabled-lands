@@ -30,7 +30,8 @@ records each audit pass and is where new work is filed.
 - [x] 221. A single flag-linked `<resurrection>` ignores the payment and renders a free Arrange button
 - [x] 222. `ownsSoleLinkedBlessing` reads a linked `<lose blessing>` as a purchase, so a payment that STRIPS a blessing is refused
 - [x] 223. A choose-one cost is payable when every linked reward is refused, so the payment is deferred rather than spent
-- [ ] 224. A `price=`/`flag=` key strips an open ability loss of its chooser, so the engine picks which ability the player forfeits
+- [x] 224. A `price=`/`flag=` key strips an open ability loss of its chooser, so the engine picks which ability the player forfeits
+- [ ] 225. The "pay to spin" cost is the third payment path that commits an open ability loss with no chooser
 
 **Done**
 
@@ -1135,6 +1136,68 @@ from COMBAT and from nothing else; the linked reward is granted on that pick and
 same shape as a `flag=`-linked loss behaves identically; and book2/157's wheel still resolves its
 range-1 outcome through `renderAbilityChoice` unchanged, which is the regression the current
 routing provides for free.
+
+Fixed as described — the picker is offered on the payment paths, and the cascade keeps its order.
+`openAbilityNode(costNode, rewards)` (`render-rules.js`) names the node that has to ask: the cost
+itself, or a linked effect the payment applies with it, because the open spec can sit on either
+half of the price/flag link. `showAbilityPicker` (`render-rewards.js`) is the ability twin of
+`showForfeitPicker`, reusing `story.appendAbilityPicker` and `abilityChoiceOptions`'s `forLoss`,
+so "you cannot choose an ability that already has a value of 1" needs no code of its own.
+
+`renderOptionalPay`'s `commit` grew a second parameter — `forNode`, the node the chooser answers
+for, defaulting to the cost. That is the whole reason the two pickers can share one commit: a
+forfeit picker's chooser names the cost's own possession and an item candidate is not a valid
+answer for an ability, so the chooser reaches exactly one node instead of every node.
+`renderChooseOnePay` asks `needsAbilityChoice` directly, between the item-availability check and
+the plain arming click — the same "give up a point" shape task 221 already covers for a lone
+priced `<resurrection>`.
+
+Fourteen `suite-economy` assertions across the three landings (a priced cost, a `flag=`-linked
+loss, a priced resurrection) plus the §2.157 regression: the wheel still charges 20 Shards with no
+ability question, and its range-1 outcome still picks through `renderAbilityChoice`. Task 221's
+own ability-priced oath fixture now names its point before the key arms — the assertion moved by
+exactly the defect this task fixes, since the point it used to lose silently was CHARISMA's.
+
+---
+
+## 225. The "pay to spin" cost is the third payment path that commits an open ability loss with no chooser
+
+**Priority: LOW — unreached by books 1–6, and the same latency task 224 carried before it. No
+shipped section keys an open ability spec to a `price=` at all (the corpus holds one such pair,
+book2/157's, and it is `flag=`-keyed on both sides).**
+
+*(Filed 2026-08-09 while completing task 224.)*
+
+Task 224 recorded "both landing paths" for a payment that commits an open ability spec —
+`renderOptionalPay` and `renderChooseOnePay` — and fixed those two. There is a **third**:
+`classifyPassive` routes a `price=` cost whose key arms a roll to `roll-payment`, and
+`renderRollPayment` (`render-rewards.js`) commits it the same blind way:
+
+```js
+btn.addEventListener('click', () => {
+  applyEffect(node, story.state, {}); // deduct the cost + set flag key (arms the roll)
+  story.rerender();
+});
+```
+
+So `<lose ability="?" amount="1" price="k"/>` beside a `<random flag="k"/>` — "give up a point of
+any ability to spin" — still docks whatever `abilityTargets` finds first, which is CHARISMA for
+almost every character. Note this is the *cost* side only: book2/157 proves the reward side is
+already safe, because a roll-gated `flag=` node falls through `classifyPassive`'s flag branch to
+`needsAbilityChoice` and gets `renderAbilityChoice`.
+
+The fix is task 224's, reused verbatim: `needsAbilityChoice(node)` as a branch above the plain
+click, revealing `showAbilityPicker` and arming with `{ chooser }` once the player answers. Both
+helpers already exist and are already exported/private in the right modules; the branch is the
+only new code. `suite-economy` beside task 224's block is the natural home — a synthetic
+`<lose ability="?" price="k"/>` + `<random dice="1" flag="k"/>`: the spin cost offers a pick per
+ability above 1, picking COMBAT takes the point from COMBAT and arms the roll, and the roll then
+resolves normally.
+
+Left open rather than folded into task 224 because it is a separate landing path with its own
+regression surface (`renderRollPayment` is the repeatable pay↔roll cycle — the flag is consumed by
+the roll, not memoised — so its picker must not survive into the next round), and the workflow
+files findings instead of widening the task in hand.
 
 ---
 

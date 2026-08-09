@@ -16,7 +16,7 @@ import {
   classifyPassive, groupPlan, groupRollDefers, ownsSoleLinkedBlessing, ITEM_FAMILY_TAGS,
   linkedRewards, isCounterReward, isChooseOne, isPricedItemAward, isPricedResurrection, hasVisiblePay,
   rewardWasteReason, menuWasteReason, forcedChoiceGroup, pendingRollVar, viewPendingVars, isFightHeld,
-  defaultEffectWords,
+  defaultEffectWords, needsAbilityChoice, openAbilityNode,
 } from './render-rules.js';
 import { aggregateFightOutcome } from './render-gates.js';
 import { titleCase, bonusSuffix, blessingLabel } from './render-util.js';
@@ -390,9 +390,16 @@ function renderOptionalPay(story, container, node, path, key) {
   // "?" forfeit needs a which-one picker. (tasks 113, 117)
   const isLose = node.tagName.toLowerCase() === 'lose';
   const plan = isLose ? losePaymentPlan(node, story.state) : null;
-  const commit = (chooser) => {
-    applyEffect(node, story.state, chooser ? { chooser } : {});
-    rewards.forEach((r) => applyEffect(r, story.state, {}));
+  // An open ability spec on either half of the price/flag link ("lose 1 point from any
+  // ability" as the cost, or as the effect the payment applies) has to name what leaves
+  // here — classifyPassive routed it past 'ability-choice'. (task 224)
+  const abilityNode = openAbilityNode(node, rewards);
+  // `forNode` is the node the chooser answers for: a forfeit picker names the cost's own
+  // possession (the default), an ability picker names the ability of whichever node asked.
+  // Keeping them apart matters — an item candidate is not a valid answer for an ability.
+  const commit = (chooser, forNode = node) => {
+    applyEffect(node, story.state, chooser && forNode === node ? { chooser } : {});
+    rewards.forEach((r) => applyEffect(r, story.state, chooser && forNode === r ? { chooser } : {}));
     if (!repeatable) story.ctx.applied.add(memo);
     story.rerender();
   };
@@ -410,6 +417,11 @@ function renderOptionalPay(story, container, node, path, key) {
     // Open "?" weapon/armour/cargo with more than one candidate: reveal a picker so the
     // player names the exact forfeit rather than the engine silently taking the first.
     btn.addEventListener('click', () => { btn.disabled = true; showForfeitPicker(story, container, plan, commit); });
+  } else if (abilityNode) {
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      showAbilityPicker(story, container, abilityNode, (chooser) => commit(chooser, abilityNode));
+    });
   } else {
     btn.addEventListener('click', () => commit(null));
   }
@@ -432,6 +444,17 @@ function showForfeitPicker(story, container, plan, commit) {
     box.appendChild(b);
   });
   container.appendChild(box);
+}
+
+// Reveal a "which ability?" picker for an open ability spec ("?" / "a|b") a payment is about
+// to commit, so the point leaves the ability the player names rather than the first candidate
+// the engine finds. The ability twin of showForfeitPicker; abilityChoiceOptions's forLoss
+// already drops anything at 1 — the printed "you cannot choose an ability that already has a
+// value of 1" — so eligibility needs no code of its own here. (task 224)
+function showAbilityPicker(story, container, node, commit) {
+  const isLoss = node.tagName.toLowerCase() === 'lose';
+  const opts = abilityChoiceOptions(node.getAttribute('ability'), story.state, isLoss);
+  story.appendAbilityPicker(container, opts, (ab) => commit(() => [ab]), isLoss ? '−' : '+');
 }
 
 // Render a force="f" optional effect as a once-per-visit opt-in button (task 74). When
@@ -497,6 +520,16 @@ function renderChooseOnePay(story, container, node, path, key) {
     btn.disabled = true; btn.title = 'Not enough Shards';
   } else if (item != null && !story.state.hasItemMatch(item, node.getAttribute('tags'))) {
     btn.disabled = true; btn.title = 'You have nothing to give.';
+  } else if (needsAbilityChoice(node)) {
+    // An open ability spec buys the menu ("give up a point of any ability"): the player names
+    // which point leaves, then the arming happens with that answer. (task 224)
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      showAbilityPicker(story, container, node, (chooser) => {
+        applyEffect(node, story.state, { chooser });
+        story.rerender();
+      });
+    });
   } else {
     btn.addEventListener('click', () => {
       applyEffect(node, story.state, {}); // deduct the cost + set flag key (arms the choice)
