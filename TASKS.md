@@ -3,13 +3,17 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-229 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and the open items; **229 is the open item** — file
+230 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), so **the backlog is empty** — file
 new work under the priority bucket that fits, and record the pass in the
 Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
+
+This file is for **defects**. New features are scoped in
+[`ROADMAP.md`](ROADMAP.md) instead, as ordered phases — with the backlog empty, a
+phase is picked up from there rather than from the buckets below.
 
 **HIGH**
 
