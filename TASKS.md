@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 230 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), so **the backlog is empty** — file
+misdiagnosis (see the Review log); **231 is the one open item** — file
 new work under the priority bucket that fits, and record the pass in the
 Review log.
 Completed detail sections are archived in
@@ -27,6 +27,7 @@ phase is picked up from there rather than from the buckets below.
 - [x] 226. An open `<lose item="?">` forfeit is taken with no picker, so the engine chooses which possession leaves
 - [x] 229. A `<group>` commits an open `<lose item="?">` with no picker, so a printed "decide which item" is ignored
 - [x] 230. A collapsed `<group>` drops its `<adjustmoney>` child, so §2.134's whole gamble pays nothing
+- [ ] 231. A plain `<lose item="?">` effect commits with no picker, so six printed "(your choice)" instructions are ignored
 
 **LOW**
 
@@ -1562,6 +1563,103 @@ had a `<tick>`/`<lose>` and was an action.
 Six new `task230`/§2.134 assertions in `suite-actions`. Verified as real regression cover by
 restoring the old selector: three of them fail with `pot=10` untouched. Full suite
 `RESULT ALL PASS pass=2320 fail=0` (title `TESTS_OK`), Node import suite `pass=35 fail=0`.
+
+---
+
+## 231. A plain `<lose item="?">` effect commits with no picker, so six printed "(your choice)" instructions are ignored
+
+**Priority: MEDIUM — live in six published sections, all of which print the choice in so many
+words: book1/259, book4/116, book4/131, book4/468, book5/66 and book6/373. Nothing is narrowed by
+a `bonus=`/`using=` filter, so the pool is every possession and the first in pack order is what
+leaves.**
+
+*(Filed 2026-08-09 during conversion work on an unpublished book, whose page carries the same
+sentence. The evidence below is all in the published books.)*
+
+Tasks 117, 226, 228 and 229 gave an open `"?"` forfeit a which-one picker on four paths: the
+plain payment (`renderPayment`), the optional/forced payment
+(`renderOptionalPay`/`renderForcedOptional`), the choose-one menu (`renderChooseOnePay`) and the
+`<group>` click (`groupForfeitChoice`). Every one of those routes through a plan. The **fifth** path
+is the ordinary passive effect — a `<lose>` with no `price=`, no `flag=`, no `force="f"` and no
+`<group>` around it — and it consults no plan at all. `classifyPassive` falls through to its
+`apply` verdict and `renderPassive` (`render-rewards.js`) commits it with the chooser explicitly
+nulled:
+
+```js
+const note = applyEffect(node, story.state, { chooser: null });
+```
+
+`applyLose` then takes its no-chooser branch — `toLose = matches.slice(0, count)`, first in
+inventory order (or first in the named cache when `cache=` is set) — even though
+`losePaymentPlan` would report `needsChoice: true` for the same node and the engine honours a
+chooser whenever one is passed.
+
+There is one earlier gate that could have caught these and does not:
+`classifyPassive`'s `payment` verdict turns an economic `<lose>` into a click-to-apply control, and
+`isEconomicPayment` does accept an `item=` spec. But it is guarded by `view.hasDecline`, which is
+true only when the section carries a `<goto force="f">` — an optional "turn back" exit. **None of
+the six has one** (checked: `grep -c 'goto[^>]*force="f"'` is 0 in all six), which is right, since
+none of these losses is a purchase the player could decline. They are hazards, and hazards are
+exactly what this path renders.
+
+This is the path the books use most, because it is the one a hazard row is written on. Every
+instance below prints the instruction the app ignores:
+
+- **book1/259** — a travel-encounter row: "Thief `<lose item="?">steals one item from you</lose>`
+  **(your choice)**".
+- **book4/468** — a town-house theft row over a named cache: "A thief.
+  `<lose item="?" cache="4.468">Lose one possession</lose>` **(your choice)** if any, that you left
+  here". The cache pool makes the wrong pick more visible, not less: the player deliberately chose
+  what to leave there.
+- **book5/66** — the troll's forfeit when you cannot pay: "`<lose item="?">lose one item</lose>`
+  **(your choice)**".
+- **book4/116** — "you have lost some possessions. Cross **three** items **(your choice)** off your
+  Adventure Sheet", written as three separate `<lose item="?">` nodes. Each takes the first, so it
+  strips the first three in list order. Worth handling as one three-item pick rather than three
+  one-item picks, or the fix asks three times for one printed sentence.
+- **book4/131** — "up to six items **(your choice)** have been stolen.
+  `<lose item="?" multiple="6">Cross them off</lose>".
+- **book6/373** — "1-6 of them are torn away by the raging wind. (`<random dice="1" var="x"/>`; **you
+  decide** `<lose item="?" multiple="x">which possessions to lose</lose>`.)"
+
+The last two carry `multiple=`, and task 229 deliberately left `multiple=` forfeits inside a
+`<group>` engine-chosen. That decision does not transfer, and the reason is the printed sentence,
+not the attribute: 229's two group cases are book3/273 and book3/629, whose pages say "lose **the
+first** 1-6 possessions", whereas book4/131 and book6/373 say "(your choice)" and "you decide". So
+the rule to implement is the count-aware picker task 228 already built (it collects `count`
+answers), applied on this path for both the single and the `multiple=` shapes — and 229's note
+should be re-read as "the corpus's *group* `multiple=` forfeits are sweeps", which it is.
+
+What must NOT start asking:
+
+- `tags="light,useonce"` candle burns (book1/164, book2/440, book2/744, book3/25, book3/196,
+  book3/395, book4/157, book4/598, book6/584) — the tag filter is the choice, and several of these
+  are `hidden="t"` book-keeping.
+- The "listed first" sweeps: book2/248 ("the items stolen are the ones listed first"), book2/521,
+  book3/640 ("take the first two possessions listed on your Adventure Sheet"). Their pages state the
+  order, so a picker would contradict them. There is no attribute distinguishing these from
+  book4/131 — both are `<lose item="?" multiple=…>` on the plain path — so whatever lands must pick
+  a rule and pin the three sweeps with assertions, or state plainly that they are being changed.
+  Narrowing by "the node carries its own descriptive words that name a choice" is not a rule; a
+  candidate rule is to keep the sweeps engine-chosen by giving them an explicit marker in the source
+  and treating an unmarked open forfeit as a choice.
+- `hidden="t"` losses generally: there is no control to hang a picker on.
+
+Sequencing is easier than task 229's: a passive effect has no bundled awards and no `<goto>` to
+hold, so the node can render its words, offer the picker in place of applying, and commit on the
+answer — the shape `renderAbilityChoice` and `renderEquipmentChoice` already use for the same
+problem in the ability and equipment families (both are `classifyPassive` verdicts of their own).
+The natural fix is a sixth verdict beside those two rather than a special case inside `apply`.
+Note that `applyLose`'s memo key is `fx@<path>`, so the deferral must not mark the node applied
+until the pick commits, or the loss is voided by the re-render.
+
+`suite-actions` beside tasks 226/228/229's block: a synthetic section whose `<outcome>` row carries
+`<lose item="?"/>` over two possessions must offer one button per possession, take only the one
+clicked, and take nothing until it is clicked; with one possession it commits with no picker as
+today; `tags=`-narrowed and `hidden="t"` forfeits still ask nothing; a `multiple="2"` open forfeit
+collects two answers; and book4/468 really asks which stored possession the thief takes while
+leaving the carried pack alone, book6/373 asks for `x` of them after its die lands, and book2/248
+still takes the ones listed first.
 
 ---
 
