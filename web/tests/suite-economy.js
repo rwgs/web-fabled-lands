@@ -6,7 +6,7 @@ import * as eng from '../js/engine.js';
 import { fightRound } from '../js/combat.js';
 import { goodsFrom, buyTrade, sellTrade, sellPlan, applyInlineBuy, sellInlineItem, canUpgradeCrew, payChoiceCost } from '../js/market.js';
 import { Story } from '../js/render.js';
-import { isRollGate, isChooseOne, isPricedResurrection } from '../js/render-rules.js';
+import { isRollGate, isChooseOne, isPricedResurrection, rewardWasteReason, ownsSoleLinkedBlessing } from '../js/render-rules.js';
 import { renderGoto } from '../js/render-choices.js';
 import { renderMarket, renderRest } from '../js/render-market.js';
 // app.js only auto-boots when a #app element exists (task 65), so importing its exported
@@ -2457,6 +2457,69 @@ export async function run(ctx) {
       // A section-less <resurrection> is the death-revival trigger, never an offer to arrange.
       ok('task221: a section-less linked resurrection is not a priced award',
          isPricedResurrection(parse('<section><lose shards="5" price="r"/><resurrection flag="r"/></section>'), 'r') === false);
+    }
+
+    // --- task 222: a linked <lose blessing> is a REMOVAL, not a re-buy ----------
+    { // block-scoped
+      // ownsSoleLinkedBlessing exists to refuse a re-buy addBlessing would dedupe away. That
+      // reasoning holds only for a node that GRANTS the blessing: a linked <lose blessing="X">
+      // means the payment exists to take X away, and reading it as a purchase left the button
+      // disabled for exactly the players the transaction is worth making for.
+      const xmlStrip = '<section><p>The priest will release you from your vow: <lose shards="20" price="quit">Pay 20 Shards</lose> and <lose blessing="storm" flag="quit">give up Safety from Storms</lose>.</p></section>';
+      const g222 = GameState.create({ name:'Vow', gender:'m', profession:'Warrior', book:2, adv });
+      g222.data.shards = 100;
+      g222.addBlessing('storm');
+      const c222 = document.createElement('div');
+      const st222 = new Story(c222, g222, { navigate(){}, onDeath(){}, notify(){} });
+      st222.begin(parse(xmlStrip), 2, 'x222');
+      const payStrip = () => c222.querySelector('.pay-action');
+      ok('task222: a payment that STRIPS a blessing is live for the holder',
+         !!payStrip() && payStrip().disabled === false, payStrip() ? `title=${payStrip().title}` : 'no pay button');
+      payStrip().click();
+      ok('task222: paying charges exactly 20 Shards and removes the blessing',
+         g222.data.shards === 80 && g222.hasBlessing('storm') === false, `sh=${g222.data.shards} storm=${g222.hasBlessing('storm')}`);
+
+      // The guard's real case is unchanged: a linked <tick blessing> GRANTS, so a holder is
+      // still refused the re-buy and everyone else may still buy it (book2/133, book3/390).
+      const xmlBuy = '<section><p><lose shards="20" price="buy">Pay 20 Shards</lose> for <tick blessing="storm" flag="buy">Safety from Storms</tick>.</p></section>';
+      const gHas = GameState.create({ name:'Has', gender:'f', profession:'Warrior', book:2, adv });
+      gHas.data.shards = 100; gHas.addBlessing('storm');
+      const cHas = document.createElement('div');
+      new Story(cHas, gHas, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlBuy), 2, 'x222b');
+      const payHas = cHas.querySelector('.pay-action');
+      ok('task222: a linked GRANT is still refused to a holder, with the same reason',
+         !!payHas && payHas.disabled === true && payHas.title === 'You already have this blessing',
+         payHas ? `dis=${payHas.disabled} title=${payHas.title}` : 'no pay button');
+      const gNot = GameState.create({ name:'Not', gender:'f', profession:'Warrior', book:2, adv });
+      gNot.data.shards = 100;
+      const cNot = document.createElement('div');
+      new Story(cNot, gNot, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlBuy), 2, 'x222c');
+      const payNot = cNot.querySelector('.pay-action');
+      ok('task222: the same grant is live for a player without it', !!payNot && payNot.disabled === false);
+      payNot.click();
+      ok('task222: buying it charges 20 Shards and grants the blessing',
+         gNot.data.shards === 80 && gNot.hasBlessing('storm') === true, `sh=${gNot.data.shards} storm=${gNot.hasBlessing('storm')}`);
+
+      // rewardWasteReason reads a choose-one option the same way: a <lose blessing> option is
+      // pickable by a holder, while a <tick blessing> one is refused.
+      ok('task222: a <lose blessing> choose-one option is not "already have this blessing"',
+         rewardWasteReason(gHas, parse('<section><lose blessing="storm"/></section>').querySelector('lose')) === null);
+      ok('task222: a <tick blessing> choose-one option still is',
+         rewardWasteReason(gHas, parse('<section><tick blessing="storm"/></section>').querySelector('tick')) === 'You already have this blessing.');
+
+      // §2.157's golden wheel carries the miscategorised shape (a <lose blessing="*"> on the
+      // price key) and was spinnable only because isRollGate routes it past the guard. A
+      // blessed player must still be able to spin it now that the guard reads it correctly.
+      const g157b = GameState.create({ name:'Blest', gender:'m', profession:'Warrior', book:2, adv });
+      g157b.data.shards = 100; g157b.addBlessing('storm');
+      const c157b = document.createElement('div');
+      const st157b = new Story(c157b, g157b, { navigate(){}, onDeath(){}, notify(){} });
+      st157b.begin(await data.getSection(2, '157'), 2, '157');
+      const pay157b = c157b.querySelector('.pay-action');
+      ok('task222: §2.157 stays spinnable for a blessed player',
+         !!pay157b && pay157b.disabled === false, pay157b ? `title=${pay157b.title}` : 'no pay button');
+      ok('task222: ownsSoleLinkedBlessing no longer reads §157 wheel as a re-buy',
+         ownsSoleLinkedBlessing(st157b.sectionEl.querySelector('[price="x"]'), 'x', st157b.sectionEl, g157b) === false);
     }
 
     // --- task 134: a sell with several non-identical matches must ask which one leaves ---

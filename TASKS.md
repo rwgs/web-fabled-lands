@@ -28,7 +28,7 @@ records each audit pass and is where new work is filed.
 - [x] 219. `<sold>` fires on a sale but its documented twin `<bought>` does nothing on a purchase
 - [x] 220. The documented headless-dump command runs nothing from an MSYS shell, so a stale dump reads as a pass
 - [x] 221. A single flag-linked `<resurrection>` ignores the payment and renders a free Arrange button
-- [ ] 222. `ownsSoleLinkedBlessing` reads a linked `<lose blessing>` as a purchase, so a payment that STRIPS a blessing is refused
+- [x] 222. `ownsSoleLinkedBlessing` reads a linked `<lose blessing>` as a purchase, so a payment that STRIPS a blessing is refused
 - [ ] 223. A choose-one cost is payable when every linked reward is refused, so the payment is deferred rather than spent
 
 **Done**
@@ -958,6 +958,30 @@ N on the click and removes the blessing; a `<lose shards="N" price="x">` linked 
 holder and live for everyone else (the existing behaviour, unchanged); and book2/157's wheel is
 still spinnable by a blessed player, which is the regression the routing accident currently
 provides for free.
+
+Fixed exactly that way, one clause each. `ownsSoleLinkedBlessing` now skips any node whose tag is
+`lose` before collecting `blessing=`, and `rewardWasteReason` reads its `blessing=` only off a
+non-`lose` node — so both predicates now agree with the curse/disease/poison branch that already
+treats a `lose` as a removal. Nothing else moved: a linked `<tick blessing>` / `<gain blessing>` is
+still refused to a holder with the same "You already have this blessing" and still live for everyone
+else, which is what all 23 grant-shaped uses in books 1–6 need.
+
+Skipping the *cost* node too (it is a `lose` in every corpus use) is deliberate rather than
+incidental: a `<lose blessing="X" price="k">` would be the payment spending X, so counting it would
+disable the click for the only players who can make it. No shipped section carries `price=` and
+`blessing=` on one node, so nothing changes today.
+
+Two things left alone on purpose. The mirror check — refusing a `<lose blessing="X">` option to a
+player who does NOT hold X, the way the curse branch says "You don't have that curse." — is not
+added: `hasBlessing` treats `*`/`?` as match-any (task 132), so a punitive "lose all blessings"
+would read as ineligible for an unblessed player rather than as a no-op, and no book needs the
+check. And §2.157 keeps its `roll-payment` routing; the coverage now pins the wheel as spinnable by
+a blessed player through the predicate being right, not through that routing.
+
+Nine `suite-economy` assertions: the removal shape live and charging exactly N, the grant shape
+refused to a holder and live-and-granting to everyone else, `rewardWasteReason` split across a
+`<lose blessing>` and a `<tick blessing>` option, and §2.157 spinnable with the predicate returning
+false for its key.
 
 ---
 

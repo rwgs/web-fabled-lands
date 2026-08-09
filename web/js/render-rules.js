@@ -103,7 +103,15 @@ export function ownsSoleLinkedBlessing(node, key, sectionEl, state) {
   const nodes = [node];
   if (sectionEl) nodes.push(...sectionEl.querySelectorAll(`[flag="${key}"]`));
   const blessings = new Set();
-  nodes.forEach((el) => { const b = el.getAttribute && el.getAttribute('blessing'); if (b) blessings.add(b); });
+  // Only a blessing-GRANTING node counts. A linked <lose blessing="X"> means the opposite —
+  // the payment exists in order to take X away — so reading it as a re-buy would disable the
+  // transaction for exactly the players it is worth making for. The same asymmetry the
+  // curse/disease/poison branch of rewardWasteReason already gets right. (task 222)
+  nodes.forEach((el) => {
+    if (!el.getAttribute || el.tagName.toLowerCase() === 'lose') return;
+    const b = el.getAttribute('blessing');
+    if (b) blessings.add(b);
+  });
   if (blessings.size !== 1) return false;
   return state.hasBlessing([...blessings][0]);
 }
@@ -182,7 +190,9 @@ export function rewardWasteReason(state, node) {
     const isCurrency = tag === 'item' && currencyAward(rawName) != null;
     if (!isCurrency && state.freeSlots() <= 0) return 'No room (12-item carry limit).';
   }
-  const bl = node.getAttribute('blessing');
+  // A blessing you already hold is a wasted GRANT; on a <lose blessing="X"> option it is the
+  // whole point of picking it, so only a granting node is refused here. (task 222)
+  const bl = tag === 'lose' ? null : node.getAttribute('blessing');
   if (bl && state.hasBlessing(bl)) return 'You already have this blessing.';
   if (tag === 'lose') {
     const c = node.getAttribute('curse');
