@@ -1772,6 +1772,94 @@ export async function run(ctx) {
         ok('task228: a multiple= forfeit reports its own count', plan228('<lose item="?" multiple="2"/>').count === 2);
         ok('task228: the equipment kinds keep count 1', plan228('<lose weapon="?"/>').count === 1);
       }
+
+      // --- task 229: a <group>'s bundled open forfeit must ask which possession leaves ---
+      // A group collapses to ONE button and consulted no payment plan: it applied every child
+      // effect with an empty options object, so applyLose fell through to its no-chooser branch
+      // and took the first item in pack order — on §6.496, whose page prints "decide which item
+      // you are handing over" and then gave no way to decide. The picker now runs FIRST and the
+      // whole rest of the group — including its <goto> — waits for it.
+      {
+        const mk229 = (xml, items, shards = 0) => {
+          const g = GameState.create({ name:'T229', gender:'m', profession:'Warrior', book:6, adv });
+          g.data.items = []; g.data.shards = shards; items.forEach((it) => g.addItem(it));
+          const c = document.createElement('div');
+          const nav = [];
+          new Story(c, g, { navigate(b, s){ nav.push(b + '/' + s); }, onDeath(){}, notify(){} }).begin(parse(xml), 6, 'x229');
+          return { g, c, nav };
+        };
+        const grp229 = (lose) => `<section><p><group force="t"><text>hand it over</text>${lose}<goto section="149"/></group></p></section>`;
+
+        // Two possessions: one button each, only the named one leaves, and the group's <goto>
+        // holds until the pick — navigating first would leave the section unchosen.
+        {
+          const { g, c, nav } = mk229(grp229('<lose item="?"/>'), [makeItem('item', 'rope'), makeItem('item', 'lantern')]);
+          const btn = c.querySelector('.group-action');
+          ok('task229: the group renders one live button and no picker yet',
+             !!btn && btn.disabled === false && picks226(c).length === 0,
+             btn ? `dis=${btn.disabled} picks=${picks226(c).length}` : 'no group button');
+          btn.click();
+          ok('task229: a bundled open forfeit asks which possession leaves, taking nothing yet',
+             picks226(c).length === 2 && g.data.items.length === 2 && nav.length === 0,
+             `picks=${picks226(c).length} ${names226(g)} nav=${nav.join()}`);
+          ok('task229: the group button is spent while the picker is open', btn.disabled === true);
+          picks226(c).find((b) => /lantern/i.test(b.textContent)).click();
+          ok('task229: the possession named is the one taken, and only then does the group move on',
+             names226(g) === 'rope' && nav.join() === '6/149', `${names226(g)} nav=${nav.join()}`);
+        }
+
+        // A lone possession is no choice: the click commits and navigates as it always did.
+        {
+          const { g, c, nav } = mk229(grp229('<lose item="?"/>'), [makeItem('item', 'rope')]);
+          c.querySelector('.group-action').click();
+          ok('task229: a lone possession commits and navigates on the click',
+             picks226(c).length === 0 && g.data.items.length === 0 && nav.join() === '6/149',
+             `picks=${picks226(c).length} ${names226(g)} nav=${nav.join()}`);
+        }
+
+        // A NAMED forfeit inside a group asks nothing — it takes that exact item, as before.
+        {
+          const { g, c, nav } = mk229(grp229('<lose item="rope"/>'), [makeItem('item', 'lantern'), makeItem('item', 'rope')]);
+          c.querySelector('.group-action').click();
+          ok('task229: a named forfeit in a group still asks nothing',
+             picks226(c).length === 0 && names226(g) === 'lantern' && nav.join() === '6/149',
+             `picks=${picks226(c).length} ${names226(g)}`);
+        }
+
+        // A multiple= forfeit stays engine-chosen: §3.273/§3.629 bundle "lose the first 1-6 of
+        // your possessions" with the roll that sets the count, and neither page offers a choice.
+        {
+          const { g, c } = mk229(grp229('<lose item="?" multiple="2"/>'),
+            [makeItem('item', 'rope'), makeItem('item', 'lantern'), makeItem('item', 'flask')]);
+          c.querySelector('.group-action').click();
+          ok('task229: a multiple= group forfeit is never a choice — it still takes the first',
+             picks226(c).length === 0 && names226(g) === 'flask', `picks=${picks226(c).length} ${names226(g)}`);
+        }
+
+        // §6.496 for real: the priests' donation asks which possession they receive, and the
+        // 10% of cash still moves. 91 Shards makes the section's own (shards+9)/10 exactly 10.
+        {
+          const g496 = GameState.create({ name:'Priest', gender:'f', profession:'Warrior', book:6, adv });
+          g496.data.items = []; g496.data.shards = 91;
+          [makeItem('item', 'rope'), makeItem('item', 'lantern')].forEach((it) => g496.addItem(it));
+          const c496 = document.createElement('div');
+          const nav496 = [];
+          new Story(c496, g496, { navigate(b, s){ nav496.push(b + '/' + s); }, onDeath(){}, notify(){} })
+            .begin(await data.getSection(6, '496'), 6, '496');
+          c496.querySelector('.group-action').click();
+          ok('task229: §6.496 really asks which item the priests are handed',
+             picks226(c496).length === 2 && g496.data.shards === 91,
+             `picks=${picks226(c496).length} sh=${g496.data.shards}`);
+          picks226(c496).find((b) => /lantern/i.test(b.textContent)).click();
+          ok('task229: §6.496 takes the named possession and the 10% donation together',
+             names226(g496) === 'rope' && g496.data.shards === 81,
+             `${names226(g496)} sh=${g496.data.shards}`);
+          const on149 = Array.from(c496.querySelectorAll('button.goto')).find((b) => /149/.test(b.textContent));
+          ok('task229: §6.496 still reaches 149 once the donation is made', !!on149);
+          on149.click();
+          ok('task229: §6.496 turns to 149', nav496.join() === '6/149', nav496.join());
+        }
+      }
     }
 
     // --- task 118: choice/equipment losses respect the keep tag ---

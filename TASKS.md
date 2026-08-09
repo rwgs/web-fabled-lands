@@ -21,7 +21,8 @@ records each audit pass and is where new work is filed.
 - [x] 214. A visit-box redirect does not hold the section body, so a one-time reward is re-takeable
 - [x] 216. `<if ticks="N">` after an in-section `<tick>` reads the pre-tick count, so "now ticked" branches never fire
 - [x] 226. An open `<lose item="?">` forfeit is taken with no picker, so the engine chooses which possession leaves
-- [ ] 229. A `<group>` commits an open `<lose item="?">` with no picker, so a printed "decide which item" is ignored
+- [x] 229. A `<group>` commits an open `<lose item="?">` with no picker, so a printed "decide which item" is ignored
+- [ ] 230. A collapsed `<group>` drops its `<adjustmoney>` child, so §2.134's whole gamble pays nothing
 
 **LOW**
 
@@ -1480,6 +1481,68 @@ a `<goto>` over two possessions must offer one button per possession, take only 
 and **not navigate until it is chosen**; with a single possession it commits and navigates on the
 click as it does today; a named `<lose item="rope">` in a group still asks nothing; and book6/496
 really asks which possession the priests receive while still transferring the 10% and reaching 149.
+
+**Done 2026-08-09.** `groupForfeitChoice` (`render-rewards.js`) finds the one bundled `<lose>` whose
+`losePaymentPlan` reports `needsChoice`, and `renderGroup` moves its **whole** body — the other
+effects, `buyNodes`/`itemNodes`/`linkedAwards`/`restNodes`, and the `<goto>`/`<return>`/revival
+tail — into a `commit(chooser)` the picker calls, so nothing runs until the item is named and the
+losses still precede the awards. The click reveals `showForfeitPicker` and disables the button;
+with no choice to make it calls `commit(null)` and behaves exactly as before.
+
+**The `multiple=` decision: engine-chosen, no picker.** The corpus has five open forfeits inside a
+`<group>`. book1/370 and book6/135 are `using="t"` (one candidate, so `needsChoice` was already
+false). book6/496 is the fixed case. The other two — book3/273 and book3/629 — are both
+`<random dice="1" var="x"/>` + `<lose item="?" multiple="x"/>`, and 273's page says "lose **the
+first** 1-6 possessions". Asking there would contradict the printed instruction, and the count is a
+rolled var, so a `count===1` rule would ask on a roll of 1 and not otherwise. `groupForfeitChoice`
+therefore skips any `multiple=` forfeit outright — which is also why `renderGroupWithRoll` needed no
+change: both `multiple=` groups are the only open forfeits on that path, and neither asks. (A
+*payment* `multiple=` forfeit still asks, per task 228 — those are priced offers where the player
+chooses what to hand over, not a random sweep.)
+
+Eleven new `task229` assertions in `suite-actions`, including §6.496 end to end. Full suite
+`RESULT ALL PASS pass=2314 fail=0` (title `TESTS_OK`), Node import suite `pass=35 fail=0`.
+
+---
+
+## 230. A collapsed `<group>` drops its `<adjustmoney>` child, so §2.134's whole gamble pays nothing
+
+**Priority: MEDIUM — live in book2/134 (four payouts) and book6/496 (a cache reset). Not latent:
+§2.134 is the Gamblers' Guild wager, and today staking money there can neither lose nor win.**
+
+*(Filed 2026-08-09 while fixing task 229, whose §6.496 fixture is one of the two sections.)*
+
+`groupPlan` (`render-rules.js`) collects a collapsed group's effects with
+
+```js
+const effects = Array.from(node.querySelectorAll('lose, tick, gain, set, curse, transfer'));
+```
+
+`adjustmoney` is missing from that list, and a `kind:'action'` group renders **only** a button — it
+never walks its children — so the tag is silently dropped. Every other effect table in the app
+includes it: `PASSIVE_TAGS` in both `render.js` and `render-rewards.js`, and `PASSIVE_BODY_TAGS` in
+`engine.js`. `renderGroupWithRoll` uses `PASSIVE_TAGS`, so the roll path applies it correctly; only
+the button path loses it.
+
+Two shipped sections reach it:
+
+- **book2/134** — the wager. Each `<outcomes>` branch is a `<group force="t">` bundling the payout
+  with the cache unlock: `<adjustmoney name="2.134" multiply="0"/>` (lose the stake),
+  `multiply="0.5"`, `1.5`, `2`. The `<tick special="unlock">` sibling **is** in the list, so the
+  group classifies as an action and its button applies the unlock and nothing else: the stake
+  returns intact on every roll. Gambling is a no-op — no loss on 2-4, no winnings on 10-12.
+- **book6/496** — `<adjustmoney cache="6.496.1" multiply="0"/>` zeroes the donation cache before the
+  group's `<transfer>` fills it. Harmless per visit (the cache is a sink), but it means the cache
+  accumulates across revisits instead of being reset.
+
+Fix: add `adjustmoney` to `groupPlan`'s selector. Check `disease`/`poison` in the same change —
+they are in all three `PASSIVE_*` sets and equally absent here; a scan of the corpus finds no
+collapsed group carrying either today, so decide whether to add them for consistency or leave the
+selector to what actually ships, and say which.
+
+`suite-actions`: a synthetic collapsed `<group>` with `<adjustmoney multiply="2"/>` over a money
+cache doubles it on the click; and §2.134 end to end — stake 10 Shards, drive the roll to a 2-4
+outcome and confirm the stake is gone, then to a 12 and confirm it comes back doubled.
 
 ---
 

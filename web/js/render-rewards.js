@@ -49,6 +49,25 @@ export function appendFxWords(story, container, node, path) {
 }
 
 // ---- group: an optional, click-to-apply action -----------------------------
+
+// The one bundled forfeit a group must ask about before it commits: an open "?"/blank
+// possession/equipment/cargo <lose> with more candidates than it takes. A group collapses to
+// ONE button and consults no payment plan, so its click fell through to applyLose's
+// no-chooser branch and took whatever came first in pack order — even on §6.496, whose page
+// says "decide which item you are handing over" and then gave no way to decide. A multiple=
+// forfeit is excluded on purpose: the corpus's only group ones are §3.273/§3.629's "lose the
+// first 1-6 of your possessions", a rolled-count sweep the book never offers a choice over,
+// and the count is a var — so it stays engine-chosen whatever that roll comes to. That also
+// leaves renderGroupWithRoll (where both of those live) with nothing to ask. (task 229)
+function groupForfeitChoice(story, effects) {
+  for (const fx of effects) {
+    if (fx.tagName.toLowerCase() !== 'lose' || fx.hasAttribute('multiple')) continue;
+    const plan = losePaymentPlan(fx, story.state);
+    if (plan.needsChoice) return { node: fx, plan };
+  }
+  return null;
+}
+
 // Classification (what the group is and what its click applies) lives in
 // groupPlan (render-rules.js); this builds the matching control.
 export function renderGroup(story, container, node, path) {
@@ -67,8 +86,14 @@ export function renderGroup(story, container, node, path) {
   btn.disabled = done;
   btn.textContent = (done ? '☑ ' : '☐ ') + plan.label;
   if (!done) {
-    btn.addEventListener('click', () => {
-      plan.effects.forEach((fx) => applyEffect(fx, story.state, {}));
+    // A bundled open forfeit is named by the player BEFORE any of this runs: the group is one
+    // button, so its other effects, awards, buys, rests and any <goto>/<return>/revival all
+    // wait for the picker — firing the navigation first would leave the section before the
+    // forfeit was chosen. The losses still precede the awards (a recipe frees the slot its
+    // reward needs), because the whole body simply moves behind the pick. (task 229)
+    const forfeit = groupForfeitChoice(story, plan.effects);
+    const commit = (chooser) => {
+      plan.effects.forEach((fx) => applyEffect(fx, story.state, chooser && fx === forfeit.node ? { chooser } : {}));
       plan.buyNodes.forEach((b) => runBuyNode(story, b));
       plan.itemNodes.forEach((n) => grantItemNode(story, n));
       plan.linkedAwards.forEach((n) => { grantItemNode(story, n); const f = n.getAttribute('flag'); if (f) story.state.setFlag(f, false); });
@@ -96,6 +121,11 @@ export function renderGroup(story, container, node, path) {
       } else {
         story.rerender();
       }
+    };
+    btn.addEventListener('click', () => {
+      if (!forfeit) { commit(null); return; }
+      btn.disabled = true; // the pick replaces the button — never let a second click re-run it
+      showForfeitPicker(story, container, forfeit.plan, commit);
     });
   }
   container.appendChild(btn);
