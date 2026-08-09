@@ -2092,6 +2092,79 @@ export async function run(ctx) {
           window.__FL_INSTANT_DICE__ = false;
         }
       }
+
+      // --- task 232: the same bare hazard must ask which CARGO UNIT leaves ---
+      // Task 231 scoped needsForfeitChoice to item=, so <lose cargo="?"> on the plain path
+      // kept taking the first Unit aboard — in 13 published sections that print the choice
+      // ("of your choice" §1.397 and its twins, "you choose which was lost" §2.534, "you can
+      // choose which is lost" §3.629). Which Unit goes is an economic decision: the goods sell
+      // for different prices per port. group= also stops counting as a narrowing here — it
+      // selects by provenance, not by a property the sentence names.
+      {
+        const mk232 = (xml, cargo) => {
+          const g = GameState.create({ name:'T232', gender:'m', profession:'Warrior', book:1, adv });
+          g.data.items = []; g.data.location = null; // at sea
+          g.data.ships = [{ id:'s1', type:'barque', name:'Ship', crew:'average', cargo: cargo.slice(), docked:null }];
+          const c = document.createElement('div');
+          new Story(c, g, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xml), 1, 'x232');
+          return { g, c };
+        };
+        const hold232 = (g) => g.data.ships[0].cargo.join(',');
+        const bare232 = '<section><p>Much was swept overboard - you <lose cargo="?">lose 1 Cargo Unit</lose>, of your choice.</p></section>';
+
+        // Two Units: one button each, and only the named good goes over the side.
+        {
+          const { g, c } = mk232(bare232, ['timber', 'spices']);
+          ok('task232: a bare cargo forfeit asks which Unit leaves, taking nothing yet',
+             picks226(c).length === 2 && hold232(g) === 'timber,spices', `picks=${picks226(c).length} ${hold232(g)}`);
+          picks226(c).find((b) => /spices/i.test(b.textContent)).click();
+          ok('task232: the Unit named is the one lost', hold232(g) === 'timber', hold232(g));
+        }
+
+        // A single Unit is no choice, and two of the same good leave one behind.
+        {
+          const { g, c } = mk232(bare232, ['timber']);
+          ok('task232: a lone Cargo Unit commits with no picker',
+             picks226(c).length === 0 && hold232(g) === '', `picks=${picks226(c).length} ${hold232(g)}`);
+          const twin = mk232(bare232, ['timber', 'timber']);
+          picks226(twin.c)[0].click();
+          ok('task232: two Units of one good lose exactly one', hold232(twin.g) === 'timber', hold232(twin.g));
+        }
+
+        // §1.397 for real — the storm row whose page says "of your choice".
+        {
+          const g397 = GameState.create({ name:'Storm', gender:'f', profession:'Warrior', book:1, adv });
+          g397.data.items = []; g397.data.location = null;
+          g397.data.ships = [{ id:'s1', type:'barque', name:'Ship', crew:'average', cargo:['furs', 'timber'], docked:null }];
+          const c397 = document.createElement('div');
+          new Story(c397, g397, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(1, '397'), 1, '397');
+          ok('task232: §1.397 asks which Cargo Unit the storm takes', picks226(c397).length === 2, 'picks=' + picks226(c397).length);
+          picks226(c397).find((b) => /furs/i.test(b.textContent)).click();
+          ok('task232: §1.397 sweeps the Unit named overboard', g397.data.ships[0].cargo.join(',') === 'timber',
+             g397.data.ships[0].cargo.join(','));
+        }
+
+        // (planner) cargo joins the rule, group= leaves the narrowers, equipment stays out.
+        {
+          const g232 = GameState.create({ name:'T232p', gender:'m', profession:'Warrior', book:5, adv });
+          g232.data.items = []; g232.data.location = null;
+          [makeItem('tool', 'silver holy symbol', 2, 'sanctity', [], [], '5.578'),
+           makeItem('weapon', 'fine sabre', 2, null, [], [], '5.578'),
+           makeItem('item', 'Uttakin telescope', 0, null, [], [], '5.578'),
+           makeItem('item', 'rope')].forEach((it) => g232.addItem(it));
+          g232.data.ships = [{ id:'s1', type:'barque', name:'Ship', crew:'average', cargo:['furs', 'timber'], docked:null }];
+          const needs232 = (xml) => rules.needsForfeitChoice(parse(xml), g232);
+          ok('task232: an open cargo forfeit with a spare Unit asks', needs232('<lose cargo="?"/>') === true);
+          ok('task232: a named cargo forfeit never asks', needs232('<lose cargo="furs"/>') === false);
+          ok('task232: the equipment kinds stay engine-chosen on this path',
+             needs232('<lose weapon="?"/>') === false && needs232('<lose armour="?"/>') === false);
+          ok('task232: a group= forfeit asks which of that award\'s items leaves',
+             needs232('<lose item="?" group="5.578"/>') === true);
+          ok('task232: the group= pool is that award only, not the whole pack',
+             eng.losePaymentPlan(parse('<lose item="?" group="5.578"/>'), g232).candidates.length === 3);
+          ok('task232: choose="f" still pins a cargo sweep', needs232('<lose cargo="?" choose="f"/>') === false);
+        }
+      }
     }
 
     // --- task 118: choice/equipment losses respect the keep tag ---

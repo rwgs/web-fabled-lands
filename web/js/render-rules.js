@@ -796,24 +796,34 @@ export function needsEquipmentChoice(node, state) {
   return candidates.length > 1;
 }
 
-// Does a bare <lose item="?"> ask the player WHICH possession leaves? Five paths already
-// ask — the plain and optional/forced payments, the choose-one menu and the <group> click
-// (tasks 117, 226, 228, 229) — and every one of them routes through losePaymentPlan. The
-// sixth is the ordinary passive effect, the path a hazard row is written on, which consulted
-// no plan at all and let applyLose take whatever came first in pack order. Six published
-// pages print the choice in so many words: §1.259, §4.116, §4.131, §4.468, §5.66, §6.373.
+// Does a bare <lose item="?">/<lose cargo="?"> ask the player WHICH possession or Cargo Unit
+// leaves? Five paths already ask — the plain and optional/forced payments, the choose-one menu
+// and the <group> click (tasks 117, 226, 228, 229) — and every one of them routes through
+// losePaymentPlan. The sixth is the ordinary passive effect, the path a hazard row is written
+// on, which consulted no plan at all and let applyLose take whatever came first in pack order.
+// Six published pages print the possession choice in so many words (§1.259, §4.116, §4.131,
+// §4.468, §5.66, §6.373) and thirteen more the cargo one — "you lose 1 Cargo Unit, if you had
+// any, of your choice" (§1.397 and its ten twins), "you choose which was lost" (§2.534), "if
+// you have more than one Unit, you can choose which is lost" (§3.629). (tasks 231, 232)
 //
 // The rule is the NARROWING. An open "?"/blank forfeit that names no filter offers the whole
-// pack, so which one leaves is the player's; one narrowed by tags=/bonus=/using=/group= has
-// been chosen BY the filter ("cross off a candle", "a +2 item") and asks nothing. Nothing in
-// the markup otherwise separates §4.131's "up to six items (your choice)" from the sweeps
-// whose pages state the order — "the items stolen are the ones listed first" (§2.248, §2.521,
-// §3.640) — so those three carry an explicit choose="f" in the source and an unmarked open
-// forfeit is a choice. Equipment/cargo forfeits keep their old behaviour on this path. (task 231)
-const FORFEIT_NARROWERS = ['tags', 'bonus', 'using', 'group'];
+// pack, so which one leaves is the player's; one narrowed by tags=/bonus=/using= has been
+// chosen BY the filter ("cross off a candle", "a +2 item") and asks nothing. group= is NOT a
+// narrowing of that kind — it selects by provenance, so §5.578's "one of the items you found"
+// still leaves three like candidates and a page ending "note which items you want to keep"
+// (task 232). Nothing in the markup otherwise separates §4.131's "up to six items (your
+// choice)" from the sweeps whose pages state the order — "the items stolen are the ones listed
+// first" (§2.248, §2.521, §3.640) — so those three carry an explicit choose="f" in the source
+// and an unmarked open forfeit is a choice.
+//
+// The weapon/armour/tool kinds stay out: every open one in the corpus names what leaves rather
+// than offering a pick — using="t" (the piece being wielded/worn), a tags=/bonus= filter, or
+// §6.36's "your BEST armour, your BEST weapon", which is a rule of its own and not a choice.
+const FORFEIT_NARROWERS = ['tags', 'bonus', 'using'];
 
 export function needsForfeitChoice(node, state) {
-  if (node.tagName.toLowerCase() !== 'lose' || node.getAttribute('item') == null) return false;
+  if (node.tagName.toLowerCase() !== 'lose') return false;
+  if (node.getAttribute('item') == null && node.getAttribute('cargo') == null) return false;
   const marked = node.getAttribute('choose');
   if (marked != null && !boolAttr(marked)) return false;
   if (FORFEIT_NARROWERS.some((a) => node.getAttribute(a) != null)) return false;

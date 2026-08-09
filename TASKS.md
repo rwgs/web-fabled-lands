@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-231 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **232 is the one open item** — file
+232 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **233 and 234 are the open items** — file
 new work under the priority bucket that fits, and record the pass in the
 Review log.
 Completed detail sections are archived in
@@ -28,7 +28,9 @@ phase is picked up from there rather than from the buckets below.
 - [x] 229. A `<group>` commits an open `<lose item="?">` with no picker, so a printed "decide which item" is ignored
 - [x] 230. A collapsed `<group>` drops its `<adjustmoney>` child, so §2.134's whole gamble pays nothing
 - [x] 231. A plain `<lose item="?">` effect commits with no picker, so six printed "(your choice)" instructions are ignored
-- [ ] 232. The same bare-hazard picker is missing on `<lose cargo="?">` and a `group=`-narrowed forfeit, so 13 more printed choices are ignored
+- [x] 232. The same bare-hazard picker is missing on `<lose cargo="?">` and a `group=`-narrowed forfeit, so 13 more printed choices are ignored
+- [ ] 233. §5.578's donation applies against an empty pool and memoises the no-op, so the Brotherhood's cut is never taken
+- [ ] 234. §6.36 strips "your **best** armour, your **best** weapon" and the engine takes the first of each instead
 
 **LOW**
 
@@ -1732,6 +1734,93 @@ leaves, which is the same narrowing rule task 231 settled on.
 over a two-Unit manifest must offer one button per Unit and move only the one clicked; a one-Unit
 ship commits with no picker; and book5/578 really asks which of its three rewards the Brotherhood
 takes while the rest of the pack stays out of the offer.
+
+**Done 2026-08-09.** `needsForfeitChoice` now admits a `cargo=` node beside `item=`, and `group`
+leaves `FORFEIT_NARROWERS`. Nothing else moved: `losePaymentPlan` already reported
+`kind:'cargo'` with `needsChoice`, `showForfeitPicker` already labelled a cargo candidate, and
+`applyLose`'s `cargo="?"` branch already honoured a chooser (it splices the named Unit's index,
+so two Units of one good lose exactly one). The count is 13, not 12 — book3/629's
+`<lose cargo="?">` sits inside an `<if cargo="?">` and prints "if you have more than one Unit,
+**you can choose** which is lost", which the first filing missed.
+
+**The five silent book3 rows get the picker too** (book3/231, book3/581, book3/616, book3/670,
+book3/718 — "Lose 1 Cargo Unit (if you have any cargo)"). They name no order at all, so the
+task-231 rule applies as written: unmarked is a choice, and a `choose="f"` marker would be
+inventing a sweep the page never states.
+
+**The weapon/armour/tool kinds stay out, and the comment now says why:** every open one in the
+corpus names what leaves — `using="t"`, a `tags=`/`bonus=` filter, or book6/36's "best".
+
+12 new `task232` assertions in `suite-actions`, including book1/397 end to end. Verified as real
+cover: restoring the old `item=`-only guard fails the first cargo assertion with `picks=0` and
+crashes the rest of the suite. Full suite `RESULT ALL PASS pass=2359 fail=0` (title `TESTS_OK`),
+Node import suite `pass=35 fail=0`.
+
+**book5/578 does NOT yet ask, and the reason is not the narrowing rule** — filed as **233**. Its
+three rewards are `Take` buttons, so when the donation node renders the pool is empty, `applyLose`
+takes nothing and `renderPassive` memoises `fx@<path>` anyway; the plan change is a prerequisite
+for that fix, not the whole of it. book6/36's "best" is filed as **234**.
+
+---
+
+## 233. §5.578's donation applies against an empty pool and memoises the no-op, so the Brotherhood's cut is never taken
+
+**Priority: MEDIUM — one published section, but the whole payment is silently skipped.**
+
+*(Filed 2026-08-09 during task 232, which made the section's forfeit a choice in principle.)*
+
+book5/578 awards three items under `group="5.578"` (a silver holy symbol, a fine sabre and an
+Uttakin telescope), then charges `<lose shards="100"/>` and
+`<lose item="?" group="5.578">one of the items</lose>` as the Brotherhood's cut.
+
+An item-family award renders a **`Take` button** (`renderItemAward`), so nothing is in the pack
+on the render that walks the `<lose>`. `loseItemMatches` returns `[]`, `applyLose` removes
+nothing — and `renderPassive`'s `'apply'` branch has *already* added `fx@<path>` to
+`ctx.applied`, so the re-render after each Take skips the node. The donation is a complete no-op:
+the player keeps all three items and pays only the 100 Shards.
+
+Task 232 dropped `group` from `FORFEIT_NARROWERS`, so the node now *classifies* as
+`'forfeit-choice'` — but only when a candidate is already held, which on entry it is not, so it
+still falls through to `'apply'` and memoises. The plan change is a prerequisite, not the fix.
+
+The rule to settle: **an open forfeit that took nothing because its pool was empty must not
+memoise.** That is the general shape (a hazard row over an empty pack behaves the same way), so
+weigh it against the reason the memo exists — an effect must not re-apply on every render. A
+candidate is to memoise only when the effect actually took something, which `applyLose` already
+knows (`itemTaken`/`paymentTaken`) but does not report to the view; another is to defer an open
+forfeit whose pool is empty while an untaken award in the same section could still fill it.
+
+`suite-actions`: book5/578 end to end — take all three rewards, then confirm the section asks
+which one the Brotherhood receives and that exactly that one leaves; and a synthetic bare
+`<lose item="?"/>` over an empty pack must not lock itself out of a possession gained later in
+the same section. Check the reverse too: an effect that legitimately takes nothing must still not
+re-fire on every render.
+
+---
+
+## 234. §6.36 strips "your **best** armour, your **best** weapon" and the engine takes the first of each instead
+
+**Priority: LOW — one published section, and the wrong piece is taken only when the pack holds more than one.**
+
+*(Filed 2026-08-09 during task 232, while establishing why the equipment kinds stay out of the
+open-forfeit picker.)*
+
+book6/36 reads "She strips you of your `<lose armour="?">best armour</lose>`, your
+`<lose weapon="?">best weapon</lose>` and `<lose shards="*">any cash you are carrying</lose>".
+`loseEquipmentCandidates` applies no ordering, so `loseEquipment` takes `cands[0]` — the first of
+that kind in acquisition order. A player carrying a rusty sword and a +3 blade loses the rusty
+one.
+
+It is the only "best" wording on a `<lose>` in the corpus (`rg 'best' books/**/*.xml` over the
+loss tags returns book6/36 alone), so this is a one-section rule and not a family. Two shapes
+worth weighing: a source marker naming the ordering (the `choose="f"` precedent from task 231),
+or a general "the open equipment forfeit takes the highest bonus" rule — the second is a
+behaviour change everywhere `<lose weapon="?">` is unnarrowed, which today is only this section,
+so the two are equivalent in effect and differ in what a future section inherits.
+
+Note this is deliberately *not* the task-231/232 picker: the page states a rule, so the player
+does not choose. `suite-actions`: book6/36 with a +0 and a +3 weapon (and likewise armour) must
+lose the +3 of each, and a single piece of a kind must still be taken.
 
 ---
 
