@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-228 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and the open items; **225, 227 and 228 are the open
-items** — file new work under the priority bucket that fits, and record the pass in the
+229 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and the open items; **229 is the open item** — file
+new work under the priority bucket that fits, and record the pass in the
 Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -21,6 +21,7 @@ records each audit pass and is where new work is filed.
 - [x] 214. A visit-box redirect does not hold the section body, so a one-time reward is re-takeable
 - [x] 216. `<if ticks="N">` after an in-section `<tick>` reads the pre-tick count, so "now ticked" branches never fire
 - [x] 226. An open `<lose item="?">` forfeit is taken with no picker, so the engine chooses which possession leaves
+- [ ] 229. A `<group>` commits an open `<lose item="?">` with no picker, so a printed "decide which item" is ignored
 
 **LOW**
 
@@ -1421,6 +1422,64 @@ count 1 for an ordinary forfeit and for the equipment kinds, 2 for `multiple="2"
 Note book4/131's "up to six items (your choice)" is now reachable in the picker, but still not
 offered: it has no `<goto force="f">`, so `view.hasDecline` is false and `classifyPassive` never
 returns `'payment'` for it. That is the same gap the task recorded and is untouched here.
+
+---
+
+## 229. A `<group>` commits an open `<lose item="?">` with no picker, so a printed "decide which item" is ignored
+
+**Priority: MEDIUM — live in book6/496, whose page prints "decide which item you are handing over"
+and is then given no way to decide. Not latent and not narrowed by a `bonus=` filter: the pool is
+every possession, so the first one in pack order is what leaves.**
+
+*(Filed 2026-08-09 during conversion work on an unpublished book, which prices an offer at two
+possessions of the player's choosing. The evidence below is all in the published books.)*
+
+Tasks 117, 226 and 228 gave an open `"?"` forfeit a which-one picker on the three payment paths
+that route through a plan: `renderPayment`, `renderOptionalPay`/`renderForcedOptional` and
+`renderChooseOnePay`. `<group>` is the fourth, and it consults no plan at all. `renderGroup`
+(`render-rewards.js`) applies every child effect with an empty options object:
+
+```js
+plan.effects.forEach((fx) => applyEffect(fx, story.state, {}));
+```
+
+`renderGroupWithRoll` does the same for the effects it defers to the roll. `applyLose` then falls
+through to its no-chooser branch — `toLose = matches.slice(0, count)`, first in inventory order —
+even though the pool it just built has a surplus and the engine would honour a chooser if one
+were passed.
+
+Two shipped sections reach it, and the first is the reason for the priority:
+
+- **book6/496** — "The priests will accept a donation of 10% of your cash and any one possession
+  listed on your Adventure Sheet. If you agree, **decide which item you are handing over**,
+  `<group force="t">`… `<lose item="?"/>`…". The one instruction the page gives the player is the
+  one the app does not implement. The group also carries the money transfer and a `<goto>`, so it
+  is the collapsed-to-one-button shape, not an inline one.
+- **book3/273** — `<group force="t">` with `<random dice="1" var="x"/>` and
+  `<lose item="?" multiple="x"/>` ("lose the first 1-6 possessions"). This one goes through
+  `renderGroupWithRoll`, so the fix has to cover both group paths, not just the button one. Its
+  page says "the first", so its behaviour is arguably correct today — but it is the count-aware
+  case, and whatever lands must not start asking where the book says "first".
+
+The pieces already exist. `losePaymentPlan` computes `candidates`/`needsChoice`/`count` for the
+item kind (task 226) and `showForfeitPicker` collects `count` answers before committing (task 228).
+What is different here is sequencing: a group is **one** button that applies several effects and
+may then navigate, so revealing the picker on the click means the rest of the group's work — the
+other effects, `itemNodes`/`buyNodes`/`linkedAwards`/`restNodes`, and `gotoNode`/`returnNode`/
+`isRevival` — must wait until the picker commits. Firing the `<goto>` first would leave the section
+before the forfeit is named. Note the group applies losses before its award for a reason (a recipe
+frees the slot its reward needs), so the deferral has to preserve that order.
+
+Scope it to what actually needs asking: an open `?`/blank spec with more candidates than the loss
+takes. A named `<lose item="rope">` must not ask, `item="*"` is a sweep and not a choice, and
+book3/273's "the first 1-6" is the case to decide explicitly rather than convert by accident —
+either leave `multiple=` groups engine-chosen or honour the picker there too, but say which and why.
+
+`suite-actions` beside tasks 226/228's block: a synthetic `<group>` carrying `<lose item="?"/>` and
+a `<goto>` over two possessions must offer one button per possession, take only the one clicked,
+and **not navigate until it is chosen**; with a single possession it commits and navigates on the
+click as it does today; a named `<lose item="rope">` in a group still asks nothing; and book6/496
+really asks which possession the priests receive while still transferring the 10% and reaching 149.
 
 ---
 
