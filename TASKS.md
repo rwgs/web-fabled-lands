@@ -28,6 +28,7 @@ records each audit pass and is where new work is filed.
 - [x] 219. `<sold>` fires on a sale but its documented twin `<bought>` does nothing on a purchase
 - [x] 220. The documented headless-dump command runs nothing from an MSYS shell, so a stale dump reads as a pass
 - [ ] 221. A single flag-linked `<resurrection>` ignores the payment and renders a free Arrange button
+- [ ] 222. `ownsSoleLinkedBlessing` reads a linked `<lose blessing>` as a purchase, so a payment that STRIPS a blessing is refused
 
 **Done**
 
@@ -873,6 +874,69 @@ renders an ability chooser that applies on click, which is the case that surface
 arms on payment, grants exactly one deal pointing at the right book/section, and is spent
 afterwards; the same behind a `<lose ability="?" amount="1" price="x">`; and book1/597's three-way
 pick still behaves as it does today.
+
+---
+
+## 222. `ownsSoleLinkedBlessing` reads a linked `<lose blessing>` as a purchase, so a payment that STRIPS a blessing is refused
+
+**Priority: LOW — latent, but only just. The one shipped section carrying the miscategorised shape
+(book2/157) is saved by a routing accident rather than by the guard being right; see below. The bug
+is in the predicate's reading of the attribute, not in any book.**
+
+*(Filed 2026-08-09 during conversion work on an unpublished book, whose temples charge a fee to
+leave a faith and strip the blessing that faith granted in the same act.)*
+
+`renderOptionalPay` (`web/js/render-rewards.js`) disables a cost when
+
+```js
+} else if (ownsSoleLinkedBlessing(node, key, story.sectionEl, story.state)) {
+  btn.disabled = true; btn.title = 'You already have this blessing';
+```
+
+and the predicate (`render-rules.js`) collects `blessing=` off the cost node plus every
+`[flag="key"]` sibling, then returns true when there is exactly one such blessing and the player
+holds it:
+
+```js
+nodes.forEach((el) => { const b = el.getAttribute && el.getAttribute('blessing'); if (b) blessings.add(b); });
+if (blessings.size !== 1) return false;
+return state.hasBlessing([...blessings][0]);
+```
+
+The guard's stated purpose is a **re-buy**: "refuse a re-buy that `addBlessing` would just dedupe
+away, so no Shards are spent for nothing". That reasoning holds only when the linked node GRANTS the
+blessing. A `<lose blessing="X">` linked to the same key means the opposite — the payment exists in
+order to take X away — and there the predicate fires precisely when the transaction is *most*
+worthwhile, leaving the button permanently disabled for every player who actually holds X and live
+only for those it would no-op on. `rewardWasteReason` reads a bare `blessing=` the same way
+(`if (bl && state.hasBlessing(bl)) return 'You already have this blessing.'`), so a choose-one
+option that spends a blessing would be greyed out by the same reasoning.
+
+Of the 24 flag-linked `blessing=` nodes in books 1–6, 23 are grants — book2/133's
+`<lose shards="cost" price="x">` + `<tick blessing="poison" flag="x">`, book2/178's Safety from
+Storms, and the rest of that family — so the guard does what it says for all of them. The 24th is
+book2/157, and it is worth reading before assuming the bug is unreachable: the golden wheel's
+`<lose shards="20" price="x"/>` links a `<lose blessing="*" flag="x">` ("Displeasure of the
+goddesses"), the exact miscategorised shape, and a player carrying any blessing satisfies
+`hasBlessing("*")`. It escapes only because its key also arms a `<random flag="x">`, so
+`classifyPassive` routes it to `roll-payment` — and `renderRollPayment` carries no blessing guard at
+all. One routing decision, not one book, is the whole margin. (The storm blessings spent by
+`blessingSpendForGoto`/`blessingSpendForReroll` are separate paths and unaffected.)
+
+The fix is one clause in each: consider only blessing-granting nodes — skip any node whose tag is
+`lose` when collecting into `blessings` (`ownsSoleLinkedBlessing`), and gate
+`rewardWasteReason`'s blessing branch on the node not being a `lose`, alongside the `curse`/
+`disease`/`poison` handling directly below it, which already reads a `lose` as a *cure* and checks
+that the affliction is present. That asymmetry — a linked `lose curse=` is understood as a removal,
+a linked `lose blessing=` is not — is the clearest statement of the defect.
+
+`suite-economy` is the natural home for the coverage: a `<lose shards="N" price="x">` linked to a
+`<lose blessing="storm" flag="x">` is LIVE for a player holding Safety from Storms, charges exactly
+N on the click and removes the blessing; a `<lose shards="N" price="x">` linked to a
+`<tick blessing="storm" flag="x">` is still refused with "You already have this blessing" for a
+holder and live for everyone else (the existing behaviour, unchanged); and book2/157's wheel is
+still spinnable by a blessed player, which is the regression the routing accident currently
+provides for free.
 
 ---
 
