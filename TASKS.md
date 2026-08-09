@@ -22,7 +22,7 @@ records each audit pass and is where new work is filed.
 - [x] 216. `<if ticks="N">` after an in-section `<tick>` reads the pre-tick count, so "now ticked" branches never fire
 - [x] 226. An open `<lose item="?">` forfeit is taken with no picker, so the engine chooses which possession leaves
 - [x] 229. A `<group>` commits an open `<lose item="?">` with no picker, so a printed "decide which item" is ignored
-- [ ] 230. A collapsed `<group>` drops its `<adjustmoney>` child, so §2.134's whole gamble pays nothing
+- [x] 230. A collapsed `<group>` drops its `<adjustmoney>` child, so §2.134's whole gamble pays nothing
 
 **LOW**
 
@@ -1543,6 +1543,21 @@ selector to what actually ships, and say which.
 `suite-actions`: a synthetic collapsed `<group>` with `<adjustmoney multiply="2"/>` over a money
 cache doubles it on the click; and §2.134 end to end — stake 10 Shards, drive the roll to a 2-4
 outcome and confirm the stake is gone, then to a 12 and confirm it comes back doubled.
+
+**Done 2026-08-09.** One selector: `groupPlan` now collects
+`lose, tick, gain, set, curse, disease, poison, adjustmoney, transfer`.
+
+**`disease`/`poison` added too, for consistency.** No collapsed group in the corpus carries either
+today, so this ships no behaviour — but they sit in all three `PASSIVE_*` sets, `applyEffect`
+already routes them exactly like `curse`, and a *silently dropped* effect is precisely the failure
+being fixed. A comment on the selector now names the three sets it must stay in step with. The
+addition cannot reclassify an existing group either: `kind` only widens from `'inline'` to
+`'action'`, and every group that gained a tag here (§2.134's four outcome groups, §6.496) already
+had a `<tick>`/`<lose>` and was an action.
+
+Six new `task230`/§2.134 assertions in `suite-actions`. Verified as real regression cover by
+restoring the old selector: three of them fail with `pot=10` untouched. Full suite
+`RESULT ALL PASS pass=2320 fail=0` (title `TESTS_OK`), Node import suite `pass=35 fail=0`.
 
 ---
 

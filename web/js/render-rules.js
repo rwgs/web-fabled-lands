@@ -293,7 +293,13 @@ export function groupPlan(sectionEl, node) {
   // (e.g. "Difficulty 15 if you have climbing gear"), not a group effect. A
   // bundled <transfer> is the group's own action (§6.490 "fight without a weapon"
   // stashes the weapon), so it applies headlessly on the group click. (task 107)
-  const effects = Array.from(node.querySelectorAll('lose, tick, gain, set, curse, transfer'));
+  // Everything else here is the passive-effect set (render.js / render-rewards.js
+  // PASSIVE_TAGS, engine.js PASSIVE_BODY_TAGS) — keep it in step with them. An
+  // action group renders ONLY its button and never walks its children, so a tag
+  // missing from this list is silently dropped: <adjustmoney> was, which left
+  // §2.134's wager applying its cache unlock and none of its four payouts, and
+  // §6.496's donation cache never reset. (task 230)
+  const effects = Array.from(node.querySelectorAll('lose, tick, gain, set, curse, disease, poison, adjustmoney, transfer'));
   // A bundled item/weapon/armour/tool reward (the hidden quest prize in §1.228/509
   // gold chain mail, §4.189 Sun Goddess mirror): the group collapses to one button,
   // so the award can't render its own Take button — grant it headlessly on the

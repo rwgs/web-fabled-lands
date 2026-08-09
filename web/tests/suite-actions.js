@@ -1860,6 +1860,70 @@ export async function run(ctx) {
           ok('task229: §6.496 turns to 149', nav496.join() === '6/149', nav496.join());
         }
       }
+
+      // --- task 230: a collapsed <group> must apply its <adjustmoney> child ---
+      // groupPlan's effects selector omitted adjustmoney (and disease/poison), and an action
+      // group renders ONLY its button — it never walks its children — so the tag was silently
+      // dropped. §2.134's wager applied its cache unlock and none of its four payouts: the
+      // stake came back intact on every roll, so gambling could neither lose nor win.
+      {
+        // A synthetic collapsed group scales the named pot on the click.
+        {
+          const g = GameState.create({ name:'T230', gender:'m', profession:'Warrior', book:2, adv });
+          g.setCacheMoney('pot', 10);
+          const c = document.createElement('div');
+          new Story(c, g, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(
+            '<section><p><group force="t"><text>double the pot</text>'
+            + '<adjustmoney name="pot" multiply="2"/><tick special="unlock" cache="pot"/></group></p></section>'), 2, 'x230');
+          const btn = c.querySelector('.group-action');
+          ok('task230: a group carrying only book-keeping still renders its button',
+             !!btn && g.cacheMoney('pot') === 10, btn ? 'pot=' + g.cacheMoney('pot') : 'no group button');
+          btn.click();
+          ok('task230: the click applies the bundled <adjustmoney>, not just its siblings',
+             g.cacheMoney('pot') === 20 && g.isCacheLocked('pot') === false, 'pot=' + g.cacheMoney('pot'));
+        }
+
+        // §2.134 for real — the Gamblers' Guild wager, staked at 10 Shards. Snake eyes wipes
+        // the stake; boxcars pays it back doubled. Both used to leave it untouched.
+        {
+          window.__FL_INSTANT_DICE__ = true;
+          const rnd230 = Math.random;
+          const settle230 = () => new Promise((r) => setTimeout(r, 30));
+          const wager = async (roll) => {
+            const g = GameState.create({ name:'Punter', gender:'f', profession:'Warrior', book:2, adv });
+            g.data.shards = 50;
+            g.depositCacheMoney('2.134', 10);
+            const c = document.createElement('div');
+            new Story(c, g, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(2, '134'), 2, '134');
+            Math.random = roll;
+            c.querySelector('.btn-roll').click();
+            await settle230();
+            const payout = c.querySelector('.group-action');
+            return { g, c, payout };
+          };
+
+          const lost = await wager(() => 0); // 1+1 = 2 → "Lose your entire stake" (×0)
+          ok('§2.134 snake eyes offers the "lose your stake" payout',
+             !!lost.payout && /entire stake/i.test(lost.payout.textContent) && lost.g.cacheMoney('2.134') === 10,
+             lost.payout ? lost.payout.textContent : 'no payout button');
+          lost.payout.click();
+          ok('task230: §2.134 taking the losing outcome really empties the pot',
+             lost.g.cacheMoney('2.134') === 0 && lost.g.data.shards === 40,
+             `pot=${lost.g.cacheMoney('2.134')} sh=${lost.g.data.shards}`);
+
+          const won = await wager(() => 0.9); // 6+6 = 12 → "Get back stake plus 100%" (×2)
+          ok('§2.134 boxcars offers the doubling payout',
+             !!won.payout && /plus 100%/i.test(won.payout.textContent),
+             won.payout ? won.payout.textContent : 'no payout button');
+          won.payout.click();
+          ok('task230: §2.134 taking the winning outcome really doubles the pot',
+             won.g.cacheMoney('2.134') === 20 && won.g.isCacheLocked('2.134') === false,
+             `pot=${won.g.cacheMoney('2.134')} locked=${won.g.isCacheLocked('2.134')}`);
+
+          Math.random = rnd230;
+          window.__FL_INSTANT_DICE__ = false;
+        }
+      }
     }
 
     // --- task 118: choice/equipment losses respect the keep tag ---
