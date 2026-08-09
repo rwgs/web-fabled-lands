@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-223 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **224 is the only open item** — file new work
-under the priority bucket that fits, and record the pass in the Review log.
+224 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **225, 226 and 227 are the open items** — file
+new work under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -19,6 +19,7 @@ records each audit pass and is where new work is filed.
 - [x] 213. The post-fight gate does not hold an item award, so loot is takeable before the fight
 - [x] 214. A visit-box redirect does not hold the section body, so a one-time reward is re-takeable
 - [x] 216. `<if ticks="N">` after an in-section `<tick>` reads the pre-tick count, so "now ticked" branches never fire
+- [ ] 226. An open `<lose item="?">` forfeit is taken with no picker, so the engine chooses which possession leaves
 
 **LOW**
 
@@ -32,6 +33,7 @@ records each audit pass and is where new work is filed.
 - [x] 223. A choose-one cost is payable when every linked reward is refused, so the payment is deferred rather than spent
 - [x] 224. A `price=`/`flag=` key strips an open ability loss of its chooser, so the engine picks which ability the player forfeits
 - [ ] 225. The "pay to spin" cost is the third payment path that commits an open ability loss with no chooser
+- [ ] 227. A wordless `<curse>`/`<disease>`/`<poison>` prints no name, so its printed sentence has a hole
 
 **Done**
 
@@ -1198,6 +1200,102 @@ Left open rather than folded into task 224 because it is a separate landing path
 regression surface (`renderRollPayment` is the repeatable pay↔roll cycle — the flag is consumed by
 the roll, not memoised — so its picker must not survive into the next round), and the workflow
 files findings instead of widening the task in hand.
+
+---
+
+## 226. An open `<lose item="?">` forfeit is taken with no picker, so the engine chooses which possession leaves
+
+**Priority: MEDIUM — live in two shipped sections (book4/456, book5/152). Nothing is over-charged
+(one qualifying item leaves either way), but the player does not choose which, where the identical
+open form on a weapon, armour, tool or cargo asks.**
+
+*(Filed 2026-08-09 during conversion work on an unpublished book, which prices several offers at a
+sum of money *or* one possession of the player's choosing, with no `bonus=` to narrow the pool.)*
+
+Task 117 gave an open `"?"` forfeit a which-one picker so the exact item the player names is what
+leaves. `losePaymentPlan` (`engine.js`) builds that verdict through a shared helper:
+
+```js
+const plan = (kind, spec, candidates) => ({
+  present: true, kind, candidates,
+  eligible: candidates.length > 0,
+  needsChoice: openForm(spec) && candidates.length > 1,
+});
+```
+
+`weapon`, `armour`, `tool` and `cargo` all go through it. The **`item` branch does not** — it
+returns its own object with `needsChoice: false` hard-coded, so a possession forfeit never asks.
+Both landings then commit blind: `renderOptionalPay` and `renderForcedOptional`
+(`render-rewards.js`) reveal `showForfeitPicker` only on `plan.needsChoice`, and `applyLose` falls
+through to `toLose = matches.slice(0, count)` — first in inventory order.
+
+The engine half is already there. `applyLose` consults `opts.chooser` whenever
+`matches.length > count`, exactly as the equipment path does; only the view's plan refuses to
+offer one, so the chooser it would honour is never built.
+
+Two shipped sections reach it. book4/456's Tambu offering is
+`<lose item="?" bonus="2" price="2">a +2 item</lose>` and a `bonus="3+"` sibling; book5/152's
+Holyamu is `<lose price="curse1" item="?" bonus="1+">any object with a +1 or greater bonus</lose>`
+and its `bonus="2+"` twin. A player carrying two qualifying items loses whichever is first in the
+pack. The `bonus=` filters narrow the pool but do not close the gap — and an *unfiltered*
+`item="?"` price would put the player's best possession first in line.
+
+The fix is to route `item` through the same `plan()` helper. Three things it must keep:
+`openForm` has to stay false for a named pattern (`item="red acorn"` is not a choice), `item="*"`
+must keep its own branch (a "lose all your possessions" sweep is not a choice either, and it
+already has the keep-item filter), and the quantity-aware eligibility task 160 added means a
+`multiple=` loss wants `candidates.length > count`, not `> 1`. `<transfer item="?" limit=>` has its
+own selection path and is out of scope.
+
+`suite-actions` beside task 117's forfeit-picker block is the natural home: a synthetic
+`<lose item="?" price="k">` with two possessions offers one button per possession and takes exactly
+the one clicked; with a single possession it commits without a picker as it does today; a named
+`<lose item="…">` still takes that item with no picker; and book4/456 still filters to genuinely +2
+items, which is the regression the current routing provides for free.
+
+---
+
+## 227. A wordless `<curse>`/`<disease>`/`<poison>` prints no name, so its printed sentence has a hole
+
+**Priority: LOW — task 215's defect one tag family later, in 14 nodes across books 1, 4 and 5.**
+
+*(Filed 2026-08-09 during conversion work on an unpublished book, which prints its afflictions the
+same way and only avoided the hole by wrapping the printed words in every one of them.)*
+
+Task 215 gave a wordless effect tag JaFL's own default label, because the corpus writes many
+effects with no words of their own — the printed sentence is made *of* what the tag names. Its
+`LABELLED_EFFECT_TAGS` is `tick`/`gain`/`lose`. The affliction tags have the same JaFL default and
+did not get it: `rules/JaFL-XML-Tags.md` states it under `<lose>`'s curse attributes ("The name of
+the curse will be used for the default text, if present") and again under `<curse>` itself.
+
+So `defaultEffectWords` returns `''` for `<curse>`, `<disease>` and `<poison>`, and every wordless
+one renders a gap in the middle of its sentence. There are 14 of them and all 14 are written around
+the tag:
+
+- book4/78 — "Note you have the **`<curse name="Blight of Nagil">`**, and reduce your CHARISMA and
+  COMBAT by one until you can find a cure." → *"Note you have the , and reduce…"*
+- book1/625 — "Note that you are under '**`<curse name="Tyrnai's Curse">`**, −1 COMBAT.'"
+- book5/620 — "Note that you have the **`<disease name="Red Ague">`** (causing a blotchy rash that
+  itches like the devil)."
+- book5/374 — "Note you have a **`<curse name="Curse of Donkey's Ears">`**, CHARISMA −2."
+- book4/215 — "Note you are **`<poison name="poisoned">`** and reduce your CHARISMA and COMBAT
+  abilities by one until you can find a cure."
+
+The rest are book1/45, book1/196, book4/31, book4/505, book5/198, book5/203, book5/238, book5/464
+and book5/638. Note book2/136 is the counter-example that shows the shape is deliberate: it writes
+`<disease name="Leprosy">contract the disease…</disease>`, so it reads correctly today.
+
+The fix is to add the three tags to `LABELLED_EFFECT_TAGS` and return `get('name')` for them. The
+existing guards carry over unchanged and matter here: `hidden="t"` stays silent, and
+`hasAncestorTag(node, SILENT_CONTENT_WRAP)` keeps a nested one quiet. The regression to pin is
+**book5/238's stone bracelet**, the corpus's only affliction nested inside an item award
+(`<item name="stone bracelet"><curse name="Curse of Blighted Magic">…</curse></item>`): that child
+is applied by `applyItemAward` on pickup and is not walked as a passive, so the label must not
+appear beside the Take button.
+
+`suite-render` beside task 215's default-words block is the natural home — a wordless
+`<curse name="X"/>` prints "X", a `hidden="t"` one prints nothing, book4/78's sentence reads whole,
+and book5/238's bracelet award still shows one button and no stray curse name.
 
 ---
 
