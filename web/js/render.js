@@ -1665,7 +1665,7 @@ export class Story {
   // moved to render-combat.js (task 119); it is mixed onto Story.prototype below.
 
   // ---- market / economy ----------------------------------------------------
-  // The economy view (renderMarket/renderShopRow/runSoldHooks/soldMatches/renderInlineBuy/
+  // The economy view (renderMarket/renderShopRow/runSoldHooks/runBoughtHooks/renderInlineBuy/
   // renderInlineSell/applyLinkedCargoBuys/renderRest/renderMoneyCache/renderItemCache/
   // renderTransfer/renderResurrection) moved to render-market.js (task 119); it is mixed
   // onto Story.prototype below.

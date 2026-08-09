@@ -2,9 +2,9 @@
 //
 // Plain functions taking the story as first argument (no prototype mixin): markets,
 // inline buy/sell, rest, money/item caches, transfers and resurrection deals. render.js's
-// TAG_RENDERERS dispatches the public renderers; renderShopRow/runSoldHooks/soldMatches/
-// applyLinkedCargoBuys are internal helpers. The economy RULES live in market.js /
-// engine.js; this only builds the widgets and wires the clicks.
+// TAG_RENDERERS dispatches the public renderers; renderShopRow/runSoldHooks/runBoughtHooks/
+// boughtItem/hookMatches/applyLinkedCargoBuys are internal helpers. The economy RULES live
+// in market.js / engine.js; this only builds the widgets and wires the clicks.
 
 import { applyEffect, applyEffectBody, boolAttr, resolveValue, applyRest, buyResurrectionDeal, readItemEffects, filterMatches, transferPlan } from './engine.js';
 import { shopKind, goodsFrom, ownsGoods, buyTrade, sellTrade, sellPlan, applyInlineBuy, buyOptions, sellInlineItem, sellCargo, canUpgradeCrew } from './market.js';
@@ -22,8 +22,10 @@ export function renderMarket(story, container, node, path) {
   // prices/buttons and the wallet check use that named pool (task 40).
   const currency = node.getAttribute('currency');
   // Market-level <sold item="?" tags="…"> hooks fire when a matching good is sold
-  // (book3/318 marks a codeword when a free item is resold) — task 41.
+  // (book3/318 marks a codeword when a free item is resold) — task 41. <bought> is the
+  // documented twin, firing on a matching purchase instead — task 219.
   const marketSolds = Array.from(node.children).filter((c) => c.tagName.toLowerCase() === 'sold');
+  const marketBoughts = Array.from(node.children).filter((c) => c.tagName.toLowerCase() === 'bought');
   let hasHeader = false;
   Array.from(node.children).forEach((child, i) => {
     const tag = child.tagName.toLowerCase();
@@ -38,7 +40,7 @@ export function renderMarket(story, container, node, path) {
       h.textContent = title;
       box.appendChild(h);
     } else if (tag === 'trade' || tag === 'armour' || tag === 'weapon' || tag === 'tool' || tag === 'item' || tag === 'cargo') {
-      box.appendChild(renderShopRow(story, child, path + '.r' + i, currency, marketSolds));
+      box.appendChild(renderShopRow(story, child, path + '.r' + i, currency, marketSolds, marketBoughts));
     }
   });
   if (!hasHeader) {
@@ -51,7 +53,7 @@ export function renderMarket(story, container, node, path) {
   return box;
 }
 
-function renderShopRow(story, node, path, currency = null, marketSolds = []) {
+function renderShopRow(story, node, path, currency = null, marketSolds = [], marketBoughts = []) {
   const kind = shopKind(node);
   const rawName = node.getAttribute('name') || node.getAttribute(kind) || node.getAttribute('item') || (kind === 'weapon' ? 'weapon' : kind);
   // An abbreviated cargo row (§4.252 "meta") shows and stores the canonical name. (task 127)
@@ -100,6 +102,7 @@ function renderShopRow(story, node, path, currency = null, marketSolds = []) {
       const res = buyTrade(story.state, goods, price, currency);
       if (!res.ok) { if (res.note) story.notify(res.note, 'warn'); return; }
       if (stockLimit != null && story.ctx) story.ctx.stock.set(path, bought + 1);
+      runBoughtHooks(story, node, goods, marketBoughts); // <bought> twin of the sale hook (task 219)
       story.rerender();
     });
     actions.appendChild(b);
@@ -148,18 +151,44 @@ function renderShopRow(story, node, path, currency = null, marketSolds = []) {
 function runSoldHooks(story, rowNode, soldItem, marketSolds) {
   const own = rowNode.querySelector(':scope > sold');
   if (own) applyEffectBody(own, story.state);
-  (marketSolds || []).forEach((s) => { if (soldMatches(s, soldItem)) applyEffectBody(s, story.state); });
+  (marketSolds || []).forEach((s) => { if (hookMatches(s, soldItem)) applyEffectBody(s, story.state); });
 }
 
-// Does a market-level <sold> filter (item="?"/name + tags=) match the sold
-// possession? A ship/cargo sale carries no possession, so it never matches.
-function soldMatches(soldNode, soldItem) {
-  if (!soldItem) return false;
-  const item = soldNode.getAttribute('item');
-  if (item && item !== '?' && item !== '*' && normalize(item) !== normalize(soldItem.name)) return false;
-  const tags = parseTags(soldNode.getAttribute('tags'));
-  const itemTags = soldItem.tags || [];
-  return tags.every((t) => itemTags.some((g) => normalize(g) === normalize(t)));
+// The mirror for a purchase: rules/JaFL-XML-Tags.md documents <bought>/<sold> as one pair,
+// but only the sale half was implemented (task 219). The row's own <bought> child always
+// fires (it IS the purchase of that row), plus any market-level <bought item="?" tags="…">
+// whose filter matches the goods actually bought. Two things differ from the sale side: a
+// purchase has no pre-owned possession to match against, so the filter reads a descriptor of
+// what the row ADDS (boughtItem); and a quantity= row can buy several times in one visit, so
+// this can fire more than once where a sale cannot — the wrapped action must tolerate the
+// repeat (<tick codeword> already does).
+function runBoughtHooks(story, rowNode, goods, marketBoughts) {
+  const own = rowNode.querySelector(':scope > bought');
+  if (own) applyEffectBody(own, story.state);
+  const gained = boughtItem(goods);
+  (marketBoughts || []).forEach((b) => { if (hookMatches(b, gained)) applyEffectBody(b, story.state); });
+}
+
+// What a purchase puts on the Adventure Sheet, in the shape hookMatches reads: the stored
+// name of a "fur cloak|wolf pelt" row plus its alternatives, and the buytags= that goodsFrom
+// already folded in — exactly what buyTrade adds. A ship/cargo buy adds no possession, so it
+// has nothing to match, just as a ship sale carries no sold item.
+function boughtItem(goods) {
+  if (goods.kind === 'ship' || goods.kind === 'cargo') return null;
+  const { name, alts } = splitItemName(goods.name);
+  return { name, tags: [...(goods.tags || []), ...alts] };
+}
+
+// Does a market-level <sold>/<bought> filter (item="?"/name + tags=) match the article that
+// changed hands — the possession sold, or the descriptor of the one bought? A ship/cargo
+// trade carries no such article, so it never matches.
+function hookMatches(hookNode, article) {
+  if (!article) return false;
+  const item = hookNode.getAttribute('item');
+  if (item && item !== '?' && item !== '*' && normalize(item) !== normalize(article.name)) return false;
+  const tags = parseTags(hookNode.getAttribute('tags'));
+  const have = article.tags || [];
+  return tags.every((t) => have.some((g) => normalize(g) === normalize(t)));
 }
 
 // Reveal a "sell which?" picker when a sale has several non-identical matches, so the exact

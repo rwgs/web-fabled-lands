@@ -4,8 +4,8 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 220 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **219, which is still open** — file new
-work under the priority bucket that fits, and record the pass in the Review log.
+misdiagnosis (see the Review log), so **the backlog is empty** — file new work
+under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -25,7 +25,7 @@ records each audit pass and is where new work is filed.
 - [x] 215. A self-closing effect tag renders no words, so published sentences print with a hole
 - [x] 217. A visit-box redirect below the section head still leaves both exits live (book1/91)
 - [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
-- [ ] 219. `<sold>` fires on a sale but its documented twin `<bought>` does nothing on a purchase
+- [x] 219. `<sold>` fires on a sale but its documented twin `<bought>` does nothing on a purchase
 - [x] 220. The documented headless-dump command runs nothing from an MSYS shell, so a stale dump reads as a pass
 
 **Done**
@@ -257,7 +257,7 @@ this order.*
 
 ---
 
-> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–218 and 220 are still below, awaiting the next re-archive pass; the open task 219 and the Review log follow them.
+> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–220 are still below, awaiting the next re-archive pass; the Review log follows them.
 
 ---
 
@@ -757,6 +757,27 @@ hook must be idempotent or the action it wraps must tolerate repeats (`addCodewo
 `suite-economy` is the natural home for the coverage: a market-level `<bought>` that fires only for
 the matching row, a row-level one that fires for its own article, neither firing on a *sale* of the
 same goods, and a `quantity="3"` row firing its hook on each of the three buys.
+
+Fixed exactly that way. `render-market.js` now collects the market-level `<bought>` children beside
+the `<sold>` ones, threads them into `renderShopRow`, and fires a `runBoughtHooks` from the Buy
+click once `buyTrade` reports `ok` — the row's own `:scope > bought` unconditionally, plus every
+market-level filter that matches. `'bought' = 'item tags'` joins the allowlist in
+`build/validate-source.ps1` (task 199), so a book may now write one.
+
+Two details of the buy side shaped the code. The filter has no pre-owned possession to read, so a
+new `boughtItem(goods)` builds the descriptor of what the row *adds* — `splitItemName`'s stored
+name plus its `|` alternatives, and the `buytags=` `goodsFrom` already folded in, which is exactly
+what `buyTrade` puts on the Sheet. A ship/cargo buy adds no possession and so returns `null`,
+mirroring a ship *sale* carrying no sold item: in both directions the row's own hook still fires
+and the market-level filter cannot match. `soldMatches` is now `hookMatches`, since one predicate
+serves the possession sold and the descriptor bought; nothing else about the sale path changed.
+
+The one real asymmetry is left to the book rather than papered over: a `quantity=` row can fire the
+hook once per buy where a sale fires at most once, so the wrapped action must tolerate repeats —
+which `<tick codeword>` does, and which the new coverage pins with a `<gain shards>` counter rather
+than a codeword, so a second firing would be visible instead of idempotent. No shipped book writes
+a `<bought>`, so the ten new `suite-economy` assertions build a synthetic market modelled on
+book3/318's market-level filter and book3/86's row-level hook.
 
 ---
 

@@ -90,6 +90,7 @@ $script:FL_TAG_ATTRS = @{
     'market' = 'buy currency sell'
     'buy' = 'ability bonus cargo crew flag force initialCrew item name quantity shards ship tags tool'
     'sell' = 'cargo item price quantity shards'
+    'bought' = 'item tags'   # the documented twin of <sold> - fires on a purchase (task 219)
     'sold' = 'item tags'
     'trade' = 'buy cargo initialCrew name quantity sell ship'
     'itemcache' = 'itemlimit max name text'

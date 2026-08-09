@@ -614,6 +614,67 @@ export async function run(ctx) {
       sellLeatherB && sellLeatherB.click();
       ok('§3.318 selling a 318.free leather DOES fire the hook', gs318b.hasCodeword('3.318.sold'));
 
+      // task 219: <bought> is the documented twin of <sold> (rules/JaFL-XML-Tags.md lists the
+      // two as one pair) but only the sale half was wired. No shipped book writes a <bought>,
+      // so the coverage is synthetic — modelled on book3/318's market-level filter and
+      // book3/86's row-level hook, with the roles reversed onto the Buy button.
+      const mkt219 = '<section name="x219"><market>'
+        + '<bought item="?" tags="219.free"><tick codeword="219.market"/></bought>'
+        + '<item name="candle" buy="10" sell="5" buytags="219.free"/>'
+        + '<item name="rope" buy="10" sell="5"/>'
+        + '<item name="lantern" buy="10" sell="5"><bought><tick codeword="219.row"/></bought></item>'
+        + '</market></section>';
+      const open219 = (xml, key, prep) => {
+        const g = GameState.create({ name: 'B9', gender: 'm', profession: 'Warrior', book: 3, adv });
+        g.data.shards = 100;
+        if (prep) prep(g); // seed BEFORE the render, or the Sell button draws disabled
+        const c = document.createElement('div');
+        new Story(c, g, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xml), 3, key);
+        return { g, c };
+      };
+      const trade219 = (c, name, verb) => {
+        const row = Array.from(c.querySelectorAll('.trade')).find((r) => name.test(r.textContent));
+        return row && Array.from(row.querySelectorAll('.btn-mini')).find((b) => verb.test(b.textContent));
+      };
+
+      // A market-level <bought item="?" tags="…"> fires for the row whose buytags= match…
+      const b219a = open219(mkt219, 'x219');
+      const buyCandle219 = trade219(b219a.c, /Candle/, /^Buy/);
+      ok('task219: the candle row has a Buy button', !!buyCandle219);
+      buyCandle219 && buyCandle219.click();
+      ok('task219: buying a buytags= article fires the market-level <bought>', b219a.g.hasCodeword('219.market') && b219a.g.hasItem('candle'), `cw=${b219a.g.hasCodeword('219.market')} item=${b219a.g.hasItem('candle')}`);
+      ok('task219: it does not fire the other row-level <bought>', !b219a.g.hasCodeword('219.row'));
+
+      // …and not for a row it does not describe.
+      const b219b = open219(mkt219, 'x219');
+      const buyRope219 = trade219(b219b.c, /Rope/, /^Buy/);
+      buyRope219 && buyRope219.click();
+      ok('task219: buying an untagged article does NOT fire the market-level <bought>', b219b.g.hasItem('rope') && !b219b.g.hasCodeword('219.market'), `item=${b219b.g.hasItem('rope')} cw=${b219b.g.hasCodeword('219.market')}`);
+
+      // A row-level <bought> fires for its own article, and only that one.
+      const b219c = open219(mkt219, 'x219');
+      const buyLantern219 = trade219(b219c.c, /Lantern/, /^Buy/);
+      buyLantern219 && buyLantern219.click();
+      ok('task219: buying an article with its own <bought> fires that hook', b219c.g.hasCodeword('219.row') && b219c.g.hasItem('lantern'), `cw=${b219c.g.hasCodeword('219.row')} item=${b219c.g.hasItem('lantern')}`);
+      ok('task219: a row-level <bought> does not drag in the market-level filter', !b219c.g.hasCodeword('219.market'));
+
+      // A SALE of the same goods fires neither: <bought> is the purchase side only.
+      const b219d = open219(mkt219, 'x219', (g) => g.addItem(makeItem('item', 'candle', 0, null, ['219.free'])));
+      const sellCandle219 = trade219(b219d.c, /Candle/, /^Sell/);
+      ok('task219: the candle row offers the matching sale', !!sellCandle219 && !sellCandle219.disabled);
+      sellCandle219 && sellCandle219.click();
+      ok('task219: selling a matching article fires no <bought> hook', !b219d.g.hasCodeword('219.market') && !b219d.g.hasCodeword('219.row') && !b219d.g.hasItem('candle'), `market=${b219d.g.hasCodeword('219.market')} row=${b219d.g.hasCodeword('219.row')}`);
+
+      // A quantity= row can be bought several times in one visit, and fires its hook on each
+      // buy — the one asymmetry with the sale side. <gain shards> counts the firings.
+      const b219e = open219('<section name="x219q"><market>'
+        + '<item name="lantern" buy="10" sell="5" quantity="3"><bought><gain shards="100"/></bought></item>'
+        + '</market></section>', 'x219q');
+      const buyQ219 = () => trade219(b219e.c, /Lantern/, /buy|sold out/i);
+      for (let n = 0; n < 3; n++) { const b = buyQ219(); if (b && !b.disabled) b.click(); }
+      ok('task219: a quantity="3" row fires its <bought> on each of the three buys', b219e.g.findItems('lantern').length === 3 && b219e.g.data.shards === 100 - 30 + 300, `n=${b219e.g.findItems('lantern').length} sh=${b219e.g.data.shards}`);
+      ok('task219: the row is then sold out, so the hook cannot fire again', buyQ219().disabled && /sold out/i.test(buyQ219().textContent), buyQ219() && buyQ219().textContent);
+
       // Adventure Sheet Use affordance (ui.js): a usable item shows a verb button that
       // fires the onUse callback; a non-usable item (aura sword) shows none.
       const gsheet = GameState.create({ name: 'Sh', gender: 'm', profession: 'Warrior', book: 4, adv });
