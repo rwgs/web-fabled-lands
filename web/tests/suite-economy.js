@@ -2522,6 +2522,76 @@ export async function run(ctx) {
          ownsSoleLinkedBlessing(st157b.sectionEl.querySelector('[price="x"]'), 'x', st157b.sectionEl, g157b) === false);
     }
 
+    // --- task 223: a choose-one cost is refused when NOTHING on the menu is takeable ---
+    { // block-scoped
+      // renderChooseOnePay gated on affordability alone, so a payment could be taken for a
+      // reward whose pick was then disabled by rewardWasteReason. It now asks the cost-side
+      // question too — but only about a refusal paying cannot clear (see the barter below).
+      const fill = (g, n) => { for (let k = 0; k < n; k++) g.addItem(makeItem('item', `filler ${k}`)); };
+      const xmlCharm = '<section><p><lose shards="50" price="k">Pay 50 Shards</lose> for a <item name="silver charm" flag="k"/>.</p></section>';
+      const gFull = GameState.create({ name:'Full', gender:'m', profession:'Warrior', book:2, adv });
+      gFull.data.items = []; gFull.data.shards = 200; fill(gFull, 12);
+      const cFull = document.createElement('div');
+      new Story(cFull, gFull, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlCharm), 2, 'x223');
+      const payFull = cFull.querySelector('.pay-action');
+      ok('task223: a full pack cannot pay Shards for an item it has no room for',
+         !!payFull && payFull.disabled === true && payFull.title === 'No room (12-item carry limit).',
+         payFull ? `dis=${payFull.disabled} title=${payFull.title}` : 'no pay button');
+      ok('task223: and the Shards stay in the purse', gFull.data.shards === 200, `sh=${gFull.data.shards}`);
+      const gRoom = GameState.create({ name:'Room', gender:'m', profession:'Warrior', book:2, adv });
+      gRoom.data.items = []; gRoom.data.shards = 200; fill(gRoom, 11);
+      const cRoom = document.createElement('div');
+      new Story(cRoom, gRoom, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlCharm), 2, 'x223b');
+      const payRoom = () => cRoom.querySelector('.pay-action');
+      ok('task223: one free slot keeps the same purchase live', !!payRoom() && payRoom().disabled === false);
+      payRoom().click();
+      cRoom.querySelector('.reward-pick').click();
+      ok('task223: paying and taking still works normally',
+         gRoom.data.shards === 150 && gRoom.findItems('silver charm').length === 1,
+         `sh=${gRoom.data.shards} charm=${gRoom.findItems('silver charm').length}`);
+
+      // A held deal is the refusal no payment can clear: buying a second one would only
+      // REPLACE it (task 98), so the temple must not take the money for a disabled pick.
+      const xmlPact223 = '<section><p><lose shards="30" price="pact">Pay 30 Shards</lose> to <resurrection book="2" section="60" flag="pact">arrange a pact</resurrection>.</p></section>';
+      const gDeal = GameState.create({ name:'Deal', gender:'f', profession:'Warrior', book:2, adv });
+      gDeal.data.shards = 100; gDeal.data.resurrections = [];
+      eng.buyResurrectionDeal(gDeal, { book:1, section:'350', text:'Nagil' });
+      const cDeal = document.createElement('div');
+      new Story(cDeal, gDeal, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlPact223), 2, 'x223c');
+      const payDeal = cDeal.querySelector('.pay-action');
+      ok('task223: a deal-holder cannot pay for a second deal they cannot pick up',
+         !!payDeal && payDeal.disabled === true && payDeal.title === 'You already have a resurrection deal.',
+         payDeal ? `dis=${payDeal.disabled} title=${payDeal.title}` : 'no pay button');
+      ok('task223: and the Shards stay in the purse', gDeal.data.shards === 100, `sh=${gDeal.data.shards}`);
+
+      // "Every, never some": the same held deal beside a takeable item keeps the cost live.
+      const xmlMixed = '<section><p><lose shards="30" price="mix">Pay 30 Shards</lose> for either <resurrection book="2" section="60" flag="mix">a pact</resurrection> or a <item name="silver charm" flag="mix"/>.</p></section>';
+      const cMixed = document.createElement('div');
+      new Story(cMixed, gDeal, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlMixed), 2, 'x223d');
+      const payMixed = cMixed.querySelector('.pay-action');
+      ok('task223: one takeable option on the menu keeps the cost live',
+         !!payMixed && payMixed.disabled === false, payMixed ? `title=${payMixed.title}` : 'no pay button');
+
+      // The regression the naive "all refused ⇒ disable" guard would cause: §4.634's barter
+      // is give-one-take-one, so the forfeit FREES the slot its own reward is refused for. A
+      // full pack must still be able to trade.
+      const g634b = GameState.create({ name:'Trade', gender:'m', profession:'Warrior', book:4, adv });
+      g634b.data.items = []; fill(g634b, 11); g634b.addItem(makeItem('item', 'bag of pearls'));
+      ok('task223: §634 test pack is full', g634b.freeSlots() === 0, `free=${g634b.freeSlots()}`);
+      const c634b = document.createElement('div');
+      const st634b = new Story(c634b, g634b, { navigate(){}, onDeath(){}, notify(){} });
+      st634b.begin(await data.getSection(4, '634'), 4, '634');
+      const payPearls223 = () => Array.from(c634b.querySelectorAll('.pay-action')).find((b) => /pearl/i.test(b.textContent));
+      ok('task223: §634 stays tradeable with a full pack — the forfeit frees the slot',
+         !!payPearls223() && payPearls223().disabled === false,
+         payPearls223() ? `title=${payPearls223().title}` : 'no pearls button');
+      payPearls223().click();
+      Array.from(c634b.querySelectorAll('.reward-pick')).find((b) => /magic trident/i.test(b.textContent)).click();
+      ok('task223: §634 the trade completes — pearls out, trident in, pack still full',
+         g634b.findItems('bag of pearls').length === 0 && g634b.findItems('magic trident').length === 1 && g634b.freeSlots() === 0,
+         `pearls=${g634b.findItems('bag of pearls').length} trident=${g634b.findItems('magic trident').length} free=${g634b.freeSlots()}`);
+    }
+
     // --- task 134: a sell with several non-identical matches must ask which one leaves ---
     const shipRow = () => goodsFrom(parse('<trade ship="brigantine" sell="800"/>'), 'ship', 'brigantine', 0);
     {

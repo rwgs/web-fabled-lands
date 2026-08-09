@@ -15,7 +15,7 @@ import { applyInlineBuy, buyOptions } from './market.js';
 import {
   classifyPassive, groupPlan, groupRollDefers, ownsSoleLinkedBlessing, ITEM_FAMILY_TAGS,
   linkedRewards, isCounterReward, isChooseOne, isPricedItemAward, isPricedResurrection, hasVisiblePay,
-  rewardWasteReason, forcedChoiceGroup, pendingRollVar, viewPendingVars, isFightHeld,
+  rewardWasteReason, menuWasteReason, forcedChoiceGroup, pendingRollVar, viewPendingVars, isFightHeld,
   defaultEffectWords,
 } from './render-rules.js';
 import { aggregateFightOutcome } from './render-gates.js';
@@ -485,8 +485,14 @@ function renderChooseOnePay(story, container, node, path, key) {
   const btn = document.createElement('button');
   btn.className = 'btn-mini pay-action' + (armed ? ' done' : '');
   btn.textContent = (armed ? '☑ ' : '') + text;
+  // Nothing on the menu collectable, for a reason paying cannot change (a deal already held,
+  // no carry slot and no forfeit to free one): refuse the click rather than take the payment
+  // for a reward whose pick would then be disabled. (task 223)
+  const wasted = menuWasteReason(node, key, story.sectionEl, story.state);
   if (armed) {
     btn.disabled = true; btn.title = 'Paid — now choose your reward.';
+  } else if (wasted) {
+    btn.disabled = true; btn.title = wasted;
   } else if (shards != null && story.state.data.shards < cost) {
     btn.disabled = true; btn.title = 'Not enough Shards';
   } else if (item != null && !story.state.hasItemMatch(item, node.getAttribute('tags'))) {

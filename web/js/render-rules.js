@@ -7,7 +7,7 @@
 // attributes / running querySelectorAll on it is fine (the same thing engine.js does);
 // only DOM *construction* belongs in the view. Unit-tested headlessly.
 
-import { boolAttr, isDiceExpr, resolveValue, matchRange } from './engine.js';
+import { boolAttr, isDiceExpr, resolveValue, matchRange, losePaymentPlan } from './engine.js';
 import { normalize, currencyAward, isShardsCurrency, splitItemName } from './state.js';
 import { bookAvailable } from './edition.js'; // the DOM-free registry, never data.js (task 195)
 import { blessingLabel } from './render-util.js'; // pure label formatting, no DOM (task 218)
@@ -203,6 +203,38 @@ export function rewardWasteReason(state, node) {
     if (p != null && !state.hasPoison(p)) return "You don't have that affliction.";
   }
   return null;
+}
+
+// Why NOTHING linked to a choose-one cost `key` can be collected right now, else null — the
+// cost-side twin of rewardWasteReason, so a payment is never taken for a reward the player
+// then cannot pick up. One takeable option keeps the cost live, so this asks "every", never
+// "some". The single refusal the payment itself CLEARS is discounted: a cost that gives up a
+// possession frees a carry slot, and a carry-limit refusal is the only reason
+// rewardWasteReason can give an item-family award — so §4.634's give-one-take-one barter
+// stays live for a full pack, where a naive "all refused" test would break it. A reason no
+// payment can clear (a deal already held, a blessing already held, an affliction not
+// suffered) blocks the click. (task 223)
+export function menuWasteReason(costNode, key, sectionEl, state) {
+  const rewards = linkedRewards(sectionEl, key);
+  if (!rewards.length) return null;
+  const freesSlot = costFreesCarrySlot(costNode, state);
+  const reasons = [];
+  for (const r of rewards) {
+    if (freesSlot && ITEM_FAMILY_TAGS.has(r.tagName.toLowerCase())) return null; // the room arrives with the forfeit
+    const why = rewardWasteReason(state, r);
+    if (!why) return null;
+    reasons.push(why);
+  }
+  return new Set(reasons).size === 1 ? reasons[0] : 'You cannot take any of these rewards yet.';
+}
+
+// Does paying this cost free a carry slot? Only a possession forfeit does — cargo and a ship
+// live off the 12-item list, and Shards were never on it. An ineligible forfeit (nothing that
+// qualifies) frees nothing, which is the case the cost's own eligibility gate already refuses.
+function costFreesCarrySlot(costNode, state) {
+  if (!costNode || costNode.tagName.toLowerCase() !== 'lose') return false;
+  const plan = losePaymentPlan(costNode, state);
+  return plan.present && plan.eligible && ITEM_FAMILY_TAGS.has(plan.kind);
 }
 
 // force="f" marks an OPTIONAL action (JaFL ActionNode defaults force=true); "f"/false

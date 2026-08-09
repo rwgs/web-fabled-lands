@@ -29,7 +29,7 @@ records each audit pass and is where new work is filed.
 - [x] 220. The documented headless-dump command runs nothing from an MSYS shell, so a stale dump reads as a pass
 - [x] 221. A single flag-linked `<resurrection>` ignores the payment and renders a free Arrange button
 - [x] 222. `ownsSoleLinkedBlessing` reads a linked `<lose blessing>` as a purchase, so a payment that STRIPS a blessing is refused
-- [ ] 223. A choose-one cost is payable when every linked reward is refused, so the payment is deferred rather than spent
+- [x] 223. A choose-one cost is payable when every linked reward is refused, so the payment is deferred rather than spent
 
 **Done**
 
@@ -1037,6 +1037,28 @@ takeable — the "every, never some" rule.
 
 Weigh the added branching against the payoff before taking it: nothing is lost today, no shipped
 section reaches the unclearable case, and the cost of getting it wrong is breaking §4.634.
+
+Fixed with the clearable split above, as a rule and not a view check: `menuWasteReason(costNode,
+key, sectionEl, state)` (`render-rules.js`) is the cost-side twin of `rewardWasteReason` — it walks
+every `[flag=key]` reward and returns null the moment one is takeable, so the "every, never some"
+rule is structural rather than remembered. `renderChooseOnePay` consults it between the `armed`
+branch and the affordability checks, matching the order `renderOptionalPay` already uses for its own
+waste guards (`plan.eligible`, `ownsSoleLinkedBlessing`, then Shards).
+
+The clearable case needed no reason-string matching, which would have been brittle. A carry-limit
+refusal is the ONLY reason `rewardWasteReason` can give an item-family award — read the function: the
+resurrection, blessing and affliction branches cannot fire for an `<item>`/`<weapon>`/`<armour>`/
+`<tool>` — so "item-family reward + a cost that frees a slot" is exactly the clearable case, tested
+structurally. The private `costFreesCarrySlot` asks `losePaymentPlan` for a `present`, `eligible`
+possession `kind`; cargo and a ship live off the 12-item list and Shards were never on it, so only a
+possession forfeit qualifies. An ineligible forfeit frees nothing, which is the case the cost's own
+eligibility gate already refuses.
+
+Ten `suite-economy` assertions, and the §4.634 one is the point of the exercise: a full pack is
+refused a Shards-priced item (the Shards stay in the purse) and a deal-holder is refused a second
+deal, while the same deal-holder may still pay a menu that also offers a takeable item, and a
+FULL-packed player still trades pearls for the magic trident at §4.634 — pearls out, trident in,
+pack still full. That last one fails against the naive guard this task was originally filed with.
 
 ---
 
