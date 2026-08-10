@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-236 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **237–239 are the open items** — file new work
+237 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **238–239 are the open items** — file new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,7 +20,6 @@ phase is picked up from there rather than from the buckets below.
 
 **MEDIUM**
 
-- [ ] 237. `run-tests.ps1` selects an unusable WindowsApps Python alias and never reaches the real interpreter
 - [ ] 238. §5.152's bonus-filtered item payment stays enabled when no carried item qualifies
 - [x] 213. The post-fight gate does not hold an item award, so loot is takeable before the fight
 - [x] 214. A visit-box redirect does not hold the section body, so a one-time reward is re-takeable
@@ -34,6 +33,7 @@ phase is picked up from there rather than from the buckets below.
 - [x] 233. §5.578's donation applies against an empty pool and memoises the no-op, so the Brotherhood's cut is never taken
 - [x] 234. §6.36 strips "your **best** armour, your **best** weapon" and the engine takes the first of each instead
 - [x] 236. A virtual-time budget that runs out reports as a suite FAILURE, with nothing saying it was the clock
+- [x] 237. `run-tests.ps1` selects an unusable WindowsApps Python alias and never reaches the real interpreter
 
 **LOW**
 
@@ -294,10 +294,11 @@ this order.*
 - [x] 234. §6.36 strips "your **best** armour, your **best** weapon" and the engine takes the first of each instead
 - [x] 235. A warm Chrome profile serves a day-old test bundle, so the headless loop reports a false `ALL PASS`
 - [x] 236. A virtual-time budget that runs out reports as a suite FAILURE, with nothing saying it was the clock
+- [x] 237. `run-tests.ps1` selects an unusable WindowsApps Python alias and never reaches the real interpreter
 
 ---
 
-> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–239 are still below; completed tasks 212–236 await the next re-archive pass, and the Review log follows them.
+> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–239 are still below; completed tasks 212–237 await the next re-archive pass, and the Review log follows them.
 
 ---
 
@@ -2073,6 +2074,9 @@ budget, both splits, and no more.
 
 **Priority: MEDIUM — the documented verification command fails before it starts the server on a
 configured Windows development machine, even though working Python is installed.**
+**Status: done.** Discovery now probes every candidate and selects the first that really runs as
+Python 3, naming what it rejected if none does. See the closing notes at the end of this section —
+including what re-measuring the reported symptom showed.
 
 *(Filed 2026-08-10 during the post-task-236 review.)*
 
@@ -2098,6 +2102,62 @@ Regression/verification: with the reviewed `PATH` order unchanged, the default r
 the aliases, select the later real interpreter, clean up its server/profile, and finish the full
 suite at non-zero assertion count. Cover the all-candidates-invalid diagnostic without relying on
 the machine's installed aliases. Keep `build/*.ps1` ASCII-only.
+
+**The reported symptom does not reproduce today, and that is worth recording rather than quietly
+fixing.** Re-measured before any change, all five candidates on the reviewed machine
+(`python`/`python3`/`py`, WindowsApps aliases and the `AppData/Local/Python/bin` install alike)
+launch through `Start-Process` and answer `--version` with `Python 3.14.5`, and the unchanged
+runner completed at **`RESULT ALL PASS pass=2382 fail=0`** — so the aliases here are working
+app-execution aliases onto that install, not the dead shims the filing describes. What was
+observed was real (`Start-Process` reporting the file cannot be accessed) but was machine state,
+not a permanent property of the path: a WindowsApps alias is dead whenever its Store package is
+absent or the alias is switched off, and it looks *identical* to a working one from
+`Get-Command`. The defect the task names is therefore in the discovery, not in the machine, and it
+is fixed as filed; the priority is closer to LOW than MEDIUM in hindsight.
+
+**What `Find-Python` does now** (`build/run-tests.ps1`): walk every candidate `Get-Command -All
+-CommandType Application` resolves for the three names, in `PATH` order, deduplicated by source
+(case-insensitively); ask each one `--version` through the *same* `Start-Process` shape the server
+launch uses, so anything that cannot start that way is rejected here rather than at the server
+start; accept the first that exits 0 *and* reports a Python 3, since a shim can also launch and
+answer without being an interpreter. Give up only after all of them, listing each rejected path
+with its reason. The chosen interpreter is printed (`Using Python <path>`) — without it, "which
+one did it pick?" is unanswerable from the output, which is half of why the original failure was
+confusing. No `-Python` override was added: the automatic path now covers the reviewed shape, and
+an override would only be a second way to say the same thing.
+
+The rejection list is written with `Write-Host` rather than carried in the thrown message. That is
+not a style preference: the error view re-wraps a multi-line exception into a gutter-prefixed
+paragraph and breaks the paths mid-word, which is unreadable for exactly the text the operator has
+to read (it also broke the first draft of the self-test's assertions, which is how it was noticed).
+
+Only the `Start-Process` call is inside a `catch`, not the whole probe. The first draft guarded the
+lot, and duly reported a bug in its *own* empty-output handling as `cannot launch (Method
+invocation failed ...)` — a broad catch around a diagnosis turns any mistake in the diagnosis into
+a plausible-looking finding about the thing being diagnosed.
+
+**New: `build/run-tests-selftest.ps1`.** A probe that quietly stopped rejecting broken shims would
+look identical to a healthy machine, where the first candidate is fine and nothing is ever
+rejected — so both directions are driven over shims the script creates, never over whatever
+aliases the machine carries. Case 1 puts four broken shims alone on `PATH`, one per shape
+(zero-byte `python.exe` that cannot launch, a `.cmd` exiting 9009 like the Store stub, a `.cmd`
+that exits 0 saying `Perl 5.38`, and a `.bat` that exits 0 saying nothing at all): the run must
+fail before the server starts and name all four with distinct reasons. The fourth was added last
+and immediately failed, which is how the empty-output mistake above was found rather than shipped
+(`Get-Content -Raw` yields nothing whatsoever for a 0-byte file, so the reason string was built
+from an array) — an argument for covering the emptiest case even when it looks like a duplicate of
+the one beside it. Case 2 is the reviewed shape — a broken shim first, the machine's real
+interpreter after it — and asserts the shim is skipped, a focused suite really passes through the
+selected interpreter, and neither a browser profile nor a listening server is left behind.
+Windows-only, like the runner itself (Chrome under Program Files, `.cmd` shims), so it is not in
+the CI matrix; CI drives the browser suite directly and never runs `run-tests.ps1`.
+
+Verified: `run-tests-selftest.ps1` **`RESULT ALL PASS pass=13 fail=0`**; the full default runner
+**`RESULT ALL PASS pass=2382 fail=0`**, exit 0, selecting and reporting its interpreter;
+`node web/tests/node-import.mjs` **`RESULT ALL PASS pass=35 fail=0`**; `validate-selftest.ps1`
+**`RESULT ALL PASS pass=23 fail=0`**; `release-selftest.ps1` **`RESULT ALL PASS pass=47 fail=0`**.
+`build/*.ps1` stays ASCII-only with the `#Requires -Version 7.0` guard on every file, including
+the new one. Nothing under `books/` or `web/` changed, so no rebuild or stamp was due.
 
 ---
 

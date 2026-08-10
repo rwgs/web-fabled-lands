@@ -40,6 +40,11 @@ combat, markets, ships, live adventure sheet). Plain HTML/CSS/ES modules —
   The test loop is `run-tests.ps1` (serve, drive Chrome, read the verdict, clean up) over
   `serve.py`, the one non-PowerShell script here — a no-cache static server, because the
   browser's own HTTP cache is what made a stale bundle report a false pass (task 235).
+  Its Python discovery — which probes each candidate instead of trusting the first name that
+  resolves, since a WindowsApps execution alias resolves like an interpreter and may not
+  launch — is driven over shim fixtures by `run-tests-selftest.ps1`. That one is Windows-only
+  (Chrome under Program Files, `.cmd` shims), so **CI does not run it**; run it by hand after
+  touching discovery (task 237).
   **`TASKS.md`** — the backlog (see workflow below).
 
 ## Architecture invariant — keep the rules out of the view

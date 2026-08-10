@@ -26,6 +26,11 @@
   budget reports as a suite failure, with nothing saying it was the clock. Get-CutShortDiagnosis
   below recognises both shapes it takes and says so. (task 236)
 
+  A fifth never reaches the browser at all: the loop needs Python to serve the tree, and the
+  first name that resolves can be a WindowsApps execution alias that no process can launch,
+  while a working interpreter sits further along PATH. Find-Python probes candidates instead of
+  trusting names. (task 237)
+
   The verdict is taken from the FIRST RESULT line in the dump. --dump-dom includes
   _test.html's inline script SOURCE, which carries the literal "RESULT FATAL pass=0 fail=1";
   the live verdict lives in <pre id="results"> at the top of <body> and is therefore always
@@ -75,12 +80,67 @@ $ErrorActionPreference = 'Stop'
 
 $repo = Split-Path -Parent $PSScriptRoot
 
-function Find-Python {
-    foreach ($n in @('python', 'python3', 'py')) {
-        $c = Get-Command $n -ErrorAction SilentlyContinue
-        if ($c) { return $c.Source }
+# Ask a candidate to identify itself, launching it EXACTLY the way the server is launched below
+# (Start-Process with a redirected handle) so anything that cannot start that way is rejected
+# here rather than at the server start. Returns the reason it is unusable, or $null if it is a
+# Python 3 this loop can serve from.
+function Get-PythonRejection([string]$Path) {
+    $stem = Join-Path ([System.IO.Path]::GetTempPath()) ('fl-python-' + [guid]::NewGuid().ToString('N'))
+    try {
+        # Only the LAUNCH is guarded. A catch around the whole body reports a bug in this
+        # function's own code as "cannot launch", which is exactly how a mistake in the
+        # empty-output branch below hid itself while the self-test was being written.
+        try {
+            $p = Start-Process -FilePath $Path -ArgumentList '--version' -Wait -PassThru -NoNewWindow `
+                -RedirectStandardOutput "$stem.out" -RedirectStandardError "$stem.err"
+        } catch {
+            # An execution alias lands here: "%1 is not a valid Win32 application."
+            return "cannot launch ($($_.Exception.Message))"
+        }
+        if ($p.ExitCode -ne 0) { return "--version exited $($p.ExitCode)" }
+        # Line-joined rather than -Raw: -Raw yields nothing at all for the silent shim that exits
+        # 0 without a word, and the reason it is rejected has to survive that.
+        $said = ''
+        if (Test-Path "$stem.out") { $said = (@(Get-Content "$stem.out") -join ' ').Trim() }
+        if ($said -notmatch 'Python\s+3') {
+            return "--version reported $(if ($said) { "'$said'" } else { 'nothing' }), not a Python 3 version"
+        }
+        return $null
+    } finally {
+        Remove-Item "$stem.out", "$stem.err" -Force -ErrorAction SilentlyContinue
     }
-    throw 'No python on PATH - the test loop needs it to serve the tree.'
+}
+
+# Python discovery by CANDIDATE, not by name (task 237). Get-Command resolves the zero-byte
+# WindowsApps execution aliases (python.exe, python3.exe, py.exe under
+# %LOCALAPPDATA%/Microsoft/WindowsApps) like any other application, so returning the first name
+# that resolves can hand back a shim Start-Process then refuses to launch - which failed the
+# whole run before the server started, on a machine carrying a working interpreter further along
+# PATH that was never considered. So walk EVERY candidate each name resolves to, in PATH order,
+# prove one runs as Python 3 before choosing it, and give up only after all of them, naming what
+# was rejected and why.
+function Find-Python {
+    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $rejected = @()
+    foreach ($n in @('python', 'python3', 'py')) {
+        # -CommandType Application: only a real file has a Source to hand Start-Process, and a
+        # profile alias or function named python is not one.
+        foreach ($c in @(Get-Command $n -All -CommandType Application -ErrorAction SilentlyContinue)) {
+            if (-not $seen.Add($c.Source)) { continue }
+            $why = Get-PythonRejection $c.Source
+            if (-not $why) { return $c.Source }
+            $rejected += "  $($c.Source) - $why"
+        }
+    }
+    if (-not $rejected.Count) { throw 'No python on PATH - the test loop needs it to serve the tree.' }
+    # The list is written out here rather than carried in the exception: the error view re-wraps a
+    # multi-line message into a gutter-prefixed paragraph and breaks the paths mid-word, which is
+    # unreadable for exactly the thing the operator needs to read. One candidate per line, then a
+    # single-line throw.
+    Write-Host 'No usable Python on PATH. Every candidate was rejected:'
+    $rejected | ForEach-Object { Write-Host $_ }
+    Write-Host 'Install Python 3, or put a working interpreter earlier on PATH.'
+    throw "No usable Python on PATH - the test loop needs one to serve the tree ($($rejected.Count) candidates rejected, listed above)."
 }
 
 function Find-Browser {
@@ -192,6 +252,7 @@ if ($Suite) { $url += "?suite=$Suite" }
 
 $server = $null
 try {
+    Write-Host "Using Python $python"
     Write-Host "Serving $repo on port $Port (no-store)..."
     $server = Start-Process -FilePath $python `
         -ArgumentList @((Join-Path $repo 'build/serve.py'), '--port', $Port, '--directory', $repo) `
