@@ -22,8 +22,13 @@ const CURSED_ABILITY = -1000;
 // <if blessing="…"> check (and its paired <lose>) in the other, and the "only one
 // blessing at a time" rule holds across the whole campaign. Match is
 // case-insensitive. (storm/storms: task 76; disease/poison: task 123)
+//
+// Exported because the structural blessing predicates in render-rules.js pair a
+// <lose blessing="X"> with an <if blessing="Y"> / <outcome blessing="Y"> and must ask the
+// SAME question this table answers — otherwise a mixed pair (storms/storm) reads as two
+// different blessings there while being one everywhere else. (task 242)
 const BLESSING_ALIASES = { storms: 'storm', poison: 'disease' };
-function canonBlessing(b) {
+export function canonBlessing(b) {
   const k = String(b).trim().toLowerCase();
   return BLESSING_ALIASES[k] || k;
 }

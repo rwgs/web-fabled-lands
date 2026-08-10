@@ -8,7 +8,7 @@
 // only DOM *construction* belongs in the view. Unit-tested headlessly.
 
 import { boolAttr, isDiceExpr, resolveValue, matchRange, losePaymentPlan } from './engine.js';
-import { normalize, currencyAward, isShardsCurrency, splitItemName } from './state.js';
+import { normalize, canonBlessing, currencyAward, isShardsCurrency, splitItemName } from './state.js';
 import { bookAvailable } from './edition.js'; // the DOM-free registry, never data.js (task 195)
 import { blessingLabel } from './render-util.js'; // pure label formatting, no DOM (task 218)
 import {
@@ -37,12 +37,15 @@ export const CHOOSE_ONE_TAGS = new Set(['lose', 'tick', 'gain', 'item', 'weapon'
 // The blessings named on a section's <outcome blessing="X"> hazards (task 108): a held
 // blessing vetoes that outcome, and a sibling <lose blessing="X"> is the deferred
 // "spend to avoid it" step, not an on-entry loss. Excludes the "*"/"?" wildcards.
+// Canonicalised (task 242), so the members are the same tokens the lookups below fold to
+// and an <outcome blessing="storms"> pairs with a <lose blessing="storm">.
 export function computeOutcomeBlessings(sectionEl) {
   if (!sectionEl) return new Set();
   return new Set(
     Array.from(sectionEl.querySelectorAll('outcome[blessing]'))
       .map((o) => normalize(o.getAttribute('blessing')))
-      .filter((b) => b && b !== '*' && b !== '?'),
+      .filter((b) => b && b !== '*' && b !== '?')
+      .map((b) => canonBlessing(b)),
   );
 }
 
@@ -74,10 +77,14 @@ export function branchBlessingEscapeGoto(node) {
   if (isOptionalForce(node)) return null;
   const b = normalize(node.getAttribute('blessing'));
   if (!b || b === '*' || b === '?') return null;
+  // Compared through canonBlessing, not bare normalize: storms/storm and poison/disease are
+  // one blessing to the engine, so an <if blessing="storms"> around a <lose blessing="storm">
+  // is the same escape and must not fall back to the on-entry charge. (task 242)
+  const cb = canonBlessing(b);
   let branch = null;
   for (let p = node.parentNode; p && p.tagName; p = p.parentNode) {
     const tag = p.tagName.toLowerCase();
-    if ((tag === 'if' || tag === 'elseif') && normalize(p.getAttribute('blessing')) === b) { branch = p; break; }
+    if ((tag === 'if' || tag === 'elseif') && canonBlessing(normalize(p.getAttribute('blessing'))) === cb) { branch = p; break; }
   }
   if (!branch) return null;
   return Array.from(branch.querySelectorAll('goto'))
@@ -97,7 +104,7 @@ export function isGuardedBlessingLoss(node, outcomeBlessings) {
   if (boolAttr(node.getAttribute('hidden'))) return false;
   const b = node.getAttribute('blessing');
   if (b == null || b === '' || b === '*' || b === '?') return false;
-  if (outcomeBlessings && outcomeBlessings.has(normalize(b))) return true;
+  if (outcomeBlessings && outcomeBlessings.has(canonBlessing(b))) return true;
   return !!branchBlessingEscapeGoto(node);
 }
 
@@ -112,7 +119,7 @@ export function blessingSpendForGoto(node, sectionEl, state, outcomeBlessings) {
   for (const l of sectionEl.querySelectorAll('lose[blessing]')) {
     const b = l.getAttribute('blessing');
     if (!state.hasBlessing(b)) continue;
-    if (!boolAttr(l.getAttribute('hidden')) && outcomeBlessings && outcomeBlessings.has(normalize(b))
+    if (!boolAttr(l.getAttribute('hidden')) && outcomeBlessings && outcomeBlessings.has(canonBlessing(b))
         && (l.compareDocumentPosition(node) & DOCUMENT_POSITION_FOLLOWING)) return b;
     if (branchBlessingEscapeGoto(l) === node) return b;
   }
@@ -127,7 +134,7 @@ export function blessingSpendForReroll(sectionEl, state, outcomeBlessings) {
   if (!outcomeBlessings || !outcomeBlessings.size || !sectionEl) return null;
   for (const l of sectionEl.querySelectorAll('lose[blessing][hidden]')) {
     const b = l.getAttribute('blessing');
-    if (b && outcomeBlessings.has(normalize(b)) && state.hasBlessing(b)) return b;
+    if (b && outcomeBlessings.has(canonBlessing(b)) && state.hasBlessing(b)) return b;
   }
   return null;
 }

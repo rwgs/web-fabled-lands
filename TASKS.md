@@ -17,7 +17,7 @@ there once the buckets below are clear.
 **HIGH**
 
 - [x] 241. A blessing-escape page spends the blessing on entry, then disables the exit it paid for
-- [ ] 242. A branch escape's `<lose>` and its `<if blessing=>` must agree on the blessing's spelling
+- [x] 242. A branch escape's `<lose>` and its `<if blessing=>` must agree on the blessing's spelling
 
 **MEDIUM**
 
@@ -2546,6 +2546,40 @@ way add a scratch-fixture assertion beside the task-241 cases in `suite-actions`
 mixed pair — a `<lose blessing="storm">` inside an `<if blessing="storms">` — since no shipped
 section can exercise it.
 
+**Done 2026-08-10.** Took the first option only. `state.js` now **exports** `canonBlessing`
+(the alias table's home is unchanged; only its visibility moved), and `render-rules.js` folds
+through it at every place a blessing *name* is matched against another blessing *name*:
+`branchBlessingEscapeGoto`'s loss↔branch comparison, `computeOutcomeBlessings`'s set members,
+and the three lookups against that set (`isGuardedBlessingLoss`, `blessingSpendForGoto`,
+`blessingSpendForReroll`). The blessing rules now ask the same question `hasBlessing` /
+`removeBlessing` have always asked.
+
+**The set and its lookups had to move together.** The task named three functions, but
+canonicalising `computeOutcomeBlessings`'s members while leaving `outcomeBlessings.has(normalize(b))`
+alone would have turned the *guarded* form's own alias pair into a fresh miss — the same defect
+one step sideways. Two of the five sites are therefore not in the task's list and are not
+optional; the fold is only sound if the producer and every consumer share it.
+
+**Deliberately skipped the second option (the `validate-source.ps1` check).** Once the rule
+folds, a mixed pair is *correct source*, not a smell — a gate failing the build on it would
+reject valid XML and, worse, encode the belief that the two spellings are distinct, which is
+what tasks 76/123 decided they are not. Nothing is left to drift into.
+
+Proved by neutralising the fold in `render-rules.js` alone (one aliased import, so `state.js`'s
+own folding stayed live and the failures could not be noise from `hasBlessing`) and re-running:
+**10 of the 12 new assertions fail**, with the filing's predicted signature intact — `spends=1`
+at entry and `held=false disabled=true` after one `rerender()`. The two survivors are the
+negative controls, which is the point of including them: `<if blessing="luck">` must *not* claim
+a `<lose blessing="storm">`, and §6.9's unblessed "Otherwise →222" must stay free. Suite 2411 →
+**2423**.
+
+Worth carrying forward: **the `<outcome>` half was reachable too.** The filing framed this as a
+gap in task 241's *new* predicate, but `<outcome blessing="storms">` + `<lose blessing="storm">`
+missed each other under task 108's older guard the same way, and had since 2024 — unexercised
+only because book 5 is the sole book writing that form and spells it consistently. A defect
+filed against new code was equally present in the code it was modelled on; when a filing says
+"the new predicate compares too narrowly", check whether the thing it was copied from does too.
+
 ---
 
 ## Review log
@@ -2553,6 +2587,19 @@ section can exercise it.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-10 (implementation pass, task 242): closed **242**, nothing new filed. `state.js`
+exports `canonBlessing` and `render-rules.js` folds every blessing-name↔blessing-name comparison
+through it, so the blessing rules match the engine's own notion of identity. Two things worth
+carrying forward. **The producer and its consumers had to move together**: canonicalising
+`computeOutcomeBlessings`'s members while leaving the three `outcomeBlessings.has(normalize(b))`
+lookups would have moved the defect one step sideways rather than closing it — two of the five
+edited sites are not in the task's list of three. And **the older `<outcome>` guard had the same
+gap**: the filing framed it as a simplification in task 241's new predicate, but task 108's form
+missed its own alias pair identically, unexercised only because book 5 alone writes it. The
+`validate-source.ps1` half was skipped on purpose — once the rule folds, a mixed pair is valid
+source, so a gate on it would reject correct XML. 10 of 12 new assertions fail with the fold
+neutralised (the 2 survivors are the negative controls); assertions 2411 → 2423.
 
 Worked 2026-08-10 (implementation pass, task 241): closed **241** and filed **242** (LOW).
 The widening went into one new structural helper (`branchBlessingEscapeGoto`) that both

@@ -467,6 +467,61 @@ export async function run(ctx) {
         ok('task241: §6.160 still keeps the blessing on entry', h160.g.hasBlessing('storm') && h160.spends.n === 0);
       }
 
+      // --- task 242: a mixed pair must still pair up (scratch fixtures) ------------
+      // storms/storm and poison/disease are ONE blessing to the engine (tasks 76/123), so the
+      // predicates above compare through canonBlessing rather than bare normalize. All 42
+      // shipped branch escapes spell it the same way within a section, so only a fixture can
+      // drive the mismatch — and it fails quietly and in the defect's own direction (no branch
+      // found → charged on entry → escape disabled one render later).
+      {
+        const mix242 = parse('<section name="t242">Storm clouds swell.<if blessing="storms">If you have a blessing of Safety from Storms, <lose blessing="storm">cross it off</lose> and <goto section="247"/>.</if>Otherwise <goto section="222"/>.</section>');
+        const held242 = GameState.create({ name:'B242', gender:'m', profession:'Warrior', book:6, adv });
+        held242.addBlessing('storms'); // granted in the OTHER spelling than the <lose> uses
+        const lose242 = mix242.querySelector('lose[blessing]');
+        const gotos242 = Array.from(mix242.querySelectorAll('goto'));
+        const ob242 = rules.computeOutcomeBlessings(mix242);
+        ok('task242: an <if blessing="storms"> claims its <lose blessing="storm">',
+           rules.branchBlessingEscapeGoto(lose242) === gotos242[0]);
+        ok('task242: the mixed pair is a guarded loss, so it stays inert on entry',
+           rules.isGuardedBlessingLoss(lose242, ob242) === true);
+        ok('task242: the in-branch →247 spends the blessing held under the other spelling',
+           rules.blessingSpendForGoto(gotos242[0], mix242, held242, ob242) === 'storm');
+        ok('task242: the unblessed "Otherwise →222" still spends nothing',
+           rules.blessingSpendForGoto(gotos242[1], mix242, held242, ob242) === null);
+
+        // Folding must not make two DIFFERENT blessings one: only the alias table pairs up.
+        const off242 = parse('<section name="t242n"><if blessing="luck"><lose blessing="storm">cross it off</lose> and <goto section="247"/>.</if></section>');
+        ok('task242: an <if blessing="luck"> does NOT claim a <lose blessing="storm">',
+           rules.branchBlessingEscapeGoto(off242.querySelector('lose[blessing]')) === null);
+
+        // The same fold on the <outcome blessing=> half (task 108's form): the set members and
+        // every lookup against it are canonical, so the pair matches across spellings too.
+        const out242 = parse('<section name="t242o"><outcome blessing="storms"/><p>Storm! <lose blessing="storm">lose it</lose> and <goto section="9"/>.</p><p><lose blessing="storm" hidden="t"/></p></section>');
+        const oob242 = rules.computeOutcomeBlessings(out242);
+        ok('task242: computeOutcomeBlessings canonicalises its members', oob242.has('storm') && oob242.size === 1, JSON.stringify([...oob242]));
+        const oLose242 = Array.from(out242.querySelectorAll('lose[blessing]')).find((l) => !l.hasAttribute('hidden'));
+        ok('task242: an <outcome blessing="storms"> guards a <lose blessing="storm">',
+           rules.isGuardedBlessingLoss(oLose242, oob242) === true);
+        ok('task242: and its safe goto spends that blessing',
+           rules.blessingSpendForGoto(out242.querySelector('goto'), out242, held242, oob242) === 'storm');
+        ok('task242: the keepblessing reroll form folds the same way',
+           rules.blessingSpendForReroll(out242, held242, oob242) === 'storm');
+
+        // End to end through the renderer, the same three moments §1.324 is measured at above.
+        const hm = enter241(6, 't242', 'storms');
+        hm.st.begin(mix242, 6, 't242');
+        ok('task242: the mixed pair keeps the blessing on entry',
+           hm.g.hasBlessing('storm') && hm.spends.n === 0, `spends=${hm.spends.n}`);
+        hm.st.rerender();
+        ok('task242: a re-render leaves the mixed-pair escape →247 live',
+           hm.g.hasBlessing('storm') && !!exit241(hm.c, 247) && !exit241(hm.c, 247).disabled,
+           `held=${hm.g.hasBlessing('storm')} disabled=${!!(exit241(hm.c, 247) || {}).disabled}`);
+        exit241(hm.c, 247).click();
+        ok('task242: taking it spends the blessing exactly once and turns to 247',
+           hm.nav.at && String(hm.nav.at.s) === '247' && !hm.g.hasBlessing('storms') && hm.spends.n === 1,
+           `nav=${JSON.stringify(hm.nav.at)} spends=${hm.spends.n}`);
+      }
+
       Math.random = rnd241;
       window.__FL_INSTANT_DICE__ = false;
     }
