@@ -592,7 +592,13 @@ function renderChooseOnePay(story, container, node, path, key) {
     btn.disabled = true; btn.title = wasted;
   } else if (shards != null && story.state.data.shards < cost) {
     btn.disabled = true; btn.title = 'Not enough Shards';
-  } else if (item != null && !story.state.hasItemMatch(item, node.getAttribute('tags'))) {
+  } else if (armPlan && armPlan.present && !armPlan.eligible) {
+    // Eligibility comes from the plan that will COMMIT the loss, as on the other two payment
+    // paths. It used to come from state.hasItemMatch(item, tags), which knows nothing of the
+    // payment's bonus=/group=/multiple= narrowing or the keep rule: §5.152 asks for "any object
+    // with a +1 or greater bonus", so a cursed player carrying only a +0 match got a live button
+    // that found no eligible loss on click — spending nothing, arming nothing, and rerendering
+    // unchanged. (task 238)
     btn.disabled = true; btn.title = 'You have nothing to give.';
   } else if (armPlan && armPlan.needsChoice) {
     btn.addEventListener('click', () => {

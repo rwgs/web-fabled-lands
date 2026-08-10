@@ -1722,6 +1722,57 @@ export async function run(ctx) {
            names226(g152) + ' armed=' + g152.getFlag('curse1'));
       }
 
+      // --- task 238: the choose-one payment's availability must come from its own loss plan ---
+      // renderChooseOnePay computed the shared plan but only asked it whether a picker was needed;
+      // the enable/disable guard called state.hasItemMatch(item, tags), which knows nothing of the
+      // payment's bonus=/group=/multiple= narrowing or the keep rule. So a cursed §5.152 player
+      // carrying only a +0 possession saw a live "any object with a +1 or greater bonus" button
+      // that found no eligible loss on click: nothing spent, the price flag unarmed, the section
+      // rerendered unchanged. The curse is set in every case here so menuWasteReason (task 223)
+      // is not what disables the cost — the title says which guard spoke. The two-qualifying-items
+      // picker is the task-226 case directly above; §4.634's full-pack barter, which must stay
+      // live, is covered by suite-economy's task-223 block.
+      {
+        const mk238 = async (items) => {
+          const g = GameState.create({ name:'T238', gender:'m', profession:'Warrior', book:5, adv });
+          g.data.items = []; g.data.shards = 0; items.forEach((it) => g.addItem(it));
+          g.addCurse('Curse of Ugliness'); // a reward worth taking, so the menu is not "wasted"
+          const c = document.createElement('div');
+          new Story(c, g, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(5, '152'), 5, '152');
+          const pay = Array.from(c.querySelectorAll('.pay-action')).find((b) => /\+1 or greater/.test(b.textContent));
+          return { g, c, pay };
+        };
+
+        // Only a +0 possession: the bonus filter matches nothing, so the offering must be inert.
+        {
+          const { g, c, pay } = await mk238([makeItem('item', 'tin whistle')]);
+          ok('task238: §5.152 a +0-only pack cannot pay the +1-or-greater offering',
+             !!pay && pay.disabled === true && /nothing to give/i.test(pay.title || ''),
+             pay ? `dis=${pay.disabled} title=${pay.title}` : 'no pay button');
+          ok('task238: §5.152 nothing is taken and the curse menu stays unarmed',
+             names226(g) === 'tin whistle' && g.getFlag('curse1') === false && picks226(c).length === 0,
+             names226(g) + ' armed=' + g.getFlag('curse1') + ' picks=' + picks226(c).length);
+        }
+
+        // No possession at all: the same plan, the same verdict.
+        {
+          const { pay } = await mk238([]);
+          ok('task238: §5.152 an empty pack cannot pay it either',
+             !!pay && pay.disabled === true, pay ? `dis=${pay.disabled}` : 'no pay button');
+        }
+
+        // Exactly one qualifying object is no choice: it commits straight away and arms the menu.
+        {
+          const { g, c, pay } = await mk238([makeItem('item', 'tin whistle'), makeItem('item', 'opal ring', 1)]);
+          ok('task238: §5.152 a single qualifying object leaves the offering live',
+             !!pay && pay.disabled === false, pay ? `dis=${pay.disabled} title=${pay.title}` : 'no pay button');
+          pay.click();
+          ok('task238: §5.152 that object is taken with no picker, and the menu is armed',
+             picks226(c).length === 0 && names226(g) === 'tin whistle' && g.getFlag('curse1') === true,
+             names226(g) + ' armed=' + g.getFlag('curse1') + ' picks=' + picks226(c).length);
+        }
+      }
+
       // --- task 228: a multiple= forfeit must collect as many answers as it takes ---
       // Task 226's needsChoice is `openForm(spec) && candidates.length > count`, so multiple="2"
       // over three possessions offers a picker — but a chooser naming ONE item under-charged,

@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-237 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **238–239 are the open items** — file new work
+238 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **239–240 are the open items** — file new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,7 +20,6 @@ phase is picked up from there rather than from the buckets below.
 
 **MEDIUM**
 
-- [ ] 238. §5.152's bonus-filtered item payment stays enabled when no carried item qualifies
 - [x] 213. The post-fight gate does not hold an item award, so loot is takeable before the fight
 - [x] 214. A visit-box redirect does not hold the section body, so a one-time reward is re-takeable
 - [x] 216. `<if ticks="N">` after an in-section `<tick>` reads the pre-tick count, so "now ticked" branches never fire
@@ -34,10 +33,12 @@ phase is picked up from there rather than from the buckets below.
 - [x] 234. §6.36 strips "your **best** armour, your **best** weapon" and the engine takes the first of each instead
 - [x] 236. A virtual-time budget that runs out reports as a suite FAILURE, with nothing saying it was the clock
 - [x] 237. `run-tests.ps1` selects an unusable WindowsApps Python alias and never reaches the real interpreter
+- [x] 238. §5.152's bonus-filtered item payment stays enabled when no carried item qualifies
 
 **LOW**
 
 - [ ] 239. The intentional `java-engine/README.md` rename leaves the reference packager looking for `README.txt`
+- [ ] 240. A cut-short run reports no progress at all, because the harness publishes `#results` once
 - [x] 215. A self-closing effect tag renders no words, so published sentences print with a hole
 - [x] 217. A visit-box redirect below the section head still leaves both exits live (book1/91)
 - [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
@@ -295,10 +296,11 @@ this order.*
 - [x] 235. A warm Chrome profile serves a day-old test bundle, so the headless loop reports a false `ALL PASS`
 - [x] 236. A virtual-time budget that runs out reports as a suite FAILURE, with nothing saying it was the clock
 - [x] 237. `run-tests.ps1` selects an unusable WindowsApps Python alias and never reaches the real interpreter
+- [x] 238. §5.152's bonus-filtered item payment stays enabled when no carried item qualifies
 
 ---
 
-> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–239 are still below; completed tasks 212–237 await the next re-archive pass, and the Review log follows them.
+> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–240 are still below; completed tasks 212–238 await the next re-archive pass, and the Review log follows them.
 
 ---
 
@@ -2165,6 +2167,8 @@ the new one. Nothing under `books/` or `web/` changed, so no rebuild or stamp wa
 
 **Priority: MEDIUM — a shipped payment presents a live action that silently does nothing for a
 normal character state.**
+**Status: done.** The control's eligibility now comes from the plan that commits the loss. See the
+closing notes at the end of this section.
 
 *(Filed 2026-08-10 during the post-task-236 review.)*
 
@@ -2193,6 +2197,45 @@ Add focused `suite-actions` coverage beside the task-226 cases:
 
 This is a `web/` change: stamp the version and finish the aggregate browser suite before closing.
 
+**The fix is one branch** in `renderChooseOnePay` (`web/js/render-rewards.js`): the guard that read
+`state.hasItemMatch(item, node.getAttribute('tags'))` now reads `armPlan.present &&
+!armPlan.eligible`, the same test the other two payment paths (`renderPayment`,
+`renderOptionalPay`) already used and the same plan whose `needsChoice` this function was already
+consulting two branches later. Nothing is reimplemented in the view: `bonus=`, `group=`,
+`multiple=`, `cache=`, the keep rule and the cargo/ship kinds all arrive through
+`losePaymentPlan`, so the button is live exactly when `applyEffect` would take something.
+
+**The old broad matcher is not dead code that happened to be wrong — it was the *only* guard for a
+non-`<lose>` cost, so removing it needed the corpus checked, not assumed.** `renderChooseOnePay`
+only ever sees a `PASSIVE_TAGS` node (`lose`/`tick`/`gain`/`set`/`curse`/`disease`/`poison`/
+`adjustmoney`), and across all six books the only non-`lose` nodes carrying both `price=` and a
+possession attribute are §4.456's `<transfer item="?" bonus="1" price="1">` and §3.538's
+`<sell cargo="?" price="x">` — both of which have their own renderers in the tag registry and
+never reach this function. So an `item=` cost here is always a `<lose>`, and the plan covers every
+case the old branch did.
+
+**Coverage** sits beside the task-226 cases in `suite-actions`, driven through the real §5.152
+section: a cursed player with only a +0 possession finds the "+1 or greater" offering disabled and
+titled, with nothing taken and `curse1` unarmed; an empty pack gets the same verdict; a single
+qualifying +1 object commits with no picker and arms the menu. Each case sets the curse
+deliberately, so `menuWasteReason` (task 223) is not what disables the button — the asserted title
+says which guard spoke. The two-qualifying-objects picker is the task-226 case immediately above,
+and §4.634's full-pack barter is `suite-economy`'s task-223 block; both are left as they were
+rather than duplicated here.
+
+**Proved against the old code before being trusted.** With the previous guard restored, the new
+block fails exactly one assertion — `task238: §5.152 a +0-only pack cannot pay the +1-or-greater
+offering :: dis=false title=` — and the empty-pack case passes, which is the point: the shipped
+symptom needed a *qualifying-but-filtered-out* possession to show, so a test that only checked an
+empty pack would have passed on the bug.
+
+Verified: `-Suite actions` **`RESULT ALL PASS pass=585 fail=0`**, full aggregate
+**`RESULT ALL PASS pass=2387 fail=0`** (2382 + the five new assertions), version stamped
+(`26.08.10.4d92e11`, service-worker cache key with it). One earlier full run was cut short by the
+virtual-time budget and the runner named it as such (task 236's placeholder arm); the immediate
+rerun passed. That run also showed the diagnosis has nothing to say about *where* the suite
+stalled, since the harness publishes `#results` only in `report()` — filed as task 240.
+
 ---
 
 ## 239. The intentional `java-engine/README.md` rename leaves the reference packager looking for `README.txt`
@@ -2215,6 +2258,47 @@ Verification: `rg README.txt java-engine` has no live filename reference (histor
 any, can remain); inspect or exercise the packager from an isolated temporary copy so no package
 output lands in the repository; then run the repository's required verification loop before
 closing the task.
+
+---
+
+## 240. A cut-short run reports no progress at all, because the harness publishes `#results` once
+
+**Priority: LOW — the run fails loudly and correctly; what is missing is any evidence of where it
+stopped, which is what would let the underlying stall be diagnosed.**
+
+*(Filed 2026-08-10 during task 238, observed live: a full run reported `RESULT FATAL pass=0 fail=1`
+with the runner's task-236 placeholder diagnosis, and the immediate rerun of the same tree reported
+`RESULT ALL PASS pass=2387 fail=0`.)*
+
+`_test.html`'s reporter writes `#results` exactly once, in `report()`, after every suite has
+finished. A run cut short therefore leaves the `running` placeholder and a ~6 KB dump with **zero
+`PASS` lines**, whether it died in the first suite or in the last assertion of the corpus scan.
+Task 236 made the runner say *that* a run was cut short rather than blaming a suite, which was the
+important half; this is the other half — it cannot say *when*, so there is nothing to compare
+between a run that stalled early and one that stalled at 99%.
+
+That matters because the stall itself is still unexplained. Task 236 measured the whole suite at
+**~13.5s of virtual time** and raised the budget to 300000 for headroom, so a run reaching that
+ceiling is not a suite that grew too large: it is a stall long enough to push virtual time past
+twenty times the normal spend. Two occurrences are now on record (task 236's filing and this one),
+both intermittent, both passing on an immediate rerun of an unchanged tree — and the dump from
+each carries no information about the point of the stall.
+
+The cheap fix is to make progress observable rather than to hunt the stall directly: publish into
+`#results` as the run proceeds (or flush the accumulated `out` lines per suite), so a cut-short
+dump names the last suite and assertion that completed. The constraint is that this must not
+weaken any existing guarantee — in particular the sticky-fatal contract (`flFatal` must still be
+able to fail an aggregate, and a provisional `RESULT FATAL` must not be overwritten by a later
+partial flush), the "first RESULT line in the dump is the verdict" rule that both the runner and
+`.github/workflows/smoke.yml` depend on, and the `pass=0` vacuous-run check. A partial flush that
+wrote a well-formed `RESULT` line for an unfinished run would be strictly worse than today's
+placeholder, so whatever is written mid-run must not look like a verdict.
+
+Verification: with progress publishing in place, a deliberately cut-short run
+(`-VirtualTimeBudget 13500`, task 236's reproduction) must still be diagnosed as cut short, must
+still exit non-zero, and its dump must now name the last completed suite; a normal run's verdict
+line, counts and title must be unchanged; and a bootstrap abort (a duplicate top-level `const` in
+one suite) must still report `RESULT FATAL pass=0 fail=1` naming the file.
 
 ---
 
