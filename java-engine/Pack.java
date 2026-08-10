@@ -20,7 +20,7 @@ public class Pack implements FilenameFilter {
 	private static final String JarName = "flands.jar";
 	private static final String LocalFiles[] =
 		{
-			"README.txt",
+			"README.md",
 			"JaFL.bat",
 			JarName,
 			"user.ini",

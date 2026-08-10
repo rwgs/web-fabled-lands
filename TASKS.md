@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-238 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **239–240 are the open items** — file new work
+239 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **240 is the only open item** — file new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -37,7 +37,6 @@ phase is picked up from there rather than from the buckets below.
 
 **LOW**
 
-- [ ] 239. The intentional `java-engine/README.md` rename leaves the reference packager looking for `README.txt`
 - [ ] 240. A cut-short run reports no progress at all, because the harness publishes `#results` once
 - [x] 215. A self-closing effect tag renders no words, so published sentences print with a hole
 - [x] 217. A visit-box redirect below the section head still leaves both exits live (book1/91)
@@ -51,6 +50,7 @@ phase is picked up from there rather than from the buckets below.
 - [x] 225. The "pay to spin" cost is the third payment path that commits an open ability loss with no chooser
 - [x] 227. A wordless `<curse>`/`<disease>`/`<poison>` prints no name, so its printed sentence has a hole
 - [x] 228. `showForfeitPicker` can only answer for one item, so a `multiple=` forfeit it offers would under-charge
+- [x] 239. The intentional `java-engine/README.md` rename leaves the reference packager looking for `README.txt`
 
 **Done**
 
@@ -297,10 +297,11 @@ this order.*
 - [x] 236. A virtual-time budget that runs out reports as a suite FAILURE, with nothing saying it was the clock
 - [x] 237. `run-tests.ps1` selects an unusable WindowsApps Python alias and never reaches the real interpreter
 - [x] 238. §5.152's bonus-filtered item payment stays enabled when no carried item qualifies
+- [x] 239. The intentional `java-engine/README.md` rename leaves the reference packager looking for `README.txt`
 
 ---
 
-> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–240 are still below; completed tasks 212–238 await the next re-archive pass, and the Review log follows them.
+> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–240 are still below; completed tasks 212–239 await the next re-archive pass, and the Review log follows them.
 
 ---
 
@@ -2242,6 +2243,8 @@ stalled, since the harness publishes `#results` only in `report()` — filed as 
 
 **Priority: LOW — the offline web port is unaffected, but the retained reference packager can no
 longer include its own README.**
+**Status: done.** The one filename literal now reads `README.md`, exercised in both directions from
+an isolated copy. See the closing notes at the end of this section.
 
 *(Filed 2026-08-10 during the post-task-236 review. User decision: retain the Markdown rename for
 displayability; it is an approved exception to the otherwise read-only `java-engine/` boundary.)*
@@ -2258,6 +2261,34 @@ Verification: `rg README.txt java-engine` has no live filename reference (histor
 any, can remain); inspect or exercise the packager from an isolated temporary copy so no package
 output lands in the repository; then run the repository's required verification loop before
 closing the task.
+
+**One character-for-character change**: `Pack.java`'s `LocalFiles[0]`, from `"README.txt"` to
+`"README.md"`. Nothing else in `java-engine/` was touched, read into the port, or reformatted, and
+`README.txt` now appears nowhere in the tree.
+
+**Exercised rather than inspected, in both directions, from a temp fixture** — `javac` and `java`
+are both on this machine, so the claim did not have to rest on reading `addFile`. The fixture is a
+throwaway copy of `Pack.java` beside stub files named for each of the ten `LocalFiles` entries and
+a one-section `book1/`; no compiled class, archive or intermediate ever entered the repository (the
+only tracked change is the one line above). With the stale literal, the run reproduces the filing
+exactly: `File 0: README.txt`, then `Error in creating file:
+java.io.FileNotFoundException: README.txt`, exit 1, and a **0-byte `JaFLtest.zip`** left behind —
+the incomplete archive the task predicted, since `zout` is opened before the first entry is read.
+With the fix, all ten local files are written in order starting `File 0: README.md`, `book1.zip` is
+nested, and it closes cleanly at exit 0; the produced archive lists exactly those eleven entries.
+
+Worth noting for anyone who reaches for this helper: the other nine names (`JaFL.bat`,
+`flands.jar`, `user.ini`, the two JPGs, `Rules.xml`, `QuickRules.xml`, `books.ini`, `jafl.ico`) are
+**not in this repository either** — `Pack.java` was written to run from the original distribution
+directory, not from `java-engine/`. So this repair makes the file list internally consistent with
+the tracked rename; it does not make the packager runnable from a checkout, and nothing here should
+be read as suggesting it is. That is not a defect of the port (the boundary is reference-only), so
+no further task is filed.
+
+Verified: full aggregate **`RESULT ALL PASS pass=2387 fail=0`**, and `stamp-version.ps1` is a
+confirmed no-op for a `java-engine/`-only change (`Version already at 26.08.10.4d92e11`), so the
+app source hash correctly excludes the reference engine and the tree stayed clean apart from the
+one line.
 
 ---
 
