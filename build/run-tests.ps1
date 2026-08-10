@@ -22,11 +22,16 @@
       dump is deleted first and size-checked after, so a missing capture cannot be read as a
       missing failure.
 
+  A fourth mode fails loudly but names the wrong culprit: a run cut short by the virtual-time
+  budget reports as a suite failure, with nothing saying it was the clock. Get-CutShortDiagnosis
+  below recognises both shapes it takes and says so. (task 236)
+
   The verdict is taken from the FIRST RESULT line in the dump. --dump-dom includes
   _test.html's inline script SOURCE, which carries the literal "RESULT FATAL pass=0 fail=1";
   the live verdict lives in <pre id="results"> at the top of <body> and is therefore always
-  the first match. The source literal only wins when #results never populated - a true hang,
-  correctly a FATAL. (task 142, mirrored from .github/workflows/smoke.yml)
+  the first match. The source literal only wins when #results never populated, which means the
+  page never finished - correctly a FATAL, but NOT the bootstrap abort that string otherwise
+  denotes, which is the task 236 case. (task 142, mirrored from .github/workflows/smoke.yml)
 
   Exit code is 0 only on RESULT ALL PASS.
 
@@ -43,6 +48,14 @@
 .PARAMETER KeepDump
   Keep the dumped DOM after a passing run (it is always kept on failure).
 
+.PARAMETER VirtualTimeBudget
+  Chrome's --virtual-time-budget in virtual milliseconds. This is NOT a wall-clock timeout:
+  virtual time leaps forward whenever the page is idle, so the whole suite finishes in ~13s of
+  real time and the unused remainder costs nothing. What consumes it is the number of awaits
+  the suite performs, which grows with the suite - a fixed 90000 was set at ~1,700 assertions
+  and started cutting runs short at ~2,400. The default therefore carries deliberate headroom;
+  raise it if a run is still cut short.
+
 .EXAMPLE
   pwsh -ExecutionPolicy Bypass -File build/run-tests.ps1
 .EXAMPLE
@@ -53,7 +66,8 @@ param(
     [string]$Suite,
     [int]$Port = 8848,
     [string]$Browser,
-    [switch]$KeepDump
+    [switch]$KeepDump,
+    [int]$VirtualTimeBudget = 300000
 )
 
 Set-StrictMode -Version Latest
@@ -85,6 +99,54 @@ function Find-Browser {
         }
     }
     throw 'No Chrome or Edge found - pass -Browser <path to chrome.exe>.'
+}
+
+# A failing verdict says WHAT broke but not WHY, and both ways a run gets cut short read as
+# something else entirely (task 236):
+#
+#   * The page never finished. Chrome dumps the DOM mid-run and #results still holds the
+#     "running" placeholder, so the FIRST RESULT line in the dump is the one in _test.html's
+#     inline SOURCE - "RESULT FATAL pass=0 fail=1" - which everywhere else means a bootstrap
+#     abort (a duplicate top-level const in a suite). Entirely different fix. The tell is
+#     exact: a real bootstrap abort has flFatal REPLACE that placeholder, so "running"
+#     surviving in #results can only mean the page was still working when the dump was taken.
+#   * The page finished, but a fetch died on the way down. Tear-down aborts whatever fetch is
+#     in flight, which arrives as an ordinary suite error ("TypeError: Failed to fetch", in
+#     whichever suite happened to be loading a section) and reads as a regression there. From
+#     inside the page that is indistinguishable from a genuinely broken server. From out here
+#     it is not, because this script owns the server, so ask it: still answering means the
+#     network was fine and the page lost it while shutting down.
+#
+# Returns $null for an ordinary failure, so nothing is ever claimed about a real one.
+function Get-CutShortDiagnosis([string]$DumpPath) {
+    $rerun = "Rerun to confirm; if it repeats, raise it: -VirtualTimeBudget $($VirtualTimeBudget * 2)."
+    # Matched on '<pre id="results">running' alone: the placeholder ends in a non-ASCII
+    # ellipsis and build/*.ps1 must stay ASCII-only (CI enforces it, for 5.1's sake).
+    if (Select-String -Path $DumpPath -Pattern '<pre id="results">running' -SimpleMatch -Quiet) {
+        return @(
+            'CUT SHORT, not a bootstrap abort: #results never reported, so the page was still working',
+            "when --virtual-time-budget=$VirtualTimeBudget expired and the DOM was dumped. The RESULT",
+            "line above is the placeholder in _test.html's own source showing through, not a verdict.",
+            'Either the budget is too small for the suite, or something in the page genuinely hangs.',
+            $rerun
+        ) -join [Environment]::NewLine
+    }
+    if (Select-String -Path $DumpPath -Pattern '^(FAIL|FATAL|ASYNC-FATAL) .*(Failed to fetch|NetworkError|net::ERR_)' -Quiet) {
+        $alive = $false
+        try { Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 5 | Out-Null; $alive = $true } catch { }
+        if ($alive) {
+            return @(
+                'CUT SHORT, not broken: a fetch failed while the server was still answering, which is what',
+                "--virtual-time-budget=$VirtualTimeBudget expiring mid-run looks like from inside the page.",
+                $rerun
+            ) -join [Environment]::NewLine
+        }
+        return @(
+            'A fetch failed AND the server has stopped answering, so the failures above are the server',
+            'dying mid-run rather than the suite. Check what else is on the port, then rerun.'
+        ) -join [Environment]::NewLine
+    }
+    return $null
 }
 
 # Collect what earlier runs left behind. This run cleans up after itself, but only the paths
@@ -155,7 +217,7 @@ try {
     Start-Process -FilePath $browser -ArgumentList @(
         '--headless=new', '--disable-gpu', '--no-sandbox',
         '--no-first-run', '--no-default-browser-check',
-        '--dump-dom', '--virtual-time-budget=90000',
+        '--dump-dom', "--virtual-time-budget=$VirtualTimeBudget",
         "--user-data-dir=$profileDir", $url
     ) -RedirectStandardOutput $dump -NoNewWindow -Wait
 
@@ -189,6 +251,8 @@ try {
         Write-Host ''
         Select-String -Path $dump -Pattern '^(FAIL|FATAL) ' | Select-Object -First 25 |
             ForEach-Object { Write-Host $_.Line }
+        $why = Get-CutShortDiagnosis $dump
+        if ($why) { Write-Host ''; Write-Host $why }
         Write-Host ''
         Write-Host "Full dump: $dump"
         exit 1

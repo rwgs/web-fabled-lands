@@ -160,7 +160,20 @@ Notes:
   served. (task 209) `build/serve.py` turns `allow_reuse_address` **off**, so a second bind
   fails loudly (`exit 2`, "something is already listening there") instead of shadowing — but
   only for servers started through it. (task 235)
-- Give it a virtual-time budget **≥ 60s** — the every-section scan is CPU-heavy.
+- **A virtual-time budget that runs out fails the run in the wrong suite's name.** When
+  `--virtual-time-budget` expires Chrome dumps the DOM and tears down at once, aborting the
+  `fetch` in flight — which arrives in the page as an ordinary suite error (`FATAL [economy]
+  TypeError: Failed to fetch`, whichever suite happened to be loading a section) and reads as
+  "the last change broke that suite". Nothing is unsound (the run fails, the runner exits 1),
+  but the only other tell is a short assertion count, and that needs a known-good number to
+  compare against. The budget is **not** a wall-clock timeout: virtual time leaps forward
+  whenever the page is idle, so the whole suite finishes in ~13s real and unused budget costs
+  nothing — what spends it is the number of awaits, which grows with the suite. A fixed 90000
+  set at ~1,700 assertions began cutting runs short at ~2,400, so the default is now
+  **300000**, with `-VirtualTimeBudget` to raise it. Inside the page an expiry and a real
+  network failure are identical, so the runner asks the question the page cannot: a fetch
+  failure against a server that is **still answering** is reported as `CUT SHORT, not broken`
+  rather than left looking like a regression. (task 236)
 - Pure-logic modules (`engine.js`, `combat.js`, `market.js`, `state.js`) can also
   be imported and unit-checked directly in Node for fast feedback. That seam is itself
   tested — `node web/tests/node-import.mjs` (no dependencies, exit 0 = pass) walks each

@@ -125,9 +125,16 @@ jobs:
 
           DOM="$(mktemp)"
           UDD="$(mktemp -d)"   # a fresh profile so no stale service-worker cache can serve an old bundle
+          # --virtual-time-budget is not a wall-clock timeout: virtual time leaps forward
+          # whenever the page is idle, so the unused remainder costs no real seconds. What
+          # spends it is the number of awaits the suite performs, which grows with the suite —
+          # the old fixed 90000 was set at ~1,700 assertions and began cutting runs short at
+          # ~2,400, aborting the fetch in flight and reporting it as an ordinary suite failure
+          # ("TypeError: Failed to fetch"). Headroom here is free; a short run is not. (task 236)
+          BUDGET=300000
           google-chrome --headless=new --disable-gpu --no-sandbox \
             --no-first-run --no-default-browser-check \
-            --dump-dom --virtual-time-budget=90000 \
+            --dump-dom --virtual-time-budget="$BUDGET" \
             --user-data-dir="$UDD" \
             "http://localhost:8848/web/_test.html" > "$DOM" || true
 
@@ -146,12 +153,38 @@ jobs:
             "RESULT ALL PASS"*)
               echo "✓ Smoke suite passed." ;;
             "RESULT FATAL"*)
-              echo "✗ Smoke suite aborted before running (module parse/bootstrap error, e.g. a duplicate top-level const):"
-              grep -oE 'FATAL [^<]{0,160}' "$DOM" | head -2 || true
+              # Two very different things wear this verdict. A bootstrap abort has flFatal
+              # REPLACE the "running" placeholder in #results; a run cut short mid-flight
+              # leaves it, so the RESULT line matched above is the placeholder in _test.html's
+              # own SOURCE showing through. Saying "duplicate top-level const" to someone whose
+              # budget simply ran out sends them looking for a syntax error there is not. (task 236)
+              if grep -q '<pre id="results">running' "$DOM"; then
+                echo "✗ Smoke suite never finished: #results never reported, so the page was still"
+                echo "  working when --virtual-time-budget=$BUDGET expired and the DOM was dumped."
+                echo "  The RESULT line above is _test.html's own placeholder, not a verdict."
+                echo "  Either the budget is too small for the suite, or something in the page hangs."
+              else
+                echo "✗ Smoke suite aborted before running (module parse/bootstrap error, e.g. a duplicate top-level const):"
+                grep -oE 'FATAL [^<]{0,160}' "$DOM" | head -2 || true
+              fi
               exit 1 ;;
             "RESULT FAILURES"*)
               echo "✗ Smoke suite failed. First FAIL lines:"
               grep -oE 'FAIL [^<]{0,160}' "$DOM" | head -50 || true
+              # Name the right culprit when the CLOCK ran out rather than the code (task 236).
+              # From inside the page a budget expiry and a broken server are the same
+              # TypeError; from out here they are not, because this job owns the server. If it
+              # still answers, the network was fine and the page lost it on the way down.
+              if grep -qE '(FAIL|FATAL)[^<]*(Failed to fetch|NetworkError|net::ERR_)' "$DOM"; then
+                if curl -sf http://localhost:8848/web/_test.html -o /dev/null; then
+                  echo "  CUT SHORT, not broken: a fetch failed while the server was still answering,"
+                  echo "  which is what --virtual-time-budget=$BUDGET expiring mid-run looks like."
+                  echo "  Re-run the job; if it repeats, raise BUDGET above."
+                else
+                  echo "  A fetch failed AND the server has stopped answering — the failures above are"
+                  echo "  the server dying mid-run, not the suite."
+                fi
+              fi
               exit 1 ;;
             *)
               echo "✗ No RESULT line — the suite did not run (server down, wrong path, or a hang)."

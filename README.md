@@ -352,6 +352,12 @@ the verdict and **exits 0 only on `RESULT ALL PASS`**; on a failure it prints th
 `FAIL`/`FATAL` lines and keeps the dumped DOM, naming its path. It also closes the loop's
 false-pass traps rather than leaving them to be remembered — see the notes below.
 
+A run that Chrome's `--virtual-time-budget` cuts short fails in *another* component's name (as a
+suite error, or as the bootstrap abort that "`RESULT FATAL pass=0 fail=1`" otherwise denotes), so
+the runner recognises both shapes and says it was the clock, with `-VirtualTimeBudget` to raise
+it. That budget is not a wall-clock timeout — virtual time leaps ahead whenever the page is idle,
+so the default carries headroom for free.
+
 The first line of the dumped `#results` reads
 `RESULT ALL PASS …` when healthy (page title
 `TESTS_OK`); any failure, or any uncaught async error / unhandled promise rejection captured

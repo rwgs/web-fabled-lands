@@ -33,7 +33,7 @@ phase is picked up from there rather than from the buckets below.
 - [x] 235. A warm Chrome profile serves a day-old test bundle, so the headless loop reports a false `ALL PASS`
 - [x] 233. §5.578's donation applies against an empty pool and memoises the no-op, so the Brotherhood's cut is never taken
 - [x] 234. §6.36 strips "your **best** armour, your **best** weapon" and the engine takes the first of each instead
-- [ ] 236. A virtual-time budget that runs out reports as a suite FAILURE, with nothing saying it was the clock
+- [x] 236. A virtual-time budget that runs out reports as a suite FAILURE, with nothing saying it was the clock
 
 **LOW**
 
@@ -1973,6 +1973,8 @@ deliberately untouched — it is already immune, and the one green gate is not w
 ## 236. A virtual-time budget that runs out reports as a suite FAILURE, with nothing saying it was the clock
 
 **Priority: LOW — it fails loudly and a rerun passes, but the message names the wrong culprit.**
+**Status: done.** The budget carries headroom, and both shapes a cut-short run takes are now
+named as the clock rather than as the code. See the closing notes at the end of this section.
 
 *(Filed 2026-08-09 during task 234, observed live: one run of an unchanged tree reported
 `RESULT FAILURES pass=2061 fail=1` / `FATAL [economy] TypeError: Failed to fetch`, and an
@@ -1998,6 +2000,54 @@ reporter print the suite count it *expected* so a short run is obvious in the ve
 have the runner treat a `Failed to fetch` FATAL as a distinct "run cut short — rerun" message. A
 budget expiry and a real network failure look identical from inside the page, so any fix that
 distinguishes them has to come from the runner, not the harness.
+
+**Measuring it first changed the fix.** `--virtual-time-budget` is not a wall-clock timeout:
+virtual time leaps forward whenever the page is idle, so the whole suite spends only **~13.5s of
+it** (the pass/fail boundary sits between `-VirtualTimeBudget 13000` and `14000`, and the real
+run takes ~10s either way). 90000 was therefore never the ceiling in normal operation — a stall
+long enough to force virtual time past it is what cut task 234's run short. Two consequences:
+headroom is **free** (raising the default to 300000 changed the wall clock by nothing), and a
+fixed number was always going to be the wrong lever on its own.
+
+**And it exposed a second, more misleading shape of the same bug.** Cutting real runs short at
+`-VirtualTimeBudget 13500` never once produced the reported `RESULT FAILURES`; all six attempts
+produced **`RESULT FATAL pass=0 fail=1` with no detail lines at all**. The dump explains it:
+`#results` still reads `running…`, so the first `RESULT` line in the file is the literal in
+`_test.html`'s own inline *source* showing through — the string that everywhere else means a
+**bootstrap abort**, which both the runner and CI spell out as "module parse error, e.g. a
+duplicate top-level const". That sends the reader hunting a syntax error that does not exist,
+which is worse than blaming the wrong suite. It is also **exactly decidable**: a real bootstrap
+abort has `flFatal` *replace* the placeholder, so `running` surviving in `#results` can only mean
+the page was still working when the dump was taken.
+
+**What the runner does now** (`Get-CutShortDiagnosis` in `build/run-tests.ps1`, returning `$null`
+for an ordinary failure so nothing is ever claimed about a real one):
+- placeholder intact → `CUT SHORT, not a bootstrap abort`, naming the budget, and honest that a
+  genuine hang looks the same from here;
+- a `FAIL`/`FATAL` line carrying `Failed to fetch`/`NetworkError`/`net::ERR_` → ask the one
+  question the page cannot. The server is this script's own child and is still up at that point,
+  so **if it answers**, the network was fine and the page lost it on the way down (`CUT SHORT,
+  not broken`); if it does not, the failures really are the server dying, and it says so.
+
+Both messages name `--virtual-time-budget=<n>` and print the doubled value to pass next time.
+
+**Verified live, both arms, on real runs rather than crafted dumps.** `-VirtualTimeBudget 13500`
+reproduces the placeholder case and prints the cut-short diagnosis. Killing `serve.py` 3.3s into
+a run reproduces the *reported* case precisely — `RESULT FAILURES pass=2061 fail=1` /
+`FATAL [economy] TypeError: Failed to fetch`, the same two numbers task 234 recorded — and prints
+the dead-server arm; killing it and restarting a server before the browser exits prints the
+`CUT SHORT, not broken` arm. Killing at 5s or 9s instead changes nothing (`ALL PASS pass=2382`):
+the data is fetched and cached inside the first ~4s, which is why the fetch shape is the rare one.
+Full suite at the new default: **`RESULT ALL PASS pass=2382 fail=0`**, exit 0, 10s wall.
+`node web/tests/node-import.mjs`: `RESULT ALL PASS pass=35 fail=0`. No generated-file drift, and
+`build/*.ps1` stays ASCII-only (the placeholder's ellipsis is non-ASCII, so the match is on
+`<pre id="results">running` alone).
+
+**`.github/workflows/smoke.yml` is included this time**, where task 235 deliberately left it
+alone. That call was right for the false-*pass* traps — CI was already immune to every one. This
+defect is not one of those: CI runs the same 90000 against the same growing suite and prints the
+same two wrong culprits, and a misread red build costs more than a misread local one. It gets the
+budget, both splits, and no more.
 
 ---
 
