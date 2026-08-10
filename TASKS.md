@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-240 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **241 is open** — file new work under the
+242 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **243 is open** — file new work under the
 priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -52,6 +52,7 @@ there once the buckets below are clear.
 - [x] 228. `showForfeitPicker` can only answer for one item, so a `multiple=` forfeit it offers would under-charge
 - [x] 239. The intentional `java-engine/README.md` rename leaves the reference packager looking for `README.txt`
 - [x] 240. A cut-short run reports no progress at all, because the harness publishes `#results` once
+- [ ] 243. A cargo buy stays enabled with a full hold and refuses on click, where every other capacity limit disables
 
 **Done**
 
@@ -2580,6 +2581,51 @@ only because book 5 is the sole book writing that form and spells it consistentl
 filed against new code was equally present in the code it was modelled on; when a filing says
 "the new predicate compares too narrowly", check whether the thing it was copied from does too.
 
+## 243. A cargo buy stays enabled with a full hold and refuses on click, where every other capacity limit disables
+
+**Priority: LOW — nothing is mis-granted or over-charged; the transaction is refused correctly.
+This is an affordance inconsistency, and the one capacity limit in the app that does not explain
+itself before the click.**
+
+*(Filed 2026-08-10, during conversion work on an unpublished book.)*
+
+Both cargo-buying paths gate on "is there a ship here", never on "has it room":
+
+* `renderShopRow` (`render-market.js`) disables a Buy for `soldOut || balance < price || noSlot`,
+  and `noSlot` is `carryable && freeSlots() <= 0` where `carryable` is weapon/armour/tool/item —
+  so a `<trade cargo=>` row never gets a room check at all.
+* `renderInlineBuy`'s reason ladder gives a `<buy cargo=>` exactly one refusal,
+  `shipsHere().length === 0` → "You need a ship here to carry cargo."
+
+The click itself is safe: `buyTrade` looks for a ship here with
+`(s.cargo || []).length < shipCap(s.type)` and returns `{ ok: false, note: 'No cargo space.' }`
+**before** spending, so the view toasts a warning and the purse and the hold are untouched.
+Measured on a real `GameState`: a barque already carrying one Unit charges nothing and loads
+nothing, on both paths.
+
+What is wrong is that the player learns it only by clicking. The 12-item cap — the same limit one
+category over — disables both paths with the title "No room (12-item limit)"; funds disable with
+"Not enough Shards"; a spent `quantity=` row disables as "Sold out". Cargo alone shows a live
+button that does nothing.
+
+The books make it visible. **book3/221** hands you a hold's worth of spices "which you can take if
+you have room for it", and **book3/410** prints the same offer. A full-hold player reads a printed
+condition, sees an enabled button, clicks, and gets a toast where every neighbouring control would
+have answered before the click. The census is 17 sections carrying a `<trade cargo=>` market row
+and 21 an inline `<buy cargo=>`, across books 1–5.
+
+**Fix:** `market.js` already owns the rule (`shipCap`, and `buyTrade`'s own search). Export the
+predicate it computes — "is there a ship here with room" — and have both view paths use it as a
+disable reason, titled with the words the refusal already uses ("No cargo space."), so the button
+and the toast cannot disagree. Assert it on both paths: a market row and an inline `<buy cargo=>`,
+each with a laden barque here (disabled, titled) and each with room (live).
+
+**Checked and deliberately not filed here:** book3/221 and book3/410 both print "you can, of
+course, jettison existing cargo to make room", and **no jettison control exists anywhere** — not in
+a market, not on the Adventure Sheet's ship panel. That is a missing feature rather than a defect in
+one, so it belongs in `ROADMAP.md`; it is named here because it is what makes a full hold a dead end
+today rather than a decision.
+
 ---
 
 ## Review log
@@ -2587,6 +2633,16 @@ filed against new code was equally present in the code it was modelled on; when 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-10 (conversion pass on an unpublished book): **243** (LOW), and nothing else. The
+cargo Buy is the only capacity-limited control in the app that stays enabled past its limit and
+answers with a toast on the click; the 12-item cap one category over disables and titles itself.
+Nothing is mis-granted — `buyTrade` refuses before spending, measured on both view paths — so the
+fix is an affordance, not a correctness one. Worth carrying forward: **the rule already exists in
+the rule module and only the view is missing it.** `market.js` computes "a ship here with room"
+inside `buyTrade`; both view paths ask the weaker question (`shipsHere().length === 0`) because
+that is the one the module happens to export. When a view's guard is thinner than the transaction's,
+look for the predicate the transaction already computes rather than writing a second one.
 
 Worked 2026-08-10 (implementation pass, task 242): closed **242**, nothing new filed. `state.js`
 exports `canonBlessing` and `render-rules.js` folds every blessing-name↔blessing-name comparison
