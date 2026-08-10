@@ -195,8 +195,10 @@ export function renderGoto(story, container, node, path) {
   // restored section — unless it carries revisit="t" (task 110).
   if (isSpentSource(story.ctx, node)) { link.disabled = true; link.classList.add('disabled'); link.title = 'You have already taken this path.'; }
 
-  // The storm-safe goto (§200/250/60) spends the guarded Safety from Storms on the
-  // way out — the roll gate only leaves it clickable in the protected state. (task 108)
+  // The blessing-safe goto spends the guarded blessing on the way out: §5.200/250/60's
+  // post-table form, where the roll gate only leaves it clickable in the protected state,
+  // and the in-branch "cross off the blessing and turn to N" whose own <if blessing=…>
+  // does that gating. (tasks 108 + 241)
   const spendBlessing = blessingSpendForGoto(node, story.sectionEl, story.state, story.outcomeBlessings);
   link.addEventListener('click', () => {
     if (!bookAvailable) { story.notify(`“${bookTitle(book)}” (Book ${book}) isn’t included in this edition.`, 'warn'); return; }

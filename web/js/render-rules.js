@@ -53,32 +53,68 @@ export function blessingVeto(state, node) {
   return state.hasBlessing(b);
 }
 
-// A non-hidden <lose blessing="X"> whose blessing guards one of this section's
-// <outcome blessing="X"> hazards (task 108). §200/250/60 write it as bare prose
-// ("…lose the blessing and turn to N"); it must NOT auto-consume on entry — the spend
-// happens when the player takes the safe goto. It renders as inert words. §232/502/716
-// instead hide the loss behind a keepblessing var, so those (hidden) forms are excluded
-// and keep their normal var-gated behaviour.
+// The escape <goto> that a plain in-branch <lose blessing="X"> pays for, or null — the
+// BRANCH spelling of "cross off the blessing and turn to N" (task 241). The shape is a
+// non-hidden, unpriced, non-force="f" <lose blessing="X"> inside an <if blessing="X"> /
+// <elseif blessing="X"> that also holds the <goto> it precedes: 42 shipped sections across
+// books 1/2/3/4/6 write it this way and NOT ONE carries an <outcome blessing="X">, so the
+// guard below never saw them. The loss applied on entry, and the next render found the
+// branch — which reads the store that spend had just emptied — inactive, disabling the very
+// escape it had paid for. The branch condition IS the guard here (only a holder of X takes
+// it), so recognise it structurally rather than via the outcome table.
+//
+// Scoping the goto to the branch is the load-bearing part: book6/9's "Otherwise <goto 222>"
+// follows the loss in document order but is the UNBLESSED alternative and must stay free.
+// The excluded forms keep their own paths — book6/160's force="f" pair stays the opt-in
+// "you decide which to cross off", and a hidden loss stays var-gated (§5.232/502/716).
+export function branchBlessingEscapeGoto(node) {
+  if (node.tagName.toLowerCase() !== 'lose') return null;
+  if (boolAttr(node.getAttribute('hidden'))) return null;
+  if (node.getAttribute('price') != null) return null;
+  if (isOptionalForce(node)) return null;
+  const b = normalize(node.getAttribute('blessing'));
+  if (!b || b === '*' || b === '?') return null;
+  let branch = null;
+  for (let p = node.parentNode; p && p.tagName; p = p.parentNode) {
+    const tag = p.tagName.toLowerCase();
+    if ((tag === 'if' || tag === 'elseif') && normalize(p.getAttribute('blessing')) === b) { branch = p; break; }
+  }
+  if (!branch) return null;
+  return Array.from(branch.querySelectorAll('goto'))
+    .find((g) => node.compareDocumentPosition(g) & DOCUMENT_POSITION_FOLLOWING) || null;
+}
+
+// A non-hidden <lose blessing="X"> that is the deferred "spend to take the safe exit" step
+// rather than an on-entry loss (tasks 108 + 241). Two spellings, one notion: the blessing
+// guards one of this section's <outcome blessing="X"> hazards — §5.200/250/60 write it as
+// bare prose after the table ("…lose the blessing and turn to N") — or it sits in the
+// blessing's own branch beside the goto it buys (branchBlessingEscapeGoto). Either way it
+// must NOT auto-consume on entry: the spend happens when the player takes that goto, and it
+// renders as inert words until then. §5.232/502/716 instead hide the loss behind a
+// keepblessing var, so those (hidden) forms are excluded and keep their var-gated behaviour.
 export function isGuardedBlessingLoss(node, outcomeBlessings) {
   if (node.tagName.toLowerCase() !== 'lose') return false;
   if (boolAttr(node.getAttribute('hidden'))) return false;
   const b = node.getAttribute('blessing');
   if (b == null || b === '' || b === '*' || b === '?') return false;
-  return outcomeBlessings.has(normalize(b));
+  if (outcomeBlessings && outcomeBlessings.has(normalize(b))) return true;
+  return !!branchBlessingEscapeGoto(node);
 }
 
-// The blessing a safe-path <goto> should spend on click (task 108): a non-hidden guarded
-// <lose blessing="X"> that PRECEDES this goto in the section, when the player still holds
-// X. The roll gate only leaves the goto clickable in the protected-hazard (vetoed) state,
-// so spending X there matches the source's "lose the blessing and turn to N".
+// The blessing a safe-path <goto> should spend on click (tasks 108 + 241) — the other half
+// of the pair above, and it must recognise the SAME two spellings, or widening only the
+// guard would replace the on-entry over-charge with never charging at all. Outcome-guarded
+// form: any non-hidden guarded <lose blessing="X"> preceding this goto in the section, since
+// the roll gate only leaves it clickable in the protected-hazard (vetoed) state. Branch form:
+// only the escape inside the loss's own blessing branch. Either way, only when X is still held.
 export function blessingSpendForGoto(node, sectionEl, state, outcomeBlessings) {
-  if (!outcomeBlessings || !outcomeBlessings.size || !sectionEl) return null;
+  if (!sectionEl) return null;
   for (const l of sectionEl.querySelectorAll('lose[blessing]')) {
-    if (boolAttr(l.getAttribute('hidden'))) continue;
-    if (!outcomeBlessings.has(normalize(l.getAttribute('blessing')))) continue;
-    if (!(l.compareDocumentPosition(node) & DOCUMENT_POSITION_FOLLOWING)) continue;
     const b = l.getAttribute('blessing');
-    if (state.hasBlessing(b)) return b;
+    if (!state.hasBlessing(b)) continue;
+    if (!boolAttr(l.getAttribute('hidden')) && outcomeBlessings && outcomeBlessings.has(normalize(b))
+        && (l.compareDocumentPosition(node) & DOCUMENT_POSITION_FOLLOWING)) return b;
+    if (branchBlessingEscapeGoto(l) === node) return b;
   }
   return null;
 }
@@ -920,9 +956,12 @@ export function classifyPassive(node, view) {
   // isn't taken, and a later state change re-renders it live if it becomes active.
   if (view.inactive) return { mode: 'inert', showWords: !hidden };
 
-  // A guarded storm-blessing loss (§200/250/60) is the deferred "spend to avoid
-  // the storm" step, not an on-entry loss: render its words, but let the safe goto
-  // spend the blessing on click (renderGoto/blessingSpendForGoto). (task 108)
+  // A guarded blessing loss — §5.200/250/60's post-table prose, or the in-branch
+  // "cross off the blessing and turn to N" of 42 sections across books 1/2/3/4/6 — is
+  // the deferred "spend to take the safe exit" step, not an on-entry loss: render its
+  // words, but let that goto spend the blessing on click (renderGoto/
+  // blessingSpendForGoto). Charging on entry emptied the store the branch itself reads,
+  // so the next render disabled the escape. (tasks 108 + 241)
   if (tag === 'lose' && isGuardedBlessingLoss(node, view.outcomeBlessings)) {
     return { mode: 'inert', showWords: true }; // never hidden — isGuardedBlessingLoss excludes hidden forms
   }

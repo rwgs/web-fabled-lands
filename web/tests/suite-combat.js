@@ -339,19 +339,31 @@ export async function run(ctx) {
       eng.applyEffect(parse('<lose blessing="storm"/>'), g90b, {});
       ok('§90 an ordinary Storms blessing is still consumed by its use', !g90b.hasBlessing('storm'));
 
-      // End-to-end: §1.586's storm-avoidance branch spends the blessing on entry — a
-      // permanent one protects through every storm, an ordinary one only the first.
+      // End-to-end: §1.586's storm-avoidance branch is the in-branch escape, so the blessing
+      // is spent when the player TAKES →85 and not on entry (task 241 — charging on entry
+      // emptied the store its own <if blessing=> reads, disabling the escape it paid for).
+      // The task-90 rule is unchanged either way: a permanent blessing protects through every
+      // storm, an ordinary one only the first.
       const s90 = await data.getSection(1, '586');
+      const exit85 = (root) => Array.from(root.querySelectorAll('.goto'))
+        .find((g) => g.textContent.trim() === '85' && !g.disabled && !g.closest('.cond-inactive'));
       const g90p = GameState.create({ name:'P90', gender:'m', profession:'Warrior', book:1, adv });
       g90p.addBlessing('storm', true);
-      new Story(document.createElement('div'), g90p, { navigate(){}, onDeath(){}, notify(){} }).begin(s90, 1, '586');
+      const c90p = document.createElement('div');
+      new Story(c90p, g90p, { navigate(){}, onDeath(){}, notify(){} }).begin(s90, 1, '586');
+      ok('§1.586 first storm: the escape is offered before anything is charged (task 241)',
+         g90p.hasBlessing('storm') && !!exit85(c90p));
+      exit85(c90p).click();
       ok('§1.586 first storm: the permanent blessing protects and survives', g90p.hasBlessing('storm') && g90p.isBlessingPermanent('storm'));
       const c90p2 = document.createElement('div');
       new Story(c90p2, g90p, { navigate(){}, onDeath(){}, notify(){} }).begin(s90, 1, '586');
       ok('§1.586 second storm: still protected (branch active, →85 live)', g90p.hasBlessing('storm') && activeGoto(c90p2, 85));
       const g90o = GameState.create({ name:'O90', gender:'m', profession:'Warrior', book:1, adv });
       g90o.addBlessing('storm');
-      new Story(document.createElement('div'), g90o, { navigate(){}, onDeath(){}, notify(){} }).begin(s90, 1, '586');
+      const c90o = document.createElement('div');
+      new Story(c90o, g90o, { navigate(){}, onDeath(){}, notify(){} }).begin(s90, 1, '586');
+      ok('§1.586 an ordinary blessing survives merely READING the page (task 241)', g90o.hasBlessing('storm'));
+      exit85(c90o).click();
       ok('§1.586 an ordinary blessing is used up by the first storm', !g90o.hasBlessing('storm'));
     }
 

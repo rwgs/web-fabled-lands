@@ -329,6 +329,148 @@ export async function run(ctx) {
       window.__FL_INSTANT_DICE__ = false;
     }
 
+    // --- task 241: the IN-BRANCH "cross off the blessing and turn to N" escape ---
+    // 42 sections across books 1/2/3/4/6 put a plain <lose blessing="X"> beside its <goto>
+    // inside an <if blessing="X">, and not one carries an <outcome blessing="X"> to arm task
+    // 108's guard above. So the loss applied on ENTRY — charging a player who had not yet
+    // chosen between the escape and the printed hazard — and the branch, reading the store
+    // that spend had just emptied, went inactive on the next render and disabled the very
+    // escape the blessing had paid for. Book 5 is the only book writing the guarded form,
+    // which is why the guard has been correct and unexercised since task 108.
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const settle241 = () => new Promise((r) => setTimeout(r, 30));
+      const rnd241 = Math.random;
+      const exit241 = (c, n) => Array.from(c.querySelectorAll('.goto')).find((b) => b.textContent.trim() === String(n));
+      // Count real consumptions at the single sink both paths reach (the engine's
+      // <lose blessing> and renderGoto's useBlessing), so "spent exactly once" is measured
+      // rather than inferred from a blessing that is merely absent at the end.
+      const countSpends = (g) => {
+        const box = { n: 0 };
+        const inner = g.removeBlessing.bind(g);
+        g.removeBlessing = (b) => { const r = inner(b); if (r) box.n++; return r; };
+        return box;
+      };
+      const enter241 = (book, sec, bless) => {
+        const g = GameState.create({ name:`T${book}.${sec}`, gender:'m', profession:'Warrior', book, adv });
+        g.addBlessing(bless);
+        const spends = countSpends(g);
+        const c = document.createElement('div');
+        const nav = { at: null };
+        const st = new Story(c, g, { navigate(b,s){ nav.at = { b, s }; }, onDeath(){}, notify(){} });
+        return { g, c, st, nav, spends };
+      };
+
+      // §1.324 (storms, escape →559) — the page the filing measured, end to end.
+      const h324 = enter241(1, '324', 'storms');
+      h324.st.begin(await data.getSection(1,'324'), 1, '324');
+      ok('task241: §1.324 keeps the blessing on entry (nobody has chosen yet)',
+         h324.g.hasBlessing('storms') && h324.spends.n === 0, `spends=${h324.spends.n}`);
+      ok('task241: §1.324 the escape →559 is live on entry',
+         !!exit241(h324.c, 559) && !exit241(h324.c, 559).disabled);
+      h324.st.rerender();
+      ok('task241: §1.324 a re-render leaves the escape live and the blessing held',
+         h324.g.hasBlessing('storms') && !!exit241(h324.c, 559) && !exit241(h324.c, 559).disabled,
+         `held=${h324.g.hasBlessing('storms')} disabled=${!!(exit241(h324.c, 559) || {}).disabled}`);
+      exit241(h324.c, 559).click();
+      ok('task241: §1.324 taking the escape spends the blessing exactly once and turns to 559',
+         h324.nav.at && String(h324.nav.at.s) === '559' && !h324.g.hasBlessing('storms') && h324.spends.n === 1,
+         `nav=${JSON.stringify(h324.nav.at)} spends=${h324.spends.n}`);
+
+      // §1.324 again, taking the hazard instead: the roll is the alternative the escape was
+      // offered against, so it must cost nothing. (No ship → the <else> galleon roll is the
+      // live one; the barque/brigantine branches render their widgets disabled.)
+      const r324 = enter241(1, '324', 'storms');
+      r324.st.begin(await data.getSection(1,'324'), 1, '324');
+      Math.random = () => 0.5; // 4+4+4 = 12 → range 6-20 (weathered the storm → 559)
+      Array.from(r324.c.querySelectorAll('.btn-roll')).find((b) => !b.disabled).click();
+      await settle241();
+      ok('task241: §1.324 rolling the hazard instead keeps the blessing unspent',
+         r324.g.hasBlessing('storms') && r324.spends.n === 0, `spends=${r324.spends.n}`);
+      ok('task241: §1.324 the hazard roll still resolves its outcome row (→559)',
+         Array.from(r324.c.querySelectorAll('.goto')).some((b) => /→\s*559/.test(b.textContent)));
+      ok('task241: §1.324 and the escape stays live beside the resolved roll',
+         !!exit241(r324.c, 559) && !exit241(r324.c, 559).disabled);
+      Math.random = rnd241;
+
+      // The other three pages the filing measured, one book each: entry holds the blessing
+      // and the escape survives a re-render.
+      for (const [book, sec, bless, exit] of [[3,'139','storm',154], [4,'11','storm',236], [6,'9','storm',247]]) {
+        const h = enter241(book, sec, bless);
+        h.st.begin(await data.getSection(book, sec), book, sec);
+        h.st.rerender();
+        ok(`task241: §${book}.${sec} holds the blessing and keeps →${exit} live across a re-render`,
+           h.g.hasBlessing(bless) && h.spends.n === 0 && !!exit241(h.c, exit) && !exit241(h.c, exit).disabled,
+           `held=${h.g.hasBlessing(bless)} spends=${h.spends.n} btn=${!!exit241(h.c, exit)}`);
+      }
+
+      // §6.9 is the scoping case: its "Otherwise <goto 222>" FOLLOWS the loss in document
+      // order but is the unblessed alternative, so only the goto inside the blessing's own
+      // branch may spend. Unit-checked on the real section, then through the rendered page.
+      {
+        const sec9 = await data.getSection(6, '9');
+        const held9 = GameState.create({ name:'B241', gender:'m', profession:'Warrior', book:6, adv });
+        held9.addBlessing('storm');
+        const lose9 = sec9.querySelector('lose[blessing]');
+        const gotos9 = Array.from(sec9.querySelectorAll('goto'));
+        const g247 = gotos9.find((g) => g.getAttribute('section') === '247');
+        const g222 = gotos9.find((g) => g.getAttribute('section') === '222');
+        const ob9 = rules.computeOutcomeBlessings(sec9);
+        ok('task241: §6.9 carries no <outcome blessing=> — task 108’s guard could never see it', ob9.size === 0);
+        ok('task241: branchBlessingEscapeGoto points the in-branch loss at its own →247',
+           rules.branchBlessingEscapeGoto(lose9) === g247);
+        ok('task241: isGuardedBlessingLoss now recognises the branch form', rules.isGuardedBlessingLoss(lose9, ob9) === true);
+        ok('task241: the in-branch escape →247 spends the blessing', rules.blessingSpendForGoto(g247, sec9, held9, ob9) === 'storm');
+        ok('task241: the "Otherwise →222" alternative spends nothing', rules.blessingSpendForGoto(g222, sec9, held9, ob9) === null);
+
+        const h9 = enter241(6, '9', 'storm');
+        h9.st.begin(sec9, 6, '9');
+        exit241(h9.c, 222).click();
+        ok('task241: §6.9 walking out by →222 leaves the blessing untouched',
+           h9.nav.at && String(h9.nav.at.s) === '222' && h9.g.hasBlessing('storm') && h9.spends.n === 0,
+           `nav=${JSON.stringify(h9.nav.at)} spends=${h9.spends.n}`);
+      }
+
+      // §2.377 keeps working: the shape matches, but its <else> is death, so the escape →17
+      // is the section's only non-fatal exit and must stay live and spend exactly once.
+      {
+        const h377 = enter241(2, '377', 'poison');
+        h377.st.begin(await data.getSection(2, '377'), 2, '377');
+        ok('task241: §2.377 the only non-fatal exit →17 is live on entry',
+           h377.g.hasBlessing('poison') && !!exit241(h377.c, 17) && !exit241(h377.c, 17).disabled);
+        ok('task241: §2.377 the fatal <else> →560 stays disabled for a blessed player',
+           !exit241(h377.c, 560) || exit241(h377.c, 560).disabled);
+        exit241(h377.c, 17).click();
+        ok('task241: §2.377 taking →17 spends the blessing exactly once',
+           h377.nav.at && String(h377.nav.at.s) === '17' && !h377.g.hasBlessing('poison') && h377.spends.n === 1,
+           `nav=${JSON.stringify(h377.nav.at)} spends=${h377.spends.n}`);
+      }
+
+      // §6.160 unchanged: its pair is written as force="f" losses ("you decide which to cross
+      // off"), so it stays the opt-in path — the widened predicate must not claim it, and its
+      // →551 must not spend on top of the player's own choice.
+      {
+        const sec160 = await data.getSection(6, '160');
+        const held160 = GameState.create({ name:'B160', gender:'m', profession:'Warrior', book:6, adv });
+        held160.addBlessing('storm');
+        const lose160 = sec160.querySelector('lose[blessing]');
+        const goto551 = Array.from(sec160.querySelectorAll('goto')).find((g) => g.getAttribute('section') === '551');
+        const ob160 = rules.computeOutcomeBlessings(sec160);
+        ok('task241: §6.160 a force="f" pair is not a branch escape',
+           rules.branchBlessingEscapeGoto(lose160) === null
+           && rules.isGuardedBlessingLoss(lose160, ob160) === false);
+        ok('task241: §6.160 its →551 spends nothing (the opt-in click owns the cost)',
+           rules.blessingSpendForGoto(goto551, sec160, held160, ob160) === null);
+
+        const h160 = enter241(6, '160', 'storm');
+        h160.st.begin(sec160, 6, '160');
+        ok('task241: §6.160 still keeps the blessing on entry', h160.g.hasBlessing('storm') && h160.spends.n === 0);
+      }
+
+      Math.random = rnd241;
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
     // --- task 109: multi-ability <success ability="…"> routes by the CHOSEN ability ---
     // §2.37 offers "SANCTITY or MAGIC (your choice)" then a SANCTITY success →60 and a
     // MAGIC success →129; the branch must match the ability the player actually rolled.

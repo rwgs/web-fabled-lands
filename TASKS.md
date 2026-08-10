@@ -16,7 +16,8 @@ there once the buckets below are clear.
 
 **HIGH**
 
-- [ ] 241. A blessing-escape page spends the blessing on entry, then disables the exit it paid for
+- [x] 241. A blessing-escape page spends the blessing on entry, then disables the exit it paid for
+- [ ] 242. A branch escape's `<lose>` and its `<if blessing=>` must agree on the blessing's spelling
 
 **MEDIUM**
 
@@ -2455,6 +2456,96 @@ Coverage to add in `suite-render` beside the existing task-108 cases, driven thr
 
 This is a `web/` change: stamp the version and finish the aggregate browser suite before closing.
 
+**Done 2026-08-10.** Both predicates were widened through ONE new structural helper in
+`render-rules.js` — `branchBlessingEscapeGoto(node)`, which returns the `<goto>` a plain
+in-branch `<lose blessing="X">` pays for, or null. It requires the loss to be non-hidden,
+unpriced and not `force="f"`, to sit inside an `<if blessing="X">`/`<elseif blessing="X">`, and
+to be followed by a `<goto>` **inside that same branch**. `isGuardedBlessingLoss` now returns
+true for it as well as for the `<outcome blessing="X">` form, and `blessingSpendForGoto`
+attributes the spend to exactly that goto — so the two read one notion of "this loss is the
+deferred spend for that goto" from one place, and widening the guard could not become an
+under-charge.
+
+**Scoping the goto to the branch is the load-bearing part, and only book6/9 shows why.** Its
+"Otherwise `<goto section="222"/>`" *follows* the loss in document order, so task 108's
+section-wide precedence rule would have made walking away unblessed cost the blessing. The
+in-branch requirement is what keeps that exit free; there is an assertion for it both ways.
+
+The filing's census was re-run mechanically before any code changed and reproduced exactly:
+**42 plain branch-shape sections** (book1=6, book2=10, book3=16, book4=5, book6=5), **none**
+carrying an `<outcome blessing="X">`, book 5 absent, and book6/160 the *only* `force="f"`
+exclusion. Two facts the census added: every one of the 42 is a single `<if>` with exactly
+**one** goto after the loss and no nested branch, and none uses a piped blessing list — so the
+"first goto in the branch" rule is unambiguous across the whole corpus.
+
+Proved by neutralising the helper and re-running: **13 assertions fail**, showing both halves —
+`spends=1` at entry (the over-charge) and `held=false disabled=true` after a single
+`rerender()` (the escape the blessing had just bought). The full suite moved 2387 → 2411
+(22 new task-241 assertions + 2 in the task-90 block below), which is the number to compare
+against when reading a verdict by hand.
+
+Four notes worth carrying forward:
+
+* **The coverage went into `suite-actions`, not `suite-render` as the task says** — the
+  task-108 cases it told me to sit beside are in `suite-actions` (§5.200/232's veto,
+  entry-hold and safe-goto spend), and `suite-render` has no blessing-guard cases at all. The
+  locator was right and the suite name was wrong.
+* **§5.200 needed no new assertions.** The adjacent task-108 block already drives exactly the
+  "unchanged" case the task asks for, and it still passes through the rewritten
+  `blessingSpendForGoto` (which no longer early-returns on an empty `outcomeBlessings`).
+* **The task's read of book2/377 was half wrong.** "Spending on entry is harmless there" holds
+  for the over-charge (the player has no alternative to be cheated out of) but not for the
+  store: the pre-fix run shows the entry charge emptied it there too. Its escape merely
+  *looked* fine because the branch's active/inactive decision is made during the walk, before
+  the loss applies — so the defect only ever shows from the second render on. That is the same
+  reason §1.324's "escape live on entry" assertion passes with the fix neutralised while every
+  post-rerender one fails.
+* **One shipped test asserted the defect.** `suite-combat`'s task-90 pair used §1.586 — one of
+  the 42 — as its end-to-end vehicle, with the comment "spends the blessing on entry". The
+  task-90 *rule* is untouched (a permanent blessing survives its spend, an ordinary one does
+  not); only the moment of charging moved, so those two assertions now click the →85 escape
+  instead of reading the state after `begin()`. A test whose comment states the wrong model is
+  worth re-reading, not just re-pointing.
+
+---
+
+## 242. A branch escape's `<lose>` and its `<if blessing=>` must agree on the blessing's spelling
+
+**Priority: LOW — nothing in the shipped corpus is affected today; this is an undocumented
+simplification in task 241's new predicate plus a gap in the source gate.**
+
+*(Filed 2026-08-10, while implementing task 241.)*
+
+`branchBlessingEscapeGoto` decides that a `<lose blessing="X">` belongs to its enclosing
+`<if blessing="Y">` by comparing the two attributes with `normalize` — case/whitespace only.
+But the corpus has **two live spellings for two blessings**: `storms`→`storm` and
+`poison`→`disease`, folded by `canonBlessing` in `state.js` precisely because "a grant in one
+spelling satisfies an `<if blessing="…">` check (and its paired `<lose>`) in the other"
+(tasks 76/123). `canonBlessing` is module-private, so the new predicate cannot reach it.
+
+The census confirms all 42 shipped branch escapes spell it the same way *within* a section
+(book1/324 uses `storms` throughout, book2/377 `poison` throughout), so the mismatch is
+unreachable now. But a mixed pair — `<if blessing="storms">` around a `<lose blessing="storm">`
+— would silently fall back to today's defect: no branch found, charged on entry, escape
+disabled one render later. It fails *quietly* and in the wrong direction, which is exactly the
+shape task 241 was filed for. It is also the kind of thing a new book's conversion produces,
+since the two spellings are interchangeable everywhere else.
+
+Two ways to close it, and they are not exclusive:
+
+* Export a canonicaliser from `state.js` (the alias table's home) and have
+  `branchBlessingEscapeGoto` — and `computeOutcomeBlessings`/`isGuardedBlessingLoss`, which
+  compare the same way — fold through it instead of bare `normalize`. That makes the rule
+  match the engine's own notion of blessing identity.
+* Add a check to `build/validate-source.ps1`: inside an `<if|elseif blessing="X">`, a
+  descendant `<lose blessing="Y">` with `canon(Y) === canon(X)` but `Y !== X` is a source
+  smell worth failing on, since the books never mix spellings inside one section.
+
+Prefer the first (it fixes the rule); the second only stops the source from drifting. Either
+way add a scratch-fixture assertion beside the task-241 cases in `suite-actions` driving the
+mixed pair — a `<lose blessing="storm">` inside an `<if blessing="storms">` — since no shipped
+section can exercise it.
+
 ---
 
 ## Review log
@@ -2462,6 +2553,20 @@ This is a `web/` change: stamp the version and finish the aggregate browser suit
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-10 (implementation pass, task 241): closed **241** and filed **242** (LOW).
+The widening went into one new structural helper (`branchBlessingEscapeGoto`) that both
+predicates read, so the guard and the spend cannot drift apart. Three things worth carrying
+forward. The filing's census reproduced exactly when re-run mechanically (42 sections, none
+guarded, book6/160 the only `force="f"` exclusion) and added the fact that makes the rule
+unambiguous: every one of the 42 is a single `<if>` with exactly one goto after the loss.
+**The branch-scoping of that goto is the part with a real trap behind it** — book6/9's
+"Otherwise →222" follows the loss in document order, so task 108's section-wide precedence
+would have charged a player for walking away unblessed; only book6/9 exposes it, out of 42.
+And **one shipped test asserted the defect**: `suite-combat`'s task-90 pair used §1.586 — one
+of the 42 — with the comment "spends the blessing on entry". The task-90 rule was untouched;
+its two assertions now click the escape instead of reading state after `begin()`. Assertions
+2387 → 2411.
 
 Filed 2026-08-10 (single finding, no code touched here): **241** (HIGH) — the "cross off the
 blessing and turn to N" escape spends the blessing on entry and then disables the goto it paid
