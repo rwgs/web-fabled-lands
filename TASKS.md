@@ -4,8 +4,8 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 243 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); the buckets are clear — file new work under
-the priority bucket that fits, and record the pass in the Review log.
+misdiagnosis (see the Review log); **244 is open** — file new work under the
+priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -53,6 +53,7 @@ there once the buckets below are clear.
 - [x] 239. The intentional `java-engine/README.md` rename leaves the reference packager looking for `README.txt`
 - [x] 240. A cut-short run reports no progress at all, because the harness publishes `#results` once
 - [x] 243. A cargo buy stays enabled with a full hold and refuses on click, where every other capacity limit disables
+- [ ] 244. A dice-table row into an unbundled book answers "please try again", where every other cross-book control names the book
 
 **Done**
 
@@ -2638,11 +2639,79 @@ browser/corpus run passed **2427/2427** (suite 2423 → **2427**).
 
 ---
 
+## 244. A dice-table row into an unbundled book answers "please try again", where every other cross-book control names the book
+
+**Priority: LOW — nothing is mis-granted and no state is corrupted; the move is rolled back
+correctly. This is the one cross-book control in the app that does not explain why it refused,
+and it refuses in the place a player has the least idea what went wrong.**
+
+*(Filed 2026-08-10, during conversion work on an unpublished book.)*
+
+`<outcome>`, `<success>` and `<failure>` all accept `book=` (the source gate's allowlist has it on
+each), and a revealed branch with a `section=` renders a "Continue → N" button. `revealBranch`
+(`render-rolls.js`) builds that button as:
+
+    const targetBook = node.getAttribute('book') ? Number(node.getAttribute('book')) : story.book;
+    btn.addEventListener('click', () => story.navigate(targetBook, section));
+
+with **no edition check** — where the two other controls that cross books both have one.
+`renderGoto` refuses before moving:
+
+    if (!bookAvailable) { story.notify(`“${bookTitle(book)}” (Book ${book}) isn’t included in this edition.`, 'warn'); return; }
+
+and `surfaceExtraChoices` (`render.js:1414`) carries the same line.
+
+Measured on a real `GameState` against the shipped six-book edition, with the raw navigate stubbed
+so the hand-off is visible:
+
+* **book3/40**, row forced to `x=3` — the `<outcome var="x" range="2-4" book="9" section="84">` row
+  reveals `"Continue → 84"`, and the click reaches `navigate(9, 84)`. In the app that is
+  `data.getSection(9, 84)` → `loadBook(9)` → a 404 on `web/data/book9.json` → the thrown
+  `Book 9 is not available in this edition.` → `Story.navigate`'s `.catch(abort)`, which logs that
+  message to the console and toasts the player **"Could not load that section — please try again."**
+  The rollback itself is sound (task 167's transaction refunds the move), so the only damage is the
+  answer: the one message that names the real cause never reaches the screen, and the one that does
+  invites a retry that can never work.
+* the same target as a plain `<goto book="9" section="84">turn to 84</goto>` — the click notifies
+  **"The Isle of a Thousand Spires" (Book 9) isn't included in this edition.** and never navigates.
+
+The corpus reaches this today in **4 places**: `book3/33` (`range="7" book="9"`), `book3/40`
+(`range="2-4" book="9"`), `book5/19` (`range="3" book="8"`) and `book3/464`
+(`<failure book="12" section="25"/>`). Three of the four are dice tables where the *page itself*
+prints the remedy — book3/33's "If you roll a 7 and are missing book 9, roll again", book3/40's
+editorial "[If you roll 2-4 and lack book 9, roll again --Ed]" — so a player who ignores the
+printed note and clicks Continue gets told to try again by the app, beside a page telling them to
+reroll. `book3/464`'s `<failure>` has no such note and no alternative exit at all.
+
+**Fix:** `revealBranch` should ask the question `renderGoto` already asks. The three call sites want
+one shared helper rather than a third copy of the line — the notify text and `bookTitle` lookup are
+identical in the two that have it. Assert it on a synthetic section per branch tag: an
+`<outcome book="N">`/`<failure book="N">` into an unbundled book notifies with the book's title and
+does **not** navigate, and the same row into a bundled book still navigates.
+
+**Also worth deciding with it, not filed separately:** whether such a button should be *disabled*
+rather than live-and-refusing. `renderGoto` deliberately keeps it live and answers on the click, so
+matching that is the smaller change and the consistent one; disabling would also need the
+`<if book=>` branch's gray treatment to stay distinguishable from it.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-10 (conversion pass on an unpublished book): **244** (LOW), and nothing else. Same
+shape as 243 filed hours earlier, one subsystem over, and the repeat is the point worth carrying
+forward: **a rule the app already states correctly in one view is missing from a second view that
+does the same job.** 243 was a capacity check the transaction owned and one view never asked for;
+244 is an edition check `renderGoto` and `surfaceExtraChoices` both make and `revealBranch` does
+not. Neither is a correctness bug — both refuse safely — and both were found by walking a control
+the corpus reaches only from a *row of a dice table*, which is the part of the renderer with the
+fewest eyes on it: a table reveals one row out of five, so four fifths of that code never renders
+in a given playthrough. When auditing a view predicate, check every renderer that builds the same
+control, not the one the books reach most often.
 
 Worked 2026-08-10 (implementation pass, task 243): closed **243**, nothing new filed. The
 capacity rule now has one home in `market.js`, and the two cargo-buy controls expose its refusal
