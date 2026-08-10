@@ -4,19 +4,19 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 240 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **no task is open** — file new work under the
+misdiagnosis (see the Review log); **241 is open** — file new work under the
 priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
 
 This file is for **defects**. New features are scoped in
-[`ROADMAP.md`](ROADMAP.md) instead, as ordered phases — the backlog is empty, so a
-phase is picked up from there rather than from the buckets below.
+[`ROADMAP.md`](ROADMAP.md) instead, as ordered phases — pick up a phase from
+there once the buckets below are clear.
 
 **HIGH**
 
-*(none open — file new HIGH work here)*
+- [ ] 241. A blessing-escape page spends the blessing on entry, then disables the exit it paid for
 
 **MEDIUM**
 
@@ -2386,11 +2386,92 @@ is that the next occurrence will name a suite instead of nothing.
 
 ---
 
+## 241. A blessing-escape page spends the blessing on entry, then disables the exit it paid for
+
+**Priority: HIGH — 42 shipped sections take the blessing for merely READING the page, and one
+re-render later the escape it bought is disabled. The player is charged and then refused.**
+
+*(Filed 2026-08-10, from a headless probe of four shipped books. Found during conversion work on
+an unpublished book, whose pages print the same instruction.)*
+
+Books 1-6 write "spend a blessing to skip this hazard" one way — book1/324, and 41 more:
+
+    <if blessing="storm">
+      If you have the blessing of Alvir and Valmir, which confers Safety from Storms, you can
+      ignore the storm. <lose blessing="storm">Cross off the blessing</lose> and <goto section="559"/>.
+    </if>
+    Otherwise the storm hits with full fury.
+    <if ship="barque"><random dice="1">…</random> if your ship is a barque</if> …
+    <outcomes>…</outcomes>
+
+`classifyPassive` sees an ordinary effect: not hidden, no `price=`, no `force="f"`, and — the check
+that decides it — not `isGuardedBlessingLoss`, which fires only when the section also carries an
+`<outcome blessing="X">` (task 108). So the loss is applied **on entry**, before the player has
+chosen between the escape and the printed alternative below it. The hazard roll is still live, so a
+player who takes it has paid for an exit they did not use.
+
+**The second half is worse than the over-charge.** The escape's own `<if blessing="storm">` reads
+the store the entry spend just emptied, so on the *next* render that branch is inactive and its
+`<goto>` renders `disabled`. Any re-render does it, and clicking the hazard roll is a re-render. A
+blessed traveller who rolls the dice has by then lost the blessing **and** the exit — the page
+offers them nothing the blessing was for.
+
+Measured on a real `GameState` (headless, scratch page, one assertion pair per book): entering
+**book1/324**, **book3/139**, **book4/11** or **book6/9** holding Safety from Storms leaves
+`state.hasBlessing('storm') === false` on the first render, and after one `story.rerender()` the
+escape (559 / 154 / 236 / 247 respectively) is present but `disabled`.
+
+**Scale, counted mechanically rather than sampled.** The shape is an `<if blessing="X">` /
+`<elseif blessing="X">` branch holding a plain (non-hidden, no `force=`, no `price=`)
+`<lose blessing="X">` beside a `<goto>`: **42 sections across books 1, 2, 3, 4 and 6**, and **not
+one** carries an `<outcome blessing="X">` to arm task 108's guard. Book 5 is the only book that
+writes the guarded form, and it puts the `<lose>` *outside* the branch as bare prose after the
+table (book5/200, book5/250, book5/60) — which is exactly why book 5 escapes and nobody noticed.
+
+Two neighbours in the family are already correct and must stay that way:
+
+* **book6/160** writes the pair as `force="f"` losses ("in the event that you have both, you decide
+  which to cross off"), so it routes to the opt-in path and is not charged on entry.
+* **book2/377** offers no alternative — its `<else>` is death — so spending on entry is harmless
+  there even though the shape matches.
+
+**Both predicates need the same widening, not just the first.** Making `isGuardedBlessingLoss`
+accept the in-branch form would stop the entry charge but never spend the blessing at all, because
+`blessingSpendForGoto` is gated on the same non-empty `outcomeBlessings` set — an under-charge
+replacing an over-charge. The two read one notion of "this loss is the deferred spend for that
+goto" and both should recognise it structurally: a plain `<lose blessing="X">` inside a branch
+conditioned on `blessing="X"` that also contains the `<goto>` it precedes. `<outcome blessing="X">`
+then stays what it is today, the *other* way a section names a guarded hazard.
+
+Coverage to add in `suite-render` beside the existing task-108 cases, driven through real sections:
+
+* book1/324 (or book3/139) entered holding the blessing: still held after the render, escape live;
+* the same page re-rendered without clicking anything: escape still live, blessing still held;
+* clicking the escape: blessing spent exactly once, navigation to the printed section;
+* clicking the hazard roll instead: blessing still held, and the outcome row resolves normally;
+* book5/200 unchanged (the `<outcome blessing=>` form must keep working);
+* book6/160 unchanged (a `force="f"` pair keeps its decline);
+* book2/377 unchanged (its escape is the only non-fatal exit).
+
+This is a `web/` change: stamp the version and finish the aggregate browser suite before closing.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-10 (single finding, no code touched here): **241** (HIGH) — the "cross off the
+blessing and turn to N" escape spends the blessing on entry and then disables the goto it paid
+for, because task 108's guard recognises only the `<outcome blessing="X">` form and book 5 is the
+only book that writes it. Found while converting an unpublished book that prints the same
+instruction, then measured against books 1, 3, 4 and 6 rather than reasoned about: all four fail
+the same pair of assertions. The census that sizes it (42 sections, none guarded) is in the task.
+Worth carrying forward: **book 5's spelling of an idiom is not evidence that the other five books
+share it** — the guard has been correct and unexercised since task 108, and every section it was
+written for lives in one book.
 
 Worked 2026-08-10 (implementation pass, tasks 237-240): started clean at `c1c94fb` and closed the
 backlog. **237** — the runner now probes Python candidates instead of trusting the first name
