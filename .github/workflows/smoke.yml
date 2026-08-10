@@ -163,6 +163,9 @@ jobs:
                 echo "  working when --virtual-time-budget=$BUDGET expired and the DOM was dumped."
                 echo "  The RESULT line above is _test.html's own placeholder, not a verdict."
                 echo "  Either the budget is too small for the suite, or something in the page hangs."
+                # The harness republishes that placeholder as each suite starts, so its first line
+                # says which suite was in flight and which had finished. (task 240)
+                echo "  How far it got: $(grep -oE '<pre id="results">running[^<]*' "$DOM" | head -1 | sed 's/.*results">//')"
               else
                 echo "✗ Smoke suite aborted before running (module parse/bootstrap error, e.g. a duplicate top-level const):"
                 grep -oE 'FATAL [^<]{0,160}' "$DOM" | head -2 || true

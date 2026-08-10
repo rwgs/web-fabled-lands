@@ -83,6 +83,24 @@ const suites = [
 const only = new URLSearchParams(location.search).get('suite');
 const wanted = only ? only.split(',').map((s) => s.trim()).filter(Boolean) : null;
 
+// Publish how far the run has got, so a run cut short mid-flight can say so. #results used to
+// be written only by report(), after the last suite: ANY unfinished run therefore left the
+// same untouched placeholder and a ~6 KB dump with zero PASS lines, whether it died in the
+// first suite or on the final assertion of the corpus scan — nothing to compare, and nothing
+// to point at the stall the budget expiry implies. Three things constrain what may be written
+// here, and all three are load-bearing (task 240):
+//   * it must still START with "running", which is the string run-tests.ps1 and
+//     .github/workflows/smoke.yml match to tell a cut-short run from a bootstrap abort (236);
+//   * it must never contain a RESULT line — the first one in the dump IS the verdict (142);
+//   * it must never overwrite a provisional fatal, or a captured async error would stop being
+//     sticky (the task 82/120 contract).
+const done = [];
+function progress(current) {
+  if (window.__FL_ASYNC_FATAL__) return; // a captured fatal owns #results from here on
+  const head = 'running: ' + current + (done.length ? ' | done: ' + done.join(', ') : '');
+  document.getElementById('results').textContent = [head].concat(out).join('\n');
+}
+
 async function main() {
   for (const [name, fn] of suites) {
     if (wanted && !wanted.includes(name)) continue;
@@ -90,12 +108,16 @@ async function main() {
     // so they assume instant-dice mode. In the aggregate an early suite establishes it and it
     // persists; setting it here as well lets any suite run hermetically in a focused ?suite= run.
     window.__FL_INSTANT_DICE__ = true;
+    // Published BEFORE the suite runs, so the one that never returns is the one named.
+    progress(name);
+    const pass0 = pass, fail0 = fail;
     try {
       await fn(ctx);
     } catch (e) {
       fail++;
       out.push('FATAL [' + name + '] ' + ((e && (e.stack || e.message)) || String(e)));
     }
+    done.push(name + '(' + (pass - pass0) + '/' + ((pass - pass0) + (fail - fail0)) + ')');
   }
   report();
 }

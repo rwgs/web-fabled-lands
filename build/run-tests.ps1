@@ -183,13 +183,20 @@ function Get-CutShortDiagnosis([string]$DumpPath) {
     # Matched on '<pre id="results">running' alone: the placeholder ends in a non-ASCII
     # ellipsis and build/*.ps1 must stay ASCII-only (CI enforces it, for 5.1's sake).
     if (Select-String -Path $DumpPath -Pattern '<pre id="results">running' -SimpleMatch -Quiet) {
-        return @(
+        # The harness republishes that placeholder as each suite starts, so its first line names
+        # the suite that was in flight and the ones already finished. Before task 240 there was
+        # nothing to read here: every unfinished run left the same untouched placeholder, whether
+        # it died in the first suite or on the last assertion of the corpus scan.
+        $got = Select-String -Path $DumpPath -Pattern '<pre id="results">(running[^<\r\n]*)' | Select-Object -First 1
+        $where = if ($got) { $got.Matches[0].Groups[1].Value.Trim() } else { '' }
+        $lines = @(
             'CUT SHORT, not a bootstrap abort: #results never reported, so the page was still working',
             "when --virtual-time-budget=$VirtualTimeBudget expired and the DOM was dumped. The RESULT",
             "line above is the placeholder in _test.html's own source showing through, not a verdict.",
-            'Either the budget is too small for the suite, or something in the page genuinely hangs.',
-            $rerun
-        ) -join [Environment]::NewLine
+            'Either the budget is too small for the suite, or something in the page genuinely hangs.'
+        )
+        if ($where) { $lines += "How far it got: $where" }
+        return ($lines + $rerun) -join [Environment]::NewLine
     }
     if (Select-String -Path $DumpPath -Pattern '^(FAIL|FATAL|ASYNC-FATAL) .*(Failed to fetch|NetworkError|net::ERR_)' -Quiet) {
         $alive = $false

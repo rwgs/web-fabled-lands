@@ -3,15 +3,15 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-239 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **240 is the only open item** — file new work
-under the priority bucket that fits, and record the pass in the Review log.
+240 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **no task is open** — file new work under the
+priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
 
 This file is for **defects**. New features are scoped in
-[`ROADMAP.md`](ROADMAP.md) instead, as ordered phases — with the backlog empty, a
+[`ROADMAP.md`](ROADMAP.md) instead, as ordered phases — the backlog is empty, so a
 phase is picked up from there rather than from the buckets below.
 
 **HIGH**
@@ -37,7 +37,6 @@ phase is picked up from there rather than from the buckets below.
 
 **LOW**
 
-- [ ] 240. A cut-short run reports no progress at all, because the harness publishes `#results` once
 - [x] 215. A self-closing effect tag renders no words, so published sentences print with a hole
 - [x] 217. A visit-box redirect below the section head still leaves both exits live (book1/91)
 - [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
@@ -51,6 +50,7 @@ phase is picked up from there rather than from the buckets below.
 - [x] 227. A wordless `<curse>`/`<disease>`/`<poison>` prints no name, so its printed sentence has a hole
 - [x] 228. `showForfeitPicker` can only answer for one item, so a `multiple=` forfeit it offers would under-charge
 - [x] 239. The intentional `java-engine/README.md` rename leaves the reference packager looking for `README.txt`
+- [x] 240. A cut-short run reports no progress at all, because the harness publishes `#results` once
 
 **Done**
 
@@ -298,10 +298,11 @@ this order.*
 - [x] 237. `run-tests.ps1` selects an unusable WindowsApps Python alias and never reaches the real interpreter
 - [x] 238. §5.152's bonus-filtered item payment stays enabled when no carried item qualifies
 - [x] 239. The intentional `java-engine/README.md` rename leaves the reference packager looking for `README.txt`
+- [x] 240. A cut-short run reports no progress at all, because the harness publishes `#results` once
 
 ---
 
-> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–240 are still below; completed tasks 212–239 await the next re-archive pass, and the Review log follows them.
+> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–240 are still below; all of them are complete and await the next re-archive pass, and the Review log follows them.
 
 ---
 
@@ -2296,6 +2297,8 @@ one line.
 
 **Priority: LOW — the run fails loudly and correctly; what is missing is any evidence of where it
 stopped, which is what would let the underlying stall be diagnosed.**
+**Status: done.** The harness republishes `#results` as each suite starts, and both the runner and
+CI print how far the run got. See the closing notes at the end of this section.
 
 *(Filed 2026-08-10 during task 238, observed live: a full run reported `RESULT FATAL pass=0 fail=1`
 with the runner's task-236 placeholder diagnosis, and the immediate rerun of the same tree reported
@@ -2331,6 +2334,56 @@ still exit non-zero, and its dump must now name the last completed suite; a norm
 line, counts and title must be unchanged; and a bootstrap abort (a duplicate top-level `const` in
 one suite) must still report `RESULT FATAL pass=0 fail=1` naming the file.
 
+**What the harness does now** (`web/_test.html`): `main()` calls a new `progress(current)` before
+each suite runs — *before*, so the suite that never returns is the one named — and records
+`name(passed/total)` for each one that finishes. It writes `running: <suite> | done: engine(213/213),
+render(271/271), …` followed by every assertion line so far. Publishing at suite boundaries rather
+than per assertion is deliberate: 14 `textContent` writes instead of ~2,400 rebuilds of a growing
+80 KB string, for the diagnostic the task actually asks for.
+
+The message has to satisfy three constraints at once, and each one is load-bearing rather than
+stylistic:
+- **It must still start with `running`.** Both `run-tests.ps1` and `smoke.yml` decide "cut short vs
+  bootstrap abort" by matching `<pre id="results">running` (task 236). Replacing the placeholder
+  with a differently-worded progress line would have silently disabled that discrimination in both
+  places — the fix would have broken the diagnosis it exists to improve.
+- **It must contain no `RESULT` line.** The verdict is the first `RESULT … pass=N fail=N` in the
+  dump (task 142); a progress line shaped like one would *become* the verdict of an unfinished run,
+  which is worse than today's placeholder.
+- **It must never overwrite a provisional fatal.** `progress()` returns early when
+  `window.__FL_ASYNC_FATAL__` is set, so once `flFatal` has claimed `#results` the sticky-fatal
+  contract (tasks 82/120/143) still owns it.
+
+`run-tests.ps1` and `.github/workflows/smoke.yml` both print the line as `How far it got: …` inside
+their existing cut-short arms. CI is included for task 236's reason: the same stall produces the
+same unreadable red build there, and a misread CI failure costs more than a local one.
+
+**All four arms exercised live, not reasoned about:**
+- cut short (`-VirtualTimeBudget 13500`): exit 1, still `CUT SHORT, not a bootstrap abort`, and now
+  `How far it got: running: actions | done: engine(213/213), render(271/271), inventory(475/475),
+  combat(289/289), economy(551/551)` — five suites complete, the stall inside `actions`. That is the
+  line the two recorded stalls could not produce.
+- normal full run: **`RESULT ALL PASS pass=2387 fail=0`**, exit 0, title `TESTS_OK`, counts
+  unchanged; focused `-Suite economy` **`pass=551 fail=0`** (the head names only the suites a
+  focused run actually visits).
+- bootstrap abort (a duplicate top-level `const` appended to `suite-engine.js`, then reverted):
+  still **`RESULT FATAL pass=0 fail=1`** with `FATAL uncaught error: Uncaught SyntaxError:
+  Identifier 'dup240' has already been declared (suite-engine.js:764)`, and **no** cut-short
+  diagnosis — the module never evaluates, so `progress()` never runs and `flFatal` still replaces
+  the placeholder.
+- mid-run async fatal (an injected `setTimeout` throw inside `suite-render`'s `run`, then
+  reverted): **`RESULT FAILURES pass=2387 fail=1`** with the `ASYNC-FATAL uncaught error …
+  (suite-render.js:17)` line intact in the final report. This is the arm the change could plausibly
+  have broken — a later `progress()` clobbering the provisional fatal — and it does not.
+
+`build/run-tests-selftest.ps1` still passes **`pass=13 fail=0`**. No stamp was due and none was
+taken: `stamp-version.ps1` deliberately excludes `_test.html` and `web/tests/` as a dev-only
+harness (its own comment says so), and running it confirmed the no-op — so a harness-only change
+correctly does not bust a returning player's cache.
+
+**The stall itself is still unexplained, and this task did not set out to explain it.** What changed
+is that the next occurrence will name a suite instead of nothing.
+
 ---
 
 ## Review log
@@ -2338,6 +2391,25 @@ one suite) must still report `RESULT FATAL pass=0 fail=1` naming the file.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-10 (implementation pass, tasks 237-240): started clean at `c1c94fb` and closed the
+backlog. **237** — the runner now probes Python candidates instead of trusting the first name
+`Get-Command` resolves, with `build/run-tests-selftest.ps1` driving both directions over shim
+fixtures. Recorded there, because it changes how the filing should be read: the reported symptom
+did **not** reproduce (all five candidates on this machine, aliases included, answer
+`Python 3.14.5`), so the alias state observed at filing time was machine state and the defect is
+the discovery's willingness to trust it. **238** — the choose-one item payment's availability now
+comes from `losePaymentPlan` rather than the broader `hasItemMatch`, proved by restoring the old
+guard and watching the new §5.152 case fail. **239** — `Pack.java`'s one stale filename literal,
+exercised both ways from a temp fixture. **240** was filed *and* closed in this pass: a full run
+was cut short mid-flight (the runner correctly named it as task 236's clock arm) and the dump
+turned out to carry no progress information at all, so the harness now republishes `#results` per
+suite and both the runner and CI print how far the run got.
+
+Two things worth carrying forward. The stall behind a cut-short run is **still unexplained** — two
+occurrences are on record against a budget with ~20x headroom, both passing on an immediate rerun;
+what changed is that the next one will name a suite. And the assertion count moved 2382 -> 2387,
+which is the number to compare against when reading a verdict by hand.
 
 Reviewed 2026-08-10 (post-task pass, after tasks 211–236): started clean at
 `cfac58d`. Re-read the completed task details and relevant production/test changes, checked the
