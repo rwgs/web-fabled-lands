@@ -3,11 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-232 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and 235, filed and closed out of order because
-it is the loop everything else is verified through; **233 and 234 are the open
-items** — file new work under the priority bucket that fits, and record the pass
-in the Review log.
+236 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **237–239 are the open items** — file new work
+under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -22,6 +20,8 @@ phase is picked up from there rather than from the buckets below.
 
 **MEDIUM**
 
+- [ ] 237. `run-tests.ps1` selects an unusable WindowsApps Python alias and never reaches the real interpreter
+- [ ] 238. §5.152's bonus-filtered item payment stays enabled when no carried item qualifies
 - [x] 213. The post-fight gate does not hold an item award, so loot is takeable before the fight
 - [x] 214. A visit-box redirect does not hold the section body, so a one-time reward is re-takeable
 - [x] 216. `<if ticks="N">` after an in-section `<tick>` reads the pre-tick count, so "now ticked" branches never fire
@@ -37,6 +37,7 @@ phase is picked up from there rather than from the buckets below.
 
 **LOW**
 
+- [ ] 239. The intentional `java-engine/README.md` rename leaves the reference packager looking for `README.txt`
 - [x] 215. A self-closing effect tag renders no words, so published sentences print with a hole
 - [x] 217. A visit-box redirect below the section head still leaves both exits live (book1/91)
 - [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
@@ -275,11 +276,28 @@ this order.*
 - [x] 216. `<if ticks="N">` after an in-section `<tick>` reads the pre-tick count, so "now ticked" branches never fire
 - [x] 217. A visit-box redirect below the section head still leaves both exits live (book1/91)
 - [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
+- [x] 219. `<sold>` fires on a sale but its documented twin `<bought>` does nothing on a purchase
 - [x] 220. The documented headless-dump command runs nothing from an MSYS shell, so a stale dump reads as a pass
+- [x] 221. A single flag-linked `<resurrection>` ignores the payment and renders a free Arrange button
+- [x] 222. `ownsSoleLinkedBlessing` reads a linked `<lose blessing>` as a purchase, so a payment that STRIPS a blessing is refused
+- [x] 223. A choose-one cost is payable when every linked reward is refused, so the payment is deferred rather than spent
+- [x] 224. A `price=`/`flag=` key strips an open ability loss of its chooser, so the engine picks which ability the player forfeits
+- [x] 225. The "pay to spin" cost is the third payment path that commits an open ability loss with no chooser
+- [x] 226. An open `<lose item="?">` forfeit is taken with no picker, so the engine chooses which possession leaves
+- [x] 227. A wordless `<curse>`/`<disease>`/`<poison>` prints no name, so its printed sentence has a hole
+- [x] 228. `showForfeitPicker` can only answer for one item, so a `multiple=` forfeit it offers would under-charge
+- [x] 229. A `<group>` commits an open `<lose item="?">` with no picker, so a printed "decide which item" is ignored
+- [x] 230. A collapsed `<group>` drops its `<adjustmoney>` child, so §2.134's whole gamble pays nothing
+- [x] 231. A plain `<lose item="?">` effect commits with no picker, so six printed "(your choice)" instructions are ignored
+- [x] 232. The same bare-hazard picker is missing on `<lose cargo="?">` and a `group=`-narrowed forfeit, so 13 more printed choices are ignored
+- [x] 233. §5.578's donation applies against an empty pool and memoises the no-op, so the Brotherhood's cut is never taken
+- [x] 234. §6.36 strips "your **best** armour, your **best** weapon" and the engine takes the first of each instead
+- [x] 235. A warm Chrome profile serves a day-old test bundle, so the headless loop reports a false `ALL PASS`
+- [x] 236. A virtual-time budget that runs out reports as a suite FAILURE, with nothing saying it was the clock
 
 ---
 
-> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–220 are still below, awaiting the next re-archive pass; the Review log follows them.
+> **Completed task details (tasks 1–211) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. The details for tasks 212–239 are still below; completed tasks 212–236 await the next re-archive pass, and the Review log follows them.
 
 ---
 
@@ -2051,11 +2069,122 @@ budget, both splits, and no more.
 
 ---
 
+## 237. `run-tests.ps1` selects an unusable WindowsApps Python alias and never reaches the real interpreter
+
+**Priority: MEDIUM — the documented verification command fails before it starts the server on a
+configured Windows development machine, even though working Python is installed.**
+
+*(Filed 2026-08-10 during the post-task-236 review.)*
+
+`Find-Python` returns the first name that `Get-Command` resolves from `python`, `python3`, and
+`py`. On the reviewed machine all three first hits are zero-byte WindowsApps execution aliases
+under `C:\Users\rob_s\AppData\Local\Microsoft\WindowsApps`; PowerShell can resolve their paths,
+but `Start-Process` reports that the file cannot be accessed. A working interpreter exists later
+on `PATH` at `C:\Users\rob_s\AppData\Local\Python\bin\python.exe`, but the runner never considers
+it. Putting that directory first temporarily makes the unchanged full suite pass:
+**`RESULT ALL PASS pass=2382 fail=0`**.
+
+Fix Python discovery without adding a dependency or weakening the existing process cleanup:
+
+- consider every `Get-Command ... -All` candidate (deduplicated by source), not only the first
+  resolvable command name;
+- prove that a candidate can actually launch as Python before selecting it, skipping execution
+  aliases and other broken shims rather than failing the whole run at `Start-Process`;
+- fail only after exhausting the candidates, with a message that identifies the rejected paths.
+  An explicit `-Python` override analogous to `-Browser` is reasonable only if it keeps this
+  automatic path simple and its invalid-path failure clear.
+
+Regression/verification: with the reviewed `PATH` order unchanged, the default runner must skip
+the aliases, select the later real interpreter, clean up its server/profile, and finish the full
+suite at non-zero assertion count. Cover the all-candidates-invalid diagnostic without relying on
+the machine's installed aliases. Keep `build/*.ps1` ASCII-only.
+
+---
+
+## 238. §5.152's bonus-filtered item payment stays enabled when no carried item qualifies
+
+**Priority: MEDIUM — a shipped payment presents a live action that silently does nothing for a
+normal character state.**
+
+*(Filed 2026-08-10 during the post-task-236 review.)*
+
+The cursed-price branch in §5.152 asks the player to surrender a weapon, armour, or magic item
+with a combat bonus of **+1 or greater**. `renderChooseOnePay` already computes the shared
+`losePaymentPlan`, but uses it only to decide whether a picker is needed; its availability guard
+then calls the broader `state.hasItemMatch(item, tags)`, which ignores the payment's bonus filter.
+A cursed player carrying only a matching +0 possession therefore sees the payment enabled. On
+click the engine correctly finds no eligible loss, spends nothing, and does not arm the price
+flag, so the apparent action simply rerenders unchanged.
+
+Make the control's eligibility come from the same payment plan that commits the loss. In
+particular, an item payment whose plan is present but ineligible must be disabled before a click
+handler is wired; bonus, group, keep, multiple, cargo, and any other shared matcher constraints
+must not be reimplemented in the view. Preserve task 223's full-pack barter path and task 226's
+open-item picker behavior.
+
+Add focused `suite-actions` coverage beside the task-226 cases:
+
+- §5.152-equivalent payment, curse set, only a +0 matching item: disabled with an explanatory
+  title, no loss, no armed flag;
+- no matching item: disabled;
+- exactly one eligible +1 item: payment commits directly and arms the flag;
+- two eligible items: the picker opens and the selected loss arms the flag;
+- §4.634's full-pack choose-one barter remains live.
+
+This is a `web/` change: stamp the version and finish the aggregate browser suite before closing.
+
+---
+
+## 239. The intentional `java-engine/README.md` rename leaves the reference packager looking for `README.txt`
+
+**Priority: LOW — the offline web port is unaffected, but the retained reference packager can no
+longer include its own README.**
+
+*(Filed 2026-08-10 during the post-task-236 review. User decision: retain the Markdown rename for
+displayability; it is an approved exception to the otherwise read-only `java-engine/` boundary.)*
+
+`java-engine/Pack.java` still lists `README.txt` in `LocalFiles`, while the tracked file is now
+`README.md`. Its packaging path opens each listed filename, so the first stale entry throws
+`FileNotFoundException`, aborts the helper, and can leave the newly opened ZIP incomplete.
+
+Make the smallest coherent repair: change that one filename literal to `README.md`. Do not alter,
+refactor, or copy any other Java engine code. `AGENTS.md` records this sole exception so the task
+is implementable without weakening the clean-room licence boundary.
+
+Verification: `rg README.txt java-engine` has no live filename reference (historical prose, if
+any, can remain); inspect or exercise the packager from an isolated temporary copy so no package
+output lands in the repository; then run the repository's required verification loop before
+closing the task.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Reviewed 2026-08-10 (post-task pass, after tasks 211–236): started clean at
+`cfac58d`. Re-read the completed task details and relevant production/test changes, checked the
+build and test entry points against this Windows environment, and traced the remaining payment
+availability path against shipped XML. No completed task needs reopening.
+
+Filed **237** (MEDIUM): the runner trusts a resolvable WindowsApps Python alias without proving it
+can execute, so it never reaches the working interpreter later on `PATH`. Filed **238** (MEDIUM):
+§5.152's bonus-qualified item cost is enabled from a broader matcher than the shared loss plan,
+leaving a +0-only player with a silent no-op button. Filed **239** (LOW): the intentional
+`java-engine/README.md` displayability rename left `Pack.java`'s packaging literal at
+`README.txt`; the user chose to retain the rename, and `AGENTS.md` now records the one-line
+packager repair as the sole exception to the reference-only boundary. Also corrected the stale
+header, Done checklist, and archive note so tasks 219 and 221–236 are represented accurately.
+
+The default aggregate command exposed task 237 before the server launched. With the real Python
+directory placed first temporarily, fresh-profile Chrome completed at
+**`RESULT ALL PASS pass=2382 fail=0`**. DOM-free Node imports:
+**`RESULT ALL PASS pass=35 fail=0`**. Validator fixtures:
+**`RESULT ALL PASS pass=23 fail=0`**. Release fixtures:
+**`RESULT ALL PASS pass=47 fail=0`**. This review made no production-code or generated-data
+change; the tree was clean before the documentation-only filing.
 
 Reviewed 2026-07-29 (twelfth full pass, after tasks 180–208): started clean at
 `9a511ac`. Re-read the completion commits and their regression coverage across imported

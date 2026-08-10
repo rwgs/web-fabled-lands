@@ -26,7 +26,9 @@ combat, markets, ships, live adventure sheet). Plain HTML/CSS/ES modules —
   `JaFL-XML-Intro.md`) — prefer those for reading.
 - **`java-engine/`** — the original Java engine (JaFL). **Reference only — never
   edit it and never copy its code.** The JS rules are a clean-room
-  reimplementation (licensing: see `NOTICE`).
+  reimplementation (licensing: see `NOTICE`). The intentional `README.txt` →
+  `README.md` rename is the sole displayability exception; task 239 may update
+  `Pack.java`'s matching filename literal so the reference packager stays coherent.
 - **`build/*.ps1`** — data build + version stamp, plus the source-XML gate
   (`validate-source.ps1`) the build runs before writing anything and its fixture
   self-test (`validate-selftest.ps1`, run by CI). Adding a new tag/attribute/value
