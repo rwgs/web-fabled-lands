@@ -9,6 +9,12 @@ import { SHIP_TYPES, CREW_LEVELS, canonShipType, canonCargo } from './rules.js';
 import { resolveValue, readItemEffects } from './engine.js';
 
 const shipCap = (type) => SHIP_TYPES[canonShipType(type)]?.capacity || 1;
+const cargoShipWithSpace = (ships) => ships.find((s) => (s.cargo || []).length < shipCap(s.type));
+
+/** Whether a ship at the player's current location has room for one Cargo Unit. */
+export function hasCargoSpace(state) {
+  return !!cargoShipWithSpace(state.shipsHere());
+}
 
 // A market's currency= (task 40): Shards is the default purse; any other name is a
 // foreign-coin pool (e.g. Mithral). These route a trade's payment/receipt to the
@@ -115,7 +121,7 @@ export function buyTrade(state, goods, price, currency = null) {
     // Load onto a ship HERE (berthed at this port / sailing with you) that has cargo
     // space — never onto a vessel left at another dock (task 89).
     const here = state.shipsHere();
-    const ship = here.find((s) => (s.cargo || []).length < shipCap(s.type));
+    const ship = cargoShipWithSpace(here);
     if (!ship) return { ok: false, note: here.length ? 'No cargo space.' : 'You have no ship here.' };
     walletSpend(state, currency, price);
     (ship.cargo ||= []).push(canonCargo(cargoName)); // store the canonical commodity (task 127)

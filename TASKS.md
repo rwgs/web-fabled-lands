@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-242 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **243 is open** — file new work under the
-priority bucket that fits, and record the pass in the Review log.
+243 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); the buckets are clear — file new work under
+the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -52,7 +52,7 @@ there once the buckets below are clear.
 - [x] 228. `showForfeitPicker` can only answer for one item, so a `multiple=` forfeit it offers would under-charge
 - [x] 239. The intentional `java-engine/README.md` rename leaves the reference packager looking for `README.txt`
 - [x] 240. A cut-short run reports no progress at all, because the harness publishes `#results` once
-- [ ] 243. A cargo buy stays enabled with a full hold and refuses on click, where every other capacity limit disables
+- [x] 243. A cargo buy stays enabled with a full hold and refuses on click, where every other capacity limit disables
 
 **Done**
 
@@ -2626,6 +2626,16 @@ a market, not on the Adventure Sheet's ship panel. That is a missing feature rat
 one, so it belongs in `ROADMAP.md`; it is named here because it is what makes a full hold a dead end
 today rather than a decision.
 
+**Done 2026-08-10.** `market.js` now exports `hasCargoSpace`, backed by the same
+ship-selection helper `buyTrade` uses, so the transaction and the view share one definition of a
+local ship with room. Both cargo-buy views disable a full hold with `No cargo space.`; the inline
+path keeps its more specific no-ship explanation when no vessel is here.
+
+Four synthetic view assertions cover a laden and an empty barque on both paths. Before the rule
+change the two full-hold assertions failed while both room controls stayed live; afterward the
+focused economy suite passed **555/555**, the DOM-free import check passed **35/35**, and the full
+browser/corpus run passed **2427/2427** (suite 2423 → **2427**).
+
 ---
 
 ## Review log
@@ -2633,6 +2643,12 @@ today rather than a decision.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-10 (implementation pass, task 243): closed **243**, nothing new filed. The
+capacity rule now has one home in `market.js`, and the two cargo-buy controls expose its refusal
+before the click. The focused economy suite passed 555 assertions and the full suite passed 2427;
+the defect was reproduced first by the two full-hold assertions while both room controls remained
+live.
 
 Filed 2026-08-10 (conversion pass on an unpublished book): **243** (LOW), and nothing else. The
 cargo Buy is the only capacity-limited control in the app that stays enabled past its limit and

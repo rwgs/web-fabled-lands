@@ -7,7 +7,7 @@
 // in market.js / engine.js; this only builds the widgets and wires the clicks.
 
 import { applyEffect, applyEffectBody, boolAttr, resolveValue, applyRest, buyResurrectionDeal, readItemEffects, filterMatches, transferPlan } from './engine.js';
-import { shopKind, goodsFrom, ownsGoods, buyTrade, sellTrade, sellPlan, applyInlineBuy, buyOptions, sellInlineItem, sellCargo, canUpgradeCrew } from './market.js';
+import { shopKind, goodsFrom, ownsGoods, hasCargoSpace, buyTrade, sellTrade, sellPlan, applyInlineBuy, buyOptions, sellInlineItem, sellCargo, canUpgradeCrew } from './market.js';
 import { normalize, parseTags, splitItemName, isShardsCurrency } from './state.js';
 import { canonCargo } from './rules.js';
 import { modal } from './ui.js';
@@ -96,8 +96,9 @@ function renderShopRow(story, node, path, currency = null, marketSolds = [], mar
     b.className = 'btn-mini';
     b.textContent = soldOut ? 'Sold out' : `Buy ${price}${coin}`;
     const noSlot = carryable && story.state.freeSlots() <= 0;
-    b.disabled = soldOut || balance < price || noSlot;
-    b.title = soldOut ? 'None left' : (balance < price ? `Not enough ${foreign ? currency : 'Shards'}` : (noSlot ? 'No room (12-item limit)' : ''));
+    const noCargoSpace = kind === 'cargo' && !hasCargoSpace(story.state);
+    b.disabled = soldOut || balance < price || noSlot || noCargoSpace;
+    b.title = soldOut ? 'None left' : (balance < price ? `Not enough ${foreign ? currency : 'Shards'}` : (noSlot ? 'No room (12-item limit)' : (noCargoSpace ? 'No cargo space.' : '')));
     b.addEventListener('click', () => {
       const res = buyTrade(story.state, goods, price, currency);
       if (!res.ok) { if (res.note) story.notify(res.note, 'warn'); return; }
@@ -296,6 +297,7 @@ export function renderInlineBuy(story, container, node, path) {
   else if (price > 0 && story.state.data.shards < price) reason = 'Not enough Shards';
   else if ((kind === 'tool' || kind === 'item') && story.state.freeSlots() <= 0) reason = 'No room (12-item limit)';
   else if (kind === 'cargo' && story.state.shipsHere().length === 0) reason = 'You need a ship here to carry cargo.';
+  else if (kind === 'cargo' && !hasCargoSpace(story.state)) reason = 'No cargo space.';
   btn.disabled = !!reason;
   if (reason && reason !== 'done') btn.title = reason;
 

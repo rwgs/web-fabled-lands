@@ -46,6 +46,28 @@ export async function run(ctx) {
     const mktBox = renderMarket(stHd, document.createElement('div'), parse('<market><header header1="Potions"/><item name="potion of strength" buy="100" sell="90"/></market>'), 'm');
     ok('header1= supplies the market heading', /Potions/.test(mktBox.textContent), mktBox.textContent.slice(0, 40));
 
+    // --- task 243: cargo buys explain a full hold before the click ---
+    const cargoBuys243 = (cargo) => {
+      const g = GameState.create({ name:'C243', gender:'m', profession:'Warrior', book:3, adv });
+      g.data.shards = 100; g.data.ships = [];
+      g.addShip({ type:'barque', name:'Hold', crew:'average', cargo: cargo.slice(), docked:null });
+      const c = document.createElement('div');
+      const st = new Story(c, g, { navigate(){}, onDeath(){}, notify(){} });
+      st.begin(parse('<section><market><trade cargo="spices" buy="10"/></market><buy cargo="spices" shards="10">spices</buy></section>'), 3, '243');
+      return {
+        market: c.querySelector('.trade .btn-mini'),
+        inline: Array.from(c.querySelectorAll('.btn-mini')).find((b) => /spices/i.test(b.textContent)),
+      };
+    };
+    const full243 = cargoBuys243(['grain']);
+    ok('task243: a market cargo Buy disables and explains a full hold',
+       full243.market.disabled && full243.market.title === 'No cargo space.', `disabled=${full243.market.disabled} title=${full243.market.title}`);
+    ok('task243: an inline cargo Buy disables and explains a full hold',
+       full243.inline.disabled && full243.inline.title === 'No cargo space.', `disabled=${full243.inline.disabled} title=${full243.inline.title}`);
+    const room243 = cargoBuys243([]);
+    ok('task243: a market cargo Buy stays live when the hold has room', !room243.market.disabled);
+    ok('task243: an inline cargo Buy stays live when the hold has room', !room243.inline.disabled);
+
     // buy a tool: grants a bonus tool tied to an ability and charges the price
     const gbtool = GameState.create({ name:'BT', gender:'m', profession:'Warrior', book:5, adv });
     gbtool.data.shards = 500;
