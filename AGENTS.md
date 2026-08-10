@@ -180,7 +180,11 @@ Notes:
   **300000**, with `-VirtualTimeBudget` to raise it. Inside the page an expiry and a real
   network failure are identical, so the runner asks the question the page cannot: a fetch
   failure against a server that is **still answering** is reported as `CUT SHORT, not broken`
-  rather than left looking like a regression. (task 236)
+  rather than left looking like a regression. (task 236) A cut-short run also now says **how far
+  it got** — `_test.html` republishes `#results` as each suite starts, so the diagnosis carries
+  `running: <suite in flight> | done: engine(213/213), …` where before every unfinished run left
+  the same placeholder whether it died in the first suite or the last assertion. The stall behind
+  such a run is still unexplained; that line is the evidence for the next one. (task 240)
 - Pure-logic modules (`engine.js`, `combat.js`, `market.js`, `state.js`) can also
   be imported and unit-checked directly in Node for fast feedback. That seam is itself
   tested — `node web/tests/node-import.mjs` (no dependencies, exit 0 = pass) walks each
