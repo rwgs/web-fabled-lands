@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-243 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **244 is open** — file new work under the
+244 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **245 is open** — file new work under the
 priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -35,6 +35,7 @@ there once the buckets below are clear.
 - [x] 236. A virtual-time budget that runs out reports as a suite FAILURE, with nothing saying it was the clock
 - [x] 237. `run-tests.ps1` selects an unusable WindowsApps Python alias and never reaches the real interpreter
 - [x] 238. §5.152's bonus-filtered item payment stays enabled when no carried item qualifies
+- [ ] 245. Only a `dead=`-gated branch is held for an unresolved fight, so §6.490 hands back the weapon it just confiscated
 
 **LOW**
 
@@ -2721,11 +2722,98 @@ ability picker first and has **no `.btn-roll` to click**, so the failure fixture
 
 ---
 
+## 245. Only a `dead=`-gated branch is held for an unresolved fight, so §6.490 hands back the weapon it just confiscated
+
+**Priority: MEDIUM — a printed cost is voided in a shipped book. §6.490's player opts to fight
+bare-handed, the app confiscates the weapons, and the very next render gives them back while the
+fight is still unresolved, so the subdual reward is kept and its price is not paid.**
+
+*(Filed 2026-08-10, during conversion work on an unpublished book.)*
+
+Two gates hold a post-fight effect, and between them they leave one shape uncovered.
+
+`computeFightGate` (`render-gates.js`) collects the effects written after a `<fight>` so they cannot
+fire until the fight resolves in their favour (task 213). It deliberately collects only **bare**
+ones — its walker carries a `gated` flag set by `WRAP = if/elseif/else/success/failure/outcomes/
+group/choice`, and the effect test is `!gated`:
+
+    if (seenFight && !skip && !gated && FIGHT_EFFECT_TAGS.has(tag) && !boolAttr(ch.getAttribute('hidden')))
+
+so anything inside an `<if>` is *by design* the conditional's business, not the gate's.
+
+`isDeferredDeadChain` (`render-gates.js:151`) is what makes that safe — task 39 holds a whole
+if/elseif/else chain inactive while a fight is unresolved, because "the player is alive throughout
+the fight" and a naive `dead="f"` would otherwise fire the win branch mid-fight. But its first line
+is:
+
+    if (node.getAttribute('dead') == null) return false;   // only fight-outcome gates
+
+**A post-fight conditional gated on anything else is therefore live from entry**, and every effect in
+its body applies on the first render — the one gate skipping it because a conditional owns it, the
+other declining because the conditional is not spelled `dead=`.
+
+Mechanical census of the corpus for the shape (every `if`/`elseif`/`else` positioned after a
+`<fight>` and carrying a value/possession effect): **32 hits, of which 22 are `dead=` chains** and so
+covered. Of the remaining 10, six are book5/356's `<if var=>` rows *inside* a `<fightdamage>` (rendered
+inert, so they never apply on render) and three are the `<else>` halves of book1/21 and book1/297's
+`<if dead="f">` chains, which task 39 holds because `chainDeferred` rides the whole chain. That leaves
+**one live instance: book6/490.**
+
+    <group><text>fight without a weapon</text>
+      <transfer weapon="*" to="6.490"/><tick special="attack" bonus="-1"/><tick codeword="6.490.1"/></group>
+    …
+    <fight name="Ridiculous Rogue" combat="4" defence="16" stamina="30"/>
+    …
+    <if codeword="6.490.1"><transfer item="*" from="6.490" hidden="t"/>
+      Then, if you were fighting to subdue him, <goto section="463"/>.</if>
+
+The `<group>`'s own click ticks `6.490.1`, which opens the `<if>` on the rerender that follows it —
+mid-fight. Measured on a real `GameState` (book 6, a Warrior pregen carrying its battle-axe plus a
+planted `test sword`, the section rendered and the group clicked):
+
+* `6.490.1` is ticked, `sectionFights` reads `[null]` — the fight has not been fought;
+* the weapons on the sheet are **`["battle-axe", "test sword"]`** — both back, from the `<transfer
+  item="*" from="6.490">` inside the branch.
+
+So the page's bargain — take a COMBAT penalty and fight unarmed, and you may treat the damage as
+subdual — is available with the penalty applied and the weapons in hand. (The `<tick special="attack"
+bonus="-1">` does stay, so the player is not strictly better off than before the click; they are
+better off than the page allows.)
+
+For contrast, the same section's *bare* post-fight loot is held correctly: its ring mail, knife and
+`<gain shards="15"/>` all render a disabled Take titled "Fight first", and book2/514 and book6/186's
+`<if dead="f">` loot is grayed by task 39. Only the non-`dead=` branch escapes.
+
+**Fix:** the hold is about "has this fight resolved", not about how the branch is spelled. Widen the
+deferral to any conditional chain positioned after an unresolved `<fight>` whose body carries an
+effect — i.e. give `isDeferredDeadChain` a second reason to defer, keeping the `dead=` case as-is, or
+compute it beside `computeFightGate`, which already knows which nodes follow a fight. Two things to
+keep: a branch whose condition is *itself* the fight outcome must still be held for a **fled** fight
+(the current rule holds fled as unresolved), and a chain with no effects in it — narration, or a
+`<goto>` the fight gate already locks — should not start rendering grayed, or pages that merely
+discuss the fight would gray for the whole of it. Assert it on a synthetic section per gate kind
+(`codeword`, `item`, `var`) plus book6/490 itself: the weapon must still be in cache `6.490` while
+the fight is unresolved and come back only once it is won.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-10 (conversion pass on an unpublished book): **245** (MEDIUM), and nothing else. The
+finding came from writing a *conditional* post-fight reward — "if you previously sold them X you can
+recover it, along with 100 Shards; if you did not, they are carrying 800 Shards" — and measuring the
+markup before committing it: the 800 landed on entry, before the fight. The carry-forward is about
+**two gates that each assume the other covers a case.** Task 213's fight gate skips `<if>`-wrapped
+effects because task 39's chain deferral owns them; task 39 owns only the spelling it was filed for
+(`dead=`). Neither is wrong on its own and the gap is invisible from either side, so when a guard
+defers to a second guard, read the second one's *entry condition* rather than its purpose. The census
+cost is worth noting too: of ten non-`dead=` hits, six were inside a `<fightdamage>` (rendered inert)
+and three were the `<else>` halves of `dead=` chains, so the raw count was 10 where the real number is
+1 — count the shape mechanically, then read every hit.
 
 Filed 2026-08-10 (conversion pass on an unpublished book): **244** (LOW), and nothing else. Same
 shape as 243 filed hours earlier, one subsystem over, and the repeat is the point worth carrying
