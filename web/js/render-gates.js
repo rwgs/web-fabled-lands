@@ -6,7 +6,7 @@
 // the actual buttons (the tag*/apply* methods stay in the view); these functions only
 // DECIDE. No DOM construction, no browser UI globals.
 
-import { boolAttr, PASSIVE_BODY_TAGS } from './engine.js';
+import { boolAttr, isDiceExpr, PASSIVE_BODY_TAGS } from './engine.js';
 
 // True when a die roll in this section is gated behind the payment keyed `k`: a
 // <random|rankcheck|difficulty flag="k"> paired with a [price="k"] cost — the "pay to
@@ -33,8 +33,22 @@ export const ITEM_FAMILY_TAGS = new Set(['item', 'weapon', 'armour', 'tool']);
 // The effects a fight gate holds: a value/possession change written after the fight.
 const FIGHT_EFFECT_TAGS = new Set(['lose', 'gain', ...ITEM_FAMILY_TAGS]);
 
+// The attributes an effect reads its MAGNITUDE from — how many Stamina, how many Shards, how
+// many of the item. The single list behind both halves of "is this effect still waiting on a
+// roll": render-rules.js's pendingRollVar (which defers the effect) imports it from here, and
+// computeRollGate below (which holds the exits until that roll is made) reads it too, so the
+// gate and the deferral can never disagree about what counts as reading a roll's result.
+export const EFFECT_MAGNITUDE_ATTRS = ['multiple', 'shards', 'stamina', 'staminato', 'amount', 'count', 'itemAt', 'quantity'];
+
 // Wrapper tag sets used only by these gate computations.
 const ROLLGATE_OPTIONAL_WRAP = new Set(['if', 'elseif', 'else', 'success', 'failure', 'outcome', 'group']);
+// A roll inside one of these is not the section's own step but the FIGHT's: a <flee> branch's
+// parting shot (book2/770's crossbow bolt), a <fightround> per-round check (book5/24's
+// Hangman) or a <fightdamage> replacement (book5/356's ability drain). None is reached unless
+// the fight takes that turn, so seeding a gate from one would hold the win route behind a roll
+// the winner never makes. computeFightGate already treats flee/fightdamage as one family
+// ("their own gotos aren't gated"); fightround is the third member. (task 247)
+const ROLLGATE_FIGHT_HOOK_WRAP = new Set(['flee', 'fightround', 'fightdamage']);
 const ROLLGATE_OUTCOME_WRAP = new Set(['outcomes', 'outcome']);
 const TRANSFER_GROUP_WRAP = new Set(['group']);
 const BUY_GROUP_WRAP = new Set(['group']);
@@ -144,12 +158,13 @@ export function isDeferredTagCleanup(node) {
     && node.getAttribute('removetag') != null;
 }
 
-// What makes a post-fight conditional chain worth holding: any write to the Adventure Sheet in
-// its body. The engine's own passive-effect set — which already counts the <transfer> book6/490
-// turns on — plus the item-family awards, together a superset of the effects computeFightGate
-// holds when they are written BARE. Borrowed from engine.js rather than spelled out again, so
-// the two gates cannot drift apart on what an effect is.
-const CHAIN_EFFECT_TAGS = new Set([...PASSIVE_BODY_TAGS, ...ITEM_FAMILY_TAGS]);
+// What counts as a write to the Adventure Sheet — the engine's own passive-effect set (which
+// already counts the <transfer> book6/490 turns on) plus the item-family awards, together a
+// superset of the effects computeFightGate holds when they are written BARE. Borrowed from
+// engine.js rather than spelled out again, so no two gates drift apart on what an effect is.
+// Two ask the question: what makes a post-fight conditional chain worth holding
+// (isDeferredFightChain), and what makes a roll's result still owed (computeRollGate).
+const SHEET_EFFECT_TAGS = new Set([...PASSIVE_BODY_TAGS, ...ITEM_FAMILY_TAGS]);
 
 // Does this if/elseif/else chain — the head plus the elseif/else element siblings after it,
 // the same run appendChildren treats as one chain — write anything to the sheet? Any branch
@@ -161,7 +176,7 @@ function chainHasEffect(head) {
     const tag = el.tagName.toLowerCase();
     if (el !== head && tag !== 'elseif' && tag !== 'else') break;
     for (const d of el.querySelectorAll('*')) {
-      if (CHAIN_EFFECT_TAGS.has(d.tagName.toLowerCase())) return true;
+      if (SHEET_EFFECT_TAGS.has(d.tagName.toLowerCase())) return true;
     }
   }
   return false;
@@ -191,22 +206,105 @@ export function isDeferredFightChain(node, sectionFights) {
   return outcome !== 'win' && outcome !== 'lose';        // still unresolved (or fled) → hold
 }
 
-// The roll gate (task 104): a mandatory <random> feeding an <outcomes> table must be rolled
-// before the section's onward <choices> unlock, and a "get lost" outcome carrying its own
-// <goto> suppresses those choices. Scoped to a mandatory roll — a pay-gated or conditionally
-// present roll is optional (the choices beside it stay live). Returns
+// ---- variable dependency trace (task 181; moved here by task 247) -----------
+//
+// Which variables a value READS, and what is derived from them. computeRollGate below needs
+// the trace to ask whether an effect still owes its magnitude to a roll, and render-rules.js
+// needs it for the reroll decision boundary it documents, so it lives HERE and is re-exported
+// there — the same one-way arrangement isRollGate and ITEM_FAMILY_TAGS use above.
+
+// The variable identifiers an attribute value would READ once resolved (resolveValue /
+// evalExpression): none for a blank, a plain integer or a dice expression, otherwise every
+// bare identifier in the expression. This is how a provisional roll result is traced through
+// the values derived from it (task 181). Sheet keywords (stamina/rank/…) are left in the list:
+// no roll in this corpus names its var after one, so a keyword can never itself be pending.
+export function expressionVars(str) {
+  const s = String(str == null ? '' : str).trim();
+  if (s === '' || /^-?\d+$/.test(s) || isDiceExpr(s)) return [];
+  return s.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
+}
+
+// Every variable whose value is still PROVISIONAL this render (task 181): `seed` (the vars a
+// pending reroll decision's roll wrote) grown through the section's <set var="V" value="expr">
+// nodes, transitively — a value derived from a provisional var is itself provisional
+// (§2.698's `roll*100` → cash, §2.684's `(rank+1)-roll` → result). The scan is deliberately
+// position- and branch-blind: an over-wide set only DEFERS work until the decision settles,
+// whereas a missed dependency would commit a rejected result.
+export function provisionalVarClosure(sectionEl, seed) {
+  const out = new Set(seed || []);
+  if (!sectionEl || !out.size) return out;
+  const sets = Array.from(sectionEl.querySelectorAll('set[var][value]'));
+  for (let pass = 0; pass <= sets.length; pass++) {
+    let grew = false;
+    for (const s of sets) {
+      const v = s.getAttribute('var');
+      if (!v || out.has(v)) continue;
+      if (expressionVars(s.getAttribute('value')).some((id) => out.has(id))) { out.add(v); grew = true; }
+    }
+    if (!grew) break;
+  }
+  return out;
+}
+
+// ---- the roll gate (tasks 104 + 247) ---------------------------------------
+
+// Is this roll the section's OWN mandatory step — one the player must make before leaving —
+// rather than an option beside it? A pay-gated ("pay to spin") roll waits on a payment that may
+// never come, a conditionally present or player-optional one may not be reached at all, and a
+// fight-hook one belongs to the fight. Shared by both seeds below, so neither can gate on a
+// roll the section does not guarantee. (task 247)
+function isMandatoryRoll(sectionEl, r) {
+  if (r.getAttribute('price') != null) return false;
+  const fl = r.getAttribute('flag');
+  if (fl != null && isRollGate(sectionEl, fl)) return false;
+  return !hasAncestorTag(r, ROLLGATE_OPTIONAL_WRAP) && !hasAncestorTag(r, ROLLGATE_FIGHT_HOOK_WRAP);
+}
+
+// Seed 1 (task 104) — the mandatory <random> whose result an <outcomes> TABLE reads.
+function tableRoll(sectionEl, outcomesNode) {
+  return Array.from(sectionEl.querySelectorAll('random')).find((r) =>
+    !!(r.compareDocumentPosition(outcomesNode) & DOCUMENT_POSITION_FOLLOWING)
+    && isMandatoryRoll(sectionEl, r)) || null;
+}
+
+// Seed 2 (task 247) — the mandatory roll whose result an EFFECT reads. The gate had only
+// seed 1, so its precondition was a page SHAPE (a roll read by a table) and not the rule
+// "hold the exits until the roll is made": book3/199's `<random var="r">` +
+// `<set var="half" value="(r+1)/2">` + `<lose stamina="half">` has no table, so its
+// cross-book <goto> was live from entry and the player walked away undamaged — likewise
+// book5/477's water-drake jet and 34 more (36 shipped sections gain the gate, measured), every
+// one of them a page that needed the rolled VALUE: the corpus's ordinary rolled wound,
+// `<lose stamina="2d">`, applies on entry and cannot be skipped either way.
+//
+// "Reads" = an Adventure Sheet effect whose magnitude is the roll's var, or a value derived
+// from it through the section's <set>s. Position-blind on the read, like the trace above and
+// pendingRollVar (§2.521's `<lose multiple="x">` sits ABOVE its roll and still waits for it);
+// the roll's own position still bounds which navigation the gate holds. A roll whose var
+// nothing reads owes nothing and keeps gating nothing.
+function owedRoll(sectionEl) {
+  const effects = Array.from(sectionEl.querySelectorAll([...SHEET_EFFECT_TAGS].join(', ')));
+  if (!effects.length) return null;
+  return Array.from(sectionEl.querySelectorAll('random[var], rankcheck[var], difficulty[var]')).find((r) => {
+    const v = (r.getAttribute('var') || '').trim();
+    if (!v || !isMandatoryRoll(sectionEl, r)) return false;
+    const owed = provisionalVarClosure(sectionEl, [v]);
+    return effects.some((e) => EFFECT_MAGNITUDE_ATTRS.some((a) => {
+      const raw = e.getAttribute(a);
+      return raw != null && expressionVars(raw).some((id) => owed.has(id));
+    }));
+  }) || null;
+}
+
+// A mandatory roll must be made before the section's onward navigation unlocks, and (table
+// seed) a "get lost" outcome carrying its own <goto> suppresses those choices. `outcomesNode`
+// is the table this gate's roll feeds, or null when the gate came from the effect seed — there
+// is no outcome to match then, so applyRollGate releases on the roll RESOLVING. Returns
 // { rollNode, outcomesNode, navNodes:Set, rollPath, matchedOutcome } or null.
 export function computeRollGate(sectionEl) {
   if (!sectionEl) return null;
   const outcomesNode = sectionEl.querySelector('outcomes');
-  if (!outcomesNode) return null;
-  const rollNode = Array.from(sectionEl.querySelectorAll('random')).find((r) => {
-    if (!(r.compareDocumentPosition(outcomesNode) & DOCUMENT_POSITION_FOLLOWING)) return false;
-    if (r.getAttribute('price') != null) return false;
-    const fl = r.getAttribute('flag');
-    if (fl != null && isRollGate(sectionEl, fl)) return false;
-    return !hasAncestorTag(r, ROLLGATE_OPTIONAL_WRAP);
-  });
+  const tabled = outcomesNode ? tableRoll(sectionEl, outcomesNode) : null;
+  const rollNode = tabled || owedRoll(sectionEl);
   if (!rollNode) return null;
   const navNodes = new Set();
   sectionEl.querySelectorAll('choice, goto, return').forEach((n) => {
@@ -216,7 +314,7 @@ export function computeRollGate(sectionEl) {
     navNodes.add(n);
   });
   if (!navNodes.size) return null; // pure roll-to-goto travel — nothing to gate
-  return { rollNode, outcomesNode, navNodes, rollPath: null, matchedOutcome: null };
+  return { rollNode, outcomesNode: tabled ? outcomesNode : null, navNodes, rollPath: null, matchedOutcome: null };
 }
 
 // The forced-transfer gate (task 107): a visible, forced (default force="t"), unpriced

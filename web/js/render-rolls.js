@@ -108,8 +108,13 @@ function offerReroll(story, widget, path, stored, reroll) {
 }
 
 // The keyed `.roll`/aria-live widget every roll renderer opens (task 172): the memo key for
-// this node's result (roll@<path>) and the live-region div the result/button lands in.
-function makeRollWidget(container, path) {
+// this node's result (roll@<path>) and the live-region div the result/button lands in. Also
+// where the roll gate's node→path binding is recorded, so applyRollGate can read whether the
+// gating roll has been made: it lives in this ONE shared place because the gate now seeds from
+// a <rankcheck>/<difficulty> as readily as a <random>, and a roll kind that gated the exits
+// without reporting its path would hold them for ever (task 247).
+function makeRollWidget(story, container, node, path) {
+  if (story.rollGate && node === story.rollGate.rollNode) story.rollGate.rollPath = path;
   const widget = document.createElement('div');
   widget.className = 'roll';
   widget.setAttribute('aria-live', 'polite'); // announce the resolved dice result to screen readers (task 153)
@@ -230,7 +235,7 @@ export function renderDifficulty(story, container, node, path) {
 
   appendRollDescription(story, container, node, path); // its own descriptive text
 
-  const { key, widget } = makeRollWidget(container, path);
+  const { key, widget } = makeRollWidget(story, container, node, path);
 
   // Pay-to-roll gate (task 51): a flag= roll paired with a [price=] cost is
   // disabled until the payment sets the flag; rolling consumes it, and a fresh
@@ -281,14 +286,11 @@ export function renderDifficulty(story, container, node, path) {
 // ---- rolls: random -----------------------------------------------------------
 
 export function renderRandom(story, container, node, path) {
-  // Remember where the travel/encounter gate's roll lives, so applyRollGate can read
-  // its result (whether the leg has been rolled yet) after the walk. (task 104)
-  if (story.rollGate && node === story.rollGate.rollNode) story.rollGate.rollPath = path;
   const dice = node.hasAttribute('dice') ? parseInt(node.getAttribute('dice'), 10) : inferDice(story, node, 2);
   const varName = node.getAttribute('var');
   appendRollDescription(story, container, node, path);
 
-  const { key, widget } = makeRollWidget(container, path);
+  const { key, widget } = makeRollWidget(story, container, node, path);
 
   // Pay-gated roll (book2/157 etc.): the roll enables only once its payment sets the flag;
   // rolling consumes the flag, and a fresh payment re-arms it (dropping the old result). (task 30)
@@ -331,7 +333,7 @@ export function renderRandom(story, container, node, path) {
 export function renderRankcheck(story, container, node, path) {
   const dice = parseInt(node.getAttribute('dice') || '1', 10);
   const add = parseInt(node.getAttribute('add') || '0', 10);
-  const { key, widget } = makeRollWidget(container, path);
+  const { key, widget } = makeRollWidget(story, container, node, path);
   // Pay-to-roll gate (task 51), as for <difficulty>/<random>.
   const { flag, gated, armed, stored } = rollGate(story, node, key);
   markWhilePending(story, stored, path, node.getAttribute('var')); // hold a <while> pass (tasks 100 + 181)
@@ -365,7 +367,7 @@ export function renderTraining(story, container, node, path) {
   const multi = spec === '' || spec === '?' || spec.includes('|');
   const dice = parseInt(node.getAttribute('dice') || '2', 10);
   const add = parseInt(node.getAttribute('add') || '0', 10);
-  const { key, widget } = makeRollWidget(container, path);
+  const { key, widget } = makeRollWidget(story, container, node, path);
   const stored = story.ctx.rolls.get(key); // <training> has no pay gate — a plain memo lookup
   markWhilePending(story, stored, path, node.getAttribute('var')); // hold a <while> pass (tasks 100 + 181)
   if (stored) {

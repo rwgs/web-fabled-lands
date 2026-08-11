@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-246 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **247 is open** — file new work under the
+247 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **248 is open** — file new work under the
 priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -21,7 +21,8 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 247. The roll gate is keyed on `<outcomes>`, so a "roll and lose this many" page can be walked past unrolled
+- [ ] 248. The roll gate holds the exits but not the `<fight>`, so §5.477's drake is fought before its jet lands
+- [x] 247. The roll gate is keyed on `<outcomes>`, so a "roll and lose this many" page can be walked past unrolled
 - [x] 213. The post-fight gate does not hold an item award, so loot is takeable before the fight
 - [x] 214. A visit-box redirect does not hold the section body, so a one-time reward is re-takeable
 - [x] 216. `<if ticks="N">` after an in-section `<tick>` reads the pre-tick count, so "now ticked" branches never fire
@@ -2904,11 +2905,76 @@ unreachable, not one that stays open.
 
 ---
 
+## 248. The roll gate holds the exits but not the `<fight>`, so §5.477's drake is fought before its jet lands
+
+**Priority: LOW — the rolled wound is no longer skippable (task 247 holds the navigation), so
+nothing is lost or mis-granted. What is wrong is the ORDER: the player fights at full Stamina a
+fight the book says begins already hurt, which in a fight is the difference between surviving
+and not.**
+
+*(Filed 2026-08-11, on closing task 247.)*
+
+`applyRollGate` disables tagged `choice`/`goto`/`return` buttons. A `<fight>` widget's Attack
+button is none of those — `computeRollGate` never collects it and the gate never sees it — so
+in a section shaped "the arrow hits you, THEN fight them", the fight is startable before the
+roll that says how hard you were hit. The wound still arrives (the exits are held until the
+roll is made, and `pendingRollVar` defers the effect until then), but it arrives *after* the
+fight instead of before it.
+
+**Scope.** Two shipped sections, both measured as carrying an effect-seeded roll gate and a
+`<fight>` after the roll: **book2/726** (the hidden accomplice's arrow, then three brigands one
+after the other) and **book5/477** (the water drake's jet, then the drake). Both spell the order
+in the prose. No other published section has both.
+
+The same hole is presumably open for the table-seeded gate (task 104) wherever a `<fight>` sits
+below the roll — §1.299 is the section that motivated "the roll gate composes with the fight
+gate", so check it, and check whether `applyPendingRerollGate` (which locks `.goto`/`.choice`
+and exempts nothing else) has the same blind spot for a provisional result.
+
+**Fix:** give the roll gate the fight's Attack control as well. The fight gate already knows how
+to hold a widget (`applyFightGate`), so the cheap version is to have `applyRollGate` disable the
+`.fight .btn-roll` of any fight positioned after `rollGate.rollNode` while the gate is shut,
+with the same "Resolve the roll above first." title. Mind the interaction the other way round:
+a fight the gate disables must not make the section read as a dead end (the `.end-fate`
+fallback counts only ENABLED controls, and an unrolled section still has its Roll button), and
+`<flee>`/escape routes stay exempt as they are in every other gate (`isEscapeNav`).
+
+**Assert it** on a synthetic `<random var="x">` + `<lose stamina="x">` + `<fight>` + `<choice>`:
+the Attack button is disabled before the roll and enabled after, and the section shows no
+"tale ends here" fallback in either state. Then re-measure book2/726 and book5/477.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-11 (implementation pass, task 247): closed **247**, and filed **248** (LOW) on the
+way out (entry above). The gate now has a SECOND seed — the mandatory roll whose result an
+Adventure Sheet effect reads, directly or through a derived `<set>` — beside the original
+"read by an `<outcomes>` table", and the release needed no change: with no table there is no
+`matchedOutcome`, and `applyRollGate` already treats a null one as "resolved, let them go".
+Three decisions worth carrying forward. **The trace is borrowed, not written again**:
+`expressionVars`/`provisionalVarClosure` moved down into `render-gates.js` (re-exported from
+`render-rules.js`, the arrangement `isRollGate` and `ITEM_FAMILY_TAGS` already use) and
+`pendingRollVar`'s private magnitude-attribute list became the exported
+`EFFECT_MAGNITUDE_ATTRS` it now imports — so the gate that HOLDS the exits and the deferral
+that holds the EFFECT cannot disagree about what counts as reading a roll's result, which is
+the disagreement this defect was made of. **A widened gate needs an exclusion measured, not
+guessed**: `<flee>`/`<fightround>`/`<fightdamage>` had to join the opt-in wrappers, because
+book2/770's parting crossbow bolt and book5/24's per-round Hangman check are the *fight's*
+step and gating on either would have held the win route behind a roll the winner never makes
+(book5/356's `<fightdamage>` roll is a third instance, missed today only because its `<lose>`s
+carry literal magnitudes). And **the node→path binding moved to the one place every roll kind
+passes through** (`makeRollWidget`), since the gate now seeds from a `<rankcheck>`/`<difficulty>`
+as readily as a `<random>` and a roll kind that gated the exits without reporting its path would
+hold them for ever. Verified by sabotage twice: restoring the `<outcomes>`-only seed fails the
+five positive assertions, dropping the fight-hook exclusion fails exactly the two that name it.
+Measured either side of the change: **36** shipped sections gain the gate (the same 36 an
+independent scan of the XML predicted) and the corpus's dead-end census is **unchanged at 8
+sections**, which is the check that matters when a change can only add locks. Full suite 2464.
 
 Filed 2026-08-11 (during conversion work on an unpublished book): **247** (MEDIUM), and nothing
 else. Found by writing a floor onto a rolled Stamina loss and then asking why the section's exit was

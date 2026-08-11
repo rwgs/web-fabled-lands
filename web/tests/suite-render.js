@@ -301,6 +301,29 @@ export async function run(ctx) {
       window.__FL_INSTANT_DICE__ = false;
     }
 
+    // --- task 247: the same hold for a roll an EFFECT is waiting on ---
+    // The gate used to require an <outcomes> table, so a "roll and lose this many" page let the
+    // player walk out unrolled and unhurt (book3/199, book5/477 and 34 more). There is no
+    // outcome to match here: making the roll IS the release.
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const settle247 = () => new Promise((r) => setTimeout(r, 20));
+      const g247 = GameState.create({ name:'G247', gender:'m', profession:'Warrior', book:1, adv });
+      g247.ephemeral = true;
+      const c247 = document.createElement('div');
+      const st247 = new Story(c247, g247, { navigate(){}, onDeath(){}, notify(){} });
+      st247.begin(parse('<section name="G247"><p><random dice="1" var="x">Roll a die</random> and <lose stamina="x">lose that many Stamina points</lose>.</p><p><goto section="321">Turn to 321</goto></p></section>'), 1, 'G247');
+      const away247 = () => c247.querySelector('.goto');
+      const before = g247.data.stamina;
+      ok('task247: the exit is held before the mandatory roll', !!away247() && away247().disabled === true);
+      ok('task247: and the rolled loss has not been taken yet', g247.data.stamina === before, 'stamina=' + g247.data.stamina);
+      c247.querySelector('.roll .btn-roll').click(); await settle247();
+      ok('task247: rolling releases the exit', !!away247() && away247().disabled === false);
+      ok('task247: and the roll it was holding for is paid', g247.data.stamina < before,
+         before + ' -> ' + g247.data.stamina);
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
     // --- interaction: clicking a choice navigates ---
     let navd = null;
     const story3 = new Story(container, gs, { navigate:(b,s)=>{navd={b,s};}, onDeath(){}, notify(){} });

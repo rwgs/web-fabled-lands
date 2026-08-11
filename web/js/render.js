@@ -772,9 +772,10 @@ export class Story {
     // follows it must not be clickable (else the player skips the fight). See
     // computeFightGate (render-gates.js) / applyFightGate.
     this.fightGate = computeFightGate(el, this.escapeCodewords);
-    // Travel/encounter roll gating: a mandatory <random> feeding an <outcomes> table
-    // must be rolled before the section's onward <choices> unlock, and a "get lost"
-    // outcome that carries its own <goto> suppresses those choices (task 104). See
+    // Mandatory-roll gating: a roll the section owes something to must be made before its
+    // onward <choices> unlock — the result read by an <outcomes> table, where a "get lost"
+    // outcome carrying its own <goto> also suppresses those choices (task 104), or read by an
+    // EFFECT, where the gate releases as soon as the roll resolves (task 247). See
     // computeRollGate / applyRollGate.
     this.rollGate = computeRollGate(el);
     // Forced-transfer gating (task 107): a visible, forced (default force="t"),
@@ -1566,7 +1567,7 @@ export class Story {
     });
   }
 
-  // ---- travel / encounter roll gating (task 104) ---------------------------
+  // ---- mandatory roll gating (tasks 104 + 247) -----------------------------
   // computeRollGate and hasAncestorTag moved to render-gates.js (task 119); the
   // tag*/apply* view helpers below consume computeRollGate's output.
 
@@ -1582,9 +1583,10 @@ export class Story {
   }
 
   // Disable the onward navigation until the mandatory roll resolves, and keep it
-  // suppressed if the matched outcome redirects the player elsewhere. Only ever
-  // ADDS a disable, so it composes with applyFightGate (a fight-in-outcome section
-  // like §1.299 stays gated on both the roll AND the fight).
+  // suppressed if the matched outcome redirects the player elsewhere. An effect-seeded
+  // gate (task 247) has no outcome to match, so resolving the roll is the whole release.
+  // Only ever ADDS a disable, so it composes with applyFightGate (a fight-in-outcome
+  // section like §1.299 stays gated on both the roll AND the fight).
   applyRollGate(flow) {
     const gate = this.rollGate;
     if (!gate) return;

@@ -2907,7 +2907,43 @@ export async function run(ctx) {
 
       const rg = gates.computeRollGate(parse('<section name="tr2"><random/><outcomes><outcome range="1-6" section="5"/></outcomes><choices><choice section="8">Leave</choice></choices></section>'));
       ok('task119: computeRollGate gates the onward choice behind the mandatory roll', !!rg && rg.navNodes.size === 1, rg ? 'n=' + rg.navNodes.size : 'null');
-      ok('task119: computeRollGate null without an outcomes table', gates.computeRollGate(parse('<section><random/><choices><choice section="8"/></choices></section>')) === null);
+      ok('task119: computeRollGate null for a roll with no table and no var to owe',
+         gates.computeRollGate(parse('<section><random/><choices><choice section="8"/></choices></section>')) === null);
+
+      // task 247: the gate's SECOND seed — a roll whose result an EFFECT reads. Keyed only on
+      // <outcomes>, its precondition was a page SHAPE rather than the rule "hold the exits
+      // until the roll is made", so every roll read by an effect instead of a table gated
+      // nothing: book3/199's "lose one die halved" left its cross-book <goto> live from entry.
+      // Synthetic on purpose — the 36 shipped instances are the regression risk, not the spec.
+      const rg247 = (xml) => gates.computeRollGate(parse('<section name="t247">' + xml + '</section>'));
+      const owed247 = rg247('<p><random dice="1" var="x">Roll a die</random> and <lose stamina="x">lose that many</lose>.</p><goto section="9"/>');
+      ok('task247: a roll an effect owes its magnitude to gates the exit',
+         !!owed247 && owed247.navNodes.size === 1, owed247 ? 'n=' + owed247.navNodes.size : 'null');
+      ok('task247: the owing roll seeds the gate, and there is no table to match',
+         !!owed247 && owed247.rollNode.getAttribute('var') === 'x' && owed247.outcomesNode === null);
+      // book3/199 verbatim in shape: the effect reads a value DERIVED from the roll.
+      ok('task247: a derived <set> between the roll and the effect still gates',
+         !!rg247('<random dice="1" var="r">Lose 1-3 Stamina</random><set var="half" value="(r+1)/2"/><lose stamina="half"/><goto book="5" section="321"/>'));
+      // A roll whose result nothing is waiting for owes nothing, so it keeps gating nothing.
+      ok('task247: a roll no effect reads gates nothing',
+         rg247('<random dice="1" var="x">Roll a die</random><goto section="9"/>') === null);
+      ok('task247: a derived <set> nothing reads gates nothing',
+         rg247('<random dice="1" var="x"/><set var="half" value="(x+1)/2"/><goto section="9"/>') === null);
+      // The seed asks the same "is this the section's own step" question the table seed asks.
+      ok('task247: the same roll inside a <group> is opt-in and gates nothing',
+         rg247('<group><random dice="1" var="x"/><lose stamina="x"/></group><goto section="9"/>') === null);
+      ok('task247: a pay-to-spin roll gates nothing',
+         rg247('<random dice="1" var="x" flag="k"/><lose stamina="x"/><lose shards="10" price="k"/><goto section="9"/>') === null);
+      // A fight hook is the FIGHT's step, not the section's: book2/770's parting crossbow bolt
+      // is only fired on a flee, and book5/24's per-round check only while the Hangman lives —
+      // gating on either would hold the win route behind a roll the winner never makes.
+      ok('task247: a roll inside a <flee> gates nothing',
+         rg247('<fight/><flee><random dice="2" var="x"/><lose stamina="x"/></flee><choices><choice section="55">Flee</choice><choice section="404">Win</choice></choices>') === null);
+      ok('task247: a roll inside a <fightround> gates nothing',
+         rg247('<fight/><fightround pre="t"><difficulty ability="sanctity" level="17" var="hang"/><failure var="hang"><lose stamina="-hang"/></failure></fightround><goto section="471"/>') === null);
+      // Seeded from the roll, not from the tag: an ability check owes its margin the same way.
+      ok('task247: a <difficulty> whose margin an effect reads gates the exit too',
+         !!rg247('<difficulty ability="combat" level="9" var="m"/><lose stamina="-m"/><goto section="9"/>'));
 
       const tg = gates.computeTransferGate(parse('<section name="tt"><transfer to="x" shards="10"/><goto section="9"/></section>'));
       ok('task119: computeTransferGate gates navigation after a forced transfer', !!tg && tg.navNodes.size === 1, tg ? 'n=' + tg.navNodes.size : 'null');

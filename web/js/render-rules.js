@@ -13,14 +13,16 @@ import { bookAvailable } from './edition.js'; // the DOM-free registry, never da
 import { blessingLabel } from './render-util.js'; // pure label formatting, no DOM (task 218)
 import {
   isRollGate, isDeferredEscapeClear, isDeferredTagCleanup, aggregateFightOutcome, ITEM_FAMILY_TAGS,
-  hasAncestorTag,
+  hasAncestorTag, expressionVars, provisionalVarClosure, EFFECT_MAGNITUDE_ATTRS,
 } from './render-gates.js';
 
 // isRollGate moved to render-gates.js (one-way dependency: classifyPassive below composes
 // the gate deferrals, so this module imports from render-gates — never the reverse);
 // re-exported here so its callers (render.js, tests) keep one import site for pay rules.
-// ITEM_FAMILY_TAGS lives there for the same reason (computeFightGate needs it, task 213).
-export { isRollGate, ITEM_FAMILY_TAGS } from './render-gates.js';
+// ITEM_FAMILY_TAGS lives there for the same reason (computeFightGate needs it, task 213), and
+// so do expressionVars/provisionalVarClosure — the roll gate traces an effect's magnitude back
+// to the roll that owes it (task 247). The decision-boundary narrative they serve stays below.
+export { isRollGate, ITEM_FAMILY_TAGS, expressionVars, provisionalVarClosure } from './render-gates.js';
 
 // DOM Node.DOCUMENT_POSITION_FOLLOWING (0x04): set in the compareDocumentPosition mask
 // when the argument node comes AFTER the reference node in document order. Spelled as a
@@ -522,38 +524,8 @@ export function pendingRerollBlessings(state, node, stored) {
   return state.rerollBlessings(rerollOptsFor(node, stored));
 }
 
-// The variable identifiers an attribute value would READ once resolved (resolveValue /
-// evalExpression): none for a blank, a plain integer or a dice expression, otherwise every
-// bare identifier in the expression. This is how a provisional roll result is traced through
-// the values derived from it (task 181). Sheet keywords (stamina/rank/…) are left in the list:
-// no roll in this corpus names its var after one, so a keyword can never itself be pending.
-export function expressionVars(str) {
-  const s = String(str == null ? '' : str).trim();
-  if (s === '' || /^-?\d+$/.test(s) || isDiceExpr(s)) return [];
-  return s.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
-}
-
-// Every variable whose value is still PROVISIONAL this render (task 181): `seed` (the vars a
-// pending reroll decision's roll wrote) grown through the section's <set var="V" value="expr">
-// nodes, transitively — a value derived from a provisional var is itself provisional
-// (§2.698's `roll*100` → cash, §2.684's `(rank+1)-roll` → result). The scan is deliberately
-// position- and branch-blind: an over-wide set only DEFERS work until the decision settles,
-// whereas a missed dependency would commit a rejected result.
-export function provisionalVarClosure(sectionEl, seed) {
-  const out = new Set(seed || []);
-  if (!sectionEl || !out.size) return out;
-  const sets = Array.from(sectionEl.querySelectorAll('set[var][value]'));
-  for (let pass = 0; pass <= sets.length; pass++) {
-    let grew = false;
-    for (const s of sets) {
-      const v = s.getAttribute('var');
-      if (!v || out.has(v)) continue;
-      if (expressionVars(s.getAttribute('value')).some((id) => out.has(id))) { out.add(v); grew = true; }
-    }
-    if (!grew) break;
-  }
-  return out;
-}
+// expressionVars and provisionalVarClosure — the trace itself — are defined in render-gates.js
+// and re-exported at the top of this file (task 247); the four refusals below are what read it.
 
 // Is this <if>/<elseif> condition undecided because it reads a provisional variable? (task 181)
 // §2.389's `<if var="x" equals="3"><tick shards="150"/>` must neither award the 150 Shards nor
@@ -783,8 +755,7 @@ export function branchPlan(state, ctx, node, roll, pendingVars = null) {
 // literal, a dice expression, or an already-set var applies now, and a var no roll here
 // fills is left to apply (harmlessly as 0) rather than hang.
 export function pendingRollVar(node, state, sectionEl, pendingVars = null) {
-  const QTY = ['multiple', 'shards', 'stamina', 'staminato', 'amount', 'count', 'itemAt', 'quantity'];
-  for (const a of QTY) {
+  for (const a of EFFECT_MAGNITUDE_ATTRS) {
     const v = node.getAttribute(a);
     if (v == null) continue;
     const s = String(v).trim();
