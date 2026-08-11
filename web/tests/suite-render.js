@@ -347,6 +347,41 @@ export async function run(ctx) {
       window.__FL_INSTANT_DICE__ = false;
     }
 
+    // --- task 249: a check read only by its own branch holds the section too ---
+    // §5.198's shape: the MAGIC check's <failure> curses the player for the fight below it, and
+    // nothing else reads the roll — so the gate had no seed, the fight gate held the exits, and
+    // winning the fight released them with the check never made.
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const settle249 = () => new Promise((r) => setTimeout(r, 20));
+      const g249 = GameState.create({ name:'G249', gender:'m', profession:'Warrior', book:1, adv });
+      g249.ephemeral = true;
+      const c249 = document.createElement('div');
+      const st249 = new Story(c249, g249, { navigate(){}, onDeath(){}, notify(){} });
+      st249.begin(parse('<section name="G249"><p><difficulty ability="magic" level="13">Make a MAGIC roll</difficulty>.<failure>If you fail, you are cursed.</failure></p><fight name="Champion" combat="8" defence="15" stamina="12"/><choices><choice section="223">Take a sword</choice></choices></section>'), 1, 'G249');
+      const attack249 = () => c249.querySelector('.fight .btn-roll');
+      ok('task249: the fight is held before the check', !!attack249() && attack249().disabled === true);
+      ok('task249: a held check is not a dead end', !c249.querySelector('.end-fate'));
+      c249.querySelector('.roll .btn-roll').click(); await settle249();
+      ok('task249: making the check releases the fight', !!attack249() && attack249().disabled === false);
+
+      // The commoner shape (34 of the 38 shipped sections gained): no fight at all, so the exit
+      // can only be held by THIS gate — §4.92's "hunt for food" camp walks its four travel
+      // choices without ever rolling, and the failed hunt's Stamina loss with it.
+      const g249b = GameState.create({ name:'G249b', gender:'m', profession:'Warrior', book:1, adv });
+      g249b.ephemeral = true;
+      const c249b = document.createElement('div');
+      new Story(c249b, g249b, { navigate(){}, onDeath(){}, notify(){} })
+        .begin(parse('<section name="G249b"><p><difficulty ability="scouting" level="11">Make a SCOUTING roll</difficulty>.<failure>If you fail, <lose stamina="1">lose 1 Stamina point</lose>.</failure></p><choices><choice section="17">North</choice><choice section="118">West</choice></choices></section>'), 1, 'G249b');
+      const away249 = () => Array.from(c249b.querySelectorAll('.choice'));
+      ok('task249: with no fight in the section, the exits are held by the check alone',
+         away249().length === 2 && away249().every((b) => b.disabled && b.title === 'Resolve the roll above first.'),
+         away249().map((b) => b.disabled + ':' + b.title).join(' | '));
+      c249b.querySelector('.roll .btn-roll').click(); await settle249();
+      ok('task249: and making it releases them', away249().length === 2 && away249().every((b) => !b.disabled));
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
     // --- interaction: clicking a choice navigates ---
     let navd = null;
     const story3 = new Story(container, gs, { navigate:(b,s)=>{navd={b,s};}, onDeath(){}, notify(){} });

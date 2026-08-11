@@ -317,6 +317,13 @@ export async function run(ctx) {
       new Story(cd689, gd689, { navigate(bk, sec){ nav689 = { bk, sec }; }, onDeath(){}, notify(){} }).begin(s689, 5, '689');
       const fr689 = cd689.querySelector('.fx.fightround');
       ok('§5.689 the fightround renders inert', !!fr689 && Array.from(fr689.querySelectorAll('button')).every((b) => b.disabled));
+      // The drake's pre-fight SCOUTING save now HOLDS the fight (task 249) — the page reads
+      // "if you fail, you are drowned; if you succeed, you must fight it in its own
+      // environment", so pass that save first and only then engage.
+      ok('§5.689 the drake cannot be engaged before the SCOUTING save', cd689.querySelector('.fight .btn-roll').disabled === true);
+      Math.random = () => 0.99; // pass the pre-fight save → the fight is on
+      cd689.querySelector('.roll .btn-roll').click();
+      await settle42();
       Math.random = () => 0; // fail the round save → dragged under
       Array.from(cd689.querySelectorAll('.fight .btn-roll')).find((b) => b.textContent === 'Attack').click();
       await settle42();

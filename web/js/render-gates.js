@@ -251,10 +251,20 @@ export function provisionalVarClosure(sectionEl, seed) {
 // Is this roll the section's OWN mandatory step — one the player must make before leaving —
 // rather than an option beside it? A pay-gated ("pay to spin") roll waits on a payment that may
 // never come, a conditionally present or player-optional one may not be reached at all, and a
-// fight-hook one belongs to the fight. Shared by both seeds below, so neither can gate on a
+// fight-hook one belongs to the fight. Shared by all three seeds below, so none can gate on a
 // roll the section does not guarantee. (task 247)
+//
+// force= is the tag's own word for exactly this question — "whether the player must activate
+// this action to continue", default true (JaFL-XML-Tags, <random>/<difficulty>/<rankcheck>) —
+// and reading it was missing until task 249 needed it for the branch seed: book1/21's
+// force="f" CHARISMA roll is the printed ALTERNATIVE to fighting the thug, so gating on it
+// would demand the talk-out attempt the page offers to skip. One shipped section was already
+// held by the older seeds for the same reason, and softly at that: book2/440's "if you want
+// to read a book" table (force="f") locked the "when you are ready to leave" exit behind a
+// roll whose every outcome carries the player away. (task 249)
 function isMandatoryRoll(sectionEl, r) {
   if (r.getAttribute('price') != null) return false;
+  if (!boolAttr(r.getAttribute('force'), true)) return false;
   const fl = r.getAttribute('flag');
   if (fl != null && isRollGate(sectionEl, fl)) return false;
   return !hasAncestorTag(r, ROLLGATE_OPTIONAL_WRAP) && !hasAncestorTag(r, ROLLGATE_FIGHT_HOOK_WRAP);
@@ -295,16 +305,52 @@ function owedRoll(sectionEl) {
   }) || null;
 }
 
+// Seed 3 (task 249) — the mandatory roll whose result a BRANCH reads. Seeds 1 and 2 ask what
+// the result FEEDS (a table, an effect's magnitude), so a check read only by its own
+// <success>/<failure> seeded nothing, and where the section's navigation was held by the fight
+// gate instead nothing else asked for the roll either: book5/198's Champion was fought at full
+// COMBAT and the MAGIC check that halves it never made, book5/218's troll fought without ever
+// escaping its grip, book5/689's drake before the drowning check had said whether the player
+// was alive. 38 shipped sections gain a held exit, book5/550 among them — its own editorial
+// comment ("this way, you can only get to the choices after making the difficulty roll") is
+// the page asking for this gate.
+//
+// A var= branch names its roll, so it is matched through the same closure the effect seed uses.
+// A BARE <success>/<failure> is bound the way the walk binds it — to the nearest roll above it
+// (render.js's activeRoll) — so a branch belonging to a later roll can never seed an earlier one.
+function branchedRoll(sectionEl) {
+  const branches = Array.from(sectionEl.querySelectorAll('success, failure'));
+  if (!branches.length) return null;
+  const rolls = Array.from(sectionEl.querySelectorAll('random, rankcheck, difficulty'));
+  const nearestRollAbove = (b) => {
+    let found = null;
+    for (const r of rolls) { if (r.compareDocumentPosition(b) & DOCUMENT_POSITION_FOLLOWING) found = r; }
+    return found;
+  };
+  return rolls.find((r) => {
+    if (!isMandatoryRoll(sectionEl, r)) return false;
+    const v = (r.getAttribute('var') || '').trim();
+    const owed = v ? provisionalVarClosure(sectionEl, [v]) : null;
+    return branches.some((b) => {
+      if (!(r.compareDocumentPosition(b) & DOCUMENT_POSITION_FOLLOWING)) return false;
+      const bv = b.getAttribute('var');
+      if (bv != null) return !!owed && owed.has(bv.trim());
+      return nearestRollAbove(b) === r;
+    });
+  }) || null;
+}
+
 // A mandatory roll must be made before the section's onward navigation unlocks, and (table
 // seed) a "get lost" outcome carrying its own <goto> suppresses those choices. `outcomesNode`
-// is the table this gate's roll feeds, or null when the gate came from the effect seed — there
-// is no outcome to match then, so applyRollGate releases on the roll RESOLVING. Returns
+// is the table this gate's roll feeds, or null when the gate came from the effect or branch
+// seed — there is no outcome to match then, so applyRollGate releases on the roll (and, for a
+// branch seed, the <success>/<failure> the roll reveals) RESOLVING. Returns
 // { rollNode, outcomesNode, navNodes:Set, fightNodes:Set, rollPath, matchedOutcome } or null.
 export function computeRollGate(sectionEl) {
   if (!sectionEl) return null;
   const outcomesNode = sectionEl.querySelector('outcomes');
   const tabled = outcomesNode ? tableRoll(sectionEl, outcomesNode) : null;
-  const rollNode = tabled || owedRoll(sectionEl);
+  const rollNode = tabled || owedRoll(sectionEl) || branchedRoll(sectionEl);
   if (!rollNode) return null;
   const navNodes = new Set();
   sectionEl.querySelectorAll('choice, goto, return').forEach((n) => {

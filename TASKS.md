@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-248 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **249 and 250 are open** — file new work under
-the priority bucket that fits, and record the pass in the Review log.
+249 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **250 is open** — file new work under the
+priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -21,7 +21,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 249. A mandatory check read only by its `<success>`/`<failure>` seeds no roll gate, so §5.198's Champion is fought uncursed — and the roll skipped for good
+- [x] 249. A mandatory check read only by its `<success>`/`<failure>` seeds no roll gate, so §5.198's Champion is fought uncursed — and the roll skipped for good
 - [x] 248. The roll gate holds the exits but not the `<fight>`, so §5.477's drake is fought before its jet lands
 - [x] 247. The roll gate is keyed on `<outcomes>`, so a "roll and lose this many" page can be walked past unrolled
 - [x] 213. The post-fight gate does not hold an item award, so loot is takeable before the fight
@@ -3021,6 +3021,27 @@ Attack is disabled while the decision stands and enabled once the result is kept
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-11 (implementation pass, task 249): closed **249**, nothing new filed. The gate has
+a third seed — a mandatory roll read by its own `<success>`/`<failure>` — and `isMandatoryRoll`
+now reads `force=`. Three things worth carrying forward. **The seed had to be widened and
+narrowed in the same change**: `force=` is the tag's own word for "must the player make this to
+continue" (default true) and nothing had ever read it, so the branch seed would have demanded
+book1/21's *optional* talk-out roll; putting the test in the shared helper rather than in the new
+seed also released one section the OLDER seeds were already holding wrongly — book2/440's "if you
+want to read a book" table locked the "when you are ready to leave" exit behind a roll whose every
+outcome carries the player away. Two definitions of "mandatory" would have left that standing.
+**A bare branch is bound the way the WALK binds it** (`render.js`'s `activeRoll`: the nearest roll
+above it), so a `<failure>` belonging to a later roll cannot seed an earlier one — the alternative,
+"any branch below the roll", seeds on position alone and would gate a roll nothing reads.
+**And an existing test failing was the finding, not a regression**: §5.689's DOM test clicked
+Attack before the drowning save, which is precisely the play this task removes; it now passes the
+save first, and carries an assertion that the drake cannot be engaged before it. Measured either
+side with the dice pinned: sections where the gate disables something go **103 → 136** (+34 gained,
+−1 released: book2/440), held fights **2 → 5** (the three §5.198/218/689 the filing named), and the
+dead-end census is **unchanged at the same 9 sections**. Verified by sabotage twice: dropping the
+branch seed fails the five assertions that name it (including §5.689's), dropping the `force=` test
+fails exactly the two that name it. Full suite 2482.
 
 Worked 2026-08-11 (implementation pass, task 248): closed **248**, and filed **249** (MEDIUM) and
 **250** (LOW) on the way out (entries above). `computeRollGate` now collects the `<fight>`s below

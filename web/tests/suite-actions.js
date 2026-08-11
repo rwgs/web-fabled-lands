@@ -2965,6 +2965,37 @@ export async function run(ctx) {
            return !!g && g.fightNodes.size === 0 && g.navNodes.size === 1;
          })());
 
+      // task 249: the gate's THIRD seed — a mandatory check read only by its own branch. Seeds 1
+      // and 2 ask what the result FEEDS (a table, an effect's magnitude), so §5.198's MAGIC check
+      // — whose <failure> curses the player for the fight below it — seeded nothing at all, and
+      // the fight gate holding the exits meant nothing else asked for the roll either: win the
+      // fight and you leave with the check unmade.
+      const branch249 = rg247('<difficulty ability="magic" level="13"/><failure>You are cursed.</failure><fight name="Champion" combat="8" defence="15" stamina="12"/><choices><choice section="223">Take a sword</choice></choices>');
+      ok('task249: a check read only by its <failure> gates the exits and the fight',
+         !!branch249 && branch249.navNodes.size === 1 && branch249.fightNodes.size === 1,
+         branch249 ? 'nav=' + branch249.navNodes.size + ' fight=' + branch249.fightNodes.size : 'null');
+      // §5.689's shape: the roll HAS a var, but only a branch reads it (an <adjust value=> is
+      // not a magnitude), so seed 2 misses it — the var seed matches through the same closure.
+      ok('task249: a var-keyed branch seeds the gate through its roll\'s var',
+         !!rg247('<difficulty ability="scouting" level="10" var="pre"/><failure var="pre">You drown, <goto section="7"/>.</failure><fight name="Water Drake" combat="9" defence="12" stamina="40"/><goto section="436"/>'));
+      // A bare branch binds to the nearest roll ABOVE it, exactly as the walk's activeRoll does,
+      // so a branch belonging to a later roll can never seed an earlier one.
+      ok('task249: a bare branch seeds the roll it binds to, not the one further up',
+         (() => {
+           const g = rg247('<random dice="1" var="x"/><difficulty ability="magic" level="13"/><failure>Cursed.</failure><goto section="9"/>');
+           return !!g && g.rollNode.tagName.toLowerCase() === 'difficulty';
+         })());
+      // force= is the tag's own word for "must the player make this to continue" (default true).
+      // book1/21's force="f" CHARISMA roll is the printed ALTERNATIVE to fighting the thug, so a
+      // seed that ignored it would demand the talk-out attempt the page offers to skip.
+      ok('task249: an optional (force="f") check gates nothing',
+         rg247('<difficulty ability="charisma" level="8" force="f"/><success>You talk your way out, <goto section="10"/>.</success><fight name="Thug" combat="4" defence="7" stamina="6"/><goto section="10"/>') === null);
+      // The same word, read for the FIRST seed too — one shipped table was already held by it:
+      // book2/440's "if you want to read a book" roll locked the "when you are ready to leave"
+      // exit behind a table whose every outcome carries the player away.
+      ok('task249: an optional (force="f") table roll gates nothing either',
+         gates.computeRollGate(parse('<section name="t440"><p>If you want to read a book, <random dice="2" force="f"/>:</p><outcomes><outcome range="2-5" section="529"/><outcome range="6-12" section="579"/></outcomes><p>When you are ready to leave, <goto section="314"/>.</p></section>')) === null);
+
       const tg = gates.computeTransferGate(parse('<section name="tt"><transfer to="x" shards="10"/><goto section="9"/></section>'));
       ok('task119: computeTransferGate gates navigation after a forced transfer', !!tg && tg.navNodes.size === 1, tg ? 'n=' + tg.navNodes.size : 'null');
       ok('task119: computeTransferGate null for a force="f" (optional) transfer', gates.computeTransferGate(parse('<section><transfer to="x" shards="10" force="f"/><goto section="9"/></section>')) === null);
