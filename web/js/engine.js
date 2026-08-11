@@ -442,8 +442,12 @@ export function applyEffect(el, state, opts = {}) {
   return applier ? applier(el, state, opts) : '';
 }
 
-// Tags applyEffectBody applies directly; anything else it recurses into.
-const PASSIVE_BODY_TAGS = new Set(['lose', 'tick', 'gain', 'set', 'curse', 'disease', 'poison', 'adjustmoney', 'transfer']);
+// Tags applyEffectBody applies directly; anything else it recurses into. Exported because it
+// is this port's canonical "writes to the Adventure Sheet" list, and render-gates.js's
+// post-fight chain deferral asks that same question: groupPlan already spells the list out a
+// second time (see its own note), and task 230 caught that copy missing <adjustmoney> — so a
+// third one is borrowed rather than written. (task 245)
+export const PASSIVE_BODY_TAGS = new Set(['lose', 'tick', 'gain', 'set', 'curse', 'disease', 'poison', 'adjustmoney', 'transfer']);
 const ROLL_BODY_TAGS = new Set(['random', 'rankcheck', 'difficulty']);
 
 /** Apply an effect *body* headlessly: a <fightdamage>/<flee>/<fightround> subtree

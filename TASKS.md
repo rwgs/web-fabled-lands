@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-244 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **245 is open** — file new work under the
+245 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **nothing is open** — file new work under the
 priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -35,7 +35,7 @@ there once the buckets below are clear.
 - [x] 236. A virtual-time budget that runs out reports as a suite FAILURE, with nothing saying it was the clock
 - [x] 237. `run-tests.ps1` selects an unusable WindowsApps Python alias and never reaches the real interpreter
 - [x] 238. §5.152's bonus-filtered item payment stays enabled when no carried item qualifies
-- [ ] 245. Only a `dead=`-gated branch is held for an unresolved fight, so §6.490 hands back the weapon it just confiscated
+- [x] 245. Only a `dead=`-gated branch is held for an unresolved fight, so §6.490 hands back the weapon it just confiscated
 
 **LOW**
 
@@ -2802,6 +2802,18 @@ the fight is unresolved and come back only once it is won.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-10 (implementation pass, task 245): closed **245**, nothing new filed. The chain
+deferral now asks "has this fight resolved" of every post-fight conditional, not only of the ones
+spelled `dead=`: `isDeferredDeadChain` became `isDeferredFightChain`, holding a chain whose body
+writes to the sheet on any gate. Two decisions worth carrying forward. **The effect list is
+borrowed, not written again** — `engine.js`'s `PASSIVE_BODY_TAGS` is now exported and unioned with
+`ITEM_FAMILY_TAGS`, because the shape of this defect was two guards disagreeing, and a third private
+copy of "what counts as an effect" is how task 230's `<adjustmoney>` went missing. **The test rides
+the whole chain, not the head**: an effect in the `<else>` alone defers, since the filing's own
+markup put the 800 Shards there. §6.490's failure reproduced first as one assertion (weapon back on
+the sheet, cache `6.490` empty, one unresolved fight) and the corpus's effect-free codeword chains
+(book6/716/743) are asserted to stay live. Focused economy+actions passed 1188; the full suite 2449.
 
 Filed 2026-08-10 (conversion pass on an unpublished book): **245** (MEDIUM), and nothing else. The
 finding came from writing a *conditional* post-fight reward — "if you previously sold them X you can

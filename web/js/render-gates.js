@@ -6,7 +6,7 @@
 // the actual buttons (the tag*/apply* methods stay in the view); these functions only
 // DECIDE. No DOM construction, no browser UI globals.
 
-import { boolAttr } from './engine.js';
+import { boolAttr, PASSIVE_BODY_TAGS } from './engine.js';
 
 // True when a die roll in this section is gated behind the payment keyed `k`: a
 // <random|rankcheck|difficulty flag="k"> paired with a [price="k"] cost — the "pay to
@@ -144,13 +144,49 @@ export function isDeferredTagCleanup(node) {
     && node.getAttribute('removetag') != null;
 }
 
-// A dead=-gated <if> chain positioned AFTER a fight is that fight's win/lose outcome
-// (book2/462 confiscate-return, book6/348 "if you win" reward). Defer the whole chain until
-// the fight is decided: while unresolved the player is still alive, which would wrongly
-// activate the "if you win" branch before a blow is struck. (task 39)
-export function isDeferredDeadChain(node, sectionFights) {
-  if (node.getAttribute('dead') == null) return false;   // only fight-outcome gates
+// What makes a post-fight conditional chain worth holding: any write to the Adventure Sheet in
+// its body. The engine's own passive-effect set — which already counts the <transfer> book6/490
+// turns on — plus the item-family awards, together a superset of the effects computeFightGate
+// holds when they are written BARE. Borrowed from engine.js rather than spelled out again, so
+// the two gates cannot drift apart on what an effect is.
+const CHAIN_EFFECT_TAGS = new Set([...PASSIVE_BODY_TAGS, ...ITEM_FAMILY_TAGS]);
+
+// Does this if/elseif/else chain — the head plus the elseif/else element siblings after it,
+// the same run appendChildren treats as one chain — write anything to the sheet? Any branch
+// counts: the deferral holds the chain as a whole, so an effect in the <else> ("if you sold
+// them the ring you may buy it back, else they carry 800 Shards") is as good a reason as one
+// in the <if>.
+function chainHasEffect(head) {
+  for (let el = head; el; el = el.nextElementSibling) {
+    const tag = el.tagName.toLowerCase();
+    if (el !== head && tag !== 'elseif' && tag !== 'else') break;
+    for (const d of el.querySelectorAll('*')) {
+      if (CHAIN_EFFECT_TAGS.has(d.tagName.toLowerCase())) return true;
+    }
+  }
+  return false;
+}
+
+// An if/elseif/else chain positioned AFTER a fight must not run before that fight is decided.
+// Defer the WHOLE chain (the else must not slip active in the held branch's place). Two
+// reasons to hold, and the second is the case the first left uncovered:
+//
+//  * a dead=-gated chain IS the fight's win/lose outcome (book2/462's confiscate-return,
+//    book6/348's "if you win" reward): while the fight is unresolved the player is still
+//    alive, so a naive dead="f" test fires the win branch before a blow is struck. (task 39)
+//  * a chain gated on anything else — codeword=, item=, var= — whose body writes to the
+//    sheet. computeFightGate deliberately skips <if>-wrapped effects because the conditional
+//    owns them, and this deferral owned only the dead= spelling, so book6/490's
+//    <if codeword="6.490.1"><transfer item="*" from="6.490"/> handed back the weapons the
+//    page had just confiscated — on the rerender after the click that ticked the codeword,
+//    mid-fight, with the subdual bargain's price unpaid. (task 245)
+//
+// A chain with no effect in it stays live: narration about the fight, or a <goto> the fight
+// gate already locks (book6/716/743), would otherwise render grayed for the whole fight.
+// Either way a FLED fight counts as unresolved — giving up earns neither outcome.
+export function isDeferredFightChain(node, sectionFights) {
   if (!sectionFights.length) return false;               // no fight before this node
+  if (node.getAttribute('dead') == null && !chainHasEffect(node)) return false;
   const outcome = aggregateFightOutcome(sectionFights);
   return outcome !== 'win' && outcome !== 'lose';        // still unresolved (or fled) → hold
 }

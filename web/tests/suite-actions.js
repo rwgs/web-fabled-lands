@@ -2878,8 +2878,32 @@ export async function run(ctx) {
       ok('task119: isDeferredTagCleanup true for a hidden removetag tick', gates.isDeferredTagCleanup(parse('<tick hidden="t" removetag="Tz"/>')) === true);
       ok('task119: isDeferredTagCleanup false for a plain tick', gates.isDeferredTagCleanup(parse('<tick codeword="X"/>')) === false);
 
-      ok('task119: isDeferredDeadChain defers a dead-gated if while the fight is unresolved', gates.isDeferredDeadChain(parse('<if dead="f"/>'), [{ outcome:null }]) === true);
-      ok('task119: isDeferredDeadChain applies once the fight resolves', gates.isDeferredDeadChain(parse('<if dead="f"/>'), [{ outcome:'win' }]) === false);
+      ok('task119: isDeferredFightChain defers a dead-gated if while the fight is unresolved', gates.isDeferredFightChain(parse('<if dead="f"/>'), [{ outcome:null }]) === true);
+      ok('task119: isDeferredFightChain applies once the fight resolves', gates.isDeferredFightChain(parse('<if dead="f"/>'), [{ outcome:'win' }]) === false);
+
+      // task 245: the hold is about "has this fight resolved", not about how the branch is
+      // spelled — a chain on ANY gate whose body writes to the sheet is held too, because
+      // computeFightGate skips <if>-wrapped effects on the grounds that the conditional owns
+      // them. One synthetic per gate kind the corpus writes after a fight.
+      const chain245 = (xml) => parse('<section name="t245"><fight/><p>' + xml + '</p></section>').querySelector('if');
+      const cwChain = chain245('<if codeword="K"><transfer item="*" from="c"/> then <goto section="463"/>.</if><else><goto section="316"/></else>');
+      ok('task245: a codeword-gated post-fight chain with an effect is deferred', gates.isDeferredFightChain(cwChain, [{ outcome:null }]) === true);
+      ok('task245: it applies once the fight is won', gates.isDeferredFightChain(cwChain, [{ outcome:'win' }]) === false);
+      ok('task245: a fled fight still holds it', gates.isDeferredFightChain(cwChain, [{ outcome:'fled' }]) === true);
+      ok('task245: nothing is held before the fight is reached', gates.isDeferredFightChain(cwChain, []) === false);
+      ok('task245: an item-gated post-fight chain with an effect is deferred',
+         gates.isDeferredFightChain(chain245('<if item="rope"><lose shards="10"/></if>'), [{ outcome:null }]) === true);
+      ok('task245: a var-gated post-fight chain with an effect is deferred',
+         gates.isDeferredFightChain(chain245('<if var="x" equals="1"><gain shards="800"/></if>'), [{ outcome:null }]) === true);
+      // The effect may sit in ANY branch of the chain — the deferral rides the whole chain.
+      ok('task245: an effect in the <else> alone defers the chain',
+         gates.isDeferredFightChain(chain245('<if codeword="K">He is beyond help.</if><else>He is carrying <gain shards="800"/>.</else>'), [{ outcome:null }]) === true);
+      // An effect-free chain stays live, or every page that merely discusses its fight would
+      // gray for the whole of it (book6/716/743 route on a codeword and nothing else).
+      ok('task245: a narration-only post-fight chain is NOT held',
+         gates.isDeferredFightChain(chain245('<if codeword="K">He recognises your badge.</if>'), [{ outcome:null }]) === false);
+      ok('task245: a chain carrying only a <goto> the fight gate already locks is NOT held',
+         gates.isDeferredFightChain(chain245('<if codeword="K">Turn to <goto section="9"/>.</if><else><goto section="10"/></else>'), [{ outcome:null }]) === false);
 
       const rg = gates.computeRollGate(parse('<section name="tr2"><random/><outcomes><outcome range="1-6" section="5"/></outcomes><choices><choice section="8">Leave</choice></choices></section>'));
       ok('task119: computeRollGate gates the onward choice behind the mandatory roll', !!rg && rg.navNodes.size === 1, rg ? 'n=' + rg.navNodes.size : 'null');

@@ -1943,6 +1943,42 @@ export async function run(ctx) {
          `n=${g462.itemCount()} start=${startItems} cache=${g462.cacheItems('2.462').length}`);
     }
 
+    // --- task 245: a post-fight branch gated on a CODEWORD is held for the fight too ---
+    { // block-scoped
+      // §6.490 sells a bargain: fight the rogue bare-handed at COMBAT −1 and you may treat
+      // his wounds as subdual. The group action stashes the weapons in cache 6.490 and ticks
+      // 6.490.1 — and the <if codeword="6.490.1"><transfer item="*" from="6.490"/> written
+      // after the fight handed them straight back on the rerender that followed the click.
+      // The fight gate skips <if>-wrapped effects (the conditional owns them) and the chain
+      // deferral used to read only dead=, so nothing held this one: the penalty applied, the
+      // subdual reward stood, and the weapons were back in hand mid-fight.
+      const g490 = GameState.create({ name:'V490', gender:'m', profession:'Warrior', book:6, adv });
+      g490.data.stamina = 100; g490.data.staminaMax = 100; // survive the rogue
+      const c490 = document.createElement('div');
+      const st490 = new Story(c490, g490, { navigate(){}, onDeath(){}, notify(){} });
+      st490.begin(await data.getSection(6, '490'), 6, '490');
+      const armed490 = () => g490.data.items.filter((i) => i.kind === 'weapon').length;
+      const startArms = armed490();
+      ok('task245: §6.490 the Warrior arrives armed', startArms >= 1, `n=${startArms}`);
+      const grp490 = Array.from(c490.querySelectorAll('.group-action')).find((b) => /without a weapon/i.test(b.textContent));
+      ok('task245: §6.490 offers the fight-unarmed group action', !!grp490);
+      grp490.click();
+      // The click ticks the codeword, so the branch's condition is TRUE from here on — the
+      // hold is the only thing keeping its transfer from firing.
+      ok('task245: §6.490 the group ticks 6.490.1, opening the codeword branch',
+         g490.hasCodeword('6.490.1') && st490.sectionFights.length === 1,
+         `cw=${g490.hasCodeword('6.490.1')} fights=${st490.sectionFights.length}`);
+      ok('task245: §6.490 the confiscated weapons stay in cache 6.490 while the fight is unresolved',
+         armed490() === 0 && g490.cacheItems('6.490').length === startArms,
+         `sheet=${armed490()} cache=${g490.cacheItems('6.490').length} start=${startArms}`);
+      // Win the fight → the codeword branch activates → the confiscated weapons come back.
+      st490.sectionFights.forEach((f) => { f.outcome = 'win'; });
+      st490.rerender();
+      ok('task245: §6.490 winning returns the confiscated weapons and empties the cache',
+         armed490() === startArms && g490.cacheItems('6.490').length === 0,
+         `sheet=${armed490()} start=${startArms} cache=${g490.cacheItems('6.490').length}`);
+    }
+
     // --- task 69: bare post-fight <lose>/<gain> apply on the OUTCOME, not on entry ---
     { // block-scoped
       // §570: the "if you lose" penalties (staminato=1, shards=*) must be held for the

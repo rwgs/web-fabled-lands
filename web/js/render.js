@@ -23,7 +23,7 @@ import {
   unsettledRollVars, conditionPending, viewPendingVars,
 } from './render-rules.js';
 import {
-  computeFightGate, computeEscapeCodewords, isDeferredDeadChain,
+  computeFightGate, computeEscapeCodewords, isDeferredFightChain,
   computeRollGate, computeTransferGate, computeBuyGate, computeRedirectGate, isEscapeNav,
 } from './render-gates.js';
 import {
@@ -1011,13 +1011,14 @@ export class Story {
         const pendingCond = conditionPending(node, viewPendingVars(this));
         if (tag === 'if' || !chainActive) {
           chainActive = true;
-          // A dead=-gated chain sitting AFTER an unresolved fight is that fight's
-          // win/lose outcome. The player is "alive" throughout the fight, so a naive
-          // dead="f" test fires the "if you win" branch — and its rewards / the
-          // confiscate-return <transfer> (book2/462) — mid-fight. Hold the WHOLE chain
-          // inactive until the fight is decided (won or lost); the else must not slip
-          // active either, so the flag rides the whole chain. (task 39)
-          chainDeferred = pendingCond || (tag === 'if' && isDeferredDeadChain(node, this.sectionFights));
+          // A chain sitting AFTER an unresolved fight is that fight's business: the
+          // dead=-gated one IS its win/lose outcome (the player is "alive" throughout, so a
+          // naive dead="f" test fires the "if you win" branch and the confiscate-return
+          // <transfer> of book2/462 mid-fight), and any other gate whose body writes to the
+          // sheet is its reward (book6/490's codeword). Hold the WHOLE chain inactive until
+          // the fight is decided (won or lost); the else must not slip active either, so the
+          // flag rides the whole chain. (tasks 39 + 245)
+          chainDeferred = pendingCond || (tag === 'if' && isDeferredFightChain(node, this.sectionFights));
           active = chainDeferred ? false : (tag === 'else' ? true : evaluateCondition(node, this.state, { ticksNow: this.walkTicks }));
           chainDone = active;
         } else if (chainDeferred) {
@@ -1531,7 +1532,7 @@ export class Story {
 
   // ---- fight gating --------------------------------------------------------
   // computeFightGate / computeEscapeCodewords / isDeferredEscapeClear /
-  // isDeferredTagCleanup / isDeferredDeadChain / aggregateFightOutcome moved to
+  // isDeferredTagCleanup / isDeferredFightChain / aggregateFightOutcome moved to
   // render-gates.js (task 119); the tag*/apply* view helpers below consume their output.
 
   // Tag a rendered nav button with its fight role, for applyFightGate to act on.
