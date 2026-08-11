@@ -7,7 +7,7 @@
 // attributes / running querySelectorAll on it is fine (the same thing engine.js does);
 // only DOM *construction* belongs in the view. Unit-tested headlessly.
 
-import { boolAttr, isDiceExpr, resolveValue, matchRange, losePaymentPlan } from './engine.js';
+import { boolAttr, isDiceExpr, resolveValue, matchRange, losePaymentPlan, PASSIVE_BODY_TAGS } from './engine.js';
 import { normalize, canonBlessing, currencyAward, isShardsCurrency, splitItemName } from './state.js';
 import { bookAvailable } from './edition.js'; // the DOM-free registry, never data.js (task 195)
 import { blessingLabel } from './render-util.js'; // pure label formatting, no DOM (task 218)
@@ -31,6 +31,11 @@ const DOCUMENT_POSITION_FOLLOWING = 0x04;
 // renderer's award/pay views, so it lives here as the single source of truth (the sibling
 // ITEM_FAMILY_TAGS is re-exported above from render-gates.js).
 export const CHOOSE_ONE_TAGS = new Set(['lose', 'tick', 'gain', 'item', 'weapon', 'armour', 'tool', 'resurrection']);
+
+// The engine's passive-effect set as a selector, built once. groupPlan asks it which of a
+// <group>'s children write to the Adventure Sheet; querySelectorAll answers in document
+// order, so the derived selector returns exactly what the old hand-written one did. (task 246)
+const PASSIVE_BODY_SELECTOR = [...PASSIVE_BODY_TAGS].join(', ');
 
 // ---- blessing rules (tasks 43/56/108/114) ----------------------------------
 
@@ -332,17 +337,17 @@ export function groupPlan(sectionEl, node) {
   if (rollNode) return { kind: 'roll', rollNode };
 
   const label = (node.textContent || '').replace(/\s+/g, ' ').trim();
-  // <adjust> is excluded: inside a group it is a modifier for a nested roll
-  // (e.g. "Difficulty 15 if you have climbing gear"), not a group effect. A
-  // bundled <transfer> is the group's own action (§6.490 "fight without a weapon"
-  // stashes the weapon), so it applies headlessly on the group click. (task 107)
-  // Everything else here is the passive-effect set (render.js / render-rewards.js
-  // PASSIVE_TAGS, engine.js PASSIVE_BODY_TAGS) — keep it in step with them. An
-  // action group renders ONLY its button and never walks its children, so a tag
-  // missing from this list is silently dropped: <adjustmoney> was, which left
-  // §2.134's wager applying its cache unlock and none of its four payouts, and
-  // §6.496's donation cache never reset. (task 230)
-  const effects = Array.from(node.querySelectorAll('lose, tick, gain, set, curse, disease, poison, adjustmoney, transfer'));
+  // The group's effects are engine.js's passive-effect set — TAKEN from it (see
+  // PASSIVE_BODY_SELECTOR) rather than spelled out again, because an action group renders
+  // ONLY its button and never walks its children, so a tag missing from this list is
+  // silently dropped: <adjustmoney> was missing from the old hand-written copy, which left
+  // §2.134's wager applying its cache unlock and none of its four payouts, and §6.496's
+  // donation cache never reset. (tasks 230 + 246) <adjust> is excluded by not being a
+  // member: inside a group it is a modifier for a nested roll ("Difficulty 15 if you have
+  // climbing gear"), not a group effect. A bundled <transfer> IS a member, and is the
+  // group's own action (§6.490 "fight without a weapon" stashes the weapon), so it applies
+  // headlessly on the group click. (task 107)
+  const effects = Array.from(node.querySelectorAll(PASSIVE_BODY_SELECTOR));
   // A bundled item/weapon/armour/tool reward (the hidden quest prize in §1.228/509
   // gold chain mail, §4.189 Sun Goddess mirror): the group collapses to one button,
   // so the award can't render its own Take button — grant it headlessly on the

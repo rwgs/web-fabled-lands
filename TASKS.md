@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-245 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **246 is open** — file new work under the
+246 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **nothing is open** — file new work under the
 priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -55,7 +55,7 @@ there once the buckets below are clear.
 - [x] 240. A cut-short run reports no progress at all, because the harness publishes `#results` once
 - [x] 243. A cargo buy stays enabled with a full hold and refuses on click, where every other capacity limit disables
 - [x] 244. A dice-table row into an unbundled book answers "please try again", where every other cross-book control names the book
-- [ ] 246. `groupPlan` writes the passive-effect list out a second time, and that copy is the one that already drifted
+- [x] 246. `groupPlan` writes the passive-effect list out a second time, and that copy is the one that already drifted
 
 **Done**
 
@@ -2838,6 +2838,16 @@ without teaching the group about it fails a test instead of losing a payout.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-10 (implementation pass, task 246): closed **246**, nothing new filed. `groupPlan`
+now derives its selector from `PASSIVE_BODY_TAGS`, and `render-rewards.js`'s `PASSIVE_TAGS` says in
+one line why it omits `<transfer>` instead of leaving the reader to guess drift from difference. The
+new assertion states the coupling — a `<group>` carrying one of every member must plan every one —
+and was **verified by sabotage** rather than by passing: dropping `adjustmoney` back out of the
+selector failed it (`planned=8 set=9`) together with all three of task 230's behavioural
+assertions, which is the point worth carrying forward. A guard written for a duplication that has
+already drifted is worth nothing until you have watched it fail; a test that only ever passed is
+indistinguishable from one that asserts a tautology. Full suite 2450.
 
 Filed 2026-08-10 (on closing task 245): **246** (LOW), and nothing else. Exporting the engine's
 passive-effect set for 245's chain deferral showed how many copies of it there are — two besides

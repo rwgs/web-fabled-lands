@@ -197,6 +197,11 @@ function renderGroupWithRoll(story, container, node, path, rollNode) {
 
 // The passive-effect tag set — the same set render.js uses to dispatch fall-through
 // effects to renderPassive; renderGroupWithRoll consults it to spot bundled effects.
+// It is engine.js's PASSIVE_BODY_TAGS minus <transfer>, and deliberately so: render.js's tag
+// table sends a <transfer> to renderTransfer, which owns its own rules (a hidden one applies
+// on entry, a visible one builds its own control), so a roll-bundled transfer follows those
+// rather than deferring to the roll. No <group> in the six books pairs a roll with a
+// transfer, so nothing is dropped today — this is the difference, not drift. (task 246)
 const PASSIVE_TAGS = new Set(['lose', 'tick', 'gain', 'set', 'curse', 'disease', 'poison', 'adjustmoney']);
 
 // Grant an <item>/<weapon>/<armour>/<tool> reward headlessly — no button — for a

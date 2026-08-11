@@ -3360,6 +3360,18 @@ export async function run(ctx) {
       ok('task119: groupPlan collects flag-linked awards outside the group (task 125)',
          linked.kind === 'action' && linked.linkedAwards.length === 1 && linked.linkedAwards[0].getAttribute('name') === 'potion of restoration');
 
+      // task 246: an action group's effect list is DERIVED from engine.js's passive-effect
+      // set, not written out beside it. Task 230's silent drop was that copy missing
+      // <adjustmoney>, and a group renders only its button — it never walks its children —
+      // so a tag it does not plan is applied nowhere. Assert the coupling, not the spelling:
+      // a group carrying one of every member must plan every one of them, so adding a tag to
+      // the engine's set without teaching groupPlan about it fails here.
+      const all246 = [...eng.PASSIVE_BODY_TAGS].map((t) => `<${t}/>`).join('');
+      const plan246 = rules.groupPlan(null, parse(`<group><text>Do it</text>${all246}</group>`));
+      ok('task246: groupPlan plans every tag in the engine\'s passive-effect set',
+         plan246.kind === 'action' && plan246.effects.length === eng.PASSIVE_BODY_TAGS.size,
+         `planned=${plan246.effects.length} set=${eng.PASSIVE_BODY_TAGS.size}`);
+
       ok('task119: groupRollDefers visible cost defers to the roll', rules.groupRollDefers(parse('<lose shards="10">bet</lose>')) === true);
       ok('task119: groupRollDefers hidden book-keeping arms on entry', rules.groupRollDefers(parse('<tick price="k" hidden="t"/>')) === false);
       ok('task119: groupRollDefers a hidden cache lock still defers (task 38)', rules.groupRollDefers(parse('<tick special="lock" cache="bet" hidden="t"/>')) === true);
