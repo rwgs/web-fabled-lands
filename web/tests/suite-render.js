@@ -324,6 +324,29 @@ export async function run(ctx) {
       window.__FL_INSTANT_DICE__ = false;
     }
 
+    // --- task 248: the same hold on the section's <fight> ---
+    // The gate held the exits but not the Attack button (no choice/goto/return), so book2/726's
+    // brigands and book5/477's water drake were fought at full Stamina and the rolled wound
+    // landed afterwards. Order is the whole point here: the prose has the arrow/jet hit FIRST.
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const settle248 = () => new Promise((r) => setTimeout(r, 20));
+      const g248 = GameState.create({ name:'G248', gender:'m', profession:'Warrior', book:1, adv });
+      g248.ephemeral = true;
+      const c248 = document.createElement('div');
+      const st248 = new Story(c248, g248, { navigate(){}, onDeath(){}, notify(){} });
+      st248.begin(parse('<section name="G248"><p><random dice="1" var="x">Roll a die</random> and <lose stamina="x">lose that many Stamina points</lose>.</p><fight name="Brigand" combat="4" defence="6" stamina="4"/><choices><choice section="353">Defeat them</choice></choices></section>'), 1, 'G248');
+      const attack248 = () => c248.querySelector('.fight .btn-roll');
+      ok('task248: the fight is held before the mandatory roll', !!attack248() && attack248().disabled === true);
+      // A gate that only ADDS disables must never make its section read as a dead end: the
+      // Roll button is still live, and the .end-fate fallback counts enabled controls (task 151).
+      ok('task248: a held fight is not a dead end', !c248.querySelector('.end-fate'));
+      c248.querySelector('.roll .btn-roll').click(); await settle248();
+      ok('task248: rolling releases the fight', !!attack248() && attack248().disabled === false);
+      ok('task248: and the released section is not a dead end either', !c248.querySelector('.end-fate'));
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
     // --- interaction: clicking a choice navigates ---
     let navd = null;
     const story3 = new Story(container, gs, { navigate:(b,s)=>{navd={b,s};}, onDeath(){}, notify(){} });

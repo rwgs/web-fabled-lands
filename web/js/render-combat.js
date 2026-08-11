@@ -59,6 +59,7 @@ export function renderFight(story, container, node, path) {
   const box = document.createElement('div');
   box.className = 'fight';
   container.appendChild(box);
+  story.tagRollFight(node, box); // held while a mandatory roll above is unmade (task 248)
   drawFight(story, box, fight, node, dmgNode, fleeNode, key, locked, roundNode);
   return box;
 }
@@ -96,6 +97,7 @@ function renderGroupFight(story, container, node, group) {
   const box = document.createElement('div');
   box.className = 'fight';
   container.appendChild(box);
+  story.tagRollFight(node, box); // held while a mandatory roll above is unmade (task 248)
   drawGroupFight(story, box, fights, dmgNode, group, fleeNode);
   return box;
 }

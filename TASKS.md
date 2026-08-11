@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-247 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **248 is open** — file new work under the
-priority bucket that fits, and record the pass in the Review log.
+248 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **249 and 250 are open** — file new work under
+the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -21,7 +21,8 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 248. The roll gate holds the exits but not the `<fight>`, so §5.477's drake is fought before its jet lands
+- [ ] 249. A mandatory check read only by its `<success>`/`<failure>` seeds no roll gate, so §5.198's Champion is fought uncursed — and the roll skipped for good
+- [x] 248. The roll gate holds the exits but not the `<fight>`, so §5.477's drake is fought before its jet lands
 - [x] 247. The roll gate is keyed on `<outcomes>`, so a "roll and lose this many" page can be walked past unrolled
 - [x] 213. The post-fight gate does not hold an item award, so loot is takeable before the fight
 - [x] 214. A visit-box redirect does not hold the section body, so a one-time reward is re-takeable
@@ -41,6 +42,7 @@ there once the buckets below are clear.
 
 **LOW**
 
+- [ ] 250. `applyPendingRerollGate` locks only `.goto`/`.choice`, so §1.21's thug is fightable while the reroll decision stands
 - [x] 215. A self-closing effect tag renders no words, so published sentences print with a hole
 - [x] 217. A visit-box redirect below the section head still leaves both exits live (book1/91)
 - [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
@@ -2945,11 +2947,98 @@ the Attack button is disabled before the roll and enabled after, and the section
 
 ---
 
+## 249. A mandatory check read only by its `<success>`/`<failure>` seeds no roll gate, so §5.198's Champion is fought uncursed — and the roll skipped for good
+
+**Priority: MEDIUM — this is not an ordering wobble like task 248 but a roll the player never has
+to make: the section's own mandatory check can be walked past entirely, and every one of the
+three instances is a check whose failure COSTS something.**
+
+*(Filed 2026-08-11, on closing task 248.)*
+
+`computeRollGate` has two seeds: a mandatory `<random>` read by an `<outcomes>` table (task 104)
+and a mandatory roll whose result an *effect's magnitude* reads (task 247). A check read only by
+its own `<success>`/`<failure>` branch is neither, so it seeds nothing — and where the section's
+navigation is held by the FIGHT gate instead, nothing else asks for the roll either. Win the
+fight and the exits unlock with the check still unmade.
+
+**Scope.** Three shipped sections, measured (every published section carrying an unconditional
+`<fight>` below a roll that is not a fight hook):
+
+* **book5/198** — `<difficulty ability="magic" level="13"/>`, whose `<failure>` applies a
+  `<curse>` halving COMBAT for the fight. The Champion is fought at full COMBAT, then the
+  player takes a sword and leaves; the curse never lands.
+* **book5/218** — `<difficulty ability="combat" level="12"/>`, whose `<failure>` is `<lose
+  stamina="3">` plus a `<while>` retry loop: you fight the troll without ever escaping its grip.
+* **book5/689** — `<difficulty ability="scouting" level="10" var="pre"/>`, whose `<failure var="pre">`
+  is `<goto section="7">` — you drowned. The drake is fightable before the section has decided
+  whether you are alive. (It HAS a var, so only the "an effect reads it" half of seed 2 misses:
+  the var is read by a branch and by an `<adjust value=>`, neither of which is a magnitude.)
+
+book1/21 is deliberately NOT in that list: its `<difficulty force="f">` is the optional "talk
+your way out" and fighting is the printed default, so it must never gate. That is what makes
+this a third SEED rather than a widening of `isMandatoryRoll`.
+
+**Fix:** a third seed — a mandatory roll (the same `isMandatoryRoll` test) with a `<success>`,
+`<failure>` or `var=`-keyed branch reading it, positioned after the roll. Mind that the branch
+seed must not fire on a roll the section merely *offers* (`force="f"`, pay-to-spin, `<group>`-
+wrapped), and that `<flee>`/`<fightround>`/`<fightdamage>` hooks stay excluded as in task 247 —
+book5/689's own `<fightround>` check is exactly the roll that must NOT gate.
+
+**Assert it** on a synthetic `<difficulty var="p">` + `<failure var="p">` + `<fight>` + `<choice>`:
+the Attack and the exit are both held before the roll and released after, and the optional
+(`force="f"`) spelling gates nothing. Then re-measure the three sections above and re-run the
+dead-end census.
+
+---
+
+## 250. `applyPendingRerollGate` locks only `.goto`/`.choice`, so §1.21's thug is fightable while the reroll decision stands
+
+**Priority: LOW — one shipped section, and only for a player holding the matching blessing.**
+
+*(Filed 2026-08-11, on closing task 248.)*
+
+Task 248 gave `applyRollGate` the fight's Attack control; `applyPendingRerollGate` (task 181)
+still disables `.goto, .choice` and nothing else, so a fight below a resolved-but-rerollable
+roll is startable while the keep-or-reroll decision is open. Where the roll ALSO seeds the roll
+gate this is already covered — `applyRollGate` treats a pending reroll as unrolled and now holds
+the fight with the exits — so the exposure is the sections whose roll seeds no gate: task 249's
+three, and **book1/21**, whose `force="f"` CHARISMA roll is optional and so can never seed one.
+There the player can attack the thug with a CHARISMA reroll still pending, and a reroll to
+success would have sent them to §10 with no fight at all.
+
+**Fix:** extend the selector the same way task 248 did, or (cheaper) recognise that both gates
+now want "every control that commits, except giving up" and name that set once. Keep
+`[data-fleenav]` and the fight's own Flee exempt, and never touch the reroll widget's own
+`.blessing-reroll`/`.keep-roll` buttons — the gate would otherwise lock the only way to settle it.
+
+**Assert it** on a synthetic rerollable check above a `<fight>` with the blessing held: the
+Attack is disabled while the decision stands and enabled once the result is kept.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-11 (implementation pass, task 248): closed **248**, and filed **249** (MEDIUM) and
+**250** (LOW) on the way out (entries above). `computeRollGate` now collects the `<fight>`s below
+its roll beside the navigation, and `applyRollGate` holds their controls with the exits. Three
+decisions worth carrying forward. **The exclusion is the same one the navigation already uses**:
+a fight inside the `<outcomes>` table is skipped, because §1.299's drunken soldier IS what the
+roll reveals — he cannot be reached early, and holding him after the reveal would lock the fight
+the roll had just started. **The gate holds the blessing buttons too, not only Attack**: a combat
+blessing redraws the widget in place (`afterAction` → `drawFight`), which hands back an enabled
+Attack that a gate running once per render never sees again — Flee stays live, as in every other
+gate. And **the census had to be made deterministic before it could be read**: the corpus
+dead-end count is state-dependent (the fallback is suppressed for a dead player), so an
+unseeded scan moved between 8 and 9 sections on the *same* code and would have convicted this
+change of a dead end it did not create; with `Math.random` pinned it is **9 either side, the same
+9 sections**, and exactly **2** sections gain a held fight (book2/726, book5/477 — the two the
+filing predicted, both with Attack disabled on entry). Verified by sabotage twice: dropping the
+fight selector from `applyRollGate` fails the one behavioural assertion, dropping the
+outcome-wrap exclusion fails the one unit assertion that names §1.299. Full suite 2471.
 
 Worked 2026-08-11 (implementation pass, task 247): closed **247**, and filed **248** (LOW) on the
 way out (entry above). The gate now has a SECOND seed — the mandatory roll whose result an

@@ -1576,6 +1576,13 @@ export class Story {
     if (this.rollGate && this.rollGate.navNodes.has(node)) btn.dataset.rollnav = '1';
   }
 
+  // Tag a rendered fight widget as roll-gated, for applyRollGate to hold its controls (task 248).
+  // The gate names the <fight> NODE, so the mark has to be made where the widget is built —
+  // a rendered box carries no trace of its position relative to the gating roll.
+  tagRollFight(node, box) {
+    if (this.rollGate && this.rollGate.fightNodes.has(node)) box.dataset.rollfight = '1';
+  }
+
   // Tag a rendered nav button as a flee/escape exit (isEscapeNav owns the rule), so
   // applyPendingRerollGate can leave it clickable like every other gate does. (task 205)
   tagEscapeNav(node, btn) {
@@ -1587,11 +1594,17 @@ export class Story {
   // gate (task 247) has no outcome to match, so resolving the roll is the whole release.
   // Only ever ADDS a disable, so it composes with applyFightGate (a fight-in-outcome
   // section like §1.299 stays gated on both the roll AND the fight).
+  //
+  // The gated fight's own controls are held too (task 248): its Attack, and the combat
+  // blessings beside it — those redraw the widget in place (afterAction), which would hand
+  // back an enabled Attack the gate never sees again. Flee stays clickable, as it does in
+  // every other gate: giving up is never locked behind the thing you are giving up on.
   applyRollGate(flow) {
     const gate = this.rollGate;
     if (!gate) return;
-    const navs = Array.from(flow.querySelectorAll('[data-rollnav]'));
-    if (!navs.length) return;
+    const held = Array.from(flow.querySelectorAll(
+      '[data-rollnav], [data-rollfight] .btn-roll, [data-rollfight] .blessing-combat'));
+    if (!held.length) return;
     const roll = gate.rollPath != null ? this.ctx.rolls.get('roll@' + gate.rollPath) : null;
     // A rolled gate whose result is still a pending blessing-reroll decision (task 175) is not
     // final: keep the onward navigation locked exactly as an unrolled gate, so the player
@@ -1606,7 +1619,7 @@ export class Story {
       disable = redirect; title = 'Your route is decided — follow it.';
     }
     if (!disable) return;
-    navs.forEach((btn) => {
+    held.forEach((btn) => {
       if (btn.disabled) return; // already gated (fight, cost, edition…) — keep its own reason
       btn.disabled = true;
       btn.classList.add('gated');

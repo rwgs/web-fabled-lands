@@ -2945,6 +2945,26 @@ export async function run(ctx) {
       ok('task247: a <difficulty> whose margin an effect reads gates the exit too',
          !!rg247('<difficulty ability="combat" level="9" var="m"/><lose stamina="-m"/><goto section="9"/>'));
 
+      // task 248: the gate holds the section's <fight> as well as its exits. A fight's Attack
+      // button is none of choice/goto/return, so the gate never collected it and book2/726's
+      // brigands and book5/477's water drake could be engaged before the rolled wound landed —
+      // the wound still arrived (the exits were held) but AFTER the fight it was meant to start.
+      const fight248 = '<fight name="Brigand" combat="5" defence="6" stamina="4"/>';
+      const held248 = rg247('<random dice="1" var="x"/><lose stamina="x"/>' + fight248 + '<choices><choice section="353">Defeat them</choice></choices>');
+      ok('task248: a fight below the gating roll is held with the exits',
+         !!held248 && held248.fightNodes.size === 1, held248 ? 'n=' + held248.fightNodes.size : 'null');
+      // Position is read from the roll, exactly as it is for the navigation: a fight the
+      // section already fought is not something the roll below it can shape.
+      ok('task248: a fight above the gating roll is not held',
+         (() => { const g = rg247(fight248 + '<random dice="1" var="x"/><lose stamina="x"/><goto section="9"/>'); return !!g && g.fightNodes.size === 0; })());
+      // §1.299's drunken soldier IS what the table reveals, so he can never be reached early;
+      // holding him after the reveal would lock the fight the roll had just started.
+      ok('task248: a fight inside the outcome table is not held',
+         (() => {
+           const g = gates.computeRollGate(parse('<section name="t248"><random type="travel" dice="1"/><outcomes><outcome range="1,2">' + fight248 + '</outcome><outcome range="3-6">Nothing happens</outcome></outcomes><choices><choice section="472">Travel on</choice></choices></section>'));
+           return !!g && g.fightNodes.size === 0 && g.navNodes.size === 1;
+         })());
+
       const tg = gates.computeTransferGate(parse('<section name="tt"><transfer to="x" shards="10"/><goto section="9"/></section>'));
       ok('task119: computeTransferGate gates navigation after a forced transfer', !!tg && tg.navNodes.size === 1, tg ? 'n=' + tg.navNodes.size : 'null');
       ok('task119: computeTransferGate null for a force="f" (optional) transfer', gates.computeTransferGate(parse('<section><transfer to="x" shards="10" force="f"/><goto section="9"/></section>')) === null);

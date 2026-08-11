@@ -299,7 +299,7 @@ function owedRoll(sectionEl) {
 // seed) a "get lost" outcome carrying its own <goto> suppresses those choices. `outcomesNode`
 // is the table this gate's roll feeds, or null when the gate came from the effect seed — there
 // is no outcome to match then, so applyRollGate releases on the roll RESOLVING. Returns
-// { rollNode, outcomesNode, navNodes:Set, rollPath, matchedOutcome } or null.
+// { rollNode, outcomesNode, navNodes:Set, fightNodes:Set, rollPath, matchedOutcome } or null.
 export function computeRollGate(sectionEl) {
   if (!sectionEl) return null;
   const outcomesNode = sectionEl.querySelector('outcomes');
@@ -313,8 +313,20 @@ export function computeRollGate(sectionEl) {
     if (boolAttr(n.getAttribute('flee'))) return;
     navNodes.add(n);
   });
-  if (!navNodes.size) return null; // pure roll-to-goto travel — nothing to gate
-  return { rollNode, outcomesNode: tabled ? outcomesNode : null, navNodes, rollPath: null, matchedOutcome: null };
+  // A <fight> below the roll is held the same way (task 248): "the arrow hits you, THEN fight
+  // them" (book2/726) and "the drake's jet knocks you off your feet, THEN fight it" (book5/477)
+  // are orderings the prose spells out, and a fight entered at full Stamina is the difference
+  // between surviving it and not. A fight inside the TABLE's outcome is skipped like the
+  // navigation there: §1.299's drunken soldier is what the roll reveals, so he can never be
+  // reached early, and holding him after the reveal would lock the fight the roll just started.
+  const fightNodes = new Set();
+  sectionEl.querySelectorAll('fight').forEach((f) => {
+    if (!(rollNode.compareDocumentPosition(f) & DOCUMENT_POSITION_FOLLOWING)) return;
+    if (hasAncestorTag(f, ROLLGATE_OUTCOME_WRAP)) return;
+    fightNodes.add(f);
+  });
+  if (!navNodes.size && !fightNodes.size) return null; // pure roll-to-goto travel — nothing to gate
+  return { rollNode, outcomesNode: tabled ? outcomesNode : null, navNodes, fightNodes, rollPath: null, matchedOutcome: null };
 }
 
 // The forced-transfer gate (task 107): a visible, forced (default force="t"), unpriced
