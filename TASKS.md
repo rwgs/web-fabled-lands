@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-249 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **250 is open** — file new work under the
+250 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **no task is open** — file new work under the
 priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -42,7 +42,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 250. `applyPendingRerollGate` locks only `.goto`/`.choice`, so §1.21's thug is fightable while the reroll decision stands
+- [x] 250. `applyPendingRerollGate` locks only `.goto`/`.choice`, so §1.21's thug is fightable while the reroll decision stands
 - [x] 215. A self-closing effect tag renders no words, so published sentences print with a hole
 - [x] 217. A visit-box redirect below the section head still leaves both exits live (book1/91)
 - [x] 218. The Adventure Sheet chips a blessing by its XML key, not the name the book prints
@@ -3021,6 +3021,17 @@ Attack is disabled while the decision stands and enabled once the result is kept
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-11 (implementation pass, task 250): closed **250**, nothing new filed, and the
+buckets are now clear. The provisional-result gate holds the fight's controls on task 248's
+selector, which is the whole change. What is worth carrying forward is how small the residue
+was: task 249's third seed had already covered every instance where the roll is the section's
+own step, so the one case left for this gate is the roll that is *deliberately* optional —
+§1.21's force="f" talk-out, where fighting is the printed default and only a rerolled success
+removes the fight. The new fixture asserts both halves in order (the Attack is live on entry,
+held only once the reroll decision appears), so it cannot pass by gating the fight outright.
+Verified by sabotage: reverting the selector to `.goto, .choice` fails exactly the one assertion
+that names the decision. Full suite 2486.
 
 Worked 2026-08-11 (implementation pass, task 249): closed **249**, nothing new filed. The gate has
 a third seed — a mandatory roll read by its own `<success>`/`<failure>` — and `isMandatoryRoll`

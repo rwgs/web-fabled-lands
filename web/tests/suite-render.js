@@ -382,6 +382,31 @@ export async function run(ctx) {
       window.__FL_INSTANT_DICE__ = false;
     }
 
+    // --- task 250: a provisional result holds the fight too ---
+    // §1.21's shape: the CHARISMA roll is the printed ALTERNATIVE to fighting the thug
+    // (force="f"), so it seeds no roll gate — and a rerollable failure is a decision that can
+    // still remove the fight entirely. The reroll gate locked .goto/.choice and nothing else.
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const settle250 = () => new Promise((r) => setTimeout(r, 20));
+      const rnd250 = Math.random;
+      const g250 = GameState.create({ name:'G250', gender:'m', profession:'Warrior', book:1, adv });
+      g250.ephemeral = true; g250.addBlessing('luck');
+      const c250 = document.createElement('div');
+      new Story(c250, g250, { navigate(){}, onDeath(){}, notify(){} })
+        .begin(parse('<section name="G250"><p><difficulty ability="charisma" level="8" force="f">Try a CHARISMA roll</difficulty><success>The thug leaves, <goto section="10"/>.</success></p><fight name="Thug" combat="4" defence="7" stamina="6"/><choices><choice section="10">Fight on</choice></choices></section>'), 1, 'G250');
+      const attack250 = () => c250.querySelector('.fight .btn-roll');
+      ok('task250: an optional check leaves the fight live (it is the printed default)',
+         !!attack250() && attack250().disabled === false);
+      Math.random = () => 0; c250.querySelector('.roll .btn-roll').click(); await settle250(); Math.random = rnd250;
+      ok('task250: a failed check with Luck held offers the reroll decision', !!c250.querySelector('.keep-roll'));
+      ok('task250: and the fight is held while that decision stands',
+         !!attack250() && attack250().disabled === true, attack250() ? 'title=' + attack250().title : 'no attack');
+      c250.querySelector('.keep-roll').click();
+      ok('task250: keeping the result releases the fight', !!attack250() && attack250().disabled === false);
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
     // --- interaction: clicking a choice navigates ---
     let navd = null;
     const story3 = new Story(container, gs, { navigate:(b,s)=>{navd={b,s};}, onDeath(){}, notify(){} });

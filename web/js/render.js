@@ -1661,9 +1661,15 @@ export class Story {
   // A flee/escape exit is exempt, exactly as it is in those gates (task 205): the fight
   // widget's own Flee button is not a .goto/.choice and was never locked here, so a direct
   // <choice flee="t"> offering the same escape must not be either.
+  // A <fight> below the decision is held too, on task 248's reasoning and by its selector: a
+  // roll the player may still reroll can decide whether the fight happens at all — §1.21's
+  // rerolled CHARISMA success talks the thug away — so its Attack must not commit first. The
+  // roll gate covers this wherever the roll SEEDS it (a pending decision reads as unrolled
+  // there); what is left for here is the roll no seed can claim, §1.21's optional one. Never
+  // the reroll widget's own .blessing-reroll/.keep-roll — those are the way to settle it.
   applyPendingRerollGate(flow) {
     if (!this.pendingRerollDecision) return;
-    flow.querySelectorAll('.goto, .choice').forEach((btn) => {
+    flow.querySelectorAll('.goto, .choice, .fight .btn-roll, .fight .blessing-combat').forEach((btn) => {
       if (btn.disabled) return; // already gated for another reason — keep its own reason
       if (btn.dataset.fleenav === '1') return; // giving up stays available
       btn.disabled = true;
