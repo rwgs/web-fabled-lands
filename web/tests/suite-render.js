@@ -970,6 +970,80 @@ export async function run(ctx) {
          navX && Number(navX.b) === 4 && String(navX.s) === '11', JSON.stringify(navX));
     }
 
+    // --- task 244: a branch's book= asks the same edition question as a <goto book=> --------
+    // <outcome>/<success>/<failure> all take book=, and a revealed branch with a section=
+    // renders a live "Continue → N". That button reached story.navigate with NO edition check,
+    // so a dice row into an unbundled book (book3/33 and /40 → book 9, book3/464's <failure>
+    // → book 12) fell through to a 404 on the book JSON and came back as the generic "Could
+    // not load that section — please try again." — the one cross-book control that never named
+    // the real cause. It now asks the shared story.requireBook, exactly as a <goto> does.
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const settle244 = () => new Promise((r) => setTimeout(r, 20));
+      const rnd244 = Math.random;
+      const avail244 = data.availableBooks();
+      ok('task244: the fixture edition bundles book 2 and not books 9/12',
+         avail244.includes(2) && !avail244.includes(9) && !avail244.includes(12), JSON.stringify(avail244));
+
+      // Render a synthetic section, roll its one die-roll, and hand back the revealed
+      // branch's Continue button along with what a click on it reached.
+      const branch244 = async (xml, rng) => {
+        const g = GameState.create({ name: 'B244', gender: 'm', profession: 'Warrior', book: 1, adv });
+        g.ephemeral = true;
+        const c = document.createElement('div');
+        const seen = { nav: null, warns: [] };
+        const st = new Story(c, g, { navigate: (b, s) => { seen.nav = { b, s }; }, onDeath() {}, notify: (m) => seen.warns.push(m) });
+        st.begin(parse(xml), 1, 'B244');
+        Math.random = rng;
+        c.querySelector('.roll .btn-roll').click();
+        await settle244();
+        Math.random = rnd244;
+        seen.btn = Array.from(c.querySelectorAll('.branch .goto')).find((b) => /Continue/.test(b.textContent));
+        return seen;
+      };
+      // (outcome row) book3/40's shape: a var-keyed 2d6 table whose low row crosses into book 9.
+      const outcomeXml = (book) => `<section name="B244"><p><random dice="2" var="x"/></p><outcomes><outcome var="x" range="2-12" book="${book}" section="84">Blown off course</outcome></outcomes></section>`;
+      const oGone = await branch244(outcomeXml(9), () => 0.5);
+      ok('task244: an <outcome book=> row reveals its Continue button', !!oGone.btn, oGone.btn ? oGone.btn.textContent : 'none');
+      oGone.btn.click();
+      ok('task244: an <outcome> row into an unbundled book refuses, and names the book',
+         oGone.nav === null && oGone.warns.length === 1
+         && /isn.t included in this edition/.test(oGone.warns[0]) && /Isle of a Thousand Spires/.test(oGone.warns[0]),
+         `nav=${JSON.stringify(oGone.nav)} warn=${oGone.warns[0]}`);
+      // The same row into a bundled book still crosses — the gate refuses the edition, not book=.
+      const oHere = await branch244(outcomeXml(2), () => 0.5);
+      oHere.btn.click();
+      ok('task244: an <outcome> row into a bundled book crosses normally',
+         oHere.nav && Number(oHere.nav.b) === 2 && String(oHere.nav.s) === '84' && oHere.warns.length === 0,
+         `nav=${JSON.stringify(oHere.nav)} warns=${oHere.warns.length}`);
+
+      // (failure branch) book3/464's shape: a failed ability roll whose <failure> crosses into
+      // book 12. level="30" is unreachable on 2d6 + any ability, so the roll always fails. Its
+      // single ability= (not the section's "magic|scouting") keeps the widget a roll button —
+      // a multi-ability roll draws the picker first and has no .btn-roll to click.
+      const failXml = (bookAttr) => `<section name="B244"><p><difficulty ability="magic" level="30"/></p><outcomes><success section="445"/><failure ${bookAttr}section="25"/></outcomes></section>`;
+      const fGone = await branch244(failXml('book="12" '), () => 0.9);
+      ok('task244: a <failure book=> branch reveals its Continue button', !!fGone.btn, fGone.btn ? fGone.btn.textContent : 'none');
+      fGone.btn.click();
+      ok('task244: a <failure> into an unbundled book refuses, and names the book',
+         fGone.nav === null && fGone.warns.length === 1
+         && /isn.t included in this edition/.test(fGone.warns[0]) && /Into The Underworld/.test(fGone.warns[0]),
+         `nav=${JSON.stringify(fGone.nav)} warn=${fGone.warns[0]}`);
+      const fHere = await branch244(failXml('book="2" '), () => 0.9);
+      fHere.btn.click();
+      ok('task244: a <failure> into a bundled book crosses normally',
+         fHere.nav && Number(fHere.nav.b) === 2 && String(fHere.nav.s) === '25' && fHere.warns.length === 0,
+         `nav=${JSON.stringify(fHere.nav)} warns=${fHere.warns.length}`);
+
+      // A branch with no book= stays in the current book, so the gate must never fire on it.
+      const fSame = await branch244(failXml(''), () => 0.9);
+      fSame.btn.click();
+      ok('task244: a same-book branch is unaffected by the gate',
+         fSame.nav && Number(fSame.nav.b) === 1 && String(fSame.nav.s) === '25' && fSame.warns.length === 0,
+         `nav=${JSON.stringify(fSame.nav)} warns=${fSame.warns.length}`);
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
     // task 150: an if/elseif/else inside a choice label is dispatched per-node via
     // renderElement (appendChildrenList), with no cross-sibling chain state — a bare
     // <else>/<elseif> must be inert, not rendered (and its effects run) unconditionally.

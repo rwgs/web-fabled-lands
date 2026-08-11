@@ -435,7 +435,10 @@ function revealBranch(story, container, node, path) {
     const btn = document.createElement('button');
     btn.className = 'goto goto-primary';
     btn.textContent = 'Continue → ' + section;
-    btn.addEventListener('click', () => story.navigate(targetBook, section));
+    // A branch's book= can leave the edition just like a <goto book=>'s — book3/33 and /40
+    // send a dice row into book 9, book3/464 a <failure> into book 12 — so it asks the same
+    // shared edition gate on the click (task 244).
+    btn.addEventListener('click', () => { if (story.requireBook(targetBook)) story.navigate(targetBook, section); });
     box.appendChild(btn);
   }
   container.appendChild(box);

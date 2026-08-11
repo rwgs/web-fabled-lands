@@ -53,7 +53,7 @@ there once the buckets below are clear.
 - [x] 239. The intentional `java-engine/README.md` rename leaves the reference packager looking for `README.txt`
 - [x] 240. A cut-short run reports no progress at all, because the harness publishes `#results` once
 - [x] 243. A cargo buy stays enabled with a full hold and refuses on click, where every other capacity limit disables
-- [ ] 244. A dice-table row into an unbundled book answers "please try again", where every other cross-book control names the book
+- [x] 244. A dice-table row into an unbundled book answers "please try again", where every other cross-book control names the book
 
 **Done**
 
@@ -2693,6 +2693,31 @@ does **not** navigate, and the same row into a bundled book still navigates.
 rather than live-and-refusing. `renderGoto` deliberately keeps it live and answers on the click, so
 matching that is the smaller change and the consistent one; disabling would also need the
 `<if book=>` branch's gray treatment to stay distinguishable from it.
+
+**Done 2026-08-10.** The edition check now lives once, as `Story.requireBook(book)` on the render
+facade — it returns true when the book is bundled and otherwise notifies with the title and refuses.
+All three cross-book controls call it: `renderGoto` (`render-choices.js`) and `surfaceExtraChoices`
+(`render.js`) lost their duplicated copies of the line, and `revealBranch` (`render-rolls.js`) gained
+the check it never had. `render-choices.js`'s now-unused `bookTitle`/`availableBooks` import went
+with them. The facade was the right home: `render-rolls` and `render-choices` deliberately don't
+import each other (task 163), and the helper needs `story.notify`, which only the facade carries.
+
+Kept live-and-refusing rather than disabled, per the note above — a branch is revealed by a roll, so
+a greyed Continue would arrive already dead beside a page telling the player to reroll, and would
+collide with the `<if book=>` gray.
+
+Seven synthetic assertions in `suite-render`, on the two corpus shapes: book3/40's var-keyed
+`<outcome range= book="9">` row and book3/464's `<outcomes><success/><failure book="12"/></outcomes>`
+after a failed ability roll. Each refuses without navigating and names the real book — "The Isle of a
+Thousand Spires", "Into The Underworld" — while the same row into book 2 still crosses, and a branch
+with no `book=` is untouched. Before the change the two unbundled cases navigated straight through
+with no warning. Afterward the DOM-free import check passed **35/35** and the full browser/corpus
+run passed **2435/2435** (suite 2427 → **2435**).
+
+One fixture note worth keeping: a multi-ability `<difficulty ability="magic|scouting">` draws the
+ability picker first and has **no `.btn-roll` to click**, so the failure fixture uses a single
+`ability="magic"`. The first run of these assertions died as
+`FATAL [render] TypeError: Cannot read properties of null (reading 'click')` for exactly that reason.
 
 ---
 

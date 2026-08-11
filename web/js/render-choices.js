@@ -9,7 +9,6 @@
 
 import { boolAttr, applyEffectBody } from './engine.js';
 import { payChoiceCost } from './market.js';
-import { bookTitle, availableBooks } from './data.js';
 import { choiceGate, flagGate, isSpentSource, blessingSpendForGoto } from './render-rules.js';
 // renderBranch (render-rolls) is reached through story.dispatchBranch, not a direct import,
 // so render-choices and render-rolls no longer form an ES-module cycle. (task 163)
@@ -178,7 +177,6 @@ export function renderGoto(story, container, node, path) {
   // A sail goto needs a ship at the CURRENT dock (not merely any owned ship — a ship
   // left at Smogmaw can't sail from Kunrir). (task 73)
   const canSail = !isSail || story.state.shipsHere().length > 0;
-  const bookAvailable = availableBooks().includes(book);
 
   const link = document.createElement('button');
   link.className = 'goto' + (primary ? ' goto-primary' : '');
@@ -201,7 +199,7 @@ export function renderGoto(story, container, node, path) {
   // does that gating. (tasks 108 + 241)
   const spendBlessing = blessingSpendForGoto(node, story.sectionEl, story.state, story.outcomeBlessings);
   link.addEventListener('click', () => {
-    if (!bookAvailable) { story.notify(`“${bookTitle(book)}” (Book ${book}) isn’t included in this edition.`, 'warn'); return; }
+    if (!story.requireBook(book)) return; // the shared edition gate (task 244)
     // The storm-safe goto spends the guarded blessing on the way out; for a sail goto
     // defer that spend into the chooser's commit so an abandoned which-ship picker
     // doesn't waste the blessing (task 149).

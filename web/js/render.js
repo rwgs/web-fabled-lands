@@ -1179,6 +1179,20 @@ export class Story {
   dispatchBranch(container, node, path, activeRoll) { return renderBranch(this, container, node, path, activeRoll); }
   dispatchChoices(container, node, path, only = null, explicitKids = null) { return renderChoices(this, container, node, path, only, explicitKids); }
 
+  // The edition check every live cross-book control makes on the click, in one place
+  // (task 244). A `book=` target this build didn't bundle must refuse HERE and name the
+  // book: let it through and the move reaches data.getSection → a 404 on the book JSON →
+  // navigate's abort path, which rolls back correctly but toasts the generic "Could not
+  // load that section — please try again." — inviting a retry that can never work. On the
+  // facade so renderGoto (render-choices), revealBranch (render-rolls) and
+  // surfaceExtraChoices below all ask the same question instead of keeping three copies
+  // of the line. Returns true when the move may proceed.
+  requireBook(book) {
+    if (availableBooks().includes(Number(book))) return true;
+    this.notify(`“${bookTitle(book)}” (Book ${book}) isn’t included in this edition.`, 'warn');
+    return false;
+  }
+
   // ---- small element renderers dispatched from TAG_RENDERERS ---------------
   renderParagraph(container, node, path) {
     const p = document.createElement('p');
@@ -1411,7 +1425,7 @@ export class Story {
       btn.textContent = c.text || `Turn to ${c.section}`;
       const targetBook = c.book || this.book;
       btn.addEventListener('click', () => {
-        if (!availableBooks().includes(targetBook)) { this.notify(`“${bookTitle(targetBook)}” (Book ${targetBook}) isn’t included in this edition.`, 'warn'); return; }
+        if (!this.requireBook(targetBook)) return;
         this.navigate(targetBook, c.section);
       });
       box.appendChild(btn);
