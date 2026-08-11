@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 250 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **no task is open** — file new work under the
+misdiagnosis (see the Review log); **251 is open** — file new work under the
 priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -21,6 +21,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
+- [ ] 251. A standing forfeit picker does not hold the section's exits, so book4/116's "cross three items (your choice)" is skippable
 - [x] 249. A mandatory check read only by its `<success>`/`<failure>` seeds no roll gate, so §5.198's Champion is fought uncursed — and the roll skipped for good
 - [x] 248. The roll gate holds the exits but not the `<fight>`, so §5.477's drake is fought before its jet lands
 - [x] 247. The roll gate is keyed on `<outcomes>`, so a "roll and lose this many" page can be walked past unrolled
@@ -3016,11 +3017,63 @@ Attack is disabled while the decision stands and enabled once the result is kept
 
 ---
 
+## 251. A standing forfeit picker does not hold the section's exits, so book4/116's "cross three items (your choice)" is skippable
+
+**Priority: MEDIUM — the printed loss is voided outright, and the exit that voids it is the
+section's only one.**
+
+*(Filed 2026-08-11, on writing a page of book4/116's shape.)*
+
+Task 231 gave a bare open `<lose item="?">` a picker and task 228 taught it to collect a
+`multiple=` count. Neither gave the section's onward navigation anything to wait for.
+`renderForfeitChoice` prints the row's words, stands the picker where the effect would have
+applied, and returns; the loss commits only inside the picker's own callback, and nothing records
+that a decision is outstanding. So on **book4/116** ("you discover you have lost some
+possessions … `<lose item="?" multiple="3">Cross three items</lose> (your choice) off your
+Adventure Sheet", then a plain `<goto section="676"/>`) the Continue is live from entry: measured
+against a real `GameState` carrying five possessions, the picker reads "Give up which? (0 of 3
+chosen)" beside an **enabled** →676, and leaving takes nothing. The `fx@` memo is deliberately not
+marked until the pick commits — which is what makes the loss correct if the player does pick, and
+permanently skipped if they do not.
+
+This is the gate half of task 107's rule, never written. A visible, forced, unpriced `<transfer>`
+is a mandatory action and `computeTransferGate` locks the navigation after it until it runs; an
+open forfeit whose page prints no choice about *whether* is exactly as mandatory. The three other
+standing pickers on the same passive path — `renderAbilityChoice` (tasks 224/225),
+`renderEquipmentChoice` and `renderProfessionChoice` — are the same shape and want measuring in
+the same change. A `<group>`'s bundled forfeit (task 229) is already safe: the group's one click
+applies its whole body, its `<goto>` included, only after the pick.
+
+**Fix:** mirror `pendingTransfer`/`applyTransferGate`. Have `renderForfeitChoice` (and whichever
+siblings measure the same) record a pending decision on the view, then disable the rendered
+`.goto`/`.choice` while it stands, with the usual exemptions — `[data-fleenav]` stays clickable
+(tasks 205/250), and never the picker's own `.btn-mini`s. Only ADD a disable, so it composes with
+the fight/roll/transfer/buy gates. The gate must key on the picker actually RENDERING, not on
+`needsForfeitChoice` alone: a forfeit inside an untaken (grayed) branch, or one already chosen
+this visit, must not lock a section with no way to settle it — the same constraint
+`pendingRerollDecision` documents.
+
+**Assert it** on book4/116 with five possessions carried: →676 disabled while "0 of 3 chosen"
+stands, three picks take exactly those three, and the exit releases. Add the negative too — a
+forfeit with only one candidate needs no choice and must leave the exit alone.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-11 (drive-by finding, task 251): filed **251** (MEDIUM), nothing closed. Found while
+writing a page of book4/116's shape and measured on book4/116 itself before filing, which is the
+part worth carrying forward — the picker family (tasks 226/228/229/231/232/233/234) was audited
+seven times for *which* possession leaves and never once for whether the player has to answer at
+all. The picker renders, the exit beside it renders enabled, and the two never meet: `renderForfeitChoice`
+holds the `fx@` memo open (correctly) so the loss can commit on the pick, and the section's
+`.goto` has nothing to consult. Task 107 had already decided the rule for the mandatory
+`<transfer>`; the same sentence was never applied to the mandatory forfeit. Three other standing
+pickers sit on the same path and are named in the entry rather than assumed to share the defect.
 
 Worked 2026-08-11 (implementation pass, task 250): closed **250**, nothing new filed, and the
 buckets are now clear. The provisional-result gate holds the fight's controls on task 248's
