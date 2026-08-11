@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 245 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **nothing is open** — file new work under the
+misdiagnosis (see the Review log); **246 is open** — file new work under the
 priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -55,6 +55,7 @@ there once the buckets below are clear.
 - [x] 240. A cut-short run reports no progress at all, because the harness publishes `#results` once
 - [x] 243. A cargo buy stays enabled with a full hold and refuses on click, where every other capacity limit disables
 - [x] 244. A dice-table row into an unbundled book answers "please try again", where every other cross-book control names the book
+- [ ] 246. `groupPlan` writes the passive-effect list out a second time, and that copy is the one that already drifted
 
 **Done**
 
@@ -2797,13 +2798,57 @@ the fight is unresolved and come back only once it is won.
 
 ---
 
+## 246. `groupPlan` writes the passive-effect list out a second time, and that copy is the one that already drifted
+
+**Priority: LOW — no shipped section is mis-rendered today. It is filed because this exact
+duplication, in this exact function, is what task 230 had to fix: the copy was missing
+`<adjustmoney>`, so §2.134's wager applied its cache unlock and none of its four payouts.**
+
+*(Filed 2026-08-10, on closing task 245.)*
+
+`engine.js`'s `PASSIVE_BODY_TAGS` is this port's canonical "writes to the Adventure Sheet" list,
+and task 245 exported it so the post-fight chain deferral could borrow it instead of writing a
+third. Two other places still answer the same question from their own text:
+
+* `groupPlan` (`render-rules.js:345`) — `querySelectorAll('lose, tick, gain, set, curse, disease,
+  poison, adjustmoney, transfer')`, character-for-character the same nine tags. Its own comment
+  names the two lists it must track and asks the reader to "keep it in step with them", which is a
+  request to a human rather than a mechanism — and the note exists *because* the request was
+  missed once (task 230). An action `<group>` renders only its button and never walks its
+  children, so a tag missing here is dropped in silence.
+* `PASSIVE_TAGS` (`render-rewards.js:200`) — the same set **minus `transfer`**, consulted by
+  `renderGroupWithRoll` to spot the effects a roll-bundled group defers to its roll. The omission
+  looks like the same drift and is not commented either way, so the next reader cannot tell it
+  from a bug. Corpus exposure measured over all six books: **zero `<group>` bundles a roll with a
+  `<transfer>`**, so nothing renders wrongly today; it is a trap for the next section that does,
+  where the stash would apply on entry instead of on the attempt.
+
+**Fix:** derive `groupPlan`'s selector from the exported set (`[...PASSIVE_BODY_TAGS].join(', ')`
+— `querySelectorAll` returns document order, so the result set is unchanged, and `<adjust>` stays
+excluded by not being a member). Then either derive `PASSIVE_TAGS` the same way with `transfer`
+removed explicitly, or leave the literal and say in one line why it differs. Assert the coupling
+rather than the spelling: a synthetic `<group>` carrying one of every `PASSIVE_BODY_TAGS` member
+must yield `plan.effects.length === PASSIVE_BODY_TAGS.size`, so adding a tag to the engine's set
+without teaching the group about it fails a test instead of losing a payout.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
 
-Worked 2026-08-10 (implementation pass, task 245): closed **245**, nothing new filed. The chain
+Filed 2026-08-10 (on closing task 245): **246** (LOW), and nothing else. Exporting the engine's
+passive-effect set for 245's chain deferral showed how many copies of it there are — two besides
+the canonical one, and the drift in one of them is task 230. Neither mis-renders a shipped section
+(the roll-group/`<transfer>` divergence has zero corpus instances, measured), so it is filed LOW
+and as a coupling to assert rather than a rendering to fix: **a comment asking a human to keep two
+lists in step is not a mechanism**, and this is the second pass to read that comment after it had
+already failed once.
+
+Worked 2026-08-10 (implementation pass, task 245): closed **245**, and filed **246** on the way out
+(entry above). The chain
 deferral now asks "has this fight resolved" of every post-fight conditional, not only of the ones
 spelled `dead=`: `isDeferredDeadChain` became `isDeferredFightChain`, holding a chain whose body
 writes to the sheet on any gate. Two decisions worth carrying forward. **The effect list is
