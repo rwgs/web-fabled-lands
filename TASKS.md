@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 246 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **nothing is open** — file new work under the
+misdiagnosis (see the Review log); **247 is open** — file new work under the
 priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -21,6 +21,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
+- [ ] 247. The roll gate is keyed on `<outcomes>`, so a "roll and lose this many" page can be walked past unrolled
 - [x] 213. The post-fight gate does not hold an item award, so loot is takeable before the fight
 - [x] 214. A visit-box redirect does not hold the section body, so a one-time reward is re-takeable
 - [x] 216. `<if ticks="N">` after an in-section `<tick>` reads the pre-tick count, so "now ticked" branches never fire
@@ -2833,11 +2834,92 @@ without teaching the group about it fails a test instead of losing a payout.
 
 ---
 
+## 247. The roll gate is keyed on `<outcomes>`, so a "roll and lose this many" page can be walked past unrolled
+
+**Priority: MEDIUM — the roll gate is the only thing that holds navigation behind a mandatory roll,
+and it is keyed on a node that half the corpus's rolls do not have. Nothing is corrupted and nothing
+is mis-granted; a player who clicks the exit before rolling simply never pays the printed price.**
+
+*(Filed 2026-08-11, during conversion work on an unpublished book.)*
+
+`computeRollGate` (`render-gates.js:199`) opens with
+
+    const outcomesNode = sectionEl.querySelector('outcomes');
+    if (!outcomesNode) return null;
+
+and everything below it — finding the gating `<random>`, collecting the `choice`/`goto`/`return`
+nodes that follow it — is reached only past that guard. So the gate exists for exactly one page
+shape: a roll whose result is read by a **table**. A roll whose result is read by an **effect**
+gets no gate at all, and that is the other half of the corpus:
+
+    <random dice="1" var="r">Lose 1-3 Stamina points</random> (the score of
+    <set var="half" value="(r+1)/2"/>
+    <lose stamina="half">one die halved</lose>, rounding fractions up).
+    …
+    <goto book="5" section="321">Turn to 321</goto>
+
+That is **book3/199** verbatim, and its only exit is live from entry. The player who takes it has
+lost no Stamina, no ship and no possessions.
+
+Measured on a real `GameState` against the shipped edition:
+
+* **book3/199** — draws its Roll control, takes no Stamina before the roll, and its cross-book
+  `<goto>` renders **enabled**.
+* **book5/477** — the water drake's `<random dice="1" var="loss">` +
+  `<lose stamina="loss" hidden="t"/>` likewise: the `<fight>` below it is startable, and both
+  onward `<choice>`s exist, with the jet damage untaken.
+* **control, book1/278** — an ordinary `<random>`+`<outcomes>` travel roll still holds all four of
+  its choices disabled. The gate works; it is only ever asked.
+
+This is the `<random>` face of a limit already recorded from the `<difficulty>` side: a section
+carrying a roll with no `<outcomes>` cannot hold anything behind it, so a conditional cost below
+such a roll reads its var as **0** and goes live before the dice are thrown.
+
+**Scope.** 48 numbered sections across books 1–6 carry a `<random>`/`<rankcheck>`/`<difficulty>`
+with a `var=`, no `<outcomes>` anywhere in the section, at least one effect or derived `<set>`
+reading that var, and navigation of some kind — book1/255, book1/649, book2/205, book2/698,
+book3/199, book3/273, book4/664, book5/24, book5/343, book5/477, book6/700 among them. Two were
+measured, above. The corpus's *usual* form for a rolled wound is `<lose stamina="2d">`, which
+applies on entry and cannot be skipped, so only the pages that need the rolled **value** — a
+halving, an armour subtraction, a floor, a scaled award — land in this shape, and every one of them
+is exposed.
+
+**Fix:** seed the gate from the roll whose var something below it reads, instead of requiring
+`<outcomes>`. The set is already computed — `unsettledRollVars` (`render-rules.js:596`) collects
+every `<random|rankcheck|difficulty var=>` the section has not filed yet and grows it through the
+derived `<set var= value=>` nodes, which is precisely "this roll's result is still owed to
+something". A `<random>` whose var nothing reads should keep gating nothing, and the existing
+exclusions must survive unchanged: `ROLLGATE_OPTIONAL_WRAP` (a roll inside an
+`if/elseif/else/success/failure/outcome/group` is opt-in), a `price=`/gate-`flag=` roll, and
+`flee="t"` navigation. Note the gate would then need to release on the roll *resolving* rather than
+on a matched outcome — `applyRollGate` reads `matchedOutcome` today, and there is no outcome to
+match here.
+
+**Assert it** on synthetic sections rather than on the shipped ones, since the shipped instances
+are the regression risk rather than the specification: a `<random var="x">` + `<lose stamina="x">`
++ `<goto>` holds the goto until rolled and releases after; the same section with the `<lose>`
+removed does not gate; and the same roll inside a `<group>` still does not. Then re-run the corpus
+scan — this change can only ever *add* locks, so the thing to watch for is a section that becomes
+unreachable, not one that stays open.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-11 (during conversion work on an unpublished book): **247** (MEDIUM), and nothing
+else. Found by writing a floor onto a rolled Stamina loss and then asking why the section's exit was
+still live — the answer being that `computeRollGate` had never looked at it, because the page has no
+`<outcomes>`. Two things worth carrying forward. **The gate's precondition is a page SHAPE, not a
+rule**: "hold the exits until the roll is made" is stated nowhere in terms of `<outcomes>`, and the
+node is only there because the first pages that needed the gate happened to be tables — which is why
+this went eight passes without being noticed. And **the census is the wrong way round from the
+usual one**: the corpus's ordinary rolled wound is `<lose stamina="2d">`, applied on entry with no
+control at all, so the exposed sections are exactly the ones that needed the rolled value for
+something, and reading "how many sections roll dice" would have said nothing about how many leak.
 
 Worked 2026-08-10 (implementation pass, task 246): closed **246**, nothing new filed. `groupPlan`
 now derives its selector from `PASSIVE_BODY_TAGS`, and `render-rewards.js`'s `PASSIVE_TAGS` says in
