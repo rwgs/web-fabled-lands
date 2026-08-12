@@ -2554,6 +2554,115 @@ export async function run(ctx) {
                .candidates.map((i) => i.name).join(',') === 'rusty sword');
         }
       }
+
+      // --- task 251: a standing picker must hold the section's exits ---
+      // Task 107 decided the rule for the mandatory <transfer> — a visible, forced action the
+      // page prints no choice about *whether* holds the onward navigation until it runs — and
+      // it was never written for the picker. renderForfeitChoice stands the picker and returns,
+      // deliberately leaving its fx@ memo open so the loss can commit on the pick; the exit
+      // beside it had nothing to consult, so §4.116's Continue was live from entry and leaving
+      // took nothing. The three sibling pickers on the same passive path are measured with it.
+      {
+        // §4.116 for real: five possessions, three to cross off, and one printed exit.
+        {
+          const g116 = GameState.create({ name:'Kelpie2', gender:'f', profession:'Warrior', book:4, adv });
+          g116.data.items = [];
+          ['a', 'b', 'c', 'd', 'e'].forEach((n) => g116.addItem(makeItem('item', n)));
+          const c116 = document.createElement('div');
+          new Story(c116, g116, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(4, '116'), 4, '116');
+          const exit116 = () => c116.querySelector('.goto');
+          ok('task251: §4.116 holds its only exit while the three-item choice stands',
+             !!exit116() && exit116().disabled === true && /choice above/i.test(exit116().title || ''),
+             exit116() ? `dis=${exit116().disabled} title=${exit116().title}` : 'no exit');
+          ok('task251: the picker itself is never gated — it is the way to settle it',
+             picks226(c116).length === 5 && picks226(c116).every((b) => !b.disabled), `picks=${picks226(c116).length}`);
+          ok('task251: a held picker is not a dead end', !c116.querySelector('.end-fate'));
+          ['e', 'd'].forEach((n) => picks226(c116).find((b) => b.textContent === n).click());
+          ok('task251: a part-answered pick keeps the exit held', !!exit116() && exit116().disabled === true);
+          picks226(c116).find((b) => b.textContent === 'c').click();
+          ok('task251: the three named leave, and only those three', names226(g116) === 'a,b', names226(g116));
+          ok('task251: answering releases the exit', !!exit116() && exit116().disabled === false,
+             exit116() ? 'dis=' + exit116().disabled : 'no exit');
+        }
+
+        // The negative the rule turns on: one candidate is no choice at all, so the forfeit
+        // commits on entry and the exit is left exactly as it was.
+        {
+          const { g, c } = mk226('<section><p>A thief <lose item="?">steals one item</lose> (your choice).</p><p><goto section="9"/></p></section>',
+                                 [makeItem('item', 'rope')]);
+          const exit = c.querySelector('.goto');
+          ok('task251: a forfeit with a single candidate asks nothing and leaves the exit live',
+             picks226(c).length === 0 && g.data.items.length === 0 && !!exit && exit.disabled === false,
+             exit ? `picks=${picks226(c).length} dis=${exit.disabled}` : 'no exit');
+        }
+
+        // Keyed on the picker RENDERING, never on needsForfeitChoice: a forfeit inside an
+        // untaken (grayed) branch stands no picker, so it must not lock a section that then
+        // has no way to settle it — the constraint pendingRerollDecision documents.
+        {
+          const { g, c } = mk226('<section><p><if codeword="Nobody"><lose item="?">a thief takes one</lose></if></p><p><goto section="9"/></p></section>',
+                                 [makeItem('item', 'rope'), makeItem('item', 'lantern')]);
+          const exit = c.querySelector('.goto');
+          ok('task251: a forfeit inside an untaken branch locks nothing',
+             picks226(c).length === 0 && names226(g) === 'rope,lantern' && !!exit && exit.disabled === false,
+             exit ? `picks=${picks226(c).length} dis=${exit.disabled} ${names226(g)}` : 'no exit');
+        }
+
+        // Giving up is never locked behind the thing you are giving up on (tasks 205/250).
+        {
+          const { c } = mk226('<section><p>A thief <lose item="?">steals one item</lose>.</p><choices><choice section="9" flee="t">Run for it</choice><choice section="10">Stay</choice></choices></section>',
+                              [makeItem('item', 'rope'), makeItem('item', 'lantern')]);
+          const flee = Array.from(c.querySelectorAll('.choice')).find((b) => /Run for it/.test(b.textContent));
+          const stay = Array.from(c.querySelectorAll('.choice')).find((b) => /Stay/.test(b.textContent));
+          ok('task251: the flee exit stays clickable while the picker stands',
+             !!flee && flee.disabled === false && !!stay && stay.disabled === true,
+             `flee=${flee && flee.disabled} stay=${stay && stay.disabled}`);
+        }
+
+        // The siblings on the same passive path measure the same. The ability picker is the
+        // biggest of them (six published pages award "add one to the ability of your choice"),
+        // and skipping it threw the point away for good.
+        {
+          const { g, c } = mk226('<section><p><gain ability="?" amount="1">add one to the ability of your choice</gain>.</p><p><goto section="9"/></p></section>', []);
+          const exit = () => c.querySelector('.goto');
+          const abPicks = () => Array.from(c.querySelectorAll('.ability-pick'));
+          ok('task251: an open ability award holds the exit until the point is placed',
+             abPicks().length > 0 && !!exit() && exit().disabled === true,
+             `picks=${abPicks().length} dis=${exit() && exit().disabled}`);
+          const before = g.data.abilities.combat;
+          abPicks().find((b) => /COMBAT/i.test(b.textContent)).click();
+          ok('task251: placing it awards the point and releases the exit',
+             g.data.abilities.combat === before + 1 && !!exit() && exit().disabled === false,
+             `combat=${g.data.abilities.combat} dis=${exit() && exit().disabled}`);
+        }
+
+        // §6.118's "you must choose a new profession" — the printed word is *must*.
+        {
+          const g118 = GameState.create({ name:'Dragon', gender:'m', profession:'Priest', book:6, adv });
+          g118.data.items = []; g118.addItem(makeItem('item', 'tatsu pearl'));
+          const c118 = document.createElement('div');
+          new Story(c118, g118, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(6, '118'), 6, '118');
+          const exit118 = () => c118.querySelector('.goto');
+          const profPicks = () => Array.from(c118.querySelectorAll('.ability-pick'));
+          ok('task251: §6.118 holds its exit while an ex-Priest has no profession chosen',
+             profPicks().length === 5 && !!exit118() && exit118().disabled === true,
+             `picks=${profPicks().length} dis=${exit118() && exit118().disabled}`);
+          profPicks().find((b) => /Rogue/i.test(b.textContent)).click();
+          ok('task251: choosing one sets it and releases the exit',
+             g118.data.profession.toLowerCase() === 'rogue' && !!exit118() && exit118().disabled === false,
+             `prof=${g118.data.profession} dis=${exit118() && exit118().disabled}`);
+
+          // …and a player who was never a Priest is asked nothing, so nothing is held.
+          const gW = GameState.create({ name:'Wayf', gender:'f', profession:'Wayfarer', book:6, adv });
+          gW.data.items = []; gW.addItem(makeItem('item', 'tatsu pearl'));
+          const cW = document.createElement('div');
+          new Story(cW, gW, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(6, '118'), 6, '118');
+          ok('task251: §6.118 asks a non-Priest nothing and leaves the exit live',
+             cW.querySelectorAll('.ability-pick').length === 0
+             && !!cW.querySelector('.goto') && cW.querySelector('.goto').disabled === false,
+             `picks=${cW.querySelectorAll('.ability-pick').length}`);
+        }
+      }
     }
 
     // --- task 118: choice/equipment losses respect the keep tag ---

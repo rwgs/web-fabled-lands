@@ -292,6 +292,7 @@ function renderAbilityChoice(story, container, node, path) {
   if (story.ctx.applied.has(memo)) return null; // already chosen this visit
   const opts = abilityChoiceOptions(node.getAttribute('ability'), story.state, isLoss);
   if (!opts.length) { story.ctx.applied.add(memo); return null; } // nothing eligible
+  story.pendingChoice = true; // the exits wait for the answer (task 251)
   story.appendAbilityPicker(container, opts, (ab) => {
     const note = applyEffect(node, story.state, { chooser: () => [ab] });
     story.ctx.applied.add(memo);
@@ -310,6 +311,7 @@ function renderEquipmentChoice(story, container, node, path) {
   story.appendChildren(desc, node, path);
   if (desc.textContent.trim()) container.appendChild(desc);
   if (story.ctx.applied.has(memo)) return null; // already chosen this visit
+  if (candidates.length) story.pendingChoice = true; // the exits wait for the answer (task 251)
   const box = document.createElement('span');
   box.className = 'ability-choice';
   candidates.forEach((it) => {
@@ -338,6 +340,7 @@ function renderForfeitChoice(story, container, node, path) {
   const memo = 'fx@' + path;
   appendFxWords(story, container, node, path);
   if (story.ctx.applied.has(memo)) return null; // already chosen this visit
+  story.pendingChoice = true; // the exits wait for the answer (task 251)
   showForfeitPicker(story, container, losePaymentPlan(node, story.state), (chooser) => {
     const note = applyEffect(node, story.state, { chooser });
     story.ctx.applied.add(memo);
@@ -366,6 +369,7 @@ function renderProfessionChoice(story, container, node, path) {
     });
     box.appendChild(btn);
   });
+  if (box.children.length) story.pendingChoice = true; // the exits wait for the answer (task 251)
   container.appendChild(box);
   return box;
 }

@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-250 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **251 is open** — file new work under the
-priority bucket that fits, and record the pass in the Review log.
+251 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **the buckets are clear** — file new work under
+the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -21,7 +21,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 251. A standing forfeit picker does not hold the section's exits, so book4/116's "cross three items (your choice)" is skippable
+- [x] 251. A standing forfeit picker does not hold the section's exits, so book4/116's "cross three items (your choice)" is skippable
 - [x] 249. A mandatory check read only by its `<success>`/`<failure>` seeds no roll gate, so §5.198's Champion is fought uncursed — and the roll skipped for good
 - [x] 248. The roll gate holds the exits but not the `<fight>`, so §5.477's drake is fought before its jet lands
 - [x] 247. The roll gate is keyed on `<outcomes>`, so a "roll and lose this many" page can be walked past unrolled
@@ -3064,6 +3064,27 @@ forfeit with only one candidate needs no choice and must leave the exit alone.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-11 (implementation pass, task 251): closed **251**, nothing new filed, and the
+buckets are clear again. `pendingChoice` + `applyChoiceGate` mirror `pendingTransfer`/
+`applyTransferGate`, and the four passive-path pickers raise the flag as they append. Three
+things worth carrying forward. **All four siblings were measured, not assumed**: the filing
+named them as candidates, and every one turned out to be the same mandatory shape, because
+`classifyPassive` reaches a picker verdict only past `view.inactive`, `hidden` and
+`isOptionalForce` — a grayed, hidden or `force="f"` effect never renders one, so "the picker
+rendered" already IS the "the page prints no choice about whether" test the gate needs. That
+is also why the flag is set at the append and never from `needs*Choice`: sabotaging exactly
+that (gate unconditionally) fails **50** assertions across nine earlier tasks, which is the
+measure of how load-bearing the render-keying is. **The gate stops at `.goto`/`.choice`
+deliberately, and that was checked rather than assumed** — no section in the corpus that
+stands a picker also carries a `<fight>`, so tasks 248/250's "hold the fight too" has nothing
+to hold here; if one is ever written, this gate needs their selector. **Census, dice pinned,
+same state either side**: **27** sections gain a held exit (six ability awards, book4/116 and
+its 18 forfeit twins, §5.386's weapon pick, §6.118's ex-Priest), and the dead-end count is
+**identical, 43 either side with the same sections** — the picker's own `.btn-mini`s are left
+enabled, so every gated section still reads as having a way forward. Verified by sabotage
+twice: dropping the `applyChoiceGate` call fails exactly the five assertions that name a held
+exit; dropping the render-keying fails the 50 above. Full suite 2500.
 
 Filed 2026-08-11 (drive-by finding, task 251): filed **251** (MEDIUM), nothing closed. Found while
 writing a page of book4/116's shape and measured on book4/116 itself before filing, which is the

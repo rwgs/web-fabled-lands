@@ -791,6 +791,14 @@ export class Story {
     // applyBuyGate then disables the tagged navs. Reset per render.
     this.buyGate = computeBuyGate(el);
     this.pendingBuy = false;
+    // Standing-picker gating (task 251): a visible, forced open choice — which possession
+    // leaves, which ability moves, which weapon is enchanted, which profession is taken — is
+    // as mandatory as the forced <transfer> above, and its onward navigation must wait for the
+    // answer. The picker renderers (render-rewards.js) flag pendingChoice while one is still
+    // standing this pass; applyChoiceGate then disables the exits. Reset per render, and keyed
+    // on the picker actually RENDERING so a forfeit inside a grayed branch — or one already
+    // answered this visit — can never lock a section with no way to settle it.
+    this.pendingChoice = false;
     // Visit-box redirect gating (tasks 214 + 217): a matched <if ticks=…> redirect is JaFL's
     // forced <goto> — it blocked the rest of the section, which is what made the once-only
     // reward below it one-time and left only one of the two printed exits live.
@@ -818,6 +826,7 @@ export class Story {
     this.applyBuyGate(flow); // gate onward nav on an unrun forced buy (task 136.5)
     this.surfaceExtraChoices(flow); // persistent <extrachoice> options active here (task 32)
     this.applyPendingRerollGate(flow); // hold every exit while a result is provisional (task 181)
+    this.applyChoiceGate(flow); // hold every exit while a standing picker is unanswered (task 251)
     // Draw the box row now (after the walk) so a <tick/> applied this visit reads
     // as ☑ immediately; it sits above the prose, beside the section number (task 70).
     if (nBoxes > 0) {
@@ -1693,6 +1702,33 @@ export class Story {
       btn.disabled = true;
       btn.classList.add('gated');
       btn.title = 'Take the item above first.';
+    });
+  }
+
+  // ---- standing-picker gating (task 251) -----------------------------------
+  // Task 107 decided the rule for the mandatory <transfer>: a visible, forced action the page
+  // prints no choice about *whether* holds the section's onward navigation until it runs. An
+  // open picker is exactly that action — book4/116's "cross three items (your choice)" prints
+  // one exit and no way to decline — but the picker family (tasks 224/225/226/228/231/232) was
+  // only ever audited for WHICH answer it takes, never for whether the player has to give one.
+  // The loss commits inside the picker's own callback and its fx@ memo is deliberately left
+  // open until then, so an ungated exit voided the printed forfeit outright and for good.
+  //
+  // Keyed on pendingChoice — set by the four picker renderers as they actually append a
+  // picker, never on needs*Choice alone — so an effect inside an untaken (grayed) branch, or
+  // one already answered this visit, leaves the exits alone, the same constraint
+  // pendingRerollDecision documents. Only ADDS a disable, so it composes with the
+  // fight/roll/transfer/buy/reroll gates. A flee/escape exit stays clickable (tasks 205/250),
+  // and the picker's own .btn-mini buttons are never touched — they are the way to settle it,
+  // and the dead-end fallback reads them as the section's live controls.
+  applyChoiceGate(flow) {
+    if (!this.pendingChoice) return;
+    flow.querySelectorAll('.goto, .choice').forEach((btn) => {
+      if (btn.disabled) return; // already gated for another reason — keep its own reason
+      if (btn.dataset.fleenav === '1') return; // giving up stays available
+      btn.disabled = true;
+      btn.classList.add('gated');
+      btn.title = 'Make the choice above first.';
     });
   }
 
