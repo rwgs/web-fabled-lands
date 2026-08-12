@@ -525,6 +525,10 @@ export function renderMoneyCache(story, container, node, path) {
 // Lists what's stored (with Take-back buttons) and lets the player deposit a
 // carried item (respecting an optional itemlimit= on the stash and the 12-item
 // carry cap on retrieval).
+// A <tick special="lock" cache="X"> seals the box (§4.586's confiscation): the Take/Store
+// buttons carry their cache name for Story.applyCacheLock, which reads the lock AFTER the
+// walk — the corpus puts the widget on both sides of its unlock, so only the end-of-walk
+// state tells a sealed box from an ordinary town house. (task 256)
 export function renderItemCache(story, container, node, path) {
   const name = node.getAttribute('name');
   if (!name) return null;
@@ -558,6 +562,7 @@ export function renderItemCache(story, container, node, path) {
     const take = document.createElement('button');
     take.className = 'btn-mini';
     take.textContent = 'Take';
+    take.dataset.cachelock = name; // sealed-strongroom gate, read after the walk (task 256)
     const noRoom = story.state.freeSlots() <= 0;
     take.disabled = noRoom;
     if (noRoom) take.title = 'No room (12-item carry limit)';
@@ -637,6 +642,7 @@ export function renderItemCache(story, container, node, path) {
       const store = document.createElement('button');
       store.className = 'btn-mini';
       store.textContent = 'Store ' + itemLabel(it);
+      store.dataset.cachelock = name; // sealed-strongroom gate, read after the walk (task 256)
       if (!eligible) {
         store.disabled = true;
         store.title = reason || 'This cannot be stored here.';

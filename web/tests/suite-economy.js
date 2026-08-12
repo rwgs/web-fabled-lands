@@ -3185,4 +3185,91 @@ export async function run(ctx) {
       }
     }
 
+    // --- task 256: a locked <itemcache> seals its Take/Store buttons ---
+    { // block-scoped
+      // §4.586 confiscates everything but keys into cache 4.586 and locks it, printing no
+      // unlock — §4.528 holds the matching one. The item widget never read the flag, so the
+      // player took it all straight back and walked into §377 fully equipped.
+      const takes = (root) => Array.from(root.querySelectorAll('.item-cache .cache-item .btn-mini'));
+      const stores = (root) => Array.from(root.querySelectorAll('.item-cache .cache-deposit .btn-mini'));
+      const sealed = (b) => b.disabled && /sealed/i.test(b.title || '');
+
+      const g586 = GameState.create({ name:'Seal', gender:'m', profession:'Warrior', book:4, adv });
+      g586.data.items = [];
+      g586.addItem(makeItem('weapon', 'sword'));
+      g586.addItem(makeItem('armour', 'leather armour'));
+      g586.addItem(makeItem('item', 'pyramid key'));
+      const c586 = document.createElement('div');
+      const st586 = new Story(c586, g586, { navigate(){}, onDeath(){}, notify(){} });
+      st586.begin(await data.getSection(4, '586'), 4, '586');
+      ok('task256: §4.586 locks cache 4.586 on entry', g586.isCacheLocked('4.586'));
+      const xfer586 = Array.from(c586.querySelectorAll('.pay-action')).find((b) => /transfer them/i.test(b.textContent));
+      ok('task256: §4.586 offers the forced transfer', !!xfer586 && !xfer586.disabled);
+      xfer586.click();
+      ok('task256: §4.586 moves the gear (not the key) into the sealed cache',
+         g586.cacheItems('4.586').map((i) => i.name).sort().join(',') === 'leather armour,sword'
+         && g586.data.items.map((i) => i.name).join(',') === 'pyramid key',
+         `cache=${g586.cacheItems('4.586').map((i) => i.name).join(',')} carried=${g586.data.items.map((i) => i.name).join(',')}`);
+      ok('task256: §4.586 every Take on the sealed box is disabled',
+         takes(c586).length === 2 && takes(c586).every(sealed),
+         `n=${takes(c586).length} states=${takes(c586).map((b) => b.disabled).join(',')}`);
+      ok('task256: §4.586 the Store buttons are sealed too',
+         stores(c586).length === 1 && stores(c586).every(sealed),
+         `n=${stores(c586).length}`);
+      // The seal is confined to the widget: the section's own exit still works, which is also
+      // what keeps the dead-end fallback from reading the locked box as a narrative death.
+      const goto377 = Array.from(c586.querySelectorAll('.goto')).find((b) => /377/.test(b.textContent));
+      ok('task256: §4.586 keeps its exit to 377 live and offers no "your tale ends here"',
+         !!goto377 && !goto377.disabled && !c586.querySelector('.end-fate'));
+
+      // §4.528 reuses the cache key: its unlock re-opens the very same box.
+      const g528 = GameState.create({ name:'Unseal', gender:'m', profession:'Warrior', book:4, adv });
+      g528.data.items = [makeItem('item', 'pyramid key')];
+      g528.cacheAddItem('4.586', makeItem('weapon', 'sword'));
+      g528.cacheAddItem('4.586', makeItem('armour', 'leather armour'));
+      g528.lockCache('4.586');
+      const c528 = document.createElement('div');
+      const st528 = new Story(c528, g528, { navigate(){}, onDeath(){}, notify(){} });
+      st528.begin(await data.getSection(4, '528'), 4, '528');
+      ok('task256: §4.528 unlocks cache 4.586 on entry', !g528.isCacheLocked('4.586'));
+      ok('task256: §4.528 offers a live Take for the gear left at §586',
+         takes(c528).length === 2 && takes(c528).every((b) => !b.disabled),
+         `n=${takes(c528).length} states=${takes(c528).map((b) => b.disabled).join(',')}`);
+      takes(c528).find((b) => /sword/i.test(b.parentElement.textContent)).click();
+      ok('task256: §4.528 taking the sword returns it to the sheet',
+         g528.findItems('sword').length === 1 && g528.cacheItems('4.586').length === 1,
+         `carried=${g528.data.items.map((i) => i.name).join(',')} cache=${g528.cacheItems('4.586').length}`);
+
+      // A town house with an unconditional unlock is untouched, whichever side of the unlock
+      // its widget sits on: §1.177's is BELOW it, §4.509's ABOVE. A sequential reading of the
+      // lock would have sealed one of the two.
+      for (const [book, sec, cache, where] of [[1, '177', '1.177', 'below'], [4, '509', '4.509', 'above']]) {
+        const gth = GameState.create({ name:'Town', gender:'f', profession:'Warrior', book, adv });
+        gth.cacheAddItem(cache, makeItem('item', 'stashed lantern'));
+        const cth = document.createElement('div');
+        new Story(cth, gth, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(book, sec), book, sec);
+        ok(`task256: §${book}.${sec} (widget ${where} the unlock) leaves its town-house box editable`,
+           !gth.isCacheLocked(cache) && takes(cth).length === 1 && !takes(cth)[0].disabled,
+           `locked=${gth.isCacheLocked(cache)} n=${takes(cth).length}`);
+      }
+
+      // §6.464 both ways: the lock is conditional on a sealed letter already being stored, and
+      // that branch sends the player to §28 at once.
+      const g464a = GameState.create({ name:'Knight', gender:'f', profession:'Warrior', book:6, adv });
+      g464a.cacheAddItem('6.464', makeItem('item', 'jade comb'));
+      const c464a = document.createElement('div');
+      new Story(c464a, g464a, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(6, '464'), 6, '464');
+      ok('task256: §6.464 with no sealed letter stored leaves the apartments editable',
+         !g464a.isCacheLocked('6.464') && takes(c464a).length === 1 && !takes(c464a)[0].disabled,
+         `locked=${g464a.isCacheLocked('6.464')} n=${takes(c464a).length}`);
+
+      const g464b = GameState.create({ name:'Knight', gender:'f', profession:'Warrior', book:6, adv });
+      g464b.cacheAddItem('6.464', makeItem('item', 'sealed letter'));
+      const c464b = document.createElement('div');
+      new Story(c464b, g464b, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(6, '464'), 6, '464');
+      ok('task256: §6.464 with the sealed letter stored locks the cache and seals its Take',
+         g464b.isCacheLocked('6.464') && takes(c464b).length === 1 && sealed(takes(c464b)[0]),
+         `locked=${g464b.isCacheLocked('6.464')} title=${takes(c464b)[0] && takes(c464b)[0].title}`);
+    }
+
 }

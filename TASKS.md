@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 256 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **256, open under MEDIUM** — file new work
+misdiagnosis (see the Review log) — the buckets are clear, so file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,7 +20,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 256. An `<itemcache>` ignores its cache lock, so §4.586's confiscation is undone by clicking Take
+*(none open — file new MEDIUM work here)*
 
 **LOW**
 
@@ -288,7 +288,7 @@ this order.*
 - [x] 253. A re-armed roll that lands the same outcome twice in one visit applies its effect once, so §3.314's second night at the tavern is paid for and does nothing
 - [x] 254. A re-armed roll whose result is read by an `<if var=>` chain instead of an `<outcomes>` table keeps its memos, so §6.628's second paid night at the garret heals nothing
 - [x] 255. Re-archive completed task details 212–254 and clear them out of the priority buckets
-- [ ] 256. An `<itemcache>` ignores its cache lock, so §4.586's confiscation is undone by clicking Take
+- [x] 256. An `<itemcache>` ignores its cache lock, so §4.586's confiscation is undone by clicking Take
 
 ---
 
@@ -362,6 +362,27 @@ book4/509, one widget either side of the unlock); assert book6/464 both ways.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-12 (implementation pass, task 256): closed **256**, nothing new filed, and the
+buckets are clear again. The fix is 13 lines of gate plus two `data-cachelock` tags, and the
+interesting part is entirely in *when* it reads the flag. Three things worth carrying forward.
+**The end-of-walk reading is not a convenience, it is the only reading that is a rule.** The
+corpus splits almost evenly on where the `<itemcache>` sits relative to its unlock — 4 below
+(book1/177, book1/434, book2/665, book6/284) against 3 above (book4/468, book4/509, book6/464) —
+so a lock read as the widget draws would seal one town house and leave its neighbour open with
+identical markup. Sabotage confirms the pass is load-bearing and nothing else: commenting out
+the single `applyCacheLock(flow)` call fails exactly 3 of the 13 new assertions (§4.586's two
+Take buttons and its Store, and §6.464's letter branch) and leaves the other 10 green, which is
+the shape you want — the untouched cases are asserted by tests that pass either way.
+**The count of sections the fix moves was measured before it was written, and it held**: 20
+sections pair an `<itemcache>` with a lock on the same cache, 16 carry an unconditional
+`hidden="t"` unlock and are untouched, and the four that seal are §4.586, book3/74 and
+book6/284 in the branch where fire has just emptied the stash, and book6/464 with a letter
+stored. §4.528's unlock is no longer dead markup: it re-opens the very box §586 sealed, cache
+key and all, which is what the editor's note in the XML always promised. **The money side was
+deliberately left alone** — an `<itemcache max=>`'s Deposit/Withdraw is the same bank
+`renderMoneyCache` gates only for a roll-bundled lock (task 38), so extending the seal to it
+would have re-opened a rule that was decided on purpose. Suite reports **2538**, up 13.
 
 Worked 2026-08-12 (maintenance pass, task 255): closed **255**, nothing new filed, and the
 buckets are empty again. Documentation-only re-archive of completed details 212–254 (plus 255's

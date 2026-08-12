@@ -831,6 +831,7 @@ export class Story {
     this.surfaceExtraChoices(flow); // persistent <extrachoice> options active here (task 32)
     this.applyPendingRerollGate(flow); // hold every exit while a result is provisional (task 181)
     this.applyChoiceGate(flow); // hold every exit while a standing picker is unanswered (task 251)
+    this.applyCacheLock(flow); // seal a locked strongroom's Take/Store buttons (task 256)
     // Draw the box row now (after the walk) so a <tick/> applied this visit reads
     // as ☑ immediately; it sits above the prose, beside the section number (task 70).
     if (nBoxes > 0) {
@@ -1733,6 +1734,39 @@ export class Story {
       btn.disabled = true;
       btn.classList.add('gated');
       btn.title = 'Make the choice above first.';
+    });
+  }
+
+  // ---- sealed item-cache gating (task 256) ---------------------------------
+  // A <tick special="lock" cache="X"> over an <itemcache name="X"> seals the strongroom, and
+  // the item widget never read the flag. §4.586 is the section that depends on it: it moves
+  // everything except keys into cache 4.586, locks it, and prints no unlock at all — §4.528
+  // holds the matching one, reusing the key so the gear is reclaimed there. With every Take
+  // live, the player emptied the box on the spot and walked into §377 fully equipped and
+  // armoured, and §528's unlock was dead markup.
+  //
+  // The lock cannot be read while the widget draws: the corpus places the <itemcache> BELOW
+  // its unlock (book1/177, book1/434, book2/665, book6/284) as often as ABOVE it (book4/468,
+  // book4/509, book6/464), so a sequential reading would seal half the town houses and leave
+  // the other half open, which is not a rule. The end-of-walk state is what separates the
+  // cases — hence a post-walk pass, like applyTransferGate/applyBuyGate/applyPendingRerollGate,
+  // and like them it only ever ADDS a disable. Over books 1–6 that leaves all 16
+  // unconditionally-unlocked town houses editable and seals exactly four boxes: §4.586's
+  // confiscation, book3/74's and book6/284's stashes in the branch where fire has just emptied
+  // them, and book6/464's letter branch (which sends the player to §28 "at once").
+  //
+  // An <itemcache max=>'s Shard controls are deliberately left alone: renderMoneyCache gates
+  // only a lock bundled with a roll, which is task 38's rule that a plain stash lock leaves a
+  // bank editable, and that bank is the same thing.
+  //
+  // Runs before the dead-end fallback's control census, which filters out disabled controls:
+  // a locked Take is not a way forward, exactly as an unaffordable Pay button isn't.
+  applyCacheLock(flow) {
+    flow.querySelectorAll('[data-cachelock]').forEach((btn) => {
+      if (btn.disabled) return; // already disabled (no room, an exclude= reason) — keep its own
+      if (!this.state.isCacheLocked(btn.dataset.cachelock)) return;
+      btn.disabled = true;
+      btn.title = 'This store is sealed — you can’t reach inside it now.';
     });
   }
 
