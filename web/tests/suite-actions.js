@@ -4121,4 +4121,44 @@ export async function run(ctx) {
          `shards=${g192.data.shards} ships=${g192.ships.length} shut=${shut261(c192).replace(/\s+/g, ' ').slice(0, 80)}`);
     }
 
+    // --- task 262: §1.460 states the printed OR instead of a port-invented proxy ---
+    // The page promises "If you have the codeword *Acid* or a **copper amulet**" and the section
+    // guarded it with `<if codeword="1.Skabb">`, a test of neither named thing. The proxy was a
+    // deliberate repair (task 3 makes `codeword= item=` on one <if> an AND, which is wrong for an
+    // "or"), and it is sound on every ordinary route: §554 kills King Skabb, hands over the amulet
+    // and ticks 1.Skabb; §384 takes the amulet back, charges 450 Shards and notes Acid. What it
+    // records is HAVING BEEN to §554, not still holding the proof — so a player who loses the amulet
+    // without reaching §384 was still sent to →327 on a condition the page says they fail. An
+    // if/elseif pair states the OR directly, and 1.Skabb now has no writer or reader in the corpus.
+    {
+      const has262 = (c) => !!Array.from(c.querySelectorAll('.goto')).find((b) => b.textContent.trim() === '327' && !b.disabled && !b.closest('.cond-inactive'));
+      const mk262 = async (setup) => {
+        const g = GameState.create({ name: 'T262', gender: 'm', profession: 'Wayfarer', book: 1, adv });
+        g.data.items = [];
+        setup(g);
+        const c = document.createElement('div');
+        new Story(c, g, { navigate() {}, onDeath() {}, notify() {} }).begin(await data.getSection(1, '460'), 1, '460');
+        return { g, c };
+      };
+      const acid262 = await mk262((g) => g.addCodeword('Acid'));
+      ok('task262: §1.460 offers →327 for the codeword Acid with no amulet', has262(acid262.c));
+      const amulet262 = await mk262((g) => g.addItem(makeItem('item', 'copper amulet')));
+      ok('task262: §1.460 offers →327 for a copper amulet with no codeword', has262(amulet262.c));
+      const both262 = await mk262((g) => { g.addCodeword('Acid'); g.addItem(makeItem('item', 'copper amulet')); });
+      ok('task262: §1.460 offers →327 once when both hold, not twice',
+         has262(both262.c) && Array.from(both262.c.querySelectorAll('.goto')).filter((b) => b.textContent.trim() === '327' && !b.disabled && !b.closest('.cond-inactive')).length === 1);
+      // Neither: no shortcut, and the section reads on to the light-source check, which sends a
+      // Wayfarer carrying no lantern back to the city.
+      const neither262 = await mk262(() => {});
+      ok('task262: §1.460 with neither offers no →327 and reads on to the light-source check',
+         !has262(neither262.c) && /light source/.test(neither262.c.textContent)
+         && !!Array.from(neither262.c.querySelectorAll('.goto')).find((b) => b.textContent.trim() === '10' && !b.disabled && !b.closest('.cond-inactive')),
+         neither262.c.textContent.replace(/\s+/g, ' ').slice(0, 90));
+      // The case the proxy got wrong, and the reason this was a defect rather than a tidy-up:
+      // been to §554 (so 1.Skabb), amulet since lost, never reached §384 (so no Acid).
+      const stale262 = await mk262((g) => g.addCodeword('1.Skabb'));
+      ok('task262: §1.460 refuses →327 for a player who has lost the amulet and has no Acid',
+         !has262(stale262.c), stale262.c.textContent.replace(/\s+/g, ' ').slice(0, 90));
+    }
+
 }

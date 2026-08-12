@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 263 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **262–263, open under LOW** — file new work
+misdiagnosis (see the Review log), and **263, open under LOW** — file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -24,7 +24,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 262. §1.460 tests a port-invented codeword in place of the printed "codeword *Acid* or a **copper amulet**", which the vocabulary can now express exactly
 - [ ] 263. Four click-time spend sites book nothing into the walk-position ledger, so a future guard above a bare `<buy>`, a paid `<rest>` or a cache Take reads the emptied purse
 
 **Done**
@@ -295,7 +294,7 @@ this order.*
 - [x] 259. A guard above the effect it reads is re-derived against live state on the next draw, so §2.105's pickpocket takes the money *and* a possession
 - [x] 260. 18 tracked `books/**/*temp.xml` working copies declare a live section's `name=`, and every corpus census counts them twice
 - [x] 261. Task 259's spend-guard latch excludes `not=`, so §1.501's "if you didn't have enough money" turns itself on the moment you pay
-- [ ] 262. §1.460 tests a port-invented codeword in place of the printed "codeword *Acid* or a **copper amulet**", which the vocabulary can now express exactly
+- [x] 262. §1.460 tests a port-invented codeword in place of the printed "codeword *Acid* or a **copper amulet**", which the vocabulary can now express exactly
 - [ ] 263. Four click-time spend sites book nothing into the walk-position ledger, so a future guard above a bare `<buy>`, a paid `<rest>` or a cache Take reads the emptied purse
 
 ---
@@ -750,6 +749,17 @@ Tests: assert §1.460 offers →327 with the codeword Acid and no amulet, and ag
 no codeword; assert that with neither it offers no →327 and reads on to the light-source check; and
 assert the case the proxy gets wrong — `1.Skabb` set, amulet gone, no Acid — offers no →327.
 
+**Done as filed.** `<if codeword="Acid">` / `<elseif item="copper amulet">` now carry a `<goto
+section="327"/>` each, with the printed sentence split so both read naturally and the untaken half
+still shows (grayed), which keeps the page's "or" visible to the reader rather than hiding whichever
+condition the player missed. The 1.Skabb tick went from `books/book1/554.xml`, leaving the codeword
+with **no writer and no reader** anywhere in `books/` — verified after the change. Five assertions,
+and the fourth and fifth are the ones that matter: the sole-writer case (`1.Skabb` set, amulet lost,
+no Acid) is now refused, and the both-hold case offers →327 exactly **once** — worth asserting,
+because an if/**else**if is what makes that true and an `<if>`/`<if>` pair would have drawn the exit
+twice. The gate needed no change: `<elseif>`'s allowlist already carried `codeword` and `item`.
+Suite **2597** (2592 + 5).
+
 ---
 
 ## 263. Four click-time spend sites book nothing into the walk-position ledger, so a future guard above a bare `<buy>`, a paid `<rest>` or a cache Take reads the emptied purse
@@ -817,6 +827,17 @@ redraw. Add the corpus census above as a guard against a future section arriving
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-12 (implementation pass, task 262): closed **262**, filing nothing. Two things worth
+carrying forward. **The proxy was sound and the fix is still a fix, which is the shape of finding to
+watch for.** `1.Skabb` implies (Acid OR amulet) on every route that keeps the amulet, so there was no
+false negative and no ordinary player was misrouted; what it could not express is *still holding the
+proof*, and book 1 carries two open `<lose item="?">` forfeits plus markets that buy. A defect that
+needs a player to have lost something to show itself is invisible to a census of routes. **An
+if/elseif is load-bearing here, not stylistic.** Two separate `<if>`s would each match when both the
+codeword and the amulet are held and draw →327 twice, so the both-hold case is asserted for the
+count and not just for reachability. `<elseif>`'s allowlist already carried `codeword` and `item`, so
+`validate-source.ps1` needed nothing. Suite **2597**.
 
 Worked 2026-08-12 (implementation pass, task 261): closed **261** and filed **263** (LOW). Four
 things worth carrying forward, and the first is the decision the task was written to prevent me
