@@ -2,10 +2,10 @@
 
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
-each task's detail section carries the same stable ID. **There are currently no
-open tasks:** every filed task through 255 is complete (listed under **Done**
-below), apart from 207, withdrawn as a misdiagnosis (see the Review log) — file
-new work under the priority bucket that fits, and record the pass in the Review
+each task's detail section carries the same stable ID. Every filed task through
+256 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **256, open under MEDIUM** — file new work
+under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -20,7 +20,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-*(none open — file new MEDIUM work here)*
+- [ ] 256. An `<itemcache>` ignores its cache lock, so §4.586's confiscation is undone by clicking Take
 
 **LOW**
 
@@ -288,6 +288,68 @@ this order.*
 - [x] 253. A re-armed roll that lands the same outcome twice in one visit applies its effect once, so §3.314's second night at the tavern is paid for and does nothing
 - [x] 254. A re-armed roll whose result is read by an `<if var=>` chain instead of an `<outcomes>` table keeps its memos, so §6.628's second paid night at the garret heals nothing
 - [x] 255. Re-archive completed task details 212–254 and clear them out of the priority buckets
+- [ ] 256. An `<itemcache>` ignores its cache lock, so §4.586's confiscation is undone by clicking Take
+
+---
+
+## 256. An `<itemcache>` ignores its cache lock, so §4.586's confiscation is undone by clicking Take
+
+**Priority: MEDIUM — one section is really broken by it and the section is a set piece, but the
+markup that depends on it is rare and the failure is a player choosing to defeat their own page,
+not a wrong result arriving unasked.**
+
+*(Filed 2026-08-12, on reading the cache vocabulary end to end while converting an unpublished
+book's confiscation scene.)*
+
+`renderItemCache` (`render-market.js:528`) never reads `isCacheLocked`. Its sibling
+`renderMoneyCache` does — line 514, and deliberately only for a lock bundled with a roll, which
+is task 38's rule that a plain stash lock leaves a bank editable. The item widget got no lock
+handling of either kind, so `<tick special="lock" cache="X">` is a no-op over an `<itemcache>`
+and every Take/Store button stays live.
+
+**book4/586 is the section that depends on it.** It prints "You cannot carry any of your
+possessions, except for any **keys** you might have… Nor can you wear any armour", moves
+everything into `4.586` with `<transfer to="4.586" item="*" xitem="*key*" shards="*">`, locks that
+cache with `<tick special="lock" cache="4.586" hidden="t"/>` — and carries **no unlock at all**.
+**book4/528** holds the matching `<tick special="unlock" cache="4.586" hidden="t"/>`, immediately
+above its own `<itemcache name="4.586">`, with an editor's note saying the cache key is reused so
+the gear can be reclaimed there. The pair is written as lock-here, unlock-there across two
+sections; today the widget at §586 offers a live **Take** for every item the transfer just moved,
+so the player empties the box on the spot and walks into §377 fully equipped and armoured. The
+whole point of the scene is lost, and §528's unlock is dead markup.
+
+**The fix cannot read the lock while the widget draws — it has to read it after the walk.** The
+corpus places an item cache on *both* sides of its unlock: book1/177, book1/434, book2/665 and
+book6/284 put the `<itemcache>` **below** the unlock, while book4/468, book4/509 and book6/464 put
+it **above**. A sequential reading would therefore lock half the town houses shut and leave the
+other half open, which is not a rule. The end-of-walk state is the one that separates the cases,
+and it is the pattern the render layer already uses for exactly this (`applyTransferGate`,
+`applyBuyGate`, `applyPendingRerollGate` — post-walk passes that only ever ADD a disable).
+
+Measured over every section in books 1–6 that pairs an `<itemcache>` with a lock on the same cache
+(20 of them), by whether the unlock is reachable unconditionally:
+
+| shape | sections | end-of-walk verdict |
+| --- | --- | --- |
+| lock + unconditional `hidden="t"` unlock | 16 (book1/177, book1/300, book1/434, book2/171, book2/211, book2/278, book2/348, book2/665, book3/335, book3/607, book4/450, book4/468, book4/509, book6/238, book6/414, book6/576) | unlocked — **unchanged**, every town house stays editable |
+| lock + unlock inside an `<if codeword=>` | 2 (book3/74, book6/284) | locked only in the branch where fire has just emptied the stash — a sealed empty box |
+| lock, no unlock | 1 (book4/586) | **locked, which is the fix** |
+| conditional lock, no unlock | 1 (book6/464) | locked only when a **sealed letter** is stored, and that branch sends the player to §28 "at once" |
+
+So the live effect is §4.586 → §4.528, plus book6/464's one letter-stored state; nothing else in
+the corpus moves. Both of those want asserting either way, since they are the only two the fix
+can be wrong about.
+
+**Fix:** tag the widget's Take/Store buttons with their cache name in `renderItemCache`, add an
+`applyCacheLock(flow)` post-walk pass beside the other gates in `render()`, and disable a tagged
+button whose cache is still locked when the walk ends, with `renderMoneyCache`'s tooltip idiom.
+It must run **before** the dead-end fallback's control census (`render.js:858`), which filters out
+disabled controls — book4/586's own `<goto section="377"/>` keeps it from firing, but a section
+whose only control is a locked Take would otherwise read as a narrative death.
+
+Tests: assert §4.586's Take is disabled after the transfer and that §4.528's unlock re-enables
+it on the same cache; assert a town house with an unconditional unlock is untouched (book1/177 and
+book4/509, one widget either side of the unlock); assert book6/464 both ways.
 
 ---
 
