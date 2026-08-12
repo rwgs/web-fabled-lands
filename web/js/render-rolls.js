@@ -115,6 +115,7 @@ function offerReroll(story, widget, path, stored, reroll) {
 // without reporting its path would hold them for ever (task 247).
 function makeRollWidget(story, container, node, path) {
   if (story.rollGate && node === story.rollGate.rollNode) story.rollGate.rollPath = path;
+  story.noteOutcomeRoll(node, path); // a revealed table row's own stake holds the row's exit (task 257)
   const widget = document.createElement('div');
   widget.className = 'roll';
   widget.setAttribute('aria-live', 'polite'); // announce the resolved dice result to screen readers (task 153)
@@ -439,6 +440,7 @@ function revealBranch(story, container, node, path) {
     // send a dice row into book 9, book3/464 a <failure> into book 12 — so it asks the same
     // shared edition gate on the click (task 244).
     btn.addEventListener('click', () => { if (story.requireBook(targetBook)) story.navigate(targetBook, section); });
+    story.tagOutcomeRollNav(node, btn); // this row's die must be rolled before its exit (task 257)
     box.appendChild(btn);
   }
   container.appendChild(box);

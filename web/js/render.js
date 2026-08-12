@@ -24,7 +24,7 @@ import {
 } from './render-rules.js';
 import {
   computeFightGate, computeEscapeCodewords, isDeferredFightChain,
-  computeRollGate, computeTransferGate, computeBuyGate, computeRedirectGate, isEscapeNav,
+  computeRollGate, computeOutcomeRollGate, computeTransferGate, computeBuyGate, computeRedirectGate, isEscapeNav,
 } from './render-gates.js';
 import {
   newCtx, resolveNodePath, serializeCtx, deserializeCtx, serializeFrame, deserializeFrame,
@@ -782,6 +782,13 @@ export class Story {
     // EFFECT, where the gate releases as soon as the roll resolves (task 247). See
     // computeRollGate / applyRollGate.
     this.rollGate = computeRollGate(el);
+    // Outcome-row roll gating (task 257): the roll a revealed <outcome> makes is the row's own
+    // stake, so the row's exit waits for it — book3/15's "Continue → 52" beside the unrolled
+    // "Lose 2-12 Shards" die used to settle the debt at zero. noteOutcomeRoll flags
+    // pendingOutcomeRoll while such a roll is still unmade this pass; applyOutcomeRollGate then
+    // disables the tagged exits. Reset per render.
+    this.outcomeRollGate = computeOutcomeRollGate(el);
+    this.pendingOutcomeRoll = false;
     // Forced-transfer gating (task 107): a visible, forced (default force="t"),
     // unpriced <transfer> is a mandatory action — the onward navigation after it
     // stays locked until it runs. renderTransfer flags pendingTransfer while such a
@@ -826,6 +833,7 @@ export class Story {
     this.appendChildren(flow, el, 'r');
     this.applyFightGate(flow);
     this.applyRollGate(flow); // gate onward nav on the mandatory travel/encounter roll (task 104)
+    this.applyOutcomeRollGate(flow); // hold a revealed table row's exit until its own die is rolled (task 257)
     this.applyTransferGate(flow); // gate onward nav on an unresolved forced transfer (task 107)
     this.applyBuyGate(flow); // gate onward nav on an unrun forced buy (task 136.5)
     this.surfaceExtraChoices(flow); // persistent <extrachoice> options active here (task 32)
@@ -1585,9 +1593,47 @@ export class Story {
   // computeRollGate and hasAncestorTag moved to render-gates.js (task 119); the
   // tag*/apply* view helpers below consume computeRollGate's output.
 
-  // Tag a rendered nav button as roll-gated, for applyRollGate to act on.
+  // Tag a rendered nav button as roll-gated, for applyRollGate to act on. The outcome-row mark
+  // rides along here rather than in another list beside every tagger, because it answers the
+  // same question of the same node — must a roll be made before this exit? (task 257)
   tagRollNav(node, btn) {
     if (this.rollGate && this.rollGate.navNodes.has(node)) btn.dataset.rollnav = '1';
+    this.tagOutcomeRollNav(node, btn);
+  }
+
+  // Tag a rendered nav button as held by the die inside its own <outcome> row, for
+  // applyOutcomeRollGate (task 257). Called with the nav NODE from tagRollNav above, and with
+  // the <outcome> ITSELF from revealBranch — that row's "Continue → N" is synthesised from
+  // section= with no node of its own, so it can only be marked where it is built.
+  tagOutcomeRollNav(node, btn) {
+    const gate = this.outcomeRollGate;
+    if (!gate) return;
+    if (gate.navNodes.has(node) || gate.outcomeNodes.has(node)) btn.dataset.ocrollnav = '1';
+  }
+
+  // The walk reached a roll: if it is a gated row's stake and still unmade, hold the row's exit.
+  // Keyed on the roll RENDERING (makeRollWidget calls this), so only the row the dice turned up
+  // can hold anything, and never from inside a grayed branch whose Roll button is disabled — a
+  // gate with no way to settle it is a softlock. A resolved result the player may still reroll is
+  // not final either, exactly as applyRollGate reads one. (task 257)
+  noteOutcomeRoll(node, path) {
+    if (!this.outcomeRollGate || this.inactive) return;
+    if (!this.outcomeRollGate.rollNodes.has(node)) return;
+    if (!this.ctx.rolls.get('roll@' + path) || this.rerollPendingRolls.has(path)) this.pendingOutcomeRoll = true;
+  }
+
+  // Disable the tagged row exit while the row's own die is unrolled. Only ever ADDS a disable, so
+  // it composes with every gate around it; and it runs before the dead-end fallback's control
+  // census, where the row's own enabled Roll button is what keeps a held exit from reading as a
+  // narrative death. (task 257)
+  applyOutcomeRollGate(flow) {
+    if (!this.outcomeRollGate || !this.pendingOutcomeRoll) return;
+    flow.querySelectorAll('[data-ocrollnav]').forEach((btn) => {
+      if (btn.disabled) return; // already gated for another reason — keep its own reason
+      btn.disabled = true;
+      btn.classList.add('gated');
+      btn.title = 'Resolve the roll above first.';
+    });
   }
 
   // Tag a rendered fight widget as roll-gated, for applyRollGate to hold its controls (task 248).

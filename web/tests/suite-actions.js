@@ -3105,6 +3105,49 @@ export async function run(ctx) {
       ok('task249: an optional (force="f") table roll gates nothing either',
          gates.computeRollGate(parse('<section name="t440"><p>If you want to read a book, <random dice="2" force="f"/>:</p><outcomes><outcome range="2-5" section="529"/><outcome range="6-12" section="579"/></outcomes><p>When you are ready to leave, <goto section="314"/>.</p></section>')) === null);
 
+      // task 257: the outcome-row gate — the die a REVEALED row makes, holding that row's exit.
+      // All three seeds above refuse a roll under `outcome`, and for the other six members of
+      // ROLLGATE_OPTIONAL_WRAP that is right; an <outcome> is not a branch the player chooses but
+      // the row the dice turned up, so a die inside a revealed row is mandatory in fact.
+      const org257 = (xml) => gates.computeOutcomeRollGate(parse('<section name="t257">' + xml + '</section>'));
+      const row257 = '<random dice="2" var="x">Lose 2-12 Shards</random><lose codeword="3.52.Loss" hidden="t"/><tick name="3.52.Loss" amount="x" hidden="t"/>';
+      const g257 = org257('<random/><outcomes><outcome range="2-5" section="52">' + row257 + '</outcome><outcome range="6-12" section="72">Nothing happens</outcome></outcomes>');
+      ok('task257: a row with its own die and its own section= is gated',
+         !!g257 && g257.rollNodes.size === 1 && g257.outcomeNodes.size === 1 && g257.navNodes.size === 0,
+         g257 ? `rolls=${g257.rollNodes.size} rows=${g257.outcomeNodes.size} nav=${g257.navNodes.size}` : 'null');
+      // Every row's die is collected, because only the revealed row is ever drawn — which is why
+      // the gate is keyed on the die RENDERING rather than on the one chosen rollNode
+      // computeRollGate names: a gate keyed on the first row's die would hold nothing whenever
+      // the dice turned up another row.
+      ok('task257: each row carries its own die into the gate',
+         (() => { const g = org257('<random/><outcomes><outcome range="2-5" section="52">' + row257 + '</outcome><outcome range="6-12" section="72">' + row257 + '</outcome></outcomes>'); return !!g && g.rollNodes.size === 2 && g.outcomeNodes.size === 2; })());
+      // A row exit written as a <goto> is the same thing as the row's section=, and both are held.
+      ok('task257: a row exit written as a <goto> is collected as a nav node',
+         (() => { const g = org257('<random/><outcomes><outcome range="2-12"><random dice="1" var="x"/><lose shards="x"/>Turn to <goto section="52"/>.</outcome></outcomes>'); return !!g && g.navNodes.size === 1 && g.outcomeNodes.size === 0; })());
+      // A row with no exit of its own has nothing to hold: its section's <choices> are seed 1's
+      // business (book1/278), and this gate must leave them exactly as they were.
+      ok('task257: a row whose die feeds no exit of its own gates nothing',
+         org257('<random/><outcomes><outcome range="2-12"><random dice="1" var="x"/><lose shards="x"/></outcome></outcomes><choices><choice section="8">Leave</choice></choices>') === null);
+      ok('task257: a row with an exit but no die of its own gates nothing',
+         org257('<random type="travel" dice="1"/><outcomes><outcome range="1,2" section="82">You get lost</outcome></outcomes>') === null);
+      // A die whose result nothing captures owes nothing, exactly as seed 2 reads it.
+      ok('task257: a var-less die in the row gates nothing',
+         org257('<random/><outcomes><outcome range="2-12" section="52"><random dice="1"/></outcome></outcomes>') === null);
+      // The forced-roll half of isMandatoryRoll still applies — an exit held behind a die the
+      // player cannot make is a softlock, not a rule.
+      ok('task257: a pay-to-spin die in the row gates nothing',
+         org257('<random/><outcomes><outcome range="2-12" section="52"><random dice="1" var="x" flag="k"/><lose shards="x"/><lose shards="10" price="k"/></outcome></outcomes>') === null);
+      ok('task257: an optional (force="f") die in the row gates nothing',
+         org257('<random/><outcomes><outcome range="2-12" section="52"><random dice="1" var="x" force="f"/><lose shards="x"/></outcome></outcomes>') === null);
+      // A fight hook inside the row belongs to the fight, not the row (ROLLGATE_FIGHT_HOOK_WRAP).
+      ok('task257: a <fightround> die in the row gates nothing',
+         org257('<random/><outcomes><outcome range="2-12" section="52"><fight name="Ogre" combat="5" defence="9" stamina="12"/><fightround pre="t"><difficulty ability="sanctity" level="17" var="h"/></fightround></outcome></outcomes>') === null);
+      // Giving up is never locked behind the thing you are giving up on (isEscapeNav's rule).
+      ok('task257: a flee exit inside the row is not held',
+         org257('<random/><outcomes><outcome range="2-12"><random dice="1" var="x"/><lose shards="x"/><choice section="9" flee="t">Run for it</choice></outcome></outcomes>') === null);
+      ok('task257: book1/278\'s ordinary table builds no row gate at all',
+         gates.computeOutcomeRollGate(parse('<section name="t278"><random type="travel" dice="1"/><outcomes><outcome range="1,2">You get lost. <goto section="82"/>.</outcome><outcome range="3,4">Nothing happens</outcome></outcomes><choices><choice section="427">To Venefax</choice></choices></section>')) === null);
+
       const tg = gates.computeTransferGate(parse('<section name="tt"><transfer to="x" shards="10"/><goto section="9"/></section>'));
       ok('task119: computeTransferGate gates navigation after a forced transfer', !!tg && tg.navNodes.size === 1, tg ? 'n=' + tg.navNodes.size : 'null');
       ok('task119: computeTransferGate null for a force="f" (optional) transfer', gates.computeTransferGate(parse('<section><transfer to="x" shards="10" force="f"/><goto section="9"/></section>')) === null);
@@ -3704,6 +3747,95 @@ export async function run(ctx) {
       ok('task114: the permanent blessing still vetoes a second 11-12 capsize', !goto510(c114p) && !!rerollBtn(c114p));
 
       Math.random = rnd114;
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
+    // --- task 257: a revealed table row's own die holds that row's exit ---
+    // book3/15 and book3/34 are the priestess's card game. Each row's stake is a SECOND die
+    // (`<random dice="2" var="x">Lose 2-12 Shards</random>` → `<tick name="3.52.Loss" amount="x">`)
+    // and the row carries its own section=, so the "Continue → 52" the reveal draws beside the
+    // unrolled die let the player bank a debt of 0 — §3.52's "Pay her what you owe" then rendered
+    // with no price at all and settled the whole hand for nothing.
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const settle257 = () => new Promise((r) => setTimeout(r, 30));
+      const rnd257 = Math.random;
+      const cont257 = (c) => Array.from(c.querySelectorAll('.goto')).find((b) => /Continue →/.test(b.textContent));
+
+      // the losing row: 1+1 = 2 → range 2-5 → §52, whose stake is 2d6
+      const g15 = GameState.create({ name:'T257', gender:'m', profession:'Warrior', book:3, adv });
+      g15.data.shards = 500;
+      const c15 = document.createElement('div');
+      const st15 = new Story(c15, g15, { navigate(){}, onDeath(){}, notify(){} });
+      st15.begin(await data.getSection(3, '15'), 3, '15');
+      // Every exit §3.15 has lives inside an outcome, which seed 1 rightly skips (§1.299's
+      // drunken soldier is what the roll reveals), so the section-level gate is null either way.
+      ok('task257: §3.15 builds a row gate where the section gate has nothing to hold',
+         st15.outcomeRollGate !== null && st15.rollGate === null);
+      ok('task257: §3.15 offers no row exit until the table itself is rolled', !cont257(c15));
+      Math.random = () => 0; // both dice = 1 → 2 → range 2-5
+      c15.querySelector('.btn-roll').click(); await settle257();
+      ok('task257: §3.15 rolling 2 reveals the losing row, its stake die and its →52',
+         !!cont257(c15) && /52/.test(cont257(c15).textContent) && !!c15.querySelector('.btn-roll'));
+      ok('task257: §3.15 the row exit is held while the stake is unrolled',
+         cont257(c15).disabled === true && cont257(c15).dataset.ocrollnav === '1');
+      ok('task257: §3.15 the debt is genuinely unwritten at that point (task 181 defers the tick)',
+         g15.codewordValue('3.52.Loss') === 0, 'v=' + g15.codewordValue('3.52.Loss'));
+      c15.querySelector('.btn-roll').click(); await settle257(); // the stake: 1+1 = 2
+      ok('task257: §3.15 rolling the stake releases the row exit', cont257(c15).disabled === false);
+      ok('task257: §3.15 the rolled stake is banked as the debt',
+         g15.codewordValue('3.52.Loss') === 2, 'v=' + g15.codewordValue('3.52.Loss'));
+      // The end-to-end consequence: §3.52 prices "Pay her what you owe" from that codeword, so
+      // an unrolled stake used to render it free.
+      const c52 = document.createElement('div');
+      new Story(c52, g15, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(3, '52'), 3, '52');
+      const pay52 = Array.from(c52.querySelectorAll('.choice')).find((b) => /Pay her what you owe/i.test(b.textContent));
+      const cost52 = pay52 && pay52.querySelector('.choice-cost');
+      ok('task257: §3.52 charges the rolled stake for the debt',
+         !!cost52 && cost52.textContent === '2 Shards', cost52 ? cost52.textContent : 'no price shown');
+
+      // The winning row is the same hole (self-punishing rather than exploitable — skipping the
+      // die banks a gain of 0 — but the row's link is held for the same reason).
+      st15.begin(await data.getSection(3, '15'), 3, '15'); // fresh visit
+      Math.random = () => 0.9; // both dice = 6 → 12 → range 10-12 → §72
+      c15.querySelector('.btn-roll').click(); await settle257();
+      ok('task257: §3.15 the winning row holds its →72 too',
+         !!cont257(c15) && /72/.test(cont257(c15).textContent) && cont257(c15).disabled === true);
+      c15.querySelector('.btn-roll').click(); await settle257(); // the stake: 6+6 = 12
+      ok('task257: §3.15 rolling the win releases →72 and banks the winnings',
+         cont257(c15).disabled === false && g15.codewordValue('3.72.Gain') === 12,
+         'v=' + g15.codewordValue('3.72.Gain'));
+
+      // book3/34, the other shipped section: a 1d6 stake, and a range-7 row that is a plain
+      // <reroll> with no die of its own.
+      const g34 = GameState.create({ name:'T257b', gender:'m', profession:'Warrior', book:3, adv });
+      g34.data.shards = 500;
+      const c34 = document.createElement('div');
+      const st34 = new Story(c34, g34, { navigate(){}, onDeath(){}, notify(){} });
+      st34.begin(await data.getSection(3, '34'), 3, '34');
+      Math.random = () => 0; // 1+1 = 2 → range 2-6 → §52
+      c34.querySelector('.btn-roll').click(); await settle257();
+      ok('task257: §3.34 holds its row exit while the stake is unrolled',
+         !!cont257(c34) && cont257(c34).disabled === true && g34.codewordValue('3.52.Loss') === 0);
+      c34.querySelector('.btn-roll').click(); await settle257(); // the stake: 1d6 = 1
+      ok('task257: §3.34 releases the exit once the stake is rolled, debt written',
+         cont257(c34).disabled === false && g34.codewordValue('3.52.Loss') === 1,
+         'v=' + g34.codewordValue('3.52.Loss'));
+
+      // Control: book1/278, an ordinary table with no stake in its rows, builds no row gate and
+      // leaves every destination exactly as seed 1 left it.
+      const g257c = GameState.create({ name:'T257c', gender:'m', profession:'Warrior', book:1, adv });
+      const c257c = document.createElement('div');
+      const st257c = new Story(c257c, g257c, { navigate(){}, onDeath(){}, notify(){} });
+      st257c.begin(await data.getSection(1, '278'), 1, '278');
+      ok('task257: §1.278 builds no row gate', st257c.outcomeRollGate === null);
+      Math.random = () => 0.5; // die = 4 → "nothing happens" (no redirect)
+      c257c.querySelector('.btn-roll').click(); await settle257();
+      ok('task257: §1.278 still unlocks all four destinations, none of them row-tagged',
+         (() => { const cs = Array.from(c257c.querySelectorAll('.choice')); return cs.length === 4 && cs.every((b) => !b.disabled && b.dataset.ocrollnav !== '1'); })(),
+         Array.from(c257c.querySelectorAll('.choice')).map((b) => b.disabled).join(','));
+
+      Math.random = rnd257;
       window.__FL_INSTANT_DICE__ = false;
     }
 }

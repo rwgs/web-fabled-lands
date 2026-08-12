@@ -263,11 +263,20 @@ export function provisionalVarClosure(sectionEl, seed) {
 // to read a book" table (force="f") locked the "when you are ready to leave" exit behind a
 // roll whose every outcome carries the player away. (task 249)
 function isMandatoryRoll(sectionEl, r) {
+  return isForcedRoll(sectionEl, r)
+    && !hasAncestorTag(r, ROLLGATE_OPTIONAL_WRAP) && !hasAncestorTag(r, ROLLGATE_FIGHT_HOOK_WRAP);
+}
+
+// The half of the test above that asks about the ROLL itself rather than where it sits: a
+// pay-gated or force="f" roll is one the player may never make. Split out for the outcome-row
+// gate (task 257), which reads `outcome` as a revealed row rather than an optional wrapper but
+// must still refuse a roll no player can settle — an exit held behind an unpayable die is a
+// softlock, not a rule.
+function isForcedRoll(sectionEl, r) {
   if (r.getAttribute('price') != null) return false;
   if (!boolAttr(r.getAttribute('force'), true)) return false;
   const fl = r.getAttribute('flag');
-  if (fl != null && isRollGate(sectionEl, fl)) return false;
-  return !hasAncestorTag(r, ROLLGATE_OPTIONAL_WRAP) && !hasAncestorTag(r, ROLLGATE_FIGHT_HOOK_WRAP);
+  return !(fl != null && isRollGate(sectionEl, fl));
 }
 
 // Seed 1 (task 104) — the mandatory <random> whose result an <outcomes> TABLE reads.
@@ -373,6 +382,47 @@ export function computeRollGate(sectionEl) {
   });
   if (!navNodes.size && !fightNodes.size) return null; // pure roll-to-goto travel — nothing to gate
   return { rollNode, outcomesNode: tabled ? outcomesNode : null, navNodes, fightNodes, rollPath: null, matchedOutcome: null };
+}
+
+// The outcome-row roll gate (task 257) — the roll a REVEALED table row makes, holding that
+// row's own exit. All three seeds above refuse a roll under ROLLGATE_OPTIONAL_WRAP, and for six
+// of its seven members that is exactly right: a roll the player may never reach must not hold
+// the navigation of players who never reach it. `outcome` is the one where it is wrong, because
+// an <outcome> is not a branch the player chooses — it is the row the dice just turned up, so a
+// roll inside a revealed row is mandatory in fact. book3/15 and book3/34 (the priestess's card
+// game) are the two shipped sections: each row's stake is a SECOND die
+// (`<random dice="2" var="x">Lose 2-12 Shards</random>` + `<tick name="3.52.Loss" amount="x">`)
+// and the row carries its own section=, so the "Continue → 52" beside the unrolled die banked a
+// debt of 0 and §3.52's "Pay her what you owe" cost nothing.
+//
+// A gate of its own rather than a fourth seed in the chain above: that gate names ONE rollNode
+// and reads ONE rollPath, whereas here every row has a die of its own and only the revealed row
+// is ever drawn — a gate keyed on the first row's die would hold nothing whenever the dice turned
+// up another. Scoped to the row instead, and keyed on the roll actually RENDERING (the walk's
+// noteOutcomeRoll), like the transfer/buy/picker gates: a row the table did not reveal draws
+// neither its die nor its exit, so it can never hold anything.
+//
+// Returns { rollNodes:Set, navNodes:Set, outcomeNodes:Set } or null. `outcomeNodes` are the rows
+// whose exit is the "Continue → N" synthesised from section=, which has no node of its own to tag.
+export function computeOutcomeRollGate(sectionEl) {
+  if (!sectionEl) return null;
+  const rollNodes = new Set(), navNodes = new Set(), outcomeNodes = new Set();
+  sectionEl.querySelectorAll('outcome').forEach((oc) => {
+    // The row's stake is a var= roll — one whose result nothing captures owes nothing, as seed 2
+    // reads it — and still only a forced one, so a pay-gated or force="f" die never locks an exit.
+    // A fight-hook roll inside the row belongs to the fight, not the row (ROLLGATE_FIGHT_HOOK_WRAP).
+    const rolls = Array.from(oc.querySelectorAll('random[var], rankcheck[var], difficulty[var]'))
+      .filter((r) => isForcedRoll(sectionEl, r) && !hasAncestorTag(r, ROLLGATE_FIGHT_HOOK_WRAP));
+    if (!rolls.length) return;
+    const nav = Array.from(oc.querySelectorAll('choice, goto, return'))
+      .filter((n) => !boolAttr(n.getAttribute('flee'))); // giving up is never locked (isEscapeNav's rule)
+    if (!nav.length && oc.getAttribute('section') == null) return; // no exit of its own — nothing to hold
+    rolls.forEach((r) => rollNodes.add(r));
+    nav.forEach((n) => navNodes.add(n));
+    if (oc.getAttribute('section') != null) outcomeNodes.add(oc);
+  });
+  if (!rollNodes.size) return null;
+  return { rollNodes, navNodes, outcomeNodes };
 }
 
 // The forced-transfer gate (task 107): a visible, forced (default force="t"), unpriced

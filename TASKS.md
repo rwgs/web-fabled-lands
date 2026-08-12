@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-257 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **257, open under MEDIUM** — file new work
+258 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **258, open under LOW** — file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,11 +20,11 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 257. A roll revealed inside an `<outcome>` gates nothing, so §3.15's gambling debt is cancelled by not rolling for it
+*(none open — file new MEDIUM work here)*
 
 **LOW**
 
-*(none open — file new LOW work here)*
+- [ ] 258. A branch's `section=` exit is a button with no XML node, so every node-keyed gate but task 257's is blind to it (book2/105 keeps the pickpocket's takings)
 
 **Done**
 
@@ -289,7 +289,8 @@ this order.*
 - [x] 254. A re-armed roll whose result is read by an `<if var=>` chain instead of an `<outcomes>` table keeps its memos, so §6.628's second paid night at the garret heals nothing
 - [x] 255. Re-archive completed task details 212–254 and clear them out of the priority buckets
 - [x] 256. An `<itemcache>` ignores its cache lock, so §4.586's confiscation is undone by clicking Take
-- [ ] 257. A roll revealed inside an `<outcome>` gates nothing, so §3.15's gambling debt is cancelled by not rolling for it
+- [x] 257. A roll revealed inside an `<outcome>` gates nothing, so §3.15's gambling debt is cancelled by not rolling for it
+- [ ] 258. A branch's `section=` exit is a button with no XML node, so every node-keyed gate but task 257's is blind to it (book2/105 keeps the pickpocket's takings)
 
 ---
 
@@ -416,6 +417,59 @@ rolls the stake owes a non-zero sum at §3.52.
 
 ---
 
+## 258. A branch's `section=` exit is a button with no XML node, so every node-keyed gate but task 257's is blind to it
+
+**Priority: LOW — one shipped section, and it needs the player to make an optional roll, succeed
+at it, and then click past a widget the page is plainly asking them to use. But the failure pays
+them (the pickpocket's takings stay in the purse) and the shape is the one task 257 just had to
+work around, so it is worth closing while the reasoning is fresh.**
+
+*(Filed 2026-08-12, during task 257's implementation pass — on discovering that the row's
+"Continue → N" could only be tagged where it is built, and then asking which OTHER gates key off
+an XML node and would therefore miss the same button.)*
+
+`revealBranch` (`render-rolls.js:426`) synthesises a `Continue → N` button from the revealed
+branch's `section=` attribute. That button has **no node of its own**, so it is invisible to every
+gate that decides by node identity: `tagFightNav`, `tagTransferNav`, `tagBuyNav` and `tagEscapeNav`
+each ask `gate.navNodes.has(node)`, and the corresponding `compute*Gate` collects only
+`choice, goto, return` **elements**. Task 257 hit this for the roll gate and solved it the only way
+available — tagging at the build site (`story.tagOutcomeRollNav(node, btn)`, keyed on the
+`<outcome>` itself). The other four gates were not touched, because a gate that holds nothing in
+the corpus should not grow code; this task is the measurement that says whether that is still true.
+
+**Measured over books 1–6:** exactly **one** section pairs a node-less branch exit
+(`<outcome|success|failure section=>`) with an action one of those gates would hold — **book2/105**,
+and it is the transfer gate. The pickpocket "brushes swiftly past you"; the theft is written as a
+forced `<transfer shards="*" to="2.105">stolen any money</transfer>` (or, with an empty purse,
+`<transfer item="?" limit="1" to="2.105">`), and the page then offers an **optional**
+(`force="f"`) SCOUTING 10 check to track him, with `<outcomes><success section="128"/><choice
+section="151">Failed (or did not attempt) SCOUTING roll</choice></outcomes>`.
+`computeTransferGate` collects the `<choice section="151">` and holds it — an `<if>`-wrapped
+transfer is still forced, only a `<group>`-wrapped one is excluded — but `<success section="128"/>`
+is a bare attribute, so the Continue it draws is live. Roll SCOUTING, succeed, click it, and the
+thief never takes anything. No fight and no `<buy force="t">` section has a node-less branch exit
+at all, so those two gates have nothing to hold today.
+
+The census reads the markup, not a running page: confirm against a real `GameState` that §2.105's
+optional SCOUTING success really does draw an **enabled** Continue → 128 beside an unrun transfer
+widget before changing anything, since a section whose gate turns out to hold it already needs no
+fix, only the assertion.
+
+**Fix:** give the three remaining node-keyed nav gates the same second mark task 257 added, at the
+same build site — one `story.tagBranchNav(node, btn)` call in `revealBranch` that consults the
+fight/transfer/buy gates for the **branch node** (as `tagOutcomeRollNav` consults the row gate),
+plus the matching membership: each `compute*Gate` already walks the section for `choice, goto,
+return`, so it also needs to collect an `outcome|success|failure` carrying `section=` in the same
+positions. `isEscapeNav` needs nothing — a branch attribute cannot carry `flee="t"`.
+
+Tests: assert §2.105's Continue → 128 is disabled while the theft transfer is unrun and enabled
+after it, and that the takings really leave the purse either way; assert a fight-then-branch and a
+forced-buy-then-branch synthetic in the same shape (neither exists in the corpus, and the point of
+the fix is that the rule is the gate's and not the section's); assert a branch exit ABOVE the
+gating action is untouched, as every other gate reads position.
+
+---
+
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -425,6 +479,31 @@ rolls the stake owes a non-zero sum at §3.52.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-12 (implementation pass, task 257): closed **257** and filed **258** (LOW). The fix
+is ~40 lines — one DOM-free planner, a tag/note/apply trio, two one-line hooks in the roll view —
+and three things are worth carrying forward. **The filing's suggested shape ("a fourth seed" of
+`computeRollGate`) does not fit, and the reason is a real constraint on that gate**: it names ONE
+`rollNode` and reads ONE `rollPath`, whereas every row of book3/15 has a die of its own and only the
+row the dice turned up is ever drawn — a gate keyed on the first row's die would have held nothing
+on three of the four rows, which is worse than holding nothing on all four. `computeOutcomeRollGate`
+is a sibling gate instead, collecting **every** row's die and keyed on the die actually RENDERING,
+which is the `pendingTransfer`/`pendingBuy`/`pendingChoice` idiom and needs no notion of which row
+won. **The forced-roll half of `isMandatoryRoll` had to be split out (`isForcedRoll`) rather than
+skipped**: task 257's whole claim is that `outcome` does not belong in `ROLLGATE_OPTIONAL_WRAP`, but
+`price=`/`force="f"`/a `flag=` payment still do apply — an exit held behind a die the player cannot
+make is a softlock, not a rule, and the row gate refuses all three. Sabotage confirms the pass is
+load-bearing and nothing else: commenting out the single `applyOutcomeRollGate(flow)` call fails
+exactly 3 of the 25 new assertions (§3.15's losing and winning rows and §3.34's) and leaves the
+other 22 green. **The census held at 2 sections and closed the family**: only book3/15 and book3/34
+put a `var=` die inside an `<outcome>` anywhere in books 1–6, and a matching sweep of the *other* six
+`ROLLGATE_OPTIONAL_WRAP` members — a `var=` die nested inside a `<success>/<failure>/<if>/<elseif>/
+<else>/<group>` whose own wrapper also carries navigation — returns **zero**, so the three sections
+the filing set aside (book1/13, book1/523, book5/592) really are the sound shape (the die reveals
+the branch that holds the `<goto>`) and nothing else in the corpus wants this gate. Suite reports
+**2563**, up 25. Task **258** came out of the fix rather than the bug: the row's "Continue → N" has
+no XML node, so it could only be tagged where it is built — and the same button is invisible to the
+fight/transfer/buy gates, which is one shipped section (book2/105's pickpocket).
 
 Filed 2026-08-12 (during conversion work on an unpublished book): **257** (MEDIUM), and nothing
 else. Found by writing a table row whose magnitude is a second die and then asking why the page's
