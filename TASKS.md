@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-260 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **259–260, open under MEDIUM/LOW** — file new work
+261 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **260–261, open under LOW** — file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,11 +20,12 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 259. A guard above the effect it reads is re-derived against live state on the next draw, so §2.105's pickpocket takes the money *and* a possession
+*(none open — file new MEDIUM work here)*
 
 **LOW**
 
 - [ ] 260. 18 tracked `books/**/*temp.xml` working copies declare a live section's `name=`, and every corpus census counts them twice
+- [ ] 261. Task 259's spend-guard latch excludes `not=`, so §1.501's "if you didn't have enough money" turns itself on the moment you pay
 
 **Done**
 
@@ -291,8 +292,9 @@ this order.*
 - [x] 256. An `<itemcache>` ignores its cache lock, so §4.586's confiscation is undone by clicking Take
 - [x] 257. A roll revealed inside an `<outcome>` gates nothing, so §3.15's gambling debt is cancelled by not rolling for it
 - [x] 258. A branch's `section=` exit is a button with no XML node, so every node-keyed gate but task 257's is blind to it (book2/105 keeps the pickpocket's takings)
-- [ ] 259. A guard above the effect it reads is re-derived against live state on the next draw, so §2.105's pickpocket takes the money *and* a possession
+- [x] 259. A guard above the effect it reads is re-derived against live state on the next draw, so §2.105's pickpocket takes the money *and* a possession
 - [ ] 260. 18 tracked `books/**/*temp.xml` working copies declare a live section's `name=`, and every corpus census counts them twice
+- [ ] 261. Task 259's spend-guard latch excludes `not=`, so §1.501's "if you didn't have enough money" turns itself on the moment you pay
 
 ---
 
@@ -530,6 +532,31 @@ possession picker never appears once the money branch has run, and that a player
 empty purse still loses exactly one possession; assert each of the other five sections behaves as
 its prose reads, whichever way the measurement lands.
 
+**Measured, and what was done.** All six sections were driven against a real `GameState` before
+anything was written, and the measurement moved the answer twice. **Three are really broken**, not
+one: §2.105 as filed (40 Shards *and* the leather jerkin, with the possession picker opening
+unbidden); **§5.376**, where crossing off the **scroll of Ebron** grays the `<goto section="509"/>`
+*inside the same guard* — the exit the initiation is FOR, so the scroll is spent and the church
+unreachable; and **§6.215**, which grays the block the player has just paid 35 Shards into. **Two
+come out sound**, and the reason is the useful part: §6.49's donation and §6.215's blessing apply
+their price as the *walk* passes it, so the guard above is read before the purse moves and the draw
+right after the click is already correct — neither ever loses its reward, and what closes them on a
+later draw is a different guard (`<if safeAddGod="Juntoku">`, `<if blessing="storm" not="t">`) going
+false *because the reward landed*, which is what the page asks for. §1.523 is sound too: its bribe
+`<group>` carries its own `<goto>`, so it navigates instead of redrawing.
+
+**The proposed walk-position purse reading was not what got written.** It needs an entry snapshot
+per resource *and* a hook at every site that spends outside the walk (a group commit, a pay action,
+a transfer, a buy), because on the redraw no effect re-applies and nothing would move the position.
+What replaced it is one rule with the same effect and none of the reach: **a spend guard — an
+`<if>`/`<elseif>` whose every attribute is a purse/pack test or a modifier of one (`isSpendGuard`,
+`render-rules.js`) — stays open once the walk has taken it**, recorded per visit in
+`ctx.guardTaken` and serialised with the memo. A first attempt memoised *every* condition, and the
+suite refused it in three places that are all correct requirements: task 133's `<if curse=>` must go
+false the moment the curse is lifted from the sheet, task 181's `<if var=>` must wait for its roll,
+and §5.232's `<if not var="keepblessing">` is rerunnable by design. The attribute whitelist is what
+keeps those re-reading live. `not=` is excluded by the same whitelist — see task 261.
+
 ---
 
 ## 260. 18 tracked `books/**/*temp.xml` working copies declare a live section's `name=`, and every corpus census counts them twice
@@ -578,6 +605,57 @@ fixture self-test (`validate-selftest.ps1`) should cover the mismatch both ways.
 
 ---
 
+## 261. Task 259's spend-guard latch excludes `not=`, so §1.501's "if you didn't have enough money" turns itself on the moment you pay
+
+**Priority: LOW — one section, and no way to reach the redraw that exposes it from inside the
+section itself, so no player can hit it today. It is filed because it is the exact mirror of a bug
+just fixed one line away, and the next section written in that shape will not be so lucky.**
+
+*(Filed 2026-08-12, during task 259's implementation pass — the `not=` exclusion is deliberate and
+the residual it leaves was measured in the same run.)*
+
+Task 259 holds a **spend guard** open once the walk has taken it, and `isSpendGuard`
+(`render-rules.js`) whitelists the guard's own attributes so that only a plain purse/pack test
+qualifies. `not=` is not on that list, on purpose: holding open "if you did **not** have the money"
+would be the mirror of the bug — the latch may only keep a branch the player *earned* revealed, and
+a negated affordability test earns nothing. The residual is that such a guard still re-derives.
+
+**book1/501 is the one section in the corpus with that shape** (measured: it is the only
+`<if not="t" shards=…>` sitting above a `<lose shards=…>` on the same purse in books 1–6):
+
+```
+<set var="ransom" value="1"/>
+<if not="t" shards="1">If you didn't have enough money … <goto section="288"/>.</if>
+<else>Otherwise, your captors <lose shards="ransom">take the money</lose> … <goto section="10"/>.</else>
+```
+
+**Measured with exactly 1 Shard.** First draw: the guard reads the purse *before* the `<else>`
+below it spends, so it is false, the `<else>` is taken, the Shard is taken, and →10 is live with
+→288 grayed — correct. Force a redraw and the purse is 0, the guard flips **true**, →288 goes live
+and **→10 grays**: a player who paid the ransom is offered only the "you couldn't pay" route.
+**Nothing in §1.501 can trigger that redraw** — the section's only controls are those two `<goto>`s,
+and a `<goto>` navigates away — so the flip is latent, which is the whole of its priority. (The
+author's own comment in the XML doubts the section is reachable at all: "Unless book 2 links here,
+this section is pointless." Worth resolving on the way past — if nothing links to §1.501, that is a
+separate content question, not this bug.)
+
+**Fix:** the honest form is the one task 259 rejected as too big for that pass — a walk-position
+purse reading in the `walkTicks` idiom (task 216), where a guard reads the sheet as of its own
+position whichever way it is phrased, so `not=` needs no special case. That needs an entry snapshot
+of the purse in `ctx` plus a way to attribute a spend to the node it happened at, including the
+spends that happen on a CLICK rather than during the walk (a `<group>` commit, a pay action, a
+transfer, a buy) — the redraw re-applies nothing, so an observational `before`/`after` around each
+node sees no movement and the position never advances. That is the real cost, and it is why this is
+its own task. **Do not instead add `not=` to `SPEND_GUARD_ATTRS`**: that would hold open the reading
+"you cannot afford this", which is the mirror bug and worse than the residual.
+
+Tests: assert §1.501 with exactly 1 Shard keeps →10 live and →288 grayed across a redraw; assert
+the paid-nothing case (0 Shards on entry) still routes to →288; and assert the positive form is
+unaffected, since a walk-position reading would replace task 259's latch rather than sit beside it
+— re-run §2.105, §5.376 and §6.215's assertions against it.
+
+---
+
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -587,6 +665,36 @@ fixture self-test (`validate-selftest.ps1`) should cover the mismatch both ways.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-12 (implementation pass, task 259): closed **259** and filed **261** (LOW). Four
+things worth carrying forward, and the first two are both corrections the measurement forced on me.
+**The census's six sections were three defects, not one and not six — and I had two of them wrong in
+both directions.** The filing confirmed only §2.105; measuring found **§5.376** as bad or worse (it
+grays the `<goto section="509"/>` *inside its own guard*, so the scroll of Ebron is crossed off and
+the church it buys is unreachable) and **§6.215** grays the block a player has just paid 35 Shards
+into. Against that, my first probe read §6.49 as "50 Shards gone, no initiate" — and it was reading
+`data.god`, a field that does not exist, where the real one is `data.gods`. §6.49 was never broken.
+Its price applies as the WALK passes it, so the guard above is read before the purse moves and the
+draw after the click is already correct; what closes it later is `<if safeAddGod="Juntoku">` going
+false *because the god was written*, which is what the page asks for. **A probe that reads a field
+name off the top of your head proves nothing** — the tell was `god=undefined` printing identically
+before and after the fix, which is exactly the shape of a field that is never set. **The suite
+refused the first fix, in three places that are all correct requirements.** Memoising *every*
+condition per visit — the obvious reading of "JaFL evaluates a section once" — broke task 133's
+lift-a-curse-from-the-sheet (the `<if curse=>` must go false without re-entering the section), task
+181's wait-for-your-roll `<if var=>`, and §5.232's deliberately rerunnable `<if not
+var="keepblessing">`. What shipped is narrowed to a **spend guard**: an `<if>` whose *every*
+attribute is a purse/pack test or a modifier of one, checked as an attribute whitelist rather than
+"does it mention shards", because `evaluateCondition` ORs across attributes and a guard that also
+reads a codeword is asking something a payment cannot answer. **The proposed walk-position purse
+reading was the right rule and the wrong pass.** It fails on a detail that only shows up in
+implementation: on a redraw no effect re-applies, so an observational before/after around each node
+sees no movement and the position never advances — every out-of-walk spend (a `<group>` commit, a
+pay action, a transfer, a buy) would need its own hook. Task **261** carries it, and with it the one
+case the narrow latch cannot reach: `not=` is excluded from the whitelist on purpose (holding open
+"you could NOT afford it" is the mirror bug), which leaves §1.501's flip standing — latent, since a
+`<goto>` is its only control and a `<goto>` navigates away. Sabotage fails exactly 3 of the 19 new
+assertions, one per confirmed section, and the other 16 pass either way. Suite reports **2591**, up 19.
 
 Worked 2026-08-12 (implementation pass, task 258): closed **258** and filed **259** (MEDIUM) and
 **260** (LOW). The fix is one shared selector, one condition in the fight walk and one `tagBranchNav`

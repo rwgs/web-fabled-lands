@@ -3902,4 +3902,133 @@ export async function run(ctx) {
       window.__FL_INSTANT_DICE__ = false;
     }
 
+    // --- task 259: a spend guard stays open once the walk has taken it ---
+    // `<if shards="35">` / `<if item="scroll of Ebron">` wrap the price they are charging AND the
+    // reward it buys. Re-derived against the live sheet on the redraw that follows the payment,
+    // the guard read the purse it had just emptied and grayed its own reward. Measured before the
+    // fix, and each figure below is from that run: §6.49 paid 50 Shards and wrote no god, §5.376
+    // crossed off the scroll and grayed the `<goto section="509"/>` the initiation is FOR, §6.215
+    // paid 35 Shards into a block that vanished, and §2.105's pickpocket took the money and then
+    // a possession as well.
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const settle259 = () => new Promise((r) => setTimeout(r, 30));
+      const rnd259 = Math.random;
+      const grayed = (el) => !!(el && el.closest('.cond-inactive'));
+      const goto259 = (c, n) => Array.from(c.querySelectorAll('.goto')).find((b) => b.textContent.trim() === String(n));
+
+      // §2.105 — the guard is above the effect and OUTSIDE it: `<if shards="1">` picks which of
+      // "he stole your money" / "he stole one possession" runs, so emptying the purse used to turn
+      // the second one on as well.
+      const g105b = GameState.create({ name:'T259', gender:'m', profession:'Warrior', book:2, adv });
+      g105b.data.shards = 40;
+      const carried = g105b.data.items.length;
+      const c105b = document.createElement('div');
+      const st105b = new Story(c105b, g105b, { navigate(){}, onDeath(){}, notify(){} });
+      st105b.begin(await data.getSection(2, '105'), 2, '105');
+      const theft259 = () => Array.from(c105b.querySelectorAll('.pay-action')).find((b) => /stolen any money/i.test(b.textContent));
+      ok('task259: §2.105 carries possessions and money into the theft', carried >= 2 && g105b.data.shards === 40, `items=${carried}`);
+      theft259().click(); await settle259();
+      ok('task259: §2.105 the thief takes the money and NOTHING else',
+         g105b.data.shards === 0 && g105b.data.items.length === carried,
+         `shards=${g105b.data.shards} items=${g105b.data.items.length}/${carried}`);
+      ok('task259: §2.105 the "if you had no money" picker never opens',
+         !c105b.querySelectorAll('.ability-pick').length
+         && !Array.from(c105b.querySelectorAll('.pay-action')).some((b) => /choose which/i.test(b.textContent) && !b.disabled && !grayed(b)),
+         Array.from(c105b.querySelectorAll('.ability-pick')).map((b) => b.textContent).join('/'));
+      // An empty purse still takes the possession — the branch the page means in that case.
+      const g105c = GameState.create({ name:'T259b', gender:'m', profession:'Warrior', book:2, adv });
+      g105c.data.shards = 0;
+      const c105c = document.createElement('div');
+      new Story(c105c, g105c, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(2, '105'), 2, '105');
+      ok('task259: §2.105 entering penniless offers the possession instead',
+         c105c.querySelectorAll('.ability-pick').length === g105c.data.items.length && g105c.data.items.length > 0,
+         `picks=${c105c.querySelectorAll('.ability-pick').length} items=${g105c.data.items.length}`);
+
+      // §5.376 — the guard is above the effect and CONTAINS it, and it also contains the exit the
+      // whole initiation is for: crossing off the scroll used to gray `<goto section="509"/>`.
+      const g376 = GameState.create({ name:'T259c', gender:'m', profession:'Warrior', book:5, adv });
+      g376.addItem(makeItem('item', 'scroll of Ebron'));
+      const c376 = document.createElement('div');
+      const st376 = new Story(c376, g376, { navigate(){}, onDeath(){}, notify(){} });
+      st376.begin(await data.getSection(5, '376'), 5, '376');
+      const grp376 = () => Array.from(c376.querySelectorAll('.group-action'))[0];
+      ok('task259: §5.376 crosses off the scroll on entry and offers the God-box action',
+         !g376.findItems('scroll of Ebron').length && !!grp376() && !grp376().disabled && !grayed(grp376()));
+      grp376().click(); await settle259();
+      ok('task259: §5.376 writing Ebron in the God box leaves →509 reachable',
+         g376.hasGod('Ebron') && !!goto259(c376, 509) && !goto259(c376, 509).disabled && !grayed(goto259(c376, 509)),
+         `god=${g376.hasGod('Ebron')} 509=${!!goto259(c376, 509)} gray=${grayed(goto259(c376, 509))}`);
+
+      // §6.49 — the reward is a flag-gated `<tick god>` under the same `<if shards="50">` as the
+      // 50-Shard donation that arms it, so the payment used to close the guard on its own reward.
+      const g49 = GameState.create({ name:'T259d', gender:'m', profession:'Warrior', book:6, adv });
+      g49.data.shards = 50;
+      const c49 = document.createElement('div');
+      const st49 = new Story(c49, g49, { navigate(){}, onDeath(){}, notify(){} });
+      st49.begin(await data.getSection(6, '49'), 6, '49');
+      const pay49 = () => Array.from(c49.querySelectorAll('.pay-action')).find((b) => /50/.test(b.textContent));
+      ok('task259: §6.49 offers the 50-Shard donation with exactly 50 Shards',
+         !!pay49() && !pay49().disabled && !grayed(pay49()) && !g49.hasGod('Juntoku'));
+      pay49().click(); await settle259();
+      ok('task259: §6.49 paying the donation writes Juntoku in the God box',
+         g49.data.shards === 0 && g49.hasGod('Juntoku'),
+         `shards=${g49.data.shards} gods=${JSON.stringify(g49.data.gods)}`);
+
+      // §6.215 — the same shape with the price bundled into the roll's own <group>. Both this and
+      // §6.49 apply the price as the WALK passes it, so the guard above it is read before the purse
+      // moves and the draw that follows the click is already correct — which is why neither ever
+      // lost its reward. What the latch protects is the NEXT draw (either section has two more
+      // clickable blocks to trigger one with), and only where a non-resource guard is not closing
+      // the block anyway: §6.49's `<if safeAddGod="Juntoku">` and §6.215's `<if blessing="storm"
+      // not="t">` both go false the moment the reward lands, and grayed is then the right answer —
+      // the page says so ("You can have only one Safety from Storms blessing at a time"). A FAILED
+      // roll is what isolates the purse guard: no blessing, so only the emptied purse could gray it.
+      const g215 = GameState.create({ name:'T259e', gender:'m', profession:'Warrior', book:6, adv });
+      g215.data.shards = 35; g215.data.abilities.charisma = 3;
+      const c215 = document.createElement('div');
+      const st215 = new Story(c215, g215, { navigate(){}, onDeath(){}, notify(){} });
+      st215.begin(await data.getSection(6, '215'), 6, '215');
+      Math.random = () => 0.9; // 6+6 = 12, +3 CHARISMA = 15 vs Difficulty 15 → failure, no blessing
+      Array.from(c215.querySelectorAll('.btn-roll')).find((b) => !b.disabled && !grayed(b)).click();
+      await settle259();
+      ok('task259: §6.215 the 35 Shards are spent on the attempt and the roll decides it',
+         g215.data.shards === 0 && !g215.hasBlessing('storm'),
+         `shards=${g215.data.shards} storm=${g215.hasBlessing('storm')}`);
+      st215.rerender(); await settle259();
+      ok('task259: §6.215 a later draw still shows the attempt the player paid for',
+         !grayed(c215.querySelector('.roll')),
+         `gray=${grayed(c215.querySelector('.roll'))}`);
+
+      // Control: §1.523's bribe group carries its own <goto>, so it navigates rather than
+      // redrawing and was never exposed — its guard is a spend guard all the same.
+      const g523 = GameState.create({ name:'T259f', gender:'m', profession:'Warrior', book:1, adv });
+      g523.data.shards = 5;
+      const c523 = document.createElement('div');
+      const st523 = new Story(c523, g523, { navigate(){}, onDeath(){}, notify(){} });
+      st523.begin(await data.getSection(1, '523'), 1, '523');
+      ok('task259: §1.523 offers the 5-Shard bribe to a Warrior holding exactly 5',
+         Array.from(c523.querySelectorAll('.group-action')).some((b) => !b.disabled && !grayed(b)));
+
+      // The predicate itself (DOM-free): a spend guard is a purse/pack test and NOTHING else, so a
+      // guard that also reads a curse, a var or a codeword keeps re-reading live state — which is
+      // what task 133's lift-from-the-sheet and task 181's wait-for-your-roll both require. `not=`
+      // is excluded by the same whitelist: "if you did NOT have the money" is the mirror reading.
+      const guard = (attrs) => rules.isSpendGuard(parse(`<section><if ${attrs}/></section>`).querySelector('if'));
+      ok('task259: a bare shards= guard is a spend guard', guard('shards="35"') === true);
+      ok('task259: an item= guard is a spend guard, with its filters', guard('item="scroll of Ebron"') === true && guard('item="?" tags="light" group="g"') === true);
+      ok('task259: a compared item count is still a spend guard', guard('item="?" greaterthan="1"') === true);
+      ok('task259: a cache= redirected purse test is still a spend guard', guard('shards="5" cache="2.105"') === true);
+      ok('task259: a not= guard is NOT one', guard('not="t" shards="1"') === false);
+      ok('task259: a guard reading anything else as well is NOT one',
+         guard('shards="5" codeword="Artery"') === false && guard('item="rope" var="x" equals="1"') === false);
+      ok('task259: a curse/var/codeword/blessing guard is NOT one',
+         guard('curse="Bogwater"') === false && guard('var="x" equals="3"') === false
+         && guard('codeword="Artery"') === false && guard('blessing="storm"') === false);
+      ok('task259: an attribute-less <else> is NOT one', rules.isSpendGuard(parse('<section><else/></section>').querySelector('else')) === false);
+
+      Math.random = rnd259;
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
 }

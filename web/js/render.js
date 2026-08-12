@@ -20,7 +20,7 @@ import { bookTitle, availableBooks, loadBook, getSection } from './data.js';
 import { modal, mountDialog, freezeButtons } from './ui.js';
 import {
   computeOutcomeBlessings, pendingRerollBlessings, provisionalVarClosure,
-  unsettledRollVars, conditionPending, viewPendingVars,
+  unsettledRollVars, conditionPending, viewPendingVars, isSpendGuard,
 } from './render-rules.js';
 import {
   computeFightGate, computeEscapeCodewords, isDeferredFightChain,
@@ -1042,7 +1042,7 @@ export class Story {
           // the fight is decided (won or lost); the else must not slip active either, so the
           // flag rides the whole chain. (tasks 39 + 245)
           chainDeferred = pendingCond || (tag === 'if' && isDeferredFightChain(node, this.sectionFights));
-          active = chainDeferred ? false : (tag === 'else' ? true : evaluateCondition(node, this.state, { ticksNow: this.walkTicks }));
+          active = chainDeferred ? false : (tag === 'else' ? true : this.decideCondition(node, path));
           chainDone = active;
         } else if (chainDeferred) {
           active = false; // still inside the deferred (fight-outcome / provisional-result) chain
@@ -1053,7 +1053,7 @@ export class Story {
         } else if (tag === 'else') {
           active = true; chainDone = true;
         } else { // elseif with no prior match
-          active = evaluateCondition(node, this.state, { ticksNow: this.walkTicks }); chainDone = active;
+          active = this.decideCondition(node, path); chainDone = active;
         }
         this.renderConditionalBranch(container, node, path, active);
         // An eligible visit-box redirect, and it matched: its <goto> has just rendered live,
@@ -1098,6 +1098,54 @@ export class Story {
     if (after > before) this.ctx.boxTicks.set(path, after);
     const at = this.ctx.boxTicks.get(path);
     if (at != null) this.walkTicks = at;
+  }
+
+  /** Evaluate an `<if>`/`<elseif>`, and hold a SPEND GUARD open once the walk has taken it
+   *  (task 259).
+   *
+   *  A spend guard is a purse-or-possession test — `<if shards="35">`, `<if item="scroll of
+   *  Ebron">` — and it is the one reading a section can spend out from under its own guard. JaFL
+   *  runs a section top to bottom exactly once, so the guard is answered at the position where
+   *  the walk first reaches it, before the price it is gating has been paid. Re-deriving it on a
+   *  later draw let the payment retract what it had bought, measured in three shipped sections.
+   *  §2.105's pickpocket empties the purse, which flipped its "if you had no money he stole one
+   *  possession instead" branch ON and robbed the player a second time — money AND a possession,
+   *  where the page says one or the other. §5.376 crosses off a **scroll of Ebron** to join the
+   *  church and its guard then grayed the `<goto section="509"/>` inside it, the exit the whole
+   *  initiation is FOR — scroll spent, initiation unreachable. §6.215 charges 35 Shards for a
+   *  blessing attempt and grayed the block the player had just paid into. This is the `walkTicks`
+   *  rule (task 216) for the purse and the pack: a guard reads the sheet as of its own position,
+   *  not as of the latest draw.
+   *
+   *  Two sections the census named come out sound, and the reason is worth keeping: §6.49's
+   *  50-Shard donation and §6.215's blessing apply their price as the WALK passes them, so the
+   *  guard above is read before the purse moves and the draw that follows the click is already
+   *  right — neither ever lost its reward. What closes them on a LATER draw is a different guard
+   *  entirely (`<if safeAddGod="Juntoku">`, `<if blessing="storm" not="t">`), which goes false
+   *  because the reward landed, and graying is then the correct answer — the page says as much
+   *  ("You can have only one Safety from Storms blessing at a time"). Those guards are not spend
+   *  guards and keep re-reading live, which is why the fix leaves both cases alone.
+   *
+   *  Only ever holds a guard OPEN, only for a guard whose every attribute is that resource test
+   *  or a modifier of it (`isSpendGuard`), and only for one the walk really took — so:
+   *  - a `curse=`/`var=`/`codeword=`/`blessing=` guard re-reads live, which is what task 133's
+   *    lift-from-the-sheet ("the choice turns live without re-entering") and task 181's
+   *    wait-for-your-roll both require;
+   *  - a `not=` guard is excluded outright: "if you did NOT have the money" is not a reading a
+   *    payment can confirm, and holding it open would be the mirror of the bug (§1.501's is the
+   *    one such guard in the corpus — see task 261);
+   *  - a DEFERRED chain (unresolved fight, task 245; provisional reroll, task 181) never reaches
+   *    here, so no placeholder is ever recorded as an answer;
+   *  - a guard inside an already-grayed branch is display-only — JaFL executes just the active
+   *    path — so it neither records nor consults anything.
+   *  The record is per VISIT and serialised with the rest of the memo, so a resume replays it
+   *  instead of re-deriving it against a purse the visit has already spent; a fresh entry asks
+   *  the question again. */
+  decideCondition(node, path) {
+    const live = evaluateCondition(node, this.state, { ticksNow: this.walkTicks });
+    if (this.inactive || !isSpendGuard(node)) return live;
+    if (live) { this.ctx.guardTaken.add(path); return true; }
+    return this.ctx.guardTaken.has(path);
   }
 
   // Render one branch of an if/elseif/else chain. The taken branch renders
