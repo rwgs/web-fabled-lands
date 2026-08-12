@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-251 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **the buckets are clear** — file new work under
-the priority bucket that fits, and record the pass in the Review log.
+252 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **252, open under HIGH** — file new work
+under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -16,6 +16,7 @@ there once the buckets below are clear.
 
 **HIGH**
 
+- [ ] 252. Task 251's choice gate makes §2.157's exit assertion fail on 2 of 6 unseeded die rolls, so the suite is green by luck
 - [x] 241. A blessing-escape page spends the blessing on entry, then disables the exit it paid for
 - [x] 242. A branch escape's `<lose>` and its `<if blessing=>` must agree on the blessing's spelling
 
@@ -3059,11 +3060,61 @@ forfeit with only one candidate needs no choice and must leave the exit alone.
 
 ---
 
+## 252. Task 251's choice gate makes §2.157's exit assertion fail on 2 of 6 unseeded die rolls, so the suite is green by luck
+
+**Priority: HIGH — a suite that fails a third of the time makes every future run's verdict
+unreadable, which is the one thing every other task's "confirm `RESULT ALL PASS`" step rests on.**
+
+*(Filed 2026-08-11, on running the suite repeatedly against the tree task 251 landed on.)*
+
+`suite-economy.js:169` asserts **`§157 exit (19) reopens once the spin resolves`**, and it does
+not seed the die. **book2/157**'s golden wheel is a 1d6 whose outcomes 1 and 2 are
+`<lose ability="?" amount="1" flag="x">` and `<gain ability="?" amount="1" flag="x">` — both
+`renderAbilityChoice`, which since task 251 sets `story.pendingChoice` as it appends the picker,
+so `applyChoiceGate` disables the page's `<goto price="x" section="19"/>`. On a 1 or a 2 the
+assertion fails; on a 3–6 it passes. Measured over six consecutive `-Suite economy` runs on a
+clean tree at `d763240`: **two failures, four passes**, matching 2/6 exactly, and the preceding
+assertion (`§157 rolling shows a die and reveals exactly one outcome`) passes in the failing runs,
+so the spin really does resolve and the only thing holding the exit is the new gate.
+
+**The behaviour is right and the assertion is stale** — this is not a request to weaken task 251.
+The page's rule is that the wheel's result must be applied, the picker is how it is applied, and
+task 251's own census counted this section deliberately ("**27** sections gain a held exit (six
+ability awards, …)"). What was missed is that one of those 27 already had a shipped assertion
+saying the opposite, and an unseeded die hid the contradiction: the implementation pass recorded
+"Full suite 2500", which was a 4-in-6 roll and not a verdict.
+
+The general point is the one worth carrying: **a census of sections whose exits a new gate will
+hold is also a census of assertions that may now be wrong**, and the suite cannot be trusted to
+say so while any of them roll live dice.
+
+**Fix:** seed the spin the way the suite already does elsewhere (`const _r = Math.random;
+Math.random = () => 0;` … restore — `suite-economy.js:1004` and `:2734` are the shipped form), and
+assert both halves against a known outcome: on a picker outcome the exit stays disabled with
+"Make the choice above first." until the ability is chosen and releases on the pick; on a
+non-picker outcome (say roll 3, the permanent Stamina loss) it reopens on the spin alone, which is
+what the current assertion was written to check. Keep both — the second is task 30's flag gate and
+is still the thing that would regress silently.
+
+**Then sweep for the same shape**: any other assertion that rolls a live die and reads a control
+task 251 can now hold. The six ability awards in that census are the candidate set.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-11 (drive-by finding, task 252): filed **252** (HIGH), nothing closed. Found by
+running `-Suite economy` several times over rather than once — the failure is a 1-in-3 and the
+task 251 pass below had recorded a single green run as "Full suite 2500". The finding is not that
+task 251 gated the wrong thing (it gated exactly what its own census said it would); it is that
+the census of newly-held exits was never crossed against the assertions that already read those
+exits, and an unseeded 1d6 in `suite-economy.js:169` meant the contradiction surfaced only two
+times in six. **Re-run a suite before trusting a green run that follows a gate change**, and seed
+any die an assertion depends on.
 
 Worked 2026-08-11 (implementation pass, task 251): closed **251**, nothing new filed, and the
 buckets are clear again. `pendingChoice` + `applyChoiceGate` mirror `pendingTransfer`/
