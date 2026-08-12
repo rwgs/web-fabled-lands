@@ -20,7 +20,7 @@ import { bookTitle, availableBooks, loadBook, getSection } from './data.js';
 import { modal, mountDialog, freezeButtons } from './ui.js';
 import {
   computeOutcomeBlessings, pendingRerollBlessings, provisionalVarClosure,
-  unsettledRollVars, conditionPending, viewPendingVars, isSpendGuard,
+  unsettledRollVars, conditionPending, viewPendingVars,
 } from './render-rules.js';
 import {
   computeFightGate, computeEscapeCodewords, isDeferredFightChain,
@@ -58,6 +58,29 @@ const ROLL_TAGS = new Set(['difficulty', 'random', 'rankcheck', 'training']);
 const PASSIVE_TAGS = new Set(['lose', 'tick', 'gain', 'set', 'curse', 'disease', 'poison', 'adjustmoney']);
 // ITEM_FAMILY_TAGS / CHOOSE_ONE_TAGS moved to render-rules.js (task 119); ITEM_FAMILY_TAGS
 // is imported back for the award/label views, CHOOSE_ONE_TAGS is used only by isChooseOne.
+
+// Document order over the walk's positional paths (task 261) — which side of a condition a
+// spend fell on. The paths are the memo keys appendChildren builds (parent path + child index),
+// so a component-wise compare IS document order, and a prefix precedes its own descendants: an
+// ancestor's effect executed above the guard nested inside it. A few components carry a letter
+// prefix for a sibling group the walk numbers itself (`.c`hoice, `.b`ranch, market `.r`ow,
+// `.o`utcome reveal), so each is split into that prefix and its index rather than compared as
+// text, where 'o10' would sort under 'o2'.
+const PATH_PART = /^([a-z]*)(\d*)$/;
+function comparePaths(a, b) {
+  if (a === b) return 0;
+  const x = a.split('.');
+  const y = b.split('.');
+  const n = Math.min(x.length, y.length);
+  for (let i = 1; i < n; i++) {
+    if (x[i] === y[i]) continue;
+    const px = PATH_PART.exec(x[i]) || [, x[i], ''];
+    const py = PATH_PART.exec(y[i]) || [, y[i], ''];
+    if (px[1] !== py[1]) return px[1] < py[1] ? -1 : 1;
+    return Number(px[2] || 0) - Number(py[2] || 0) < 0 ? -1 : 1;
+  }
+  return x.length - y.length;
+}
 
 // Tag-dispatch table for renderElement (task 9): tag → view function, called as
 // fn(story, container, node, path); tags that share a handler are listed under each
@@ -293,6 +316,7 @@ export class Story {
     this.onRender = opts.onRender || (() => {}); // called after each (re)render
     this.ctx = null;
     this.sectionEl = null;
+    this.spendSeen = { shards: 0, ids: new Set() }; // per-draw spend attribution (task 261), re-armed each draw
     this.outcomeBlessings = new Set(); // blessing-guarded outcomes this section (task 108)
     this.sectionTodock = null;  // current section's todock= (task 81)
     this._sailExempt = null;    // ship id exempted from todock on a sail exit (task 81)
@@ -822,6 +846,11 @@ export class Story {
     // this visit applied (noteBoxTick), so a guard above a tick still reads the entry count
     // (task 105) while one below it sees the tick. Re-derived per draw, like redirectHeld.
     this.walkTicks = this.state.entryTickCount();
+    // What THIS draw has already attributed to a node, so an ancestor's mark is netted against
+    // its descendants' and no Shard is booked twice (noteSpend, task 261). The ledger it feeds
+    // (ctx.spends) is per visit; this counter is per draw, because a draw after the one that
+    // applied an effect re-applies nothing and so marks nothing.
+    this.spendSeen = { shards: 0, ids: new Set() };
     // Blessing-guarded storm/capsize outcomes (task 108): the blessings named on this
     // section's <outcome blessing="X"> hazards. A held blessing vetoes that outcome
     // (renderBranch), and a non-hidden sibling <lose blessing="X"> is the deferred
@@ -1071,8 +1100,16 @@ export class Story {
       // reads (task 216): note the count before it renders so noteBoxTick can see whether
       // this visit's tick landed here.
       const ticksBefore = tag === 'tick' ? this.state.tickCount() : 0;
+      // …and what it TAKES off the sheet moves the purse and pack every resource test below it
+      // reads (task 261). Marking every node covers each effect the walk applies wherever it
+      // sits — a bare <lose>, a bundled price inside a <group>, a hidden <transfer> arming on
+      // entry — with noteSpend netting an ancestor's mark against its descendants' so nothing is
+      // counted twice. A grayed branch applies nothing (renderConditionalBranch), so it is not
+      // marked; the two spends the player CLICKS for mark themselves at their own node.
+      const spentBefore = this.inactive ? null : this.spendMark();
       this.renderElement(container, node, path);
       if (tag === 'tick') this.noteBoxTick(path, ticksBefore);
+      if (spentBefore) this.noteSpend(path, spentBefore);
       // Track the roll a shared <success>/<failure> binds to. An inactive branch's
       // roll never counts. When two rolls feed ONE shared branch ("make a MAGIC roll
       // …or a SCOUTING roll", book2/122/book6/630), bind to whichever ACTUALLY
@@ -1100,52 +1137,91 @@ export class Story {
     if (at != null) this.walkTicks = at;
   }
 
-  /** Evaluate an `<if>`/`<elseif>`, and hold a SPEND GUARD open once the walk has taken it
-   *  (task 259).
+  /** Note what an effect at `path` TOOK off the adventure sheet, for the walk-position reading
+   *  below (tasks 259 + 261).
    *
-   *  A spend guard is a purse-or-possession test — `<if shards="35">`, `<if item="scroll of
-   *  Ebron">` — and it is the one reading a section can spend out from under its own guard. JaFL
-   *  runs a section top to bottom exactly once, so the guard is answered at the position where
-   *  the walk first reaches it, before the price it is gating has been paid. Re-deriving it on a
-   *  later draw let the payment retract what it had bought, measured in three shipped sections.
-   *  §2.105's pickpocket empties the purse, which flipped its "if you had no money he stole one
-   *  possession instead" branch ON and robbed the player a second time — money AND a possession,
-   *  where the page says one or the other. §5.376 crosses off a **scroll of Ebron** to join the
-   *  church and its guard then grayed the `<goto section="509"/>` inside it, the exit the whole
-   *  initiation is FOR — scroll spent, initiation unreachable. §6.215 charges 35 Shards for a
-   *  blessing attempt and grayed the block the player had just paid into. This is the `walkTicks`
-   *  rule (task 216) for the purse and the pack: a guard reads the sheet as of its own position,
-   *  not as of the latest draw.
+   *  `mark` is a spendMark() taken immediately before the node rendered: the difference is what
+   *  it moved, and only a taking is recorded — a gain is always read live (see sheetAt). An
+   *  ancestor's mark spans its descendants' effects too, so the amount they already claimed is
+   *  netted out (`spendSeen`, reset per draw) and each Shard and each possession is attributed to
+   *  exactly one node — the deepest that moved it. A `<group>` is where that lands for a bundled
+   *  price: its own body applies the cost, so the group's button is the position. Accumulates,
+   *  because a re-armed roll (tasks 253 + 254) drops its memo and really does charge twice. */
+  noteSpend(path, mark) {
+    const own = (mark.shards - this.state.data.shards) - (this.spendSeen.shards - mark.seenShards);
+    const held = new Set(this.state.data.items.map((it) => it.id));
+    const lost = mark.items.filter((it) => !held.has(it.id) && !this.spendSeen.ids.has(it.id));
+    if (own <= 0 && !lost.length) return;
+    const rec = this.ctx.spends.get(path) || { shards: 0, items: [] };
+    if (own > 0) { rec.shards += own; this.spendSeen.shards += own; }
+    lost.forEach((it) => { rec.items.push(it); this.spendSeen.ids.add(it.id); });
+    this.ctx.spends.set(path, rec);
+  }
+
+  /** The spendable sheet as it stands, for a noteSpend() comparison after the node has run. */
+  spendMark() {
+    return { shards: this.state.data.shards, items: this.state.data.items.slice(), seenShards: this.spendSeen.shards };
+  }
+
+  /** The purse and pack a condition at `path` must read — the sheet as of its OWN position
+   *  (task 261). Returns evaluateCondition opts, or null where live state already is that
+   *  reading (the common case: nothing spent this visit, or nothing spent below this node).
    *
-   *  Two sections the census named come out sound, and the reason is worth keeping: §6.49's
-   *  50-Shard donation and §6.215's blessing apply their price as the WALK passes them, so the
-   *  guard above is read before the purse moves and the draw that follows the click is already
-   *  right — neither ever lost its reward. What closes them on a LATER draw is a different guard
-   *  entirely (`<if safeAddGod="Juntoku">`, `<if blessing="storm" not="t">`), which goes false
-   *  because the reward landed, and graying is then the correct answer — the page says as much
-   *  ("You can have only one Safety from Storms blessing at a time"). Those guards are not spend
-   *  guards and keep re-reading live, which is why the fix leaves both cases alone.
+   *  JaFL runs a section top to bottom exactly once, so a resource test is answered where the
+   *  walk reaches it, before the price it is gating has been paid. Re-deriving it against the
+   *  live sheet on a later draw let the payment retract what it had bought, measured in three
+   *  shipped sections. §2.105's pickpocket empties the purse, which flipped its "if you had no
+   *  money he stole one possession instead" branch ON and robbed the player a second time — money
+   *  AND a possession, where the page says one or the other. §5.376 crosses off a **scroll of
+   *  Ebron** to join the church and its guard then grayed the `<goto section="509"/>` inside it,
+   *  the exit the whole initiation is FOR — scroll spent, initiation unreachable. §6.215 charges
+   *  35 Shards for a blessing attempt and grayed the block the player had just paid into. This is
+   *  the `walkTicks` rule (task 216) for the purse and the pack.
    *
-   *  Only ever holds a guard OPEN, only for a guard whose every attribute is that resource test
-   *  or a modifier of it (`isSpendGuard`), and only for one the walk really took — so:
-   *  - a `curse=`/`var=`/`codeword=`/`blessing=` guard re-reads live, which is what task 133's
-   *    lift-from-the-sheet ("the choice turns live without re-entering") and task 181's
-   *    wait-for-your-roll both require;
-   *  - a `not=` guard is excluded outright: "if you did NOT have the money" is not a reading a
-   *    payment can confirm, and holding it open would be the mirror of the bug (§1.501's is the
-   *    one such guard in the corpus — see task 261);
-   *  - a DEFERRED chain (unresolved fight, task 245; provisional reroll, task 181) never reaches
-   *    here, so no placeholder is ever recorded as an answer;
-   *  - a guard inside an already-grayed branch is display-only — JaFL executes just the active
-   *    path — so it neither records nor consults anything.
-   *  The record is per VISIT and serialised with the rest of the memo, so a resume replays it
-   *  instead of re-deriving it against a purse the visit has already spent; a fresh entry asks
-   *  the question again. */
+   *  The ledger records only what the visit TOOK, so the reading is only ever richer than live
+   *  state, never poorer — and that is what makes it free of the guard's phrasing (task 261).
+   *  §1.501 demands a ransom the player can just afford: `<if not="t" shards="1">` above the
+   *  `<else>` that spends means "if you didn't have enough", and re-derivation turned it ON the
+   *  moment the money was taken, offering a player who HAD paid only the "you couldn't pay"
+   *  route. Reading the purse that stood at the guard keeps `<if shards="1">` open and
+   *  `<if not="t" shards="1">` shut for the same reason, with no special case for either.
+   *
+   *  What it deliberately leaves reading live:
+   *  - a GAIN below the guard, so an award or a Take still opens the choice that needs it on the
+   *    next draw rather than waiting for a re-entry;
+   *  - a `cache=` test, which asks after a stash and not the sheet (evaluateCondition);
+   *  - everything but the purse and pack — a `curse=`/`var=`/`codeword=`/`blessing=` test is not
+   *    a resource a spend can retract, which is what task 133's lift-from-the-sheet ("the choice
+   *    turns live without re-entering") and task 181's wait-for-your-roll both require. §6.49's
+   *    `<if safeAddGod="Juntoku">` and §6.215's `<if blessing="storm" not="t">` go false because
+   *    the reward LANDED, and graying is then the right answer — the page says as much ("You can
+   *    have only one Safety from Storms blessing at a time").
+   *
+   *  The ledger is per VISIT and serialised with the rest of the memo, so a resume replays it
+   *  instead of re-deriving against a purse the visit has already spent; a fresh entry starts
+   *  empty and asks the question again. */
+  sheetAt(path) {
+    if (!this.ctx.spends.size) return null;
+    let shards = 0;
+    let items = null;
+    for (const [p, rec] of this.ctx.spends) {
+      if (comparePaths(p, path) <= 0) continue; // at or above this node — live state already reads it
+      shards += rec.shards;
+      if (rec.items.length) (items || (items = [])).push(...rec.items);
+    }
+    if (!shards && !items) return null;
+    const opts = {};
+    if (shards) opts.shardsNow = this.state.data.shards + shards;
+    if (items) opts.itemsNow = this.state.data.items.concat(items);
+    return opts;
+  }
+
+  /** Evaluate an `<if>`/`<elseif>` at the walk's own position — the box count it reached
+   *  (task 216) and the sheet as of this node (task 261). A DEFERRED chain (unresolved fight,
+   *  task 245; provisional reroll, task 181) never reaches here, and a guard inside an
+   *  already-grayed branch is display-only, since JaFL executes only the active path. */
   decideCondition(node, path) {
-    const live = evaluateCondition(node, this.state, { ticksNow: this.walkTicks });
-    if (this.inactive || !isSpendGuard(node)) return live;
-    if (live) { this.ctx.guardTaken.add(path); return true; }
-    return this.ctx.guardTaken.has(path);
+    return evaluateCondition(node, this.state, { ticksNow: this.walkTicks, ...this.sheetAt(path) });
   }
 
   // Render one branch of an if/elseif/else chain. The taken branch renders
@@ -1520,7 +1596,7 @@ export class Story {
     // Undecided while it reads a provisional reroll result — the same hold the walker's
     // chain applies, so a choice-label/group conditional can't commit early either. (task 181)
     if (conditionPending(node, viewPendingVars(this))) return null;
-    const ok = evaluateCondition(node, this.state, { ticksNow: this.walkTicks });
+    const ok = evaluateCondition(node, this.state, { ticksNow: this.walkTicks, ...this.sheetAt(path) });
     const chainKey = 'chain@' + path;
     if (ok) {
       this.ctx.applied.add(chainKey); // this branch taken

@@ -542,27 +542,13 @@ export function conditionPending(node, pendingVars) {
   return false;
 }
 
-// Is this <if>/<elseif> a SPEND GUARD — a test of the purse or the pack, and nothing else?
-// (task 259) These are the only conditions a section can spend out from under its own guard:
-// `<if shards="35">` wrapping the 35 Shards it charges, `<if item="scroll of Ebron">` wrapping
-// the scroll it crosses off. The renderer holds such a guard open once the walk has taken it, so
-// the answer has to be unambiguous — hence a whitelist of the guard's OWN attributes rather than
-// "does it mention shards": evaluateCondition ORs across every recognised attribute, so a guard
-// that also reads a codeword, a curse or a var is asking something a payment cannot answer and
-// must keep re-reading live state. `not=` is excluded by the same whitelist and deliberately:
-// "if you did NOT have the money" is the mirror reading, and holding it open would be the mirror
-// of the bug. The modifiers that shape a resource test are allowed through (a comparator, an
-// item tag/provenance filter, a cache= redirect to a stash).
-const SPEND_GUARD_ATTRS = new Set(['shards', 'item', 'tags', 'group', 'equals', 'greaterthan', 'lessthan', 'cache']);
-export function isSpendGuard(node) {
-  if (!node || !node.attributes || !node.attributes.length) return false;
-  let hasResource = false;
-  for (const a of Array.from(node.attributes)) {
-    if (!SPEND_GUARD_ATTRS.has(a.name)) return false;
-    if (a.name === 'shards' || a.name === 'item') hasResource = true;
-  }
-  return hasResource;
-}
+// The SPEND-GUARD predicate task 259 whitelisted here is gone (task 261). It selected the
+// conditions whose answer the renderer latched — a purse/pack test and nothing else — and the
+// whitelist is what made the latch unable to express `not=`: "if you did NOT have the money"
+// held OPEN would be the mirror of the bug it fixed, so a negated guard kept re-deriving and
+// §1.501 turned its "you couldn't pay" route on the moment the ransom was paid. What replaced it
+// reads the SHEET at the walk's position instead of memoising the guard's verdict (Story.sheetAt,
+// render.js), which needs no view of how the condition is phrased.
 
 // Is this <set> itself unsettled — does its expression READ a var that is not settled yet
 // (task 181)? Such a set must not write: §2.698's `<set var="cash" value="roll*100">` would

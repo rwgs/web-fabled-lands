@@ -203,9 +203,18 @@ export function evaluateCondition(el, state, opts = {}) {
   };
 
   // cache= redirects money/item/equipment lookups to a named stash (task 20 stocks it).
+  //
+  // A section runs SEQUENTIALLY in JaFL, so a purse/pack test reads the sheet as of its OWN
+  // position — `opts.shardsNow`/`opts.itemsNow` are the live sheet with everything this visit
+  // took off it BELOW this node added back, which the renderer's walk ledger supplies (task 261,
+  // the same rule `opts.ticksNow` implements for the box count). A caller with no walk position
+  // (the headless effect-body walk, direct use) reads live state. A cache= redirect is never
+  // overridden: a stash is not the adventure sheet, and its contents are not what a spend here
+  // retracts.
   const cacheN = get('cache');
-  const money = cacheN != null ? state.cacheMoney(cacheN) : state.data.shards;
-  const itemPool = cacheN != null ? state.cacheItems(cacheN) : state.data.items;
+  const money = cacheN != null ? state.cacheMoney(cacheN)
+    : (opts.shardsNow != null ? opts.shardsNow : state.data.shards);
+  const itemPool = cacheN != null ? state.cacheItems(cacheN) : (opts.itemsNow || state.data.items);
   const safeAdd = get('safeAddGod');
 
   add(get('codeword'), () => matchCodewords(state, get('codeword')));

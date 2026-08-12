@@ -707,7 +707,12 @@ export function renderTransfer(story, container, node, path) {
   const text = label.textContent.trim() || 'Transfer';
 
   const commit = (chosen) => {
+    // This runs on the CLICK, not during the walk, so the transfer books its own taking at its
+    // own node — §2.105's `<if shards="1">` sits above the pickpocket's `<transfer shards="*">`
+    // and must keep reading the purse the player walked in with (task 261).
+    const mark = story.spendMark();
     applyEffect(node, story.state, chosen ? { chooser: () => [chosen] } : {});
+    story.noteSpend(path, mark);
     if (price == null) story.ctx.applied.add(memo);
     story.rerender();
   };

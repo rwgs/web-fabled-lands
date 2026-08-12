@@ -93,6 +93,9 @@ export function renderGroup(story, container, node, path) {
     // reward needs), because the whole body simply moves behind the pick. (task 229)
     const forfeit = groupForfeitChoice(story, plan.effects);
     const commit = (chooser) => {
+      // The whole body applies on the CLICK, not during the walk, so the group books its taking
+      // at its own node — the button is the position a bundled price was paid at (task 261).
+      const mark = story.spendMark();
       plan.effects.forEach((fx) => applyEffect(fx, story.state, chooser && fx === forfeit.node ? { chooser } : {}));
       plan.buyNodes.forEach((b) => runBuyNode(story, b));
       plan.itemNodes.forEach((n) => grantItemNode(story, n));
@@ -102,6 +105,7 @@ export function renderGroup(story, container, node, path) {
         const cost = r.getAttribute('shards') ? resolveValue(story.state, r.getAttribute('shards')) : 0;
         applyRest(story.state, perUse, cost);
       });
+      story.noteSpend(path, mark);
       story.ctx.applied.add(key);
       if (plan.isRevival) {
         // Consume the deal and turn to its section (the revive rule — full

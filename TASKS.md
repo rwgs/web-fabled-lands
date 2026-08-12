@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-262 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **261–262, open under LOW** — file new work
+263 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **262–263, open under LOW** — file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -24,8 +24,8 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 261. Task 259's spend-guard latch excludes `not=`, so §1.501's "if you didn't have enough money" turns itself on the moment you pay
 - [ ] 262. §1.460 tests a port-invented codeword in place of the printed "codeword *Acid* or a **copper amulet**", which the vocabulary can now express exactly
+- [ ] 263. Four click-time spend sites book nothing into the walk-position ledger, so a future guard above a bare `<buy>`, a paid `<rest>` or a cache Take reads the emptied purse
 
 **Done**
 
@@ -294,8 +294,9 @@ this order.*
 - [x] 258. A branch's `section=` exit is a button with no XML node, so every node-keyed gate but task 257's is blind to it (book2/105 keeps the pickpocket's takings)
 - [x] 259. A guard above the effect it reads is re-derived against live state on the next draw, so §2.105's pickpocket takes the money *and* a possession
 - [x] 260. 18 tracked `books/**/*temp.xml` working copies declare a live section's `name=`, and every corpus census counts them twice
-- [ ] 261. Task 259's spend-guard latch excludes `not=`, so §1.501's "if you didn't have enough money" turns itself on the moment you pay
+- [x] 261. Task 259's spend-guard latch excludes `not=`, so §1.501's "if you didn't have enough money" turns itself on the moment you pay
 - [ ] 262. §1.460 tests a port-invented codeword in place of the printed "codeword *Acid* or a **copper amulet**", which the vocabulary can now express exactly
+- [ ] 263. Four click-time spend sites book nothing into the walk-position ledger, so a future guard above a bare `<buy>`, a paid `<rest>` or a cache Take reads the emptied purse
 
 ---
 
@@ -655,6 +656,58 @@ the paid-nothing case (0 Shards on entry) still routes to →288; and assert the
 unaffected, since a walk-position reading would replace task 259's latch rather than sit beside it
 — re-run §2.105, §5.376 and §6.215's assertions against it.
 
+**Measured, and what was done.** The prescribed form is what got written, and the reason to prefer
+it over the cheap fix is worth recording, because the cheap fix measured out nearly free and was
+still the wrong answer. Adding `not=` to the whitelist and latching the guard's *resource reading*
+rather than its verdict — hold a negated guard shut, never open — passes every test above in about
+ten lines, and a census says it would change behaviour in **exactly one section**: 15 `not=`
+resource guards exist in books 1–6 (13 sections), and book1/501 is the only one whose section
+takes money or a possession at all, the other twelve carrying no `<lose>`/`<transfer>`/`<buy>` and
+no priced `<rest>`. What rules it out is authenticity, not risk. A latch memoises a verdict and so
+is blind to where the walk stands: for a guard BELOW a click-time spend it freezes the pre-spend
+answer, which is a reading JaFL never gives. It would buy §1.501 by introducing a smaller
+inauthenticity somewhere else.
+
+**The reading is of the SHEET, so it needs no view of how the condition is phrased.** A per-visit
+ledger (`ctx.spends`) records what the visit has taken off the sheet and at which node; a condition
+at path P is answered against the live sheet with every entry BELOW P added back (`Story.sheetAt`,
+feeding `opts.shardsNow`/`opts.itemsNow` beside task 216's `opts.ticksNow`). `isSpendGuard` and
+`ctx.guardTaken` are gone. Document order over the positional memo paths is what "below" means
+(`comparePaths`), so a prefix precedes its own descendants — the guard that CONTAINS its price is
+answered before it, which is §5.376's and §6.215's shape.
+
+**Only takings are booked; a gain is always read live.** That asymmetry is deliberate and is what
+makes the reading polarity-free: the sheet is only ever read as richer than it is, never poorer, so
+`<if shards="1">` above the price stays open and `<if not="t" shards="1">` above the same price
+stays shut, for the one reason. Booking gains as well would freeze an award or a Take out of the
+choice that needs it until a re-entry, which nothing asked for.
+
+**Three feeders, and the census that says three is enough.** The walk marks every node it passes,
+which covers every effect it applies wherever nested, with an ancestor's mark netted against its
+descendants' so no Shard is booked twice (`noteSpend`/`spendSeen`). The two spends the player
+CLICKS for run outside any walk and book at their own node: `renderTransfer`'s commit (§2.105's
+pickpocket) and `renderGroup`'s (a bundled price). Every other click-time spend books nothing — see
+task 263 — and a census of the 14 sections pairing a resource guard with one of those sites found
+**no live case**: in all 14 the guard sits below the spend (the tavern `<rest shards="1">` family,
+book1/332, book1/342, book3/715, book4/111, book5/548), or tests a resource the spend cannot move
+(book3/406, book5/145), or is a `cache=` test, which is never overridden (book6/464).
+
+**It fixes a fourth section task 259's census never asked about.** §5.192's `<if shards="50">` wraps
+a `<group>` whose price is a `<buy ship=>`; the census looked for `<transfer|lose>`, so the shape
+was missed. A buy runs from the click, so nothing the walk marks would see the maintenance fee
+leave — verified by removing the group's booking, which grays the block naming the *Wrath of God* on
+the Ship's Manifest and fails that assertion alone.
+
+Every assertion was checked for teeth by neutering `sheetAt`: §1.501's redraw fails exactly as
+filed (`10=gray 288=live` — the player who paid offered only the "you couldn't pay" route), and
+§2.105, §5.376 and §6.215 fail with it, so the new reading carries task 259's three sections on its
+own rather than sitting beside a latch. Suite: 2,592 assertions, `RESULT ALL PASS`.
+
+**The reachability aside is resolved, and the section is not pointless.** The author's comment
+("Unless book 2 links here, this section is pointless") is answered from book 1: `books/book1/605.xml`
+— the bank — offers `<choice section="501">If paying a ransom</choice>`. Nothing else in books 1–6
+links to §1.501 and no cross-book `book="1" section="501"` exists, so §605 is the sole route in.
+
 ---
 
 ## 262. §1.460 tests a port-invented codeword in place of the printed "codeword *Acid* or a **copper amulet**", which the vocabulary can now express exactly
@@ -699,6 +752,62 @@ assert the case the proxy gets wrong — `1.Skabb` set, amulet gone, no Acid —
 
 ---
 
+## 263. Four click-time spend sites book nothing into the walk-position ledger, so a future guard above a bare `<buy>`, a paid `<rest>` or a cache Take reads the emptied purse
+
+**Priority: LOW — no section in books 1–6 is affected, measured, so no player can reach it today.
+It is filed because the boundary is invisible from the reading it belongs to: the rule reads as
+"a guard is answered at its own position" and is that, exactly, for every spend the walk applies and
+the two the player clicks for, and silently is not for four more.**
+
+*(Filed 2026-08-12, during task 261's implementation pass — the census that decided which spend
+sites to hook is what named these.)*
+
+Task 261 answers a condition against the sheet as of its own position, from a per-visit ledger of
+what the visit has TAKEN (`ctx.spends`, keyed by node path — `Story.sheetAt`, `render.js`). The
+ledger has three feeders: the walk marks every node it passes, and the two click-time spends that
+matter book at their own node (`renderTransfer`'s commit, `renderGroup`'s). A spend the walk does
+not apply and that is not one of those two **books nothing**, so it stays invisible to the ledger
+and every guard above it reads the emptied purse — task 259's behaviour, and therefore not a
+regression, but not the rule the code now states either.
+
+The four, all in the render layer and all applying on a click:
+
+| site | what it takes |
+| --- | --- |
+| `renderInlineBuy` / crew row (`render-market.js:259`, `:311`) | a standalone `<buy>`'s price, and the item/ship/crew it grants |
+| `renderRest` (`render-market.js:427`, `:442`) | a paid `<rest shards=>`'s nightly charge |
+| `renderMoneyCache` / `renderItemCache` Take/Store | money and possessions across a stash boundary |
+| the priced-pick family (`render-rewards.js` — payment, choose-one, priced roll/choice arming) | a `price=`/`shards=` cost that arms a flag |
+
+**Measured: no live case.** 14 sections in books 1–6 pair a resource guard (`<if|elseif shards=|item=>`)
+with a `<buy>`, `<market>`, `<itemcache>`, `<moneycache>` or a priced `<rest>`, and in every one the
+guard is unreachable by the gap: it sits **below** the spend, where the live reading is already the
+positional one — the four tavern sections' `<rest shards="1">` above `<if shards="3">` (book1/184,
+/387, /483, /497, /506), book1/332, book1/342, book3/715, book4/111, book5/548 — or it tests a
+resource the spend cannot move (book3/406's `<if item="ship's deeds">` above a ship purchase,
+book5/145's deed test above a crew hire), or it is a `cache=` test, which `evaluateCondition` never
+overrides because a stash is not the sheet (book6/464). §5.192 is the one section where a guard sits
+above a buy, and it is already covered — the buy is bundled in a `<group>`, so the group's booking
+carries it (task 261 asserts exactly that).
+
+**Fix:** give each site the two-line `spendMark()`/`noteSpend(path, mark)` pair the transfer and
+group commits use, so the ledger's rule holds without a per-site exception. All four have their
+node's `path` in scope already. Note the cache pair needs a decision, not just a hook: a Take moves
+money ONTO the sheet (a gain, which the ledger deliberately does not book) while a Store moves it
+off, so only the Store direction has anything to record.
+
+**Do not widen this into booking gains.** Task 261's asymmetry — only takings are booked, so the
+sheet is only ever read as richer than it is — is what makes the reading free of the guard's
+phrasing, and it is what keeps an award or a Take opening the choice that needs it on the next draw
+instead of on a re-entry.
+
+Tests: no corpus section exercises any of the four, so the assertions have to be synthetic, in the
+idiom task 261 already uses for its netting and gain-reads-live cases (`suite-actions.js`) — a guard
+above a bare `<buy>` on the same purse, and one above a paid `<rest>`, each asserted across a
+redraw. Add the corpus census above as a guard against a future section arriving in that shape.
+
+---
+
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -708,6 +817,40 @@ assert the case the proxy gets wrong — `1.Skabb` set, amulet gone, no Acid —
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-12 (implementation pass, task 261): closed **261** and filed **263** (LOW). Four
+things worth carrying forward, and the first is the decision the task was written to prevent me
+making cheaply. **The cheap fix measured out nearly free and was still the wrong answer, and the
+reason is authenticity rather than risk.** Task 261 forbids adding `not=` to task 259's whitelist
+because latching "you cannot afford this" OPEN is the mirror of the bug — but latching the guard's
+*resource reading* instead of its verdict (resource present ⇒ a negated guard held SHUT, never open)
+honours that reason in about ten lines, and a census says it would change behaviour in exactly one
+section: of 15 `not=` resource guards in books 1–6, book1/501 is the only one whose section takes
+money or a possession at all. What rules it out is that a latch memoises a verdict and so cannot
+know where the walk stands: for a guard BELOW a click-time spend it freezes the pre-spend answer,
+a reading JaFL never gives. It would buy §1.501 by introducing a smaller inauthenticity elsewhere.
+Asking rather than picking silently was right, and the answer — "which is most authentic?" — is the
+question that settles this class of fork. **The ledger's asymmetry is the whole trick.** Booking only
+what the visit TAKES, never what it grants, means the sheet is read as richer than it is and never
+poorer — which is what makes the reading free of the guard's phrasing (`<if shards="1">` above the
+price stays open and `<if not="t" shards="1">` stays shut for the *one* reason) while an award or a
+Take still opens the choice that needs it on the next draw. Booking gains too would have been the
+tidier-looking rule and would have broken that. **Marking every node the walk passes needs the
+ancestor netted against its descendants, or a nested price is booked once per level it is wrapped
+in** — a 30-Shard toll two levels down reads back as 90, and a guard above asking for 60 opens on
+money the player never had. `spendSeen` is that netting, and it is asserted directly, because the
+error is invisible in the sections that motivated the change (§1.501's `<lose>` is one level down,
+where 1× and 2× both round to "still affordable"). **Hooking two click sites out of six was a census
+result, not a shortcut** — 14 sections pair a resource guard with one of the four un-hooked sites and
+not one has the guard above the spend, so the gap is unreachable today; it is filed as **263** anyway,
+because the rule the code now states does not admit an exception. Every assertion was checked for
+teeth by neutering `sheetAt`: §1.501's redraw fails exactly as filed (`10=gray 288=live`), and
+§2.105/§5.376/§6.215 fail with it, so the new reading carries task 259's three sections on its own.
+It also fixes a **fourth** the earlier census could not see — §5.192, whose `<if shards="50">` wraps a
+`<group>` priced by a `<buy ship=>`, missed because the census pattern was `<transfer|lose>`. The
+reachability aside resolved in book 1's favour: `book1/605.xml` (the bank) offers
+`<choice section="501">If paying a ransom</choice>`, so §1.501 is not pointless and the author's
+comment can go. Suite **2592** (2591 − 8 deleted predicate assertions + 9 new).
 
 Worked 2026-08-12 (implementation pass, task 260): closed **260** and filed **262** (LOW). Three
 things worth carrying forward. **The filing's census was itself short by two, in exactly the way the

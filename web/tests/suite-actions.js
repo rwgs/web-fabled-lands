@@ -4010,25 +4010,115 @@ export async function run(ctx) {
       ok('task259: §1.523 offers the 5-Shard bribe to a Warrior holding exactly 5',
          Array.from(c523.querySelectorAll('.group-action')).some((b) => !b.disabled && !grayed(b)));
 
-      // The predicate itself (DOM-free): a spend guard is a purse/pack test and NOTHING else, so a
-      // guard that also reads a curse, a var or a codeword keeps re-reading live state — which is
-      // what task 133's lift-from-the-sheet and task 181's wait-for-your-roll both require. `not=`
-      // is excluded by the same whitelist: "if you did NOT have the money" is the mirror reading.
-      const guard = (attrs) => rules.isSpendGuard(parse(`<section><if ${attrs}/></section>`).querySelector('if'));
-      ok('task259: a bare shards= guard is a spend guard', guard('shards="35"') === true);
-      ok('task259: an item= guard is a spend guard, with its filters', guard('item="scroll of Ebron"') === true && guard('item="?" tags="light" group="g"') === true);
-      ok('task259: a compared item count is still a spend guard', guard('item="?" greaterthan="1"') === true);
-      ok('task259: a cache= redirected purse test is still a spend guard', guard('shards="5" cache="2.105"') === true);
-      ok('task259: a not= guard is NOT one', guard('not="t" shards="1"') === false);
-      ok('task259: a guard reading anything else as well is NOT one',
-         guard('shards="5" codeword="Artery"') === false && guard('item="rope" var="x" equals="1"') === false);
-      ok('task259: a curse/var/codeword/blessing guard is NOT one',
-         guard('curse="Bogwater"') === false && guard('var="x" equals="3"') === false
-         && guard('codeword="Artery"') === false && guard('blessing="storm"') === false);
-      ok('task259: an attribute-less <else> is NOT one', rules.isSpendGuard(parse('<section><else/></section>').querySelector('else')) === false);
-
       Math.random = rnd259;
       window.__FL_INSTANT_DICE__ = false;
+    }
+
+    // --- task 261: the reading is free of the guard's phrasing, because it reads the SHEET ---
+    // Task 259 memoised the guard's VERDICT, which could only ever be held OPEN — so a negated
+    // affordability test was excluded outright and kept re-deriving. §1.501 is the one section in
+    // the corpus with that shape, and it is the exact mirror: `<if not="t" shards="1">` above the
+    // `<else>` that takes the ransom turned ON the moment the money was taken, offering a player
+    // who HAD paid only the "you couldn't pay" route. Measured with exactly 1 Shard before the
+    // fix: first draw correct (→10 live, →288 grayed), forced redraw →288 live and →10 GRAYED.
+    // Reading the purse that stood AT the guard needs no case for either phrasing.
+    {
+      const grayed261 = (el) => !!(el && el.closest('.cond-inactive'));
+      const goto261 = (c, n) => Array.from(c.querySelectorAll('.goto')).find((b) => b.textContent.trim() === String(n));
+      const mk261 = (shards) => {
+        const g = GameState.create({ name: 'T261', gender: 'm', profession: 'Warrior', book: 1, adv });
+        g.data.shards = shards;
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate() {}, onDeath() {}, notify() {} });
+        return { g, c, st };
+      };
+      const routes261 = (c) => `10=${goto261(c, 10) ? (grayed261(goto261(c, 10)) ? 'gray' : 'live') : 'absent'} 288=${goto261(c, 288) ? (grayed261(goto261(c, 288)) ? 'gray' : 'live') : 'absent'}`;
+
+      // Able to pay: the captors take the Shard and release you into Yellowport, and the redraw
+      // must still say so — the guard reads the purse it was answered against, not the emptied one.
+      const paid261 = mk261(1);
+      paid261.st.begin(await data.getSection(1, '501'), 1, '501');
+      ok('task261: §1.501 with the ransom money takes it and releases you to →10',
+         paid261.g.data.shards === 0 && !grayed261(goto261(paid261.c, 10)) && grayed261(goto261(paid261.c, 288)),
+         `shards=${paid261.g.data.shards} ${routes261(paid261.c)}`);
+      paid261.st.rerender();
+      ok('task261: §1.501 a later draw does not re-route a paid ransom to "you couldn\'t pay"',
+         !grayed261(goto261(paid261.c, 10)) && grayed261(goto261(paid261.c, 288)), routes261(paid261.c));
+
+      // Penniless: the negated guard is the branch the page means, and it stays that way — the
+      // ledger only ever reads the sheet as RICHER, so a visit that took nothing changes nothing.
+      const broke261 = mk261(0);
+      broke261.st.begin(await data.getSection(1, '501'), 1, '501');
+      ok('task261: §1.501 penniless routes to →288 and pays nothing',
+         broke261.g.data.shards === 0 && !grayed261(goto261(broke261.c, 288)) && grayed261(goto261(broke261.c, 10)),
+         `${routes261(broke261.c)}`);
+      broke261.st.rerender();
+      ok('task261: §1.501 penniless still routes to →288 on a later draw',
+         !grayed261(goto261(broke261.c, 288)) && grayed261(goto261(broke261.c, 10)), routes261(broke261.c));
+
+      // The two directions the reading is deliberately asymmetric about. A guard BELOW the spend
+      // reads the emptied purse (its position is past it), and a GAIN is always read live — so an
+      // award still opens the choice that needs it on the next draw instead of on a re-entry.
+      const mkx261 = (xml, shards, items) => {
+        const g = GameState.create({ name: 'T261b', gender: 'm', profession: 'Warrior', book: 1, adv });
+        g.data.items = []; g.data.shards = shards;
+        (items || []).forEach((it) => g.addItem(it));
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate() {}, onDeath() {}, notify() {} });
+        st.begin(parse(xml), 1, 'x261');
+        return { g, c, st };
+      };
+      // An ACTIVE branch's words go straight into the flow (renderConditionalBranch appends them
+      // with no wrapper), so "is this branch live" is read off the grayed side: shown, and not
+      // inside a .cond-inactive.
+      const shut261 = (c) => Array.from(c.querySelectorAll('.cond-inactive')).map((s) => s.textContent).join(' | ');
+      const lit261 = (c, re) => re.test(c.textContent) && !re.test(shut261(c));
+      const below261 = mkx261('<section><p><lose shards="10">pay the toll</lose>.'
+        + ' <if shards="10">You can still afford the ferry.</if><else>You cannot afford the ferry.</else></p></section>', 10);
+      ok('task261: a guard BELOW the spend reads the emptied purse',
+         below261.g.data.shards === 0 && lit261(below261.c, /cannot afford/) && !lit261(below261.c, /can still afford/),
+         `shards=${below261.g.data.shards} text=${below261.c.textContent.replace(/\s+/g, ' ').trim()}`);
+
+      const gain261 = mkx261('<section><p><if shards="10">You have the fare.</if><else>You are short.</else>'
+        + ' <gain shards="10"/></p></section>', 0);
+      gain261.st.rerender();
+      ok('task261: a GAIN below a guard is read live, so the fare turns affordable without re-entering',
+         gain261.g.data.shards === 10 && lit261(gain261.c, /have the fare/) && !lit261(gain261.c, /You are short/),
+         `shards=${gain261.g.data.shards} text=${gain261.c.textContent.replace(/\s+/g, ' ').trim()}`);
+
+      // Netting: a price is booked ONCE, however deeply it is wrapped. The walk marks every node
+      // it passes, and an ancestor's mark spans its descendants' effects too — so a 30-Shard toll
+      // two levels down would read back as 90 if each level booked it in full, and the guard above
+      // asking for 60 would open on money the player never had.
+      const nested261 = mkx261('<section><p><if shards="60">Sixty as well.</if><else>But not sixty.</else>'
+        + ' <if shards="30">Thirty will do it.</if><else>Not enough.</else>'
+        + '<p><p><lose shards="30">pay the toll</lose></p></p></p></section>', 30);
+      nested261.st.rerender();
+      ok('task261: a nested price is booked once, not once per level it is wrapped in',
+         nested261.g.data.shards === 0
+         && lit261(nested261.c, /Thirty will do it/) && !lit261(nested261.c, /Not enough/)
+         && lit261(nested261.c, /But not sixty/) && !lit261(nested261.c, /Sixty as well/),
+         `shards=${nested261.g.data.shards} text=${nested261.c.textContent.replace(/\s+/g, ' ').trim()}`);
+
+      // §5.192 is the corpus section that needs the GROUP's own booking rather than the walk's:
+      // its `<if shards="50">` wraps a <group> whose price is a `<buy ship=>`, and a buy runs from
+      // the click (runBuyNode), so nothing the walk marks would ever see the 50 Shards leave. The
+      // maintenance fee must not gray the block that names the Wrath of God on the Ship's Manifest.
+      // Not in task 259's census, which looked for `<transfer|lose>` and so never asked about a buy.
+      const g192 = GameState.create({ name: 'T261c', gender: 'f', profession: 'Wayfarer', book: 5, adv });
+      g192.data.shards = 50;
+      g192.addItem(makeItem('item', 'deed to the Wrath of God'));
+      const c192 = document.createElement('div');
+      const st192 = new Story(c192, g192, { navigate() {}, onDeath() {}, notify() {} });
+      st192.begin(await data.getSection(5, '192'), 5, '192');
+      const claim192 = Array.from(c192.querySelectorAll('.group-action')).find((b) => !b.disabled && !grayed261(b));
+      ok('task261: §5.192 offers the 50-Shard maintenance fee with exactly 50 Shards', !!claim192);
+      if (claim192) claim192.click();
+      await new Promise((r) => setTimeout(r, 30));
+      st192.rerender();
+      ok('task261: §5.192 paying the fee keeps the block that names the ship on the Manifest',
+         g192.data.shards === 0 && g192.ships.length === 1 && lit261(c192, /Ship's Manifest/),
+         `shards=${g192.data.shards} ships=${g192.ships.length} shut=${shut261(c192).replace(/\s+/g, ' ').slice(0, 80)}`);
     }
 
 }

@@ -14,7 +14,7 @@ import { isRollGate } from './render-gates.js';
 // applied/resolved this visit, keyed by positional node paths. Shared by begin() and
 // deserializeCtx() so the shape has a single definition.
 export function newCtx() {
-  return { applied: new Set(), rolls: new Map(), fights: new Map(), buys: new Map(), groupLimits: new Map(), groupPicks: new Map(), wroteVars: new Set(), rolledVars: new Set(), pathNodes: new Map(), rollLockCaches: new Set(), forcedChosen: new Map(), awardCounts: new Map(), stock: new Map(), boxTicks: new Map(), guardTaken: new Set(), usedSource: null };
+  return { applied: new Set(), rolls: new Map(), fights: new Map(), buys: new Map(), groupLimits: new Map(), groupPicks: new Map(), wroteVars: new Set(), rolledVars: new Set(), pathNodes: new Map(), rollLockCaches: new Set(), forcedChosen: new Map(), awardCounts: new Map(), stock: new Map(), boxTicks: new Map(), spends: new Map(), usedSource: null };
 }
 
 // Resolve a serialised memo path back to its parsed-section node (task 116). Paths are the
@@ -192,7 +192,7 @@ export function serializeCtx(ctx) {
     awardCounts: [...ctx.awardCounts],
     stock: [...ctx.stock],
     boxTicks: [...ctx.boxTicks],
-    guardTaken: [...ctx.guardTaken],
+    spends: [...ctx.spends].map(([p, rec]) => [p, { shards: rec.shards, items: rec.items }]),
     usedSourcePath,
   };
 }
@@ -284,12 +284,19 @@ export function deserializeCtx(rec, sectionEl) {
     const n = frameNum(e[1], NaN, { min: 0, int: true });
     if (Number.isFinite(n)) ctx.boxTicks.set(e[0], n);
   });
-  // The purse/pack guards this visit already TOOK (task 259) — replayed for the same reason
-  // boxTicks is: the guard was answered at the walk's sequential position, and re-deriving it on
-  // a later draw let the payment it was gating retract the reward it had bought. Paths only, and
-  // the memo can only hold a guard OPEN, so a bogus entry from an untrusted save can at worst
-  // leave a branch visible whose payment then re-validates against the live sheet (task 133).
-  arr(r.guardTaken).forEach((p) => { if (typeof p === 'string') ctx.guardTaken.add(p); });
+  // What this visit has TAKEN off the sheet, and at which node (tasks 259 + 261) — replayed for
+  // the same reason boxTicks is: a guard is answered at the walk's sequential position, and
+  // re-deriving it against a purse the visit has already spent let the payment retract the reward
+  // it had bought. Feeds a condition straight from an untrusted save, so it is coerced: a memo
+  // path keyed to a non-negative Shard figure and named possessions, anything else dropped. The
+  // ledger only ever makes a guard read the sheet as RICHER than it is, never poorer, so a bogus
+  // entry can at worst hold one branch of a chain in the reading it had on entry.
+  arr(r.spends).forEach((e) => {
+    if (!Array.isArray(e) || e.length !== 2 || typeof e[0] !== 'string' || !e[1] || typeof e[1] !== 'object') return;
+    const shards = frameNum(e[1].shards, 0, { min: 0, int: true });
+    const items = arr(e[1].items).filter((it) => it && typeof it === 'object' && typeof it.name === 'string');
+    if (shards > 0 || items.length) ctx.spends.set(e[0], { shards, items });
+  });
   if (r.usedSourcePath) ctx.usedSource = resolveNodePath(r.usedSourcePath, sectionEl);
   rebuildVisitScaffold(ctx, sectionEl);
   return ctx;
