@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-256 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log) — the buckets are clear, so file new work
+257 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **257, open under MEDIUM** — file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,7 +20,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-*(none open — file new MEDIUM work here)*
+- [ ] 257. A roll revealed inside an `<outcome>` gates nothing, so §3.15's gambling debt is cancelled by not rolling for it
 
 **LOW**
 
@@ -289,6 +289,7 @@ this order.*
 - [x] 254. A re-armed roll whose result is read by an `<if var=>` chain instead of an `<outcomes>` table keeps its memos, so §6.628's second paid night at the garret heals nothing
 - [x] 255. Re-archive completed task details 212–254 and clear them out of the priority buckets
 - [x] 256. An `<itemcache>` ignores its cache lock, so §4.586's confiscation is undone by clicking Take
+- [ ] 257. A roll revealed inside an `<outcome>` gates nothing, so §3.15's gambling debt is cancelled by not rolling for it
 
 ---
 
@@ -353,6 +354,68 @@ book4/509, one widget either side of the unlock); assert book6/464 both ways.
 
 ---
 
+## 257. A roll revealed inside an `<outcome>` gates nothing, so §3.15's gambling debt is cancelled by not rolling for it
+
+**Priority: MEDIUM — two shipped sections, and unlike task 256's the failure pays the player
+rather than merely letting them undo their own page: the losing row's debt is settled for zero.
+It is still a deliberate click away from the printed instruction, which is what keeps it off
+HIGH.**
+
+*(Filed 2026-08-12, during conversion work on an unpublished book, on writing a table row that
+rolls a second die for its magnitude and then asking why the page's exits were live beside it.)*
+
+All three of `computeRollGate`'s seeds funnel through `isMandatoryRoll`
+(`render-gates.js:270`), which refuses any roll under `ROLLGATE_OPTIONAL_WRAP` —
+`if/elseif/else/success/failure/outcome/group`. For six of those seven that is exactly right: a
+roll the player may never reach must not hold the navigation of players who never reach it.
+**`outcome` is the one where it is wrong, because an `<outcome>` is not a branch the player
+chooses — it is the row the dice just turned up.** Once the table reveals it, a roll inside it is
+mandatory in fact, and nothing holds anything until it is made.
+
+**book3/15 and book3/34 are the two shipped sections** (the whole family: a census of rolls under
+a conditional wrapper that also carries that wrapper's own navigation reads 5 sections in books
+1–6, and the other three — book1/13, book1/523, book5/592 — put their `<goto>` inside a
+`<success>`/`<failure>` that the roll itself reveals, so they are sound). Both are the priestess's
+card game. Each row of book3/15 is
+`<outcome range="2-5" section="52"><random dice="2" var="x">Lose 2-12 Shards</random>
+<lose codeword="3.52.Loss" hidden="t"/><tick name="3.52.Loss" amount="x" hidden="t"/></outcome>`
+— the row's stake is a **second** roll, and the row carries its own destination, which
+`revealBranch` draws as a live "Continue → 52".
+
+**Measured against a real `GameState` (500 Shards, `?suite=`-style scratch page).** Rolling the
+table to 2 reveals "Lose 2-12 Shards", offers the magnitude Roll — and the "Continue → 52" button
+beside it is **enabled**. Click it without rolling: `3.52.Loss` is still 0 (correctly — task 181's
+closure defers the `<tick amount="x">` while `x` is unfilled), so §3.52's
+`<choice section="72" shards="loss">Pay her what you owe</choice>` resolves `loss` to **0**,
+renders live with no price, and settling the debt leaves the purse at 500. The player wins the
+right to walk away from every losing hand. The mirror row is self-punishing and so not a live
+exploit — skipping the die on a *winning* row banks `3.72.Gain = 0` — but it is the same hole.
+`computeRollGate` returns **null** on both sections, which is correct as far as it goes: every
+exit they have lives inside an outcome, and the gate rightly skips those (§1.299's drunken
+soldier is what the roll reveals, so holding him after the reveal would lock the fight the roll
+just started). The defect is one layer in — the row's own link versus the row's own roll.
+
+Control: book1/278, an ordinary table with no nested roll, still holds all four destinations
+before its roll, so the existing seeds are unaffected.
+
+**Fix:** in `computeRollGate`, stop treating `outcome` as an optional wrapper for a roll whose
+own outcome-row carries navigation. The narrowest form is a fourth seed rather than a change to
+`isMandatoryRoll` (which the other six wrappers rely on): for each `<random|rankcheck|difficulty
+var=>` inside an `<outcome>`, hold the `choice`/`goto` nodes **within that same outcome** until
+that roll resolves. A revealed row is already the only one rendered, so a gate scoped to the row
+cannot leak into the rows the dice did not turn up. **The row's own `section=` needs a second
+mark**: `tagRollNav` keys `data-rollnav` off an XML node in `gate.navNodes`, and `revealBranch`'s
+"Continue → N" button (`render-rolls.js:436`) is synthesised from the `<outcome>`'s attribute with
+no node of its own, so it can only be tagged where it is built. Both are the shape `applyRollGate`
+already consumes, and it only ever adds a disable.
+
+Tests: assert book3/15's "Continue → 52" is disabled while the magnitude die is unrolled and
+enabled after it, on both a loss row and a win row; assert the same for book3/34; assert
+book1/278's four destinations are untouched; and assert the end-to-end consequence — a player who
+rolls the stake owes a non-zero sum at §3.52.
+
+---
+
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -362,6 +425,20 @@ book4/509, one widget either side of the unlock); assert book6/464 both ways.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-12 (during conversion work on an unpublished book): **257** (MEDIUM), and nothing
+else. Found by writing a table row whose magnitude is a second die and then asking why the page's
+exits were live beside the unrolled die — the answer being that `isMandatoryRoll` refuses every
+roll under a conditional wrapper, and `outcome` is in that list. Two things worth carrying
+forward. **`ROLLGATE_OPTIONAL_WRAP` conflates two different things.** Six of its seven members are
+branches the player might never reach, so a roll inside them is genuinely optional; `outcome`
+is not a branch at all but the row the dice turned up, and once it is revealed the roll inside it
+is as mandatory as one on the page. The set was assembled from the first question ("could this
+roll go unreached?") and has been read ever since as answering the second ("must this roll be
+made?"). And **the census is again the wrong way round from the obvious one**: counting sections
+with a nested roll finds nothing useful, because most put their navigation inside a
+`<success>`/`<failure>` the roll itself reveals — the exposed shape is specifically a roll whose
+*sibling* is the destination, which is 2 sections, both of them the same card game.
 
 Worked 2026-08-12 (implementation pass, task 256): closed **256**, nothing new filed, and the
 buckets are clear again. The fix is 13 lines of gate plus two `data-cachelock` tags, and the
