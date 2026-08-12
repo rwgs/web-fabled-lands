@@ -164,12 +164,34 @@ export async function run(ctx) {
     ok('§157 paying deducts exactly 20 Shards', g157.data.shards === 80, `sh=${g157.data.shards}`);
     ok('§157 paying fires NO outcome effect (arms only)', JSON.stringify(g157.data.abilities) === ab0 && g157.data.stamina === stm0 && g157.data.blessings.length === bl0 && g157.data.titles.length === ti0, `ab=${JSON.stringify(g157.data.abilities)} st=${g157.data.stamina} bl=${g157.data.blessings.length} ti=${g157.data.titles.length}`);
     ok('§157 roll armed + exit (19) withheld while paid, unrolled', !!roll157() && !roll157().disabled && !!goto19() && goto19().disabled === true);
+    // The die MUST be seeded here (task 252): the wheel's outcomes 1 and 2 are ability
+    // pickers, and since task 251 a standing picker holds the section's exits — so an
+    // unseeded spin decided whether "the exit reopens" was true, and this pair of
+    // assertions passed on 4 rolls in 6. Both halves are asserted against a known outcome.
+    const picks157 = () => Array.from(c157.querySelectorAll('.ability-pick'));
+    const _rnd157 = Math.random; Math.random = () => 0;   // every d6 reads 1 → outcome range 1
     roll157().click(); await settle();
+    Math.random = _rnd157;
     ok('§157 rolling shows a die and reveals exactly one outcome', !!c157.querySelector('.die') && c157.querySelectorAll('.branch').length === 1, `dice=${!!c157.querySelector('.die')} branches=${c157.querySelectorAll('.branch').length}`);
-    ok('§157 exit (19) reopens once the spin resolves', !!goto19() && goto19().disabled === false);
+    ok('§157 rolling 1 stands the ability picker and holds exit (19) for it (task 251)',
+       picks157().length === 6 && !!goto19() && goto19().disabled === true && /Make the choice above first/.test(goto19().title || ''),
+       `picks=${picks157().length} dis=${goto19() && goto19().disabled} title=${goto19() && goto19().title}`);
+    picks157().find((b) => /Combat/i.test(b.textContent)).click();
+    ok('§157 naming the ability settles the wheel and releases exit (19)',
+       g157.abilityNatural('combat') === 5 && picks157().length === 0 && !!goto19() && goto19().disabled === false,
+       `combat=${g157.abilityNatural('combat')} picks=${picks157().length} dis=${goto19() && goto19().disabled}`);
     // re-arm: paying again drops the prior result and re-enables the roll.
     pay157().click();
     ok('§157 re-paying re-arms the roll (fresh button, no stale die)', g157.data.shards === 60 && !!roll157() && !roll157().disabled && !c157.querySelector('.die'), `sh=${g157.data.shards} die=${!!c157.querySelector('.die')}`);
+    // …and on an outcome that asks nothing (3 = the permanent Stamina loss) the exit reopens
+    // on the spin alone — task 30's flag gate, which is what the old assertion meant to check.
+    const stm157 = g157.data.stamina;
+    const _rnd157b = Math.random; Math.random = () => 0.4; // 1 + floor(0.4*6) = 3 both for the outcome and its 1d
+    roll157().click(); await settle();
+    Math.random = _rnd157b;
+    ok('§157 an outcome that asks nothing reopens exit (19) on the spin alone (task 30)',
+       g157.data.stamina === stm157 - 3 && picks157().length === 0 && !!goto19() && goto19().disabled === false,
+       `stam=${stm157}->${g157.data.stamina} picks=${picks157().length} dis=${goto19() && goto19().disabled}`);
 
     // §3.314 tavern: 1 Shard/day, repeatable — the roll re-arms per payment.
     const g314 = GameState.create({ name:'W314', gender:'m', profession:'Warrior', book:3, adv });

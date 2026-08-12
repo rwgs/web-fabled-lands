@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-252 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **252, open under HIGH** — file new work
+253 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **253, open under MEDIUM** — file new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,12 +16,13 @@ there once the buckets below are clear.
 
 **HIGH**
 
-- [ ] 252. Task 251's choice gate makes §2.157's exit assertion fail on 2 of 6 unseeded die rolls, so the suite is green by luck
+- [x] 252. Task 251's choice gate makes §2.157's exit assertion fail on 2 of 6 unseeded die rolls, so the suite is green by luck
 - [x] 241. A blessing-escape page spends the blessing on entry, then disables the exit it paid for
 - [x] 242. A branch escape's `<lose>` and its `<if blessing=>` must agree on the blessing's spelling
 
 **MEDIUM**
 
+- [ ] 253. A re-armed roll that lands the same outcome twice in one visit applies its effect once, so §3.314's second night at the tavern is paid for and does nothing
 - [x] 251. A standing forfeit picker does not hold the section's exits, so book4/116's "cross three items (your choice)" is skippable
 - [x] 249. A mandatory check read only by its `<success>`/`<failure>` seeds no roll gate, so §5.198's Champion is fought uncursed — and the roll skipped for good
 - [x] 248. The roll gate holds the exits but not the `<fight>`, so §5.477's drake is fought before its jet lands
@@ -3101,11 +3102,72 @@ task 251 can now hold. The six ability awards in that census are the candidate s
 
 ---
 
+## 253. A re-armed roll that lands the same outcome twice in one visit applies its effect once, so §3.314's second night at the tavern is paid for and does nothing
+
+**Priority: MEDIUM — it costs the player a real resource for nothing, but only on the
+"pay again without leaving" path, and the page is always re-enterable for a clean second go.**
+
+*(Filed 2026-08-11, measured while seeding §2.157's spin for task 252.)*
+
+`rollGate` (`render-rolls.js:138`) drops the *stored roll result* when a `price=` flag is
+re-armed — that is what makes "pay again, spin again" work — but the effects that result
+already revealed keep their `fx@<path>` entries in `ctx.applied`, which is per **visit**
+(`visit-state.js:16`) and is never cleared for a re-armed roll. Land the same outcome twice in
+one visit and the second landing renders its words and applies nothing.
+
+Measured on **book3/314**, the tavern that is explicitly repeatable ("Each day you spend
+resting at the tavern, `<random dice="1" flag="x"/>`"), with the die pinned to 1 (Dysentery,
+`<lose stamina="1">`): two paid days took **2 Shards (10 → 8) and 1 Stamina (5 → 4 → 4)**.
+The second night was bought and did nothing. The picker path shows the same thing from the
+other side — pinning both of §2.157's spins to outcome 1 leaves the second spin standing **no
+picker at all** (`picks=0`, abilities untouched), because the first spin's pick had already
+set that node's `fx@` memo.
+
+Not measured, and worth measuring first: the **3-6 "good rest" branch** of the same section
+(`<rest stamina="1">`), which is the outcome a player actually repeats and which memoises
+through a different renderer (`renderRest`, `render-market.js`), so it may or may not share
+the defect.
+
+**Fix:** re-arming a roll must drop the memos of what its outcomes applied, not just the
+result — clear the `ctx.applied` entries whose path lies under the roll's `<outcomes>` subtree
+at the same point `rollGate` deletes `ctx.rolls`. Two things to keep straight while doing it:
+the memo is what stops an effect re-firing on an ordinary **rerender**, so it can only be
+dropped on a genuine re-arm; and a repeat must not become a farm — pin the dice and check the
+per-visit award caps (`ctx.awardCounts`, `groupLimits`) still hold across two landings.
+
+Also worth deciding separately, and **not** part of this fix: §2.157's page says "You may spin
+this wheel **once**", yet the app re-enables its payment and lets the player spin again. The
+shipped assertion (`suite-economy.js` §157 "re-paying re-arms the roll") documents the current
+behaviour, so changing it is a rules decision, not a bug fix.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-11 (implementation pass, task 252): closed **252**, and filed **253** (MEDIUM).
+§2.157's spin is seeded twice and both halves are asserted: roll **1** stands the six-option
+ability picker, holds exit (19) and says so in the button's own title ("Make the choice above
+first.") — which is what distinguishes task 251's gate from task 30's flag gate, since a roll
+that had not resolved would hold the same button for a different reason — then naming COMBAT
+takes the point (6 → 5) and releases the exit; roll **3** (the permanent 1d Stamina loss, seeded
+so the amount reads 3 as well) reopens it on the spin alone, which is the assertion the old line
+meant to make. Verified by sabotage in both directions: seeding the first spin to 3 fails the
+picker assertion (`picks=0 dis=false`), seeding the second to 1 fails the flag-gate one.
+**Six consecutive full-suite runs now report the same 2502** where the old line was a 4-in-6;
+that repetition, not a single green, is the verdict. The **sweep** the filing asked for is
+negative and was done by intersecting the corpus rather than by reading tests: only a section
+that stands a picker *inside a roll branch* can have a die decide whether the gate fires — 21
+sections in `books/` carry both — and of the ones any suite touches (§4.456/468, §6.373, §2.248,
+§2.521, §3.273, §5.386, §6.731/736, §6.164, §6.118) every roll is already seeded and none of the
+unseeded ones read a `.goto`/`.choice`. §6.118's ex-Priest, the one other census member with a
+held-exit assertion, rolls no die at all. What the sabotage did turn up is **253**: pinning both
+spins to the same outcome showed the second landing applying nothing, because `rollGate` drops
+the roll's stored result on a re-arm but not the `fx@` memos of what that result applied —
+measured on §3.314, where two paid nights cost 2 Shards and 1 Stamina.
 
 Filed 2026-08-11 (drive-by finding, task 252): filed **252** (HIGH), nothing closed. Found by
 running `-Suite economy` several times over rather than once — the failure is a 1-in-3 and the
