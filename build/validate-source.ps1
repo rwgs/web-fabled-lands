@@ -311,6 +311,26 @@ function Test-SourceTree([string]$rulesDir, [hashtable]$bookDirs) {
                 }
             }
 
+        # 2b. Any OTHER .xml sitting directly in a book folder that CLAIMS a section id. The
+        #     filter above bundles and validates only `^\d+[a-z]?$` basenames, so a working
+        #     copy named 501temp.xml was neither bundled nor checked - while opening
+        #     <section name="501"> and so reading as section 501 to every by-hand census of
+        #     the corpus, which is how one defect got counted twice and another three times
+        #     over. 20 such files had accumulated; they live under books/book<N>/temp/ now,
+        #     which this non-recursive walk deliberately does not enter. A pregen biography
+        #     and New.xml also root at <section>, but name a person or a book title rather
+        #     than a section id, so only a NUMERIC name= is a claim worth failing. (task 260)
+        Get-ChildItem -Path $dir -Filter '*.xml' |
+            Where-Object { $_.BaseName -notmatch '^\d+[a-z]?$' } |
+            ForEach-Object {
+                $doc = Get-XmlDoc (Read-Xml $_.FullName)
+                if ($null -eq $doc -or $doc.DocumentElement.get_Name() -ne 'section') { return }
+                $claimed = $doc.DocumentElement.GetAttribute('name')
+                if ($claimed -match '^\d+[a-z]?$') {
+                    [void]$errors.Add(("{0}/{1} : section name=`"{2}`" is a section id, but the file is not {2}.xml (move a working copy to {0}/temp/)" -f $dirName, $_.Name, $claimed))
+                }
+            }
+
         # 3. Adventurers.xml: rooted at <adventurers>, and each pregen's biography readable -
         #    inline prose, or the <FirstName>.xml the build folds its first <p> from. A
         #    malformed/missing bio used to leave the create-character card blank in silence.

@@ -9,7 +9,11 @@ combat, markets, ships, live adventure sheet). Plain HTML/CSS/ES modules —
 
 ## Repository map — what is source, what is generated
 - **`books/book<N>/*.xml`** — section text + rules markup. **SOURCE OF TRUTH**
-  (~4,400 sections). Edit these.
+  (~4,400 sections). Edit these. Superseded working copies live in
+  **`books/book<N>/temp/`**, which nothing walks — keep them out of the book folder itself,
+  where a file declaring a `<section name=>` that is not its own filename now fails the
+  build gate, because such a file reads as a second copy of a live section to any by-hand
+  census of the corpus (task 260).
 - **`books/books.ini`** — the edition registry. `Published=` is the **single source** of
   which books a build ships: it drives validation, the per-book JSON, the copied maps and
   art, `sw.js`'s offline inventory and the every-section scan. Publishing/withdrawing a

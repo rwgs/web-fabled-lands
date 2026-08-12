@@ -33,6 +33,13 @@ $FIXTURE = @{
     'books/book1/2a.xml'   = '<section name="2a"><p>A continuation.</p><return/></section>'
     'books/book1/Adventurers.xml' = '<adventurers><starting><adventurer name="Andriel the Hammer" profession="Warrior" gender="m"/></starting></adventurers>'
     'books/book1/Andriel.xml'     = '<section name="Andriel"><p>A warrior of few words.</p></section>'
+    # A parked working copy: it claims section 1's id, but sits in the book's temp/ folder,
+    # which the gate's non-recursive walk does not enter. Present in the CLEAN fixture, so
+    # making that walk recursive would fail the whole suite here. (task 260)
+    'books/book1/temp/1temp.xml'  = '<section name="1"><p>An older draft, parked out of the section namespace.</p></section>'
+    # An absent-by-default slot: the same working copy left loose in the book folder, which
+    # only the two task 260 cases below fill in.
+    'books/book1/1temp.xml'       = $null
     'books/book2/1.xml'    = '<section name="1"><trade ship="brig" cargo="timb" buy="10"/><if crew="excellent"><p>Fine crew.</p></if></section>'
     'books/book2/Adventurers.xml' = '<adventurers><starting><adventurer name="Shen Darkeye" profession="Mage" gender="f">Born to the violet ocean.</adventurer></starting></adventurers>'
     'rules/Rules.xml'      = '<section name="rules"><h3>Rules</h3><p>Roll two dice.</p><table><tr><td>1</td></tr></table></section>'
@@ -66,7 +73,8 @@ Assert 'every fixture file is actually checked (sections + adventurers + bio + r
 
 # ---- 2. One mutation per class of mistake ----------------------------------------------
 # Each case: a label, the file it breaks, its replacement text, and a fragment the error must
-# mention. `$null` text deletes the file.
+# mention. `$null` text deletes the file (and a fixture entry that is already `$null` is
+# absent until a case supplies its text).
 $CASES = @(
     @{ label = 'not well-formed XML'
        file  = 'books/book1/1.xml'
@@ -77,6 +85,11 @@ $CASES = @(
        file  = 'books/book1/2.xml'
        text  = '<section name="22"><p>Wrong name.</p></section>'
        want  = 'does not match filename' }
+
+    @{ label = 'a stale working copy loose in a book folder claiming a live section id (task 260)'
+       file  = 'books/book1/1temp.xml'
+       text  = '<section name="1"><p>An older draft of section 1.</p></section>'
+       want  = 'is a section id, but the file is not 1.xml' }
 
     @{ label = 'a wrong root element in a section file'
        file  = 'books/book1/2.xml'
@@ -174,6 +187,11 @@ $ok2 = Build-Fixture @{ 'books/book1/1.xml' = '<section name="1"><choices><choic
 Assert 'a lettered continuation section resolves' ($ok2.Errors.Count -eq 0) ($ok2.Errors -join ' | ')
 $ok3 = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2"><if ability="?"><p>Any.</p></if><lose cargo="*"/><gain crew="-1"/></section>' }
 Assert 'JaFL wildcards and a crew delta are accepted values' ($ok3.Errors.Count -eq 0) ($ok3.Errors -join ' | ')
+# The other half of task 260's check: a <section> file whose name is PROSE claims no section
+# id, so it is left alone. New.xml names the book and a pregen bio names the character - both
+# sit loose in the book folder and neither may be read as a mis-named section.
+$ok4 = Build-Fixture @{ 'books/book1/1temp.xml' = '<section name="The War-Torn Kingdom"><p>Book title, not a section id.</p></section>' }
+Assert 'a prose-named <section> loose in a book folder is left alone' ($ok4.Errors.Count -eq 0) ($ok4.Errors -join ' | ')
 
 if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
 

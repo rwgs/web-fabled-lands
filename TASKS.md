@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-261 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **260–261, open under LOW** — file new work
+262 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **261–262, open under LOW** — file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -24,8 +24,8 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 260. 18 tracked `books/**/*temp.xml` working copies declare a live section's `name=`, and every corpus census counts them twice
 - [ ] 261. Task 259's spend-guard latch excludes `not=`, so §1.501's "if you didn't have enough money" turns itself on the moment you pay
+- [ ] 262. §1.460 tests a port-invented codeword in place of the printed "codeword *Acid* or a **copper amulet**", which the vocabulary can now express exactly
 
 **Done**
 
@@ -293,8 +293,9 @@ this order.*
 - [x] 257. A roll revealed inside an `<outcome>` gates nothing, so §3.15's gambling debt is cancelled by not rolling for it
 - [x] 258. A branch's `section=` exit is a button with no XML node, so every node-keyed gate but task 257's is blind to it (book2/105 keeps the pickpocket's takings)
 - [x] 259. A guard above the effect it reads is re-derived against live state on the next draw, so §2.105's pickpocket takes the money *and* a possession
-- [ ] 260. 18 tracked `books/**/*temp.xml` working copies declare a live section's `name=`, and every corpus census counts them twice
+- [x] 260. 18 tracked `books/**/*temp.xml` working copies declare a live section's `name=`, and every corpus census counts them twice
 - [ ] 261. Task 259's spend-guard latch excludes `not=`, so §1.501's "if you didn't have enough money" turns itself on the moment you pay
+- [ ] 262. §1.460 tests a port-invented codeword in place of the printed "codeword *Acid* or a **copper amulet**", which the vocabulary can now express exactly
 
 ---
 
@@ -656,6 +657,48 @@ unaffected, since a walk-position reading would replace task 259's latch rather 
 
 ---
 
+## 262. §1.460 tests a port-invented codeword in place of the printed "codeword *Acid* or a **copper amulet**", which the vocabulary can now express exactly
+
+**Priority: LOW — one section, and the substitute is right on every ordinary route: it diverges only
+for a player who parts with the amulet without handing it in. It is filed because it is an
+undocumented rewrite of a printed condition — nothing in the XML says why the markup asks a
+different question than the prose — and because the exact condition is expressible today.**
+
+*(Filed 2026-08-12, during task 260's diff of the 20 parked working copies. `book1/temp/460old.xml`
+is the upstream original, and this condition is the whole of what the live section changed.)*
+
+`books/book1/460.xml` prints "If you have the codeword *Acid* or a **copper amulet**,
+`<goto section="327"/>` immediately" and guards it with `<if codeword="1.Skabb">` — a test of
+neither named thing. The parked original reads `<if codeword="Acid" item="copper amulet">`, which
+task 3 made an **AND**, so it is wrong for an "or" clause: the substitution was a deliberate repair,
+not a typo. `1.Skabb` is a port-invented codeword with exactly **one writer and one reader**
+(measured): ticked hidden at `book1/554.xml:3`, read only here.
+
+**It is a sound proxy in the ordinary flow.** §554 is where King Skabb dies and the amulet is taken;
+§384 takes the amulet back, pays 450 Shards and notes **Acid**; §122 routes an amulet-holder to §384.
+The string "copper amulet" occurs in books 1–6 only at book1/122, /384, /460 and /554, and Acid is
+granted only at §384 — so the amulet has no other source, Acid has no other source, and `1.Skabb`
+implies (amulet OR Acid) on every route that keeps the amulet. **There is no false negative.**
+
+**Where it diverges is that `1.Skabb` records having been to §554, not still holding the proof.**
+Lose the amulet without reaching §384 — book 1 carries 2 open `<lose item="?">` forfeits, and the
+markets buy — and §460 still sends the player to §327 on a condition the page says they fail.
+
+The printed condition needs no proxy today: `<elseif>` already accepts both `codeword` and `item`
+(`validate-source.ps1`'s `FL_TAG_ATTRS`), so an if/elseif pair states the OR directly.
+
+**Fix:** replace the `1.Skabb` guard in `books/book1/460.xml` with
+`<if codeword="Acid">…</if><elseif item="copper amulet">…</elseif>`, each branch carrying the same
+`<goto section="327"/>`, and split the printed sentence across the two so each reads naturally.
+`1.Skabb` then has no reader, so drop its tick at `books/book1/554.xml:3` as an orphan of this
+change. `books/` changes, so rebuild and commit the regenerated data.
+
+Tests: assert §1.460 offers →327 with the codeword Acid and no amulet, and again with the amulet and
+no codeword; assert that with neither it offers no →327 and reads on to the light-source check; and
+assert the case the proxy gets wrong — `1.Skabb` set, amulet gone, no Acid — offers no →327.
+
+---
+
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -665,6 +708,35 @@ unaffected, since a walk-position reading would replace task 259's latch rather 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-12 (implementation pass, task 260): closed **260** and filed **262** (LOW). Three
+things worth carrying forward. **The filing's census was itself short by two, in exactly the way the
+task was filed to stop.** It counted 18 `*temp.xml` and missed `book1/460old.xml` and
+`book2/322old.xml`, which are the same shape — a stale working copy declaring a live section's
+`name=` — because the sweep that found them matched on the *name* `temp` rather than on what makes
+them hazardous. Grouping every non-`^\d+[a-z]?$` file under `books/book<N>/` by its declared
+`<section name=>` found all 20 at once and also cleared the genuine non-sections (the pregen bios and
+`New.xml` name a person or a book title, never a section id). All 20 moved to `books/book<N>/temp/`,
+per the disposition chosen on the day: keep them, out of the section namespace. **The diff the filing
+asked for came back clean, which is the answer that mattered.** All 20 are strictly earlier working
+states — every one arrived in the single `books add` import of 2026-07-01 and none has been touched
+since, while siblings have moved on (book2/248 as recently as 2026-08-09). The only content unique to
+a working copy is two editor comments. The one omission that looked real — `460old`'s
+`<tick codeword="StillInYellowport">`, dropped by the live section — is harmless, because its
+destination §10 sets that codeword itself; **checking the destination is what turned a suspected
+content bug into a non-finding**, and doing it before filing saved a wrong task. What the diff did
+surface is **262**: the same file's `<if codeword="1.Skabb">` under prose that promises "codeword
+*Acid* or a **copper amulet**", a sound proxy for an OR that task 3's AND could not express, but
+undocumented and now expressible exactly via `<elseif>`. **The gate's new check is scoped to the
+claim, not to the filename.** A `*.xml` sitting directly in a book folder fails only if its
+`<section name=>` looks like a section id its filename is not — so `501temp.xml` claiming `501`
+fails while `Andriel.xml` and `New.xml` pass untouched, and the check would also catch a working copy
+named anything at all. Note the trap in reusing the existing task 78 path for this: its lettered
+continuation rule strips `[a-z]+$`, which folds `501temp` to `501` and would have *accepted* the very
+file this closes. The walk stays non-recursive, so `temp/` is deliberately outside it — and the
+fixture self-test now keeps a parked copy in `book1/temp/` in its **clean** tree, so making that walk
+recursive fails the suite rather than quietly re-flagging all 20. Self-test 25 pass; the generated
+tree rebuilt byte-for-byte identical (no bundled file moved); suite **2591**, unchanged as expected.
 
 Worked 2026-08-12 (implementation pass, task 259): closed **259** and filed **261** (LOW). Four
 things worth carrying forward, and the first two are both corrections the measurement forced on me.
