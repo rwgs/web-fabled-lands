@@ -14,7 +14,6 @@ import { branchPlan, blessingSpendForReroll, isRollGate, viewPendingVars, provis
 // import, so render-rolls and render-choices no longer form an ES-module cycle. (task 163)
 import { animateDice } from './ui.js';
 import { diceWord, blessingLabel } from './render-util.js';
-import { dropRolledBranchMemos } from './visit-state.js';
 
 // ---- shared widgets --------------------------------------------------------
 
@@ -131,25 +130,16 @@ function appendRollDescription(story, container, node, path) {
   if (desc.textContent.trim()) container.appendChild(desc);
 }
 
-// Pay-to-roll gate + re-arm state shared by the roll renderers (tasks 30, 51, 172): a flag=
-// roll paired with a [price="k"] cost is armed only while flag k is set. Also drops a stale
-// stored result once the flag is (re-)armed, so a fresh payment starts the per-visit "spin
-// again" cycle. Returns the flag name, whether the roll is gated/armed, and the live stored
-// result (null once re-armed or never rolled).
+// Pay-to-roll gate state shared by the roll renderers (tasks 30, 51, 172): a flag= roll
+// paired with a [price="k"] cost is armed only while flag k is set. Returns the flag name,
+// whether the roll is gated/armed, and the live stored result (null when never rolled — or
+// when a fresh payment re-armed it, which dropReArmedRolls forgot before this render's walk
+// began, so that the re-armed section is walked from the top in its unrolled state).
 function rollGate(story, node, key) {
   const flag = node.getAttribute('flag');
   const gated = flag != null && isRollGate(story.sectionEl, flag);
   const armed = gated ? story.state.getFlag(flag) : true;
-  let stored = story.ctx.rolls.get(key);
-  if (gated && armed && stored) {
-    story.ctx.rolls.delete(key);
-    // …and the memos of what that result APPLIED go with it, or the same outcome landed twice
-    // in one visit renders its words and does nothing (task 253). Only on a genuine re-arm:
-    // the memo is what stops an effect re-firing on an ordinary rerender.
-    dropRolledBranchMemos(story.ctx, node);
-    stored = null;
-  }
-  return { flag, gated, armed, stored };
+  return { flag, gated, armed, stored: story.ctx.rolls.get(key) };
 }
 
 // Hold the enclosing <while> pass on a roll that has not SETTLED (tasks 100 + 181): unrolled,

@@ -28,7 +28,7 @@ import {
 } from './render-gates.js';
 import {
   newCtx, resolveNodePath, serializeCtx, deserializeCtx, serializeFrame, deserializeFrame,
-  rebuildVisitScaffold,
+  rebuildVisitScaffold, dropReArmedRolls,
 } from './visit-state.js';
 import {
   renderReroll, renderDifficulty, renderRandom, renderRankcheck, renderTraining,
@@ -736,6 +736,10 @@ export class Story {
     // nested inside a preceding `<p>` (a very common structure).
     this.activeRoll = null;
     this.blocked = false; // set true by an unresolved forced economic payment
+    // A fresh payment has re-armed a pay-to-roll gate: drop the old result and the memos of
+    // what it applied, BEFORE the walk so the section's own "not yet rolled" sentinel can
+    // re-run in this same render rather than a render later (tasks 253 + 254).
+    dropReArmedRolls(this.ctx, el, this.state);
     // Rerollable-result decision boundary (tasks 175 + 181): a resolved roll the player still
     // holds an eligible blessing reroll for is a PENDING decision, and its result is wholly
     // provisional — its <success>/<failure>/<outcome> branch, that branch's effects/awards/

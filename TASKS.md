@@ -22,7 +22,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 254. A re-armed roll whose result is read by an `<if var=>` chain instead of an `<outcomes>` table keeps its memos, so §6.628's second paid night at the garret heals nothing
+- [x] 254. A re-armed roll whose result is read by an `<if var=>` chain instead of an `<outcomes>` table keeps its memos, so §6.628's second paid night at the garret heals nothing
 - [x] 253. A re-armed roll that lands the same outcome twice in one visit applies its effect once, so §3.314's second night at the tavern is paid for and does nothing
 - [x] 251. A standing forfeit picker does not hold the section's exits, so book4/116's "cross three items (your choice)" is skippable
 - [x] 249. A mandatory check read only by its `<success>`/`<failure>` seeds no roll gate, so §5.198's Champion is fought uncursed — and the roll skipped for good
@@ -3145,6 +3145,8 @@ behaviour, so changing it is a rules decision, not a bug fix.
 
 ## 254. A re-armed roll whose result is read by an `<if var=>` chain instead of an `<outcomes>` table keeps its memos, so §6.628's second paid night at the garret heals nothing
 
+**DONE (2026-08-12).**
+
 **Priority: MEDIUM — the same cost-for-nothing as task 253, in the two sections that express the
 same idiom the other way; the page is re-enterable for a clean second go.**
 
@@ -3189,6 +3191,33 @@ would re-open a completed purchase.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-12 (implementation pass, task 254): closed **254**, nothing new filed, and the
+buckets are clear again. The scope widened from "the branches the roll reveals" to "what the
+roll's result is READ through", which now also covers an `<if var=>`/`<elseif>` chain on the
+roll's own var. Three things worth carrying forward. **The census says a `var=` test is the
+whole of it**: intersecting `flag=` rolls with a matching `price=` gives 15 sections, only two
+of which give that roll a `var=` at all (§6.628, §6.50) — and both name it directly in the
+`<if>`, so `expressionVars` over the comparator attributes (what `conditionPending` needs) buys
+nothing here and is not spent. The chain is walked as ONE unit — head plus its `elseif`/`else`
+element siblings — matching `chainHasEffect`/`conditionPending`, so an `<else>` reached only
+because the roll missed every arm counts as the roll's doing; no shipped section has one yet.
+**Where the drop happens turned out to be the load-bearing half.** Dropping the memos alone
+makes it worse, not better: §6.628's `<if>` chain reads live state, not `ctx.wroteVars`, so
+between the fresh payment and the new die it kept showing the PREVIOUS day's arm — with its
+memo now gone, as a *live* button for an outcome no die had produced. What closes it is
+forgetting the re-armed roll's own `var=` write, which hands the section's `<set var="y"
+value="7">` sentinel back the ownership task 61's `rollOwned` took from it — and that only
+works from BEFORE the walk, because the sentinel sits above the roll. So the re-arm moved out
+of `rollGate` (mid-walk, per-roll) into `dropReArmedRolls`, called once at the top of
+`render()`; `rollGate` is now a pure read. Verified by sabotage three ways: disabling the
+`<if>`-chain widening fails 3 assertions (the second night's arm ☑ and disabled, the Shard
+gone and no Stamina — the filed defect exactly), disabling the own-var drop fails the
+blank-chain assertion alone (`heal=false` — the stale arm live), and moving the call back below
+the walk collapses the suite at §157 with a stale die and a null click. **Three consecutive
+full runs report 2525.** §6.50 shares the shape and is left as the filing left it — the price
+is the dragon mask and there is only one, so its repeat path is unreachable; note that it has
+no sentinel, so were it ever re-armable the stale `roll` would still be readable there.
 
 Worked 2026-08-11 (implementation pass, task 253): closed **253**, and filed **254** (MEDIUM). The
 re-arm now drops the memos of what the old result applied, scoped to the branch subtrees the roll

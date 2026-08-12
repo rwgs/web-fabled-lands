@@ -258,6 +258,61 @@ export async function run(ctx) {
     ok('§314 …and that rest really heals', g314.data.stamina === stm314 && g314.data.shards === 6,
        `st=${g314.data.stamina} sh=${g314.data.shards}`);
 
+    // §6.628 garret: §3.314's twin written the OTHER way — the same 1-Shard-a-day re-armable
+    // roll, but its two arms are an <if var="y">/<elseif> chain rather than an <outcomes>
+    // table, so their <group force="t"> effects sit outside every branch tag and kept their
+    // group@ memos across a re-arm (task 254). One die: 0 → 1 (the 1-5 "regain 1 Stamina"
+    // arm), 0.99 → 6 (dysentery).
+    const g628 = GameState.create({ name:'W628', gender:'m', profession:'Warrior', book:6, adv });
+    g628.data.shards = 10; g628.data.stamina = 4; // injured, so the arm's <rest stamina="1"> has room to heal
+    const c628 = document.createElement('div');
+    const st628 = new Story(c628, g628, { navigate(){}, onDeath(){}, notify(){} });
+    const s628 = await data.getSection(6,'628'); st628.begin(s628,6,'628');
+    const roll628 = () => c628.querySelector('.roll .btn-roll');
+    const pay628 = () => c628.querySelector('.pay-action');
+    // Both arms draw a group button every render (the untaken one grayed inside .cond-inactive),
+    // so each is read by its own label rather than by position.
+    const arm628 = (re) => Array.from(c628.querySelectorAll('button.group-action')).find((b) => re.test(b.textContent));
+    const heal628 = () => arm628(/regain 1 Stamina/i);
+    const ill628 = () => arm628(/lose 1 Stamina/i);
+    const live628 = (b) => !!b && b.disabled === false && !b.closest('.cond-inactive');
+    const held628 = (b) => !!b && b.disabled === true && !!b.closest('.cond-inactive');
+    const spin628 = async (v) => { const p = Math.random; Math.random = () => v; roll628().click(); await settle(); Math.random = p; };
+    ok('§628 roll gated before payment', !!roll628() && roll628().disabled === true);
+    ok('§628 neither arm is active before the die (the y=7 sentinel)', held628(heal628()) && held628(ill628()));
+    pay628().click();
+    ok('§628 pay deducts 1 Shard and arms the roll', g628.data.shards === 9 && !!roll628() && !roll628().disabled, `sh=${g628.data.shards}`);
+    await spin628(0);
+    ok('§628 a die of 1 stands the live "regain 1 Stamina" arm', live628(heal628()),
+       `heal=${!!heal628()} dis=${heal628() && heal628().disabled}`);
+    heal628().click();
+    ok('§628 the arm heals 1 Stamina and marks itself done', g628.data.stamina === 5 && !!heal628() && heal628().disabled === true,
+       `st=${g628.data.stamina} dis=${heal628() && heal628().disabled}`);
+    pay628().click();
+    // The re-arm must forget the previous day's arm — and must not leave it standing as a LIVE
+    // button in the window between the payment and the new die, which is what dropping its memo
+    // alone would do. Forgetting the roll's own var= write is what closes that: it hands the
+    // section's "not yet rolled" sentinel (<set var="y" value="7">) back its ownership, so y
+    // reads 7 again and NEITHER arm matches until the die lands.
+    ok('§628 re-pay deducts another Shard, re-arms the roll and blanks the chain (task 254)',
+       g628.data.shards === 8 && !!roll628() && !roll628().disabled && held628(heal628()) && held628(ill628()),
+       `sh=${g628.data.shards} heal=${heal628() && heal628().disabled} ill=${ill628() && ill628().disabled}`);
+    await spin628(0);
+    ok('§628 a second paid night on the same 1 stands the arm again (task 254)', live628(heal628()),
+       `dis=${heal628() && heal628().disabled}`);
+    heal628().click();
+    ok('§628 …and that second night really heals', g628.data.stamina === 6 && g628.data.shards === 8,
+       `st=${g628.data.stamina} sh=${g628.data.shards}`);
+    // The OTHER arm on the same re-armed roll: a 6 must reach the dysentery branch, not the
+    // healing one the previous night left written into y.
+    pay628().click();
+    await spin628(0.99);
+    ok('§628 a re-armed roll of 6 stands the dysentery arm instead', live628(ill628()) && held628(heal628()),
+       `ill=${ill628() && ill628().disabled} heal=${heal628() && heal628().disabled}`);
+    ill628().click();
+    ok('§628 …and it costs a Stamina point', g628.data.stamina === 5 && g628.data.shards === 7,
+       `st=${g628.data.stamina} sh=${g628.data.shards}`);
+
     // §5.674 physician: flag "c" gate; paying must not cure/damage until the roll.
     const g674 = GameState.create({ name:'W674', gender:'m', profession:'Warrior', book:5, adv });
     g674.data.shards = 100;

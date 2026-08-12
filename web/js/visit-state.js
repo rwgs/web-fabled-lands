@@ -8,6 +8,7 @@
 // constructing DOM or touching a browser UI global.
 
 import { restoreFight } from './combat.js';
+import { isRollGate } from './render-gates.js';
 
 // A fresh per-visit execution context: the renderer's memo of what has already been
 // applied/resolved this visit, keyed by positional node paths. Shared by begin() and
@@ -38,6 +39,10 @@ export function resolveNodePath(path, sectionEl) {
 // The branches a roll's result reveals — the subtrees whose memos a RE-ARMED roll must
 // forget. A lone <outcome> (inside a <choices> table) counts like the table itself.
 const ROLL_BRANCH_TAGS = new Set(['success', 'failure', 'outcomes', 'outcome']);
+// The other way a section reads a roll: an <if var=>/<elseif> chain on the roll's own var=
+// instead of a branch tag (task 254). Only a chain that TESTS that var counts — a plain
+// <if codeword=> after the roll is not the roll's doing and keeps its memos.
+const IF_CHAIN_TAGS = new Set(['if', 'elseif', 'else']);
 // The roll elements whose var= write is undone along with their dropped result (below).
 const ROLL_TAGS = new Set(['random', 'difficulty', 'rankcheck', 'training']);
 // DOM node type / position constants, spelled as literals so this module never reaches for
@@ -45,13 +50,38 @@ const ROLL_TAGS = new Set(['random', 'difficulty', 'rankcheck', 'training']);
 const ELEMENT_NODE = 1;
 const DOCUMENT_POSITION_FOLLOWING = 0x04;
 
-// Is this node inside a branch THIS roll feeds — a <success>/<failure>/<outcomes>/<outcome>
-// positioned after it? Walks up to the section root. An ancestor branch never qualifies (a
-// containing node reports CONTAINS|PRECEDING, not FOLLOWING), so a roll nested inside an
-// earlier roll's outcome does not count itself as its own reveal.
-function inBranchAfterRoll(node, rollNode) {
+// Does the if/elseif/else chain this element belongs to test `v` — the head plus the
+// elseif/else element siblings after it, the same run appendChildren treats as ONE chain?
+// Any branch counts, because the chain picks exactly one arm: an <else> reached only
+// because the roll's var missed every test is as much that roll's doing as the arm that
+// matched. Reading the `var=` attribute alone is enough for this corpus — the only two
+// sections that read a re-armable roll this way (§6.628, §6.50) name it directly.
+function chainTestsVar(el, v) {
+  let head = el;
+  while (head.tagName.toLowerCase() !== 'if') {
+    const prev = head.previousElementSibling;
+    if (!prev || !IF_CHAIN_TAGS.has(prev.tagName.toLowerCase())) break;
+    head = prev;
+  }
+  for (let n = head; n; n = n.nextElementSibling) {
+    const tag = n.tagName.toLowerCase();
+    if (n !== head && tag !== 'elseif' && tag !== 'else') break;
+    if (n.getAttribute('var') === v) return true;
+  }
+  return false;
+}
+
+// Is this node inside something THIS roll's result reveals — a <success>/<failure>/
+// <outcomes>/<outcome>, or an <if var=> chain on the roll's own var, positioned after it?
+// Walks up to the section root. An ancestor never qualifies (a containing node reports
+// CONTAINS|PRECEDING, not FOLLOWING), so a roll nested inside an earlier roll's outcome does
+// not count itself as its own reveal.
+function inBranchAfterRoll(node, rollNode, rollVar) {
   for (let p = node.parentNode; p && p.nodeType === ELEMENT_NODE; p = p.parentNode) {
-    if (!ROLL_BRANCH_TAGS.has(p.tagName.toLowerCase())) continue;
+    const tag = p.tagName.toLowerCase();
+    const reads = ROLL_BRANCH_TAGS.has(tag)
+      || (rollVar != null && IF_CHAIN_TAGS.has(tag) && chainTestsVar(p, rollVar));
+    if (!reads) continue;
     if (rollNode.compareDocumentPosition(p) & DOCUMENT_POSITION_FOLLOWING) return true;
   }
   return false;
@@ -64,7 +94,9 @@ function inBranchAfterRoll(node, rollNode) {
 // words and applied nothing. §3.314's second paid night at the tavern cost a Shard and no
 // Stamina moved; §2.157's second spin on the same number stood no picker at all.
 //
-// Scoped to the branch subtrees the roll feeds, and read from ctx.pathNodes (the walk's own
+// Scoped to what the roll's result is READ through — its branch subtrees, plus an
+// <if var=>/<elseif> chain on its own var= where the section spells the same idiom without
+// branch tags (§6.628's garret, task 254) — and read from ctx.pathNodes (the walk's own
 // path→node map) rather than by prefix arithmetic, so the synthetic path segments the view
 // mints for a revealed outcome ('.o<i>') or a <choices> row ('.b<i>') need no special case.
 // What that scope deliberately leaves alone:
@@ -77,10 +109,11 @@ function inBranchAfterRoll(node, rollNode) {
 // clearing the outcome memos alone would hand out the same boon again on a guaranteed match.
 export function dropRolledBranchMemos(ctx, rollNode) {
   if (!ctx || !rollNode || !ctx.pathNodes || !ctx.pathNodes.size) return;
+  const rollVar = ROLL_TAGS.has(rollNode.tagName.toLowerCase()) ? rollNode.getAttribute('var') : null;
   // The node a '<kind>@<path>' memo key names, when it sits in one of those branches.
   const revealed = (memoKey) => {
     const node = ctx.pathNodes.get(memoKey.slice(memoKey.indexOf('@') + 1));
-    return node && inBranchAfterRoll(node, rollNode) ? node : null;
+    return node && inBranchAfterRoll(node, rollNode, rollVar) ? node : null;
   };
   for (const key of [...ctx.applied]) {
     if (!revealed(key)) continue;
@@ -99,6 +132,41 @@ export function dropRolledBranchMemos(ctx, rollNode) {
     // alone, before the repeat has thrown a die. That is the farm this scope is guarding.
     const v = node.tagName && ROLL_TAGS.has(node.tagName.toLowerCase()) ? node.getAttribute('var') : null;
     if (v) { ctx.wroteVars.delete(v); ctx.rolledVars.delete(v); }
+  }
+  // …and the RE-ARMED roll's OWN var write, one level up from the nested case above and for
+  // the same reason (task 254). §6.628 reads its die through an <if var="y"> chain, so between
+  // the fresh payment and the new die the chain would keep showing the PREVIOUS day's arm —
+  // and now, with its memo dropped, as a LIVE button. Forgetting the write hands the section's
+  // own "not yet rolled" sentinel (<set var="y" value="7">) back the ownership task 61's
+  // rollOwned took from it, so the sentinel re-runs and blanks the chain until the die lands.
+  // That only works because the drop happens BEFORE the walk (dropReArmedRolls) — the sentinel
+  // sits above the roll, so a drop made as the roll is drawn would come a render too late.
+  if (rollVar) { ctx.wroteVars.delete(rollVar); ctx.rolledVars.delete(rollVar); }
+}
+
+// Forget every RE-ARMED roll this visit has stored: a pay-to-roll gate (tasks 30/51) whose
+// flag is set again while the previous spin's result is still held. Dropping the result is
+// what makes "pay again, spin again" work; dropRolledBranchMemos above is what makes the
+// repeat actually apply. Called ONCE before the render walk (render.js) rather than as each
+// roll is drawn, because the drop has to land while the walk can still react to it: §6.628's
+// "not yet rolled" sentinel <set var="y" value="7"> sits ABOVE its roll, so a drop made at
+// the roll would leave that render showing the previous day's arm with its memo already gone
+// — a live button for an outcome no die had produced. (tasks 253 + 254)
+//
+// Reading ctx.rolls (not a DOM walk) keeps the loop to the rolls that actually stored a
+// result; pathNodes (from the prior render) resolves each one's node, falling back to the
+// positional path on a resumed visit that has no pathNodes yet.
+export function dropReArmedRolls(ctx, sectionEl, state) {
+  if (!ctx || !sectionEl || !state || !ctx.rolls.size) return;
+  for (const [key, stored] of [...ctx.rolls]) {
+    if (!stored || typeof key !== 'string' || !key.startsWith('roll@')) continue;
+    const path = key.slice(5);
+    const node = ctx.pathNodes.get(path) || resolveNodePath(path, sectionEl);
+    if (!node || node.nodeType !== ELEMENT_NODE || !ROLL_TAGS.has(node.tagName.toLowerCase())) continue;
+    const flag = node.getAttribute('flag');
+    if (flag == null || !isRollGate(sectionEl, flag) || !state.getFlag(flag)) continue;
+    ctx.rolls.delete(key);
+    dropRolledBranchMemos(ctx, node);
   }
 }
 
