@@ -440,7 +440,7 @@ function revealBranch(story, container, node, path) {
     // send a dice row into book 9, book3/464 a <failure> into book 12 — so it asks the same
     // shared edition gate on the click (task 244).
     btn.addEventListener('click', () => { if (story.requireBook(targetBook)) story.navigate(targetBook, section); });
-    story.tagOutcomeRollNav(node, btn); // this row's die must be rolled before its exit (task 257)
+    story.tagBranchNav(node, btn); // this exit has no node of its own — ask every nav gate here (tasks 257 + 258)
     box.appendChild(btn);
   }
   container.appendChild(box);

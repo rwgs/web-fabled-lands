@@ -25,6 +25,15 @@ const ELEMENT_NODE = 1;
 const TEXT_NODE = 3;
 const DOCUMENT_POSITION_FOLLOWING = 0x04;
 
+// A revealed branch that carries its own destination. The "Continue → N" the view synthesises
+// from a `section=` attribute is a real exit with NO node of its own, so a gate that collected
+// only `choice, goto, return` elements never saw it and every node-keyed tagger missed it
+// (task 258: book2/105's pickpocket kept nothing if you tracked him). The gates below collect
+// the branch ITSELF in the same positions, and the view tags it where it builds the button.
+// A branch attribute can never carry flee="t", so no gate needs to exempt one.
+const BRANCH_EXIT_SELECTOR = 'outcome[section], success[section], failure[section]';
+const BRANCH_EXIT_TAGS = new Set(['outcome', 'success', 'failure']);
+
 // The item-family effect tags (a possession award). Defined here rather than in
 // render-rules.js — which re-exports it for its own callers — because computeFightGate
 // below needs it and the dependency between the two rule modules stays one-way.
@@ -118,7 +127,11 @@ export function computeFightGate(sectionEl, escapeCodewords) {
       const childGated = gated || WRAP.has(tag);
       const isFleeChoice = tag === 'choice' && boolAttr(ch.getAttribute('flee'));
       const isEscapeChoice = ch.getAttribute('box') != null && escapeCodewords.has(ch.getAttribute('box'));
-      if (seenFight && !skip && !isFleeChoice && !isEscapeChoice && (tag === 'goto' || tag === 'choice' || tag === 'return')) {
+      // A branch's own section= is an exit too (task 258) — no section in books 1-6 pairs a fight
+      // with one, so this holds nothing today; it is here because the rule belongs to the gate.
+      const isExit = tag === 'goto' || tag === 'choice' || tag === 'return'
+        || (BRANCH_EXIT_TAGS.has(tag) && ch.getAttribute('section') != null);
+      if (seenFight && !skip && !isFleeChoice && !isEscapeChoice && isExit) {
         navNodes.add(ch);
         if (boolAttr(ch.getAttribute('dead')) || (LOSE.test(recent) && !WIN.test(recent))) loseNodes.add(ch);
         recent = '';
@@ -439,7 +452,10 @@ export function computeTransferGate(sectionEl) {
   if (!forced.length) return null;
   const first = forced[0];
   const navNodes = new Set();
-  sectionEl.querySelectorAll('choice, goto, return').forEach((n) => {
+  // A revealed branch's own section= is an exit as much as a <goto> is (task 258): book2/105's
+  // pickpocket is a forced <transfer>, and its optional SCOUTING success draws a "Continue → 128"
+  // that held nothing, so tracking the thief left the takings in the purse.
+  sectionEl.querySelectorAll('choice, goto, return, ' + BRANCH_EXIT_SELECTOR).forEach((n) => {
     if (!(first.compareDocumentPosition(n) & DOCUMENT_POSITION_FOLLOWING)) return;
     if (forced.some((t) => t.contains(n))) return; // navigation inside the transfer's own words
     if (boolAttr(n.getAttribute('flee'))) return;
@@ -476,7 +492,9 @@ export function computeBuyGate(sectionEl) {
   if (!forced.length) return null;
   const first = forced[0];
   const navNodes = new Set();
-  sectionEl.querySelectorAll('choice, goto, return').forEach((n) => {
+  // A branch's own section= is an exit too (task 258) — the same rule as the transfer gate above,
+  // and dead in books 1-6 (no forced <buy> section carries such a branch) for the same reason.
+  sectionEl.querySelectorAll('choice, goto, return, ' + BRANCH_EXIT_SELECTOR).forEach((n) => {
     if (!(first.compareDocumentPosition(n) & DOCUMENT_POSITION_FOLLOWING)) return;
     if (forced.some((b) => b.contains(n))) return; // navigation inside the buy's own words
     if (boolAttr(n.getAttribute('flee'))) return;

@@ -3838,4 +3838,68 @@ export async function run(ctx) {
       Math.random = rnd257;
       window.__FL_INSTANT_DICE__ = false;
     }
+
+    // --- task 258: a branch's section= exit is held by the gates its section is under ---
+    // The "Continue → N" revealBranch draws from a branch's section= attribute has no XML node, so
+    // every node-keyed nav gate missed it. §2.105's pickpocket is a forced <transfer> and the page
+    // then offers an OPTIONAL SCOUTING 10 check to track him, whose <success section="128"/> drew a
+    // live exit: roll it, succeed, click Continue, and the thief never took the money. Measured
+    // before the fix — theft widget live, pendingTransfer set, the <choice section="151"> correctly
+    // held, and Continue → 128 enabled with 40 Shards still in the purse.
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const settle258 = () => new Promise((r) => setTimeout(r, 30));
+      const rnd258 = Math.random;
+      const theft258 = (c) => Array.from(c.querySelectorAll('.pay-action')).find((b) => /stolen any money/i.test(b.textContent));
+      const cont258 = (c) => Array.from(c.querySelectorAll('.goto')).find((b) => /Continue →/.test(b.textContent));
+
+      const g105 = GameState.create({ name:'T258', gender:'m', profession:'Warrior', book:2, adv });
+      g105.data.shards = 40;
+      // Carrying nothing, so the theft's release is readable: §2.105 re-derives its "if you had no
+      // money, he stole one possession instead" branch against the LIVE purse on every draw, so
+      // with possessions in hand the emptied purse flips it on and its own forced <transfer> holds
+      // the exit again — a separate defect (task 259), and not what this gate is being asked about.
+      g105.data.items = [];
+      const c105 = document.createElement('div');
+      const st105 = new Story(c105, g105, { navigate(){}, onDeath(){}, notify(){} });
+      st105.begin(await data.getSection(2, '105'), 2, '105');
+      // The gate now names two exits: the printed <choice section="151"> and the <success
+      // section="128"/> the SCOUTING roll can reveal.
+      ok('task258: §2.105 the transfer gate collects the branch exit as well as the choice',
+         !!st105.transferGate && st105.transferGate.navNodes.size === 2,
+         st105.transferGate ? 'n=' + st105.transferGate.navNodes.size : 'null');
+      ok('task258: §2.105 the theft is a live forced transfer on entry',
+         !!theft258(c105) && !theft258(c105).disabled && st105.pendingTransfer === true);
+      Math.random = () => 0.9; // 6+6 = 12 + SCOUTING vs 10 → success
+      c105.querySelector('.btn-roll').click(); await settle258();
+      ok('task258: §2.105 the SCOUTING success reveals its →128',
+         !!cont258(c105) && /128/.test(cont258(c105).textContent));
+      ok('task258: §2.105 that exit is held while the pickpocket has taken nothing',
+         cont258(c105).disabled === true && cont258(c105).dataset.xfernav === '1'
+         && g105.data.shards === 40,
+         `dis=${cont258(c105).disabled} tag=${cont258(c105).dataset.xfernav} shards=${g105.data.shards}`);
+      theft258(c105).click(); await settle258();
+      ok('task258: §2.105 running the theft empties the purse and releases the exit',
+         g105.data.shards === 0 && !!cont258(c105) && cont258(c105).disabled === false,
+         `shards=${g105.data.shards} dis=${cont258(c105) && cont258(c105).disabled}`);
+
+      // The rule belongs to the gate, not to §2.105: the fight and forced-buy gates collect the
+      // same branch exit, though no section in books 1-6 pairs either with one.
+      const fb258 = gates.computeFightGate(parse('<section name="t258f"><fight name="Ogre" combat="5" defence="9" stamina="12"/><outcomes><success section="128"/><choice section="151">Ran away</choice></outcomes></section>'), new Set());
+      ok('task258: the fight gate holds a branch exit below the fight',
+         !!fb258 && fb258.navNodes.size === 2, fb258 ? 'n=' + fb258.navNodes.size : 'null');
+      const bb258 = gates.computeBuyGate(parse('<section name="t258b"><buy force="t" ship="barque"/><outcomes><success section="533"/></outcomes></section>'));
+      ok('task258: the forced-buy gate holds a branch exit below the buy',
+         !!bb258 && bb258.navNodes.size === 1, bb258 ? 'n=' + bb258.navNodes.size : 'null');
+      // Position is read the same way it is for a <goto>: a branch ABOVE the action is not held.
+      ok('task258: a branch exit above the forced action is untouched',
+         gates.computeTransferGate(parse('<section name="t258p"><outcomes><success section="128"/></outcomes><transfer shards="*" to="x"/></section>')) === null);
+      // A branch with no destination of its own is not an exit at all.
+      ok('task258: a branch carrying no section= is not collected',
+         gates.computeTransferGate(parse('<section name="t258n"><transfer shards="*" to="x"/><outcomes><success>You spot him.</success></outcomes></section>')) === null);
+
+      Math.random = rnd258;
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
 }

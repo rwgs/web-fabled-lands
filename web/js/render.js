@@ -1602,13 +1602,26 @@ export class Story {
   }
 
   // Tag a rendered nav button as held by the die inside its own <outcome> row, for
-  // applyOutcomeRollGate (task 257). Called with the nav NODE from tagRollNav above, and with
-  // the <outcome> ITSELF from revealBranch — that row's "Continue → N" is synthesised from
+  // applyOutcomeRollGate (task 257). Called with the nav NODE from tagRollNav above, and with the
+  // <outcome> ITSELF via tagBranchNav below — that row's "Continue → N" is synthesised from
   // section= with no node of its own, so it can only be marked where it is built.
   tagOutcomeRollNav(node, btn) {
     const gate = this.outcomeRollGate;
     if (!gate) return;
     if (gate.navNodes.has(node) || gate.outcomeNodes.has(node)) btn.dataset.ocrollnav = '1';
+  }
+
+  // A revealed branch's "Continue → N" is synthesised from its section= attribute and has no node
+  // of its own, so it was invisible to every node-keyed nav gate — §2.105's optional SCOUTING
+  // success handed out a live exit while the pickpocket's forced <transfer> stood unrun, and the
+  // thief got nothing. Task 257 tagged the roll gate here for the same reason; this asks the other
+  // three the same question of the BRANCH node, which each compute*Gate now collects beside the
+  // choice/goto/return elements. Called only from revealBranch. (task 258)
+  tagBranchNav(node, btn) {
+    this.tagFightNav(node, btn);
+    this.tagTransferNav(node, btn);
+    this.tagBuyNav(node, btn);
+    this.tagOutcomeRollNav(node, btn);
   }
 
   // The walk reached a roll: if it is a gated row's stake and still unmade, hold the row's exit.

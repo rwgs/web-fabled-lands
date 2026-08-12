@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-258 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **258, open under LOW** — file new work
+260 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **259–260, open under MEDIUM/LOW** — file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,11 +20,11 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-*(none open — file new MEDIUM work here)*
+- [ ] 259. A guard above the effect it reads is re-derived against live state on the next draw, so §2.105's pickpocket takes the money *and* a possession
 
 **LOW**
 
-- [ ] 258. A branch's `section=` exit is a button with no XML node, so every node-keyed gate but task 257's is blind to it (book2/105 keeps the pickpocket's takings)
+- [ ] 260. 18 tracked `books/**/*temp.xml` working copies declare a live section's `name=`, and every corpus census counts them twice
 
 **Done**
 
@@ -290,7 +290,9 @@ this order.*
 - [x] 255. Re-archive completed task details 212–254 and clear them out of the priority buckets
 - [x] 256. An `<itemcache>` ignores its cache lock, so §4.586's confiscation is undone by clicking Take
 - [x] 257. A roll revealed inside an `<outcome>` gates nothing, so §3.15's gambling debt is cancelled by not rolling for it
-- [ ] 258. A branch's `section=` exit is a button with no XML node, so every node-keyed gate but task 257's is blind to it (book2/105 keeps the pickpocket's takings)
+- [x] 258. A branch's `section=` exit is a button with no XML node, so every node-keyed gate but task 257's is blind to it (book2/105 keeps the pickpocket's takings)
+- [ ] 259. A guard above the effect it reads is re-derived against live state on the next draw, so §2.105's pickpocket takes the money *and* a possession
+- [ ] 260. 18 tracked `books/**/*temp.xml` working copies declare a live section's `name=`, and every corpus census counts them twice
 
 ---
 
@@ -470,6 +472,112 @@ gating action is untouched, as every other gate reads position.
 
 ---
 
+## 259. A guard above the effect it reads is re-derived against live state on the next draw, so §2.105's pickpocket takes the money *and* a possession
+
+**Priority: MEDIUM — one shipped section is really wrong (the player is robbed twice where the
+page says "or"), it arrives unasked rather than being clicked for, and the same shape sits in five
+more sections that need checking. It is not HIGH because the takings are recoverable at §2.174 and
+the extra loss is one possession, not a softlock.**
+
+*(Filed 2026-08-12, during task 258's implementation pass — the release half of §2.105's assertion
+would not go green, and the reason turned out to be the section robbing the player a second time.)*
+
+The walk re-derives every condition from scratch on each draw, so a guard that reads a resource
+**above** an effect that changes it sees the pre-effect value on the first draw and the post-effect
+value on every draw after. §2.105 is the section where that changes the outcome:
+
+```
+<if shards="1"><set var="x" value="1"/></if><else><set var="x" value="2"/></else>
+… <if var="x" equals="1"><transfer shards="*" to="2.105">stolen any money</transfer></if> …
+… <if var="x" equals="2">(If you had no money, he stole one possession instead -
+                          you <transfer item="?" limit="1" to="2.105">choose which</transfer>.)</if>
+```
+
+**Measured against a real `GameState`** (Warrior, 40 Shards, leather jerkin + battle-axe + map):
+on entry `x = 1`, the money transfer is the only live widget, no possession picker. Click it and the
+purse empties — and the redraw re-runs `<if shards="1">`, which is now **false**, so `x` flips to
+**2**, the "if you had no money" branch activates, and a live picker offers all three possessions.
+Take one (the picker is a forced transfer, so task 107's gate holds the section's exits until you
+do) and the sheet has lost 40 Shards **and** the jerkin. The page says the thief takes the money
+*or*, failing that, one possession; our engine makes it both, and the second loss is unavoidable.
+
+JaFL runs a section sequentially, top to bottom, once — so a guard above the transfer really does
+execute before it. That is the same rule task 216 already implements for the tick count
+(`walkTicks`: "the count an `<if ticks=>` guard reached HERE must read", starting from the entry
+snapshot and advancing as the walk passes each tick applied this visit), and tasks 253/254 for a
+re-armed roll's memos. The purse has no such walk-position reading.
+
+**Corpus reach — 6 sections** carry a resource guard above an effect on the same resource
+(`<if|elseif shards=|item=>` above a `<transfer|lose>` on that resource, the effect outside the
+guard): **book1/501**, **book1/523**, **book2/105**, **book5/376**, **book6/215**, **book6/49**.
+Only §2.105 is confirmed wrong so far; the other five want measuring the same way before anything
+changes, since a guard whose branch is *below* its own effect may well be what the page intends
+(book6/215's tiered "if you have 35 Shards … 50 Shards" prices read like a genuine cascade, and
+book1/523's bribe pays 5 Shards inside a `<group>` whose guard is above it). **Measure first, then
+fix only what the measurement condemns.** (Note the census must exclude `books/**/*temp.xml` — see
+task 260 — which is why the raw sweep reads 13 rows over 8 files.)
+
+**Fix (shape, to be settled by the measurement):** the narrowest form is a walk-position purse
+reading in the same idiom as `walkTicks` — snapshot the entry Shards, let an `<if shards=>` guard
+read the entry value until the walk has passed an applied money-moving effect, and only then the
+live one. A `<set var>` memo per visit would also close §2.105 but is wider: `<set>` is
+deliberately re-derived, and freezing it would break a var recomputed on purpose after a
+mid-section change. Whatever the form, it belongs beside `walkTicks` in `render.js`'s per-draw
+state, not in a condition evaluator that has no idea where the walk is.
+
+Tests: assert §2.105 with money and possessions loses the money and **nothing else**, that the
+possession picker never appears once the money branch has run, and that a player entering with an
+empty purse still loses exactly one possession; assert each of the other five sections behaves as
+its prose reads, whichever way the measurement lands.
+
+---
+
+## 260. 18 tracked `books/**/*temp.xml` working copies declare a live section's `name=`, and every corpus census counts them twice
+
+**Priority: LOW — the build and the app are unaffected (the file filter excludes them), so no
+player ever sees one. What they cost is measurement: they silently inflate every corpus census, and
+this backlog decides scope by census.**
+
+*(Filed 2026-08-12, during task 259's census — which reported `book1/501` and `book1/501temp` as
+two separate hits for the same defect, and `book6/215` three times over.)*
+
+`books/` holds **18** files tracked in git whose names end `temp.xml`: book1/501temp, book1/554temp,
+book2/248temp, book2/267temp, book2/542temp, book2/726temp, book3/635temp, book5/386temp,
+book6/160temp, book6/171temp, book6/215temp, book6/4temp, book6/533temp, book6/548temp,
+book6/628temp, book6/635temp, book6/691temp, book6/731temp. Each is a working copy of its
+non-`temp` sibling and — this is the part that bites — each declares the sibling's own section
+number inside: `books/book1/501temp.xml` opens `<section name="501">`, differing from `501.xml` only
+in an editor's comment.
+
+**Nothing reaches the app.** `build-data.ps1:152` keeps only `$_.BaseName -match '^\d+[a-z]?$'`,
+which `501temp` fails (the pattern allows one trailing letter, not four), so no `*temp` file is
+bundled and no JSON key collides — verified: no `web/data/*.json` has a key matching `[0-9]*temp`.
+It follows that they are **also unvalidated**, since `validate-source.ps1` gates the same file set:
+a tag outside the allowlist could sit in one indefinitely. And no section in books 1–6 links to a
+`temp` name, so they are unreachable as well as unbundled.
+
+The cost is the census. A sweep written the obvious way — `Get-ChildItem book*/*.xml` — reads a
+`temp` file as a section, so a defect present in `501.xml` is reported twice and one present only
+in the stale copy is reported as live. Task 259's first sweep did exactly this. Every task in this
+backlog that says "measured over every section in books 1–6" was written by hand against this
+directory, so the hazard is standing, not hypothetical.
+
+**Fix:** decide what they are, then make the tree say it. Two defensible ends, and the choice is
+the whole task: (a) they are stale scratch — delete them, and the hazard is gone for good; or (b)
+they are worth keeping as the editor's notes — move them out of `books/book<N>/` (a
+`books/notes/` sibling the build never walks) or rename them so no file under `books/` declares a
+`name=` that is not its own. **Do not simply extend the build filter**: the filter already excludes
+them; the problem is that they LOOK like sections to everything except the filter. Whichever way it
+goes, first diff each against its sibling and report which of the 18 carry content the live section
+does not — a `temp` copy holding the newer text would be a content bug hiding behind this one.
+
+Tests: this is tree hygiene, not engine behaviour, so the assertion belongs in the build gate —
+`validate-source.ps1` should fail on any file under `books/book<N>/` whose `<section name=>` does
+not match its own basename, which catches both this and a future mis-named section, and its
+fixture self-test (`validate-selftest.ps1`) should cover the mismatch both ways.
+
+---
+
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -479,6 +587,30 @@ gating action is untouched, as every other gate reads position.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-12 (implementation pass, task 258): closed **258** and filed **259** (MEDIUM) and
+**260** (LOW). The fix is one shared selector, one condition in the fight walk and one `tagBranchNav`
+call, and three things are worth carrying forward. **The measurement was run before the fix and it
+found the defect exactly as filed**, which is the point of insisting on it: §2.105 on entry draws a
+live theft widget with `pendingTransfer` set and its `<choice section="151">` correctly held, and a
+successful SCOUTING roll then drew `Continue → 128` **enabled** with all 40 Shards still in the purse
+— so the filing's "confirm against a real GameState before changing anything" was answered yes, and
+the assertion for it is now the regression test. **Two of the three gates are dead in the corpus and
+were still given the rule**, deliberately: no section in books 1–6 pairs a fight or a forced `<buy>`
+with a node-less branch exit, so the fight/buy halves hold nothing today and are asserted with
+synthetics. The reason to include them is that the rule is the gate's and not the section's — the
+transfer gate had exactly the same hole for years while the corpus happened to contain one section
+that exercised it, and the next converted book decides which of the three gets the next one. **The
+release half of the assertion is what found task 259**: it would not go green, and the reason was
+not this gate at all — §2.105 re-derives `<if shards="1">` on the redraw, so emptying the purse flips
+its "if you had no money he stole one possession instead" branch ON and robs the player a second
+time. The test now enters carrying nothing so the release is readable, with a comment naming 259;
+the guard-above-its-own-effect shape reads 6 sections and only §2.105 is confirmed wrong.
+Task **260** came out of 259's census: 18 tracked `*temp.xml` working copies under `books/` each
+declare their live sibling's `<section name=>`, so the raw sweep reported book1/501 twice and
+book6/215 three times. The build filter excludes them (`'^\d+[a-z]?$'` fails on `501temp`) so no
+player is affected — but every "measured over every section in books 1–6" line in this backlog was
+written against this directory. Suite reports **2572**, up 9.
 
 Worked 2026-08-12 (implementation pass, task 257): closed **257** and filed **258** (LOW). The fix
 is ~40 lines — one DOM-free planner, a tag/note/apply trio, two one-line hooks in the roll view —
