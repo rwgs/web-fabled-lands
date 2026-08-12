@@ -14,6 +14,7 @@ import { branchPlan, blessingSpendForReroll, isRollGate, viewPendingVars, provis
 // import, so render-rolls and render-choices no longer form an ES-module cycle. (task 163)
 import { animateDice } from './ui.js';
 import { diceWord, blessingLabel } from './render-util.js';
+import { dropRolledBranchMemos } from './visit-state.js';
 
 // ---- shared widgets --------------------------------------------------------
 
@@ -140,7 +141,14 @@ function rollGate(story, node, key) {
   const gated = flag != null && isRollGate(story.sectionEl, flag);
   const armed = gated ? story.state.getFlag(flag) : true;
   let stored = story.ctx.rolls.get(key);
-  if (gated && armed && stored) { story.ctx.rolls.delete(key); stored = null; }
+  if (gated && armed && stored) {
+    story.ctx.rolls.delete(key);
+    // …and the memos of what that result APPLIED go with it, or the same outcome landed twice
+    // in one visit renders its words and does nothing (task 253). Only on a genuine re-arm:
+    // the memo is what stops an effect re-firing on an ordinary rerender.
+    dropRolledBranchMemos(story.ctx, node);
+    stored = null;
+  }
   return { flag, gated, armed, stored };
 }
 

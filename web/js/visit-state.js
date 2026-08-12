@@ -35,6 +35,73 @@ export function resolveNodePath(path, sectionEl) {
   return n === sectionEl ? null : n;
 }
 
+// The branches a roll's result reveals — the subtrees whose memos a RE-ARMED roll must
+// forget. A lone <outcome> (inside a <choices> table) counts like the table itself.
+const ROLL_BRANCH_TAGS = new Set(['success', 'failure', 'outcomes', 'outcome']);
+// The roll elements whose var= write is undone along with their dropped result (below).
+const ROLL_TAGS = new Set(['random', 'difficulty', 'rankcheck', 'training']);
+// DOM node type / position constants, spelled as literals so this module never reaches for
+// the browser `Node` global (matching render-gates.js).
+const ELEMENT_NODE = 1;
+const DOCUMENT_POSITION_FOLLOWING = 0x04;
+
+// Is this node inside a branch THIS roll feeds — a <success>/<failure>/<outcomes>/<outcome>
+// positioned after it? Walks up to the section root. An ancestor branch never qualifies (a
+// containing node reports CONTAINS|PRECEDING, not FOLLOWING), so a roll nested inside an
+// earlier roll's outcome does not count itself as its own reveal.
+function inBranchAfterRoll(node, rollNode) {
+  for (let p = node.parentNode; p && p.nodeType === ELEMENT_NODE; p = p.parentNode) {
+    if (!ROLL_BRANCH_TAGS.has(p.tagName.toLowerCase())) continue;
+    if (rollNode.compareDocumentPosition(p) & DOCUMENT_POSITION_FOLLOWING) return true;
+  }
+  return false;
+}
+
+// Forget what a roll's PREVIOUS result revealed, because a fresh payment has re-armed that
+// roll (task 253). rollGate drops the stored result — that is what makes "pay again, spin
+// again" work — but the effects that result already applied keep their memos, and a memo is
+// per VISIT: land the same outcome twice in one visit and the second landing printed its
+// words and applied nothing. §3.314's second paid night at the tavern cost a Shard and no
+// Stamina moved; §2.157's second spin on the same number stood no picker at all.
+//
+// Scoped to the branch subtrees the roll feeds, and read from ctx.pathNodes (the walk's own
+// path→node map) rather than by prefix arithmetic, so the synthetic path segments the view
+// mints for a revealed outcome ('.o<i>') or a <choices> row ('.b<i>') need no special case.
+// What that scope deliberately leaves alone:
+//  - the payment ABOVE the roll, and anything below the table that the roll never revealed
+//    (§6.587's wand market) — neither is the old result's doing;
+//  - the per-visit award caps (awardCounts/groupPicks/groupLimits), so a second landing may
+//    re-apply its effect but a repeat can never become an item farm.
+// A roll NESTED inside such a branch drops its stored result too (§6.731's boon die lives
+// inside the CHARISMA roll's <success>): re-arming has to make the repeat re-roll it, or
+// clearing the outcome memos alone would hand out the same boon again on a guaranteed match.
+export function dropRolledBranchMemos(ctx, rollNode) {
+  if (!ctx || !rollNode || !ctx.pathNodes || !ctx.pathNodes.size) return;
+  // The node a '<kind>@<path>' memo key names, when it sits in one of those branches.
+  const revealed = (memoKey) => {
+    const node = ctx.pathNodes.get(memoKey.slice(memoKey.indexOf('@') + 1));
+    return node && inBranchAfterRoll(node, rollNode) ? node : null;
+  };
+  for (const key of [...ctx.applied]) {
+    if (!revealed(key)) continue;
+    ctx.applied.delete(key);
+    // A force="f" choose-one member records its pick twice (see renderForcedOptional): drop
+    // the group token with the memo, or the untaken siblings stay locked to a dead answer.
+    for (const [token, memo] of ctx.forcedChosen) if (memo === key) ctx.forcedChosen.delete(token);
+  }
+  for (const key of [...ctx.rolls.keys()]) {
+    const node = revealed(key);
+    if (!node) continue;
+    ctx.rolls.delete(key);
+    // Its var= write goes too, or the drop is only half done: a var-keyed table resolves on
+    // the WRITE and not on the roll (branchResolved), so leaving z marked written would make
+    // the old outcome re-reveal — and now, with its memo gone, re-APPLY — on the fresh payment
+    // alone, before the repeat has thrown a die. That is the farm this scope is guarding.
+    const v = node.tagName && ROLL_TAGS.has(node.tagName.toLowerCase()) ? node.getAttribute('var') : null;
+    if (v) { ctx.wroteVars.delete(v); ctx.rolledVars.delete(v); }
+  }
+}
+
 // Flatten a ctx to a plain, JSON-safe object. Maps→entry arrays, Sets→arrays; the roll and
 // fight values are already plain data. DOM references are never stored: pathNodes is rebuilt
 // lazily on render, and usedSource is recorded as its positional path (looked up in

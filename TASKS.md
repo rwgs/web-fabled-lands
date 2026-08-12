@@ -22,7 +22,8 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 253. A re-armed roll that lands the same outcome twice in one visit applies its effect once, so §3.314's second night at the tavern is paid for and does nothing
+- [ ] 254. A re-armed roll whose result is read by an `<if var=>` chain instead of an `<outcomes>` table keeps its memos, so §6.628's second paid night at the garret heals nothing
+- [x] 253. A re-armed roll that lands the same outcome twice in one visit applies its effect once, so §3.314's second night at the tavern is paid for and does nothing
 - [x] 251. A standing forfeit picker does not hold the section's exits, so book4/116's "cross three items (your choice)" is skippable
 - [x] 249. A mandatory check read only by its `<success>`/`<failure>` seeds no roll gate, so §5.198's Champion is fought uncursed — and the roll skipped for good
 - [x] 248. The roll gate holds the exits but not the `<fight>`, so §5.477's drake is fought before its jet lands
@@ -3142,11 +3143,79 @@ behaviour, so changing it is a rules decision, not a bug fix.
 
 ---
 
+## 254. A re-armed roll whose result is read by an `<if var=>` chain instead of an `<outcomes>` table keeps its memos, so §6.628's second paid night at the garret heals nothing
+
+**Priority: MEDIUM — the same cost-for-nothing as task 253, in the two sections that express the
+same idiom the other way; the page is re-enterable for a clean second go.**
+
+*(Filed 2026-08-11, measured while fixing task 253.)*
+
+Task 253 scoped `dropRolledBranchMemos` (`visit-state.js`) to the branches a roll *reveals* —
+the `<success>`/`<failure>`/`<outcomes>`/`<outcome>` subtrees after it — deliberately, so a memo
+the roll never produced (the payment above it, §6.587's wand market below the table) is untouched.
+Two sections read the same gated roll through an **`<if var=>`/`<elseif>` chain** instead, and
+their effects therefore sit outside every branch tag and keep their memos across a re-arm:
+
+- **book6/628** — the garret, §3.314's twin ("1 Shard a day … Each day you spend here,
+  `<random dice="1" flag="x" var="y"/>`"), whose 1-5 and 6 arms each wrap a `<group force="t">`.
+- **book6/50** — `<if var="roll" greaterthan="t">` → `<gain ability="thievery">`. One-shot in
+  practice (the price is the **dragon mask**, and there is only one), so the repeat path is
+  unreachable; listed because it shares the shape, not because it can be triggered.
+
+Measured on **book6/628** with the die pinned to 1 (the 1-5 "regain 1 Stamina" arm) and Stamina
+started at 4: night one paid a Shard (10 → 9) and the group's button healed to 5; re-paying took a
+second Shard (9 → 8) and left that button **☑ and disabled**, so Stamina stayed at 5. Two further
+details the probe turned up, both worth keeping straight in the fix:
+
+- the memo doing the blocking is `group@<path>` (`render-rewards.js:181`), not the `fx@`/`rest@`
+  keys task 253 dealt with, so the drop has to reach a group as well as a leaf effect;
+- **between the re-payment and the new roll the chain still shows the PREVIOUS day's arm** — `y`
+  stays in `ctx.wroteVars` with the old value, exactly the stale-write half task 253 had to undo
+  for a nested roll. So the var write is part of this too, and here it is the *re-armed roll's own*
+  var rather than a nested one's.
+
+**Fix:** widen what a re-arm forgets to the roll's result-*readers*, not just its revealed branches —
+and keep task 253's two constraints while doing it, since they are what stop the widening becoming
+a farm: the per-visit award caps (`ctx.awardCounts`, `groupPicks`, `groupLimits`) must still hold
+across two landings, and a memo may only ever be dropped on a genuine re-arm (it is what stops an
+effect re-firing on an ordinary rerender). Note the widening is **not** "everything after the
+roll": §6.587's market sits below its table and its `buy@`/`sell@` memos must survive, or a re-arm
+would re-open a completed purchase.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-11 (implementation pass, task 253): closed **253**, and filed **254** (MEDIUM). The
+re-arm now drops the memos of what the old result applied, scoped to the branch subtrees the roll
+reveals and read off `ctx.pathNodes` — the walk's own path→node map — rather than by prefix
+arithmetic, which is what lets the synthetic path segments the view mints for a revealed outcome
+(`.o<i>`) or a `<choices>` row (`.b<i>`) need no special case at all. Three things worth carrying
+forward. **The scope is the whole design**, and it was chosen against a corpus census, not by
+taste: only **15** sections carry a `flag=` roll paired with a matching `price=`, and of those only
+eight can actually re-arm (§2.122/§6.630's payment is a `<tick price= hidden>`, memoised per visit,
+so their shared `<success>` can never re-arm at all). "Everything after the roll" would have been
+simpler and wrong — §6.587's wand market sits below its table and its `buy@`/`sell@` memos must
+survive. **Widening the drop nearly introduced a worse bug than it fixed**, and the guard against
+it is measured: §6.731's boon die is *nested* inside the CHARISMA roll's `<success>`, so clearing
+the `<outcomes var="z">` memos alone re-granted the same boon **on the payment alone, with no die
+thrown** — because a var-keyed table resolves on the WRITE and not on the roll (`branchResolved`).
+Dropping a nested roll's `var=` from `ctx.wroteVars`/`rolledVars` with its stored result is what
+closes that, and sabotaging exactly those two deletes fails the two §6.731 assertions while every
+other one passes. The award caps (`awardCounts`/`groupPicks`/`groupLimits`) are deliberately left
+alone, so a second landing re-applies its effect but a repeat can never become an item farm.
+**Both halves of §3.314 are asserted, including the one the filing had not measured**: the 3-6
+"good rest" does share the defect, through `renderRest`'s own `rest@` key rather than `fx@` — the
+second night's button read "You have already rested here". Verified by sabotage twice: dropping the
+`dropRolledBranchMemos` call fails 7 assertions (§157 `picks=0`, §314 both branches, §731 the
+replayed die), dropping the var-write undo fails the 2 above. **Three consecutive full runs report
+2515.** What the sabotage turned up is **254**: §6.628 is §3.314's twin written as an `<if var=>`
+chain, so its effects sit outside every branch tag — measured, its second paid night takes the
+Shard and heals nothing.
 
 Worked 2026-08-11 (implementation pass, task 252): closed **252**, and filed **253** (MEDIUM).
 §2.157's spin is seeded twice and both halves are asserted: roll **1** stands the six-option

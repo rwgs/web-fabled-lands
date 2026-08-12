@@ -192,6 +192,23 @@ export async function run(ctx) {
     ok('§157 an outcome that asks nothing reopens exit (19) on the spin alone (task 30)',
        g157.data.stamina === stm157 - 3 && picks157().length === 0 && !!goto19() && goto19().disabled === false,
        `stam=${stm157}->${g157.data.stamina} picks=${picks157().length} dis=${goto19() && goto19().disabled}`);
+    // A third spin pinned back to outcome 1 — the SAME outcome as the first (task 253). The
+    // re-arm drops the memos of what the old result applied, not just the stored result, so the
+    // picker stands again; before that it stood no picker at all (picks=0, abilities untouched)
+    // because the first landing's fx@ memo was still set for this node.
+    pay157().click();
+    const comb157 = g157.abilityNatural('combat');
+    const _rnd157c = Math.random; Math.random = () => 0; // back to outcome range 1
+    roll157().click(); await settle();
+    Math.random = _rnd157c;
+    ok('§157 a repeat landing on the same outcome stands its picker again (task 253)',
+       g157.data.shards === 40 && picks157().length === 6 && !!goto19() && goto19().disabled === true,
+       `sh=${g157.data.shards} picks=${picks157().length} dis=${goto19() && goto19().disabled}`);
+    const repick157 = picks157().find((b) => /Combat/i.test(b.textContent));
+    if (repick157) repick157.click(); // a missing picker is the assertion above's failure, not this one's throw
+    ok('§157 …and the point the repeat names really leaves (task 253)',
+       g157.abilityNatural('combat') === comb157 - 1 && picks157().length === 0 && !!goto19() && goto19().disabled === false,
+       `combat=${comb157}->${g157.abilityNatural('combat')} picks=${picks157().length}`);
 
     // §3.314 tavern: 1 Shard/day, repeatable — the roll re-arms per payment.
     const g314 = GameState.create({ name:'W314', gender:'m', profession:'Warrior', book:3, adv });
@@ -204,10 +221,42 @@ export async function run(ctx) {
     ok('§314 roll gated before payment', !!roll314() && roll314().disabled === true);
     pay314().click();
     ok('§314 pay deducts 1 Shard and arms the roll', g314.data.shards === 9 && !!roll314() && !roll314().disabled, `sh=${g314.data.shards}`);
-    roll314().click(); await settle();
+    // Every spin below is pinned (task 252): each assertion reads the outcome it landed on, and
+    // the repeat pairs need the SAME outcome twice. 0 → a die of 1, 0.4 → 1+floor(0.4*6) = 3.
+    const spin314 = async (v) => { const p = Math.random; Math.random = () => v; roll314().click(); await settle(); Math.random = p; };
+    const stm314 = g314.data.stamina;
+    await spin314(0); // outcome 1 — Dysentery, <lose stamina="1">
     ok('§314 rolled once; pay re-enabled for another day', !!c314.querySelector('.die') && !!pay314() && !pay314().disabled);
+    ok('§314 a night on 1 costs 1 Stamina', g314.data.stamina === stm314 - 1, `st=${stm314}->${g314.data.stamina}`);
     pay314().click();
     ok('§314 re-pay deducts another Shard and re-arms', g314.data.shards === 8 && !!roll314() && !roll314().disabled, `sh=${g314.data.shards}`);
+    // task 253: the same outcome a second time must apply a second time. This is the measurement
+    // the finding was filed on — two paid nights took 2 Shards and 1 Stamina, so the second night
+    // was bought and did nothing, because the re-arm dropped the stored result and not the fx@
+    // memo of what that result had applied.
+    await spin314(0);
+    ok('§314 a second paid night on the same 1 costs Stamina again (task 253)',
+       g314.data.stamina === stm314 - 2 && g314.data.shards === 8, `st=${stm314}->${g314.data.stamina} sh=${g314.data.shards}`);
+    // …and the 3-6 "good rest" branch, the outcome a player actually repeats: it memoises through
+    // renderRest's own rest@ key rather than fx@, which the filing left unmeasured. Same defect —
+    // a second night's Rest button read "You have already rested here".
+    const rest314 = () => Array.from(c314.querySelectorAll('button')).find((b) => /^Rest \(/.test(b.textContent));
+    const doRest314 = () => { const b = rest314(); if (b && !b.disabled) b.click(); }; // a locked button is the assertion's business, not a throw
+    pay314().click();
+    await spin314(0.4); // outcome 3-6 — a good rest, <rest stamina="1">
+    ok('§314 a good rest stands a live Rest button', !!rest314() && rest314().disabled === false,
+       `rest=${!!rest314()} dis=${rest314() && rest314().disabled}`);
+    doRest314();
+    ok('§314 resting heals 1 Stamina and spends the night',
+       g314.data.stamina === stm314 - 1 && !!rest314() && rest314().disabled === true,
+       `st=${g314.data.stamina} dis=${rest314() && rest314().disabled}`);
+    pay314().click();
+    await spin314(0.4);
+    ok('§314 a second paid night on the same good rest offers the Rest button again (task 253)',
+       !!rest314() && rest314().disabled === false, `dis=${rest314() && rest314().disabled}`);
+    doRest314();
+    ok('§314 …and that rest really heals', g314.data.stamina === stm314 && g314.data.shards === 6,
+       `st=${g314.data.stamina} sh=${g314.data.shards}`);
 
     // §5.674 physician: flag "c" gate; paying must not cure/damage until the roll.
     const g674 = GameState.create({ name:'W674', gender:'m', profession:'Warrior', book:5, adv });
@@ -221,6 +270,37 @@ export async function run(ctx) {
     c674.querySelector('.pay-action').click();
     ok('§674 pay charges 25 and fires no outcome (stamina intact)', g674.data.shards === 75 && g674.data.stamina === stm674, `sh=${g674.data.shards} st=${g674.data.stamina}`);
     ok('§674 roll armed after paying', !!roll674() && !roll674().disabled);
+
+    // §6.731 shrine boon: the pay-to-roll gate sits on a CHARISMA <difficulty>, and the die that
+    // picks the boon is NESTED inside that roll's own <success>. Re-arming must drop that nested
+    // roll's stored result and its var write too (task 253) — clearing the <outcomes var="z">
+    // memos alone would hand out the same boon again on the payment, with no die thrown.
+    const g731 = GameState.create({ name:'W731', gender:'m', profession:'Warrior', book:6, adv });
+    g731.data.shards = 300; g731.data.abilities.charisma = 10; // 2d6 pinned to 12 clears Difficulty 18
+    const c731 = document.createElement('div');
+    const st731 = new Story(c731, g731, { navigate(){}, onDeath(){}, notify(){} });
+    const s731 = await data.getSection(6,'731'); st731.begin(s731,6,'731');
+    const live731 = () => Array.from(c731.querySelectorAll('.roll .btn-roll')).filter((b) => !b.disabled);
+    const pay731 = () => c731.querySelectorAll('.pay-action')[0]; // the roll's 100, not the difficulty-reducing one
+    const spin731 = async (v) => { const p = Math.random; Math.random = () => v; if (live731()[0]) live731()[0].click(); await settle(); Math.random = p; };
+    const max731 = g731.data.staminaMax;
+    pay731().click();
+    await spin731(0.99); // 2d6 = 12, +CHARISMA 10 vs Difficulty 18 → success, revealing the boon die
+    ok('§731 a successful CHARISMA roll stands the boon die unrolled', live731().length === 1, `live=${live731().length}`);
+    await spin731(0.4);  // 1 + floor(0.4*6) = 3 → permanent +1 Stamina
+    ok('§731 the boon die applies its outcome', g731.data.staminaMax === max731 + 1 && g731.data.shards === 200,
+       `max=${max731}->${g731.data.staminaMax} sh=${g731.data.shards}`);
+    pay731().click();
+    ok('§731 re-paying re-arms the CHARISMA roll and grants no boon on its own (task 253)',
+       g731.data.staminaMax === max731 + 1 && live731().length === 1 && g731.data.shards === 100,
+       `max=${g731.data.staminaMax} live=${live731().length} sh=${g731.data.shards}`);
+    await spin731(0.99);
+    ok('§731 the repeat stands a FRESH boon die rather than replaying the old outcome (task 253)',
+       g731.data.staminaMax === max731 + 1 && live731().length === 1,
+       `max=${g731.data.staminaMax} live=${live731().length}`);
+    await spin731(0.4);
+    ok('§731 …and the same boon landed twice applies twice (task 253)',
+       g731.data.staminaMax === max731 + 2, `max=${max731}->${g731.data.staminaMax}`);
 
     // --- task 31: <rest> with no stamina= restores Stamina to full ---
     const gR = GameState.create({ name:'R', gender:'m', profession:'Warrior', book:1, adv });
