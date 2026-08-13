@@ -1567,4 +1567,99 @@ export async function run(ctx) {
          rerolls218.join(' | ') === 'Use your blessing of COMBAT to reroll | Use your blessing of Luck to reroll',
          rerolls218.join(' | '));
     }
+
+    // --- task 273: a codeword the walk crossed off is still held at the guard above it ---------
+    // The walk-position ledger (tasks 259 + 261) booked the purse and the pack and nothing else, so
+    // a codeword condition was always re-derived against the live sheet — and a block that SPENDS
+    // the codeword gating it then retracted its own exit on the next draw. §2.143 prints the shape
+    // plainly: "If you have the codeword Bounty, delete it and turn to 601. If not, turn to 625",
+    // so after a rerender the player who HAD Bounty had it spent and could reach only the exit
+    // meant for the player who had not. Measured before the fix, with Bounty held: first draw
+    // →601 live, after story.rerender() →601 GRAYED. The "if not" exit sits outside the guard and
+    // is live throughout — that is the control, not the symptom.
+    {
+      const gray273 = (el) => !!(el && el.closest('.cond-inactive'));
+      const goto273 = (c, n) => Array.from(c.querySelectorAll('.goto')).find((b) => b.textContent.trim() === String(n));
+      const routes273 = (c, a, b) => `${a}=${goto273(c, a) ? (gray273(goto273(c, a)) ? 'gray' : 'live') : 'absent'}`
+        + ` ${b}=${goto273(c, b) ? (gray273(goto273(c, b)) ? 'gray' : 'live') : 'absent'}`;
+      const mk273 = (book, sec, setup) => {
+        const g = GameState.create({ name: 'T273', gender: 'm', profession: 'Warrior', book, adv });
+        if (setup) setup(g);
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate() {}, onDeath() {}, notify() {} });
+        return { g, c, st };
+      };
+
+      const bounty = mk273(2, '143', (g) => g.addCodeword('Bounty'));
+      bounty.st.begin(await data.getSection(2, '143'), 2, '143');
+      ok('task273: §2.143 spends Bounty and offers the →601 it was spent for',
+         !bounty.g.hasCodeword('Bounty') && !gray273(goto273(bounty.c, 601)) && !gray273(goto273(bounty.c, 625)),
+         `Bounty=${bounty.g.hasCodeword('Bounty')} ${routes273(bounty.c, 601, 625)}`);
+      bounty.st.rerender();
+      ok('task273: §2.143 a later draw still offers →601 to the player who paid the codeword',
+         !bounty.g.hasCodeword('Bounty') && !gray273(goto273(bounty.c, 601)) && !gray273(goto273(bounty.c, 625)),
+         `Bounty=${bounty.g.hasCodeword('Bounty')} ${routes273(bounty.c, 601, 625)}`);
+
+      // Control: never held it. The ledger only ever reads the sheet as RICHER than it is, so a
+      // visit that crossed nothing off cannot invent the codeword — the guard stays shut on both
+      // draws and only the printed "If not" route is open.
+      const noBounty = mk273(2, '143');
+      noBounty.st.begin(await data.getSection(2, '143'), 2, '143');
+      const shut273a = gray273(goto273(noBounty.c, 601)) && !gray273(goto273(noBounty.c, 625));
+      noBounty.st.rerender();
+      ok('task273: §2.143 without Bounty grays →601 on both draws and leaves →625 alone',
+         shut273a && gray273(goto273(noBounty.c, 601)) && !gray273(goto273(noBounty.c, 625)),
+         `first=${shut273a} later=${routes273(noBounty.c, 601, 625)}`);
+
+      // §6.32 is the same page in another book (Dog → 358, otherwise → 96).
+      const dog = mk273(6, '32', (g) => g.addCodeword('Dog'));
+      dog.st.begin(await data.getSection(6, '32'), 6, '32');
+      const first273b = !gray273(goto273(dog.c, 358)) && !gray273(goto273(dog.c, 96));
+      dog.st.rerender();
+      ok('task273: §6.32 keeps →358 live across a redraw once Dog is crossed off',
+         !dog.g.hasCodeword('Dog') && first273b && !gray273(goto273(dog.c, 358)) && !gray273(goto273(dog.c, 96)),
+         `Dog=${dog.g.hasCodeword('Dog')} first=${first273b} ${routes273(dog.c, 358, 96)}`);
+
+      // §2.633 is the click-driven form, and the one the filing's own census missed: the guard is
+      // an OR list (Bastion|Brush) and the deletions sit in a <group force="t">, so the codewords
+      // go the moment the player presses the button — with the exit INSIDE the guard, as §2.143's.
+      const bastion = mk273(2, '633', (g) => { g.addCodeword('Bastion'); g.addCodeword('Boysen'); });
+      bastion.st.begin(await data.getSection(2, '633'), 2, '633');
+      const btn633 = Array.from(bastion.c.querySelectorAll('.group-action')).find((b) => !b.disabled);
+      ok('task273: §2.633 offers the deletion group to a player holding Bastion', !!btn633);
+      if (btn633) btn633.click();
+      await new Promise((r) => setTimeout(r, 30));
+      ok('task273: §2.633 keeps →657 live after the group deletes the codewords that opened it',
+         !bastion.g.hasCodeword('Bastion') && !bastion.g.hasCodeword('Boysen')
+         && !gray273(goto273(bastion.c, 657)) && !gray273(goto273(bastion.c, 681)),
+         `Bastion=${bastion.g.hasCodeword('Bastion')} Boysen=${bastion.g.hasCodeword('Boysen')}`
+         + ` ${routes273(bastion.c, 657, 681)}`);
+
+      // The counter value goes with the codeword, because removeCodeword drops both: a `name=`
+      // guard above the deletion must keep reading the count the walk had there. No shipped
+      // section pairs the two today — the corpus census in suite-corpus is what says so — so this
+      // is synthetic, the way task 265's gaps were.
+      const shut273 = (c) => Array.from(c.querySelectorAll('.cond-inactive')).map((s) => s.textContent).join(' | ');
+      const lit273 = (c, re) => re.test(c.textContent) && !re.test(shut273(c));
+      const tally = mk273(1, 'x273', (g) => { g.addCodeword('Tally'); g.setCodewordValue('Tally', 3); });
+      tally.st.begin(parse('<section><p><if name="Tally" greaterthan="1">You had counted three.'
+        + ' <lose codeword="Tally" hidden="t"/></if><else>You had counted too few.</else></p></section>'), 1, 'x273');
+      const first273c = lit273(tally.c, /counted three/) && !lit273(tally.c, /too few/);
+      tally.st.rerender();
+      ok('task273: a name= guard above the deletion reads the count the walk had there',
+         tally.g.codewordValue('Tally') === 0 && first273c
+         && lit273(tally.c, /counted three/) && !lit273(tally.c, /too few/),
+         `value=${tally.g.codewordValue('Tally')} first=${first273c}`
+         + ` text=${tally.c.textContent.replace(/\s+/g, ' ').trim()}`);
+
+      // The asymmetry the ledger keeps, matching task 261's: only a TAKING is booked, so a
+      // codeword GAINED below a guard is read live and opens it on the next draw.
+      const gained = mk273(1, 'x273b');
+      gained.st.begin(parse('<section><p><if codeword="Torch">The way is lit.</if>'
+        + '<else>You stumble in the dark.</else> <tick codeword="Torch" hidden="t"/></p></section>'), 1, 'x273b');
+      gained.st.rerender();
+      ok('task273: a codeword GAINED below a guard is still read live',
+         gained.g.hasCodeword('Torch') && lit273(gained.c, /way is lit/) && !lit273(gained.c, /in the dark/),
+         `Torch=${gained.g.hasCodeword('Torch')} text=${gained.c.textContent.replace(/\s+/g, ' ').trim()}`);
+    }
 }

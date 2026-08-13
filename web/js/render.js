@@ -317,7 +317,7 @@ export class Story {
     this.onRender = opts.onRender || (() => {}); // called after each (re)render
     this.ctx = null;
     this.sectionEl = null;
-    this.spendSeen = { shards: 0, ids: new Set() }; // per-draw spend attribution (task 261), re-armed each draw
+    this.spendSeen = { shards: 0, ids: new Set(), cws: new Set() }; // per-draw spend attribution (task 261), re-armed each draw
     this.outcomeBlessings = new Set(); // blessing-guarded outcomes this section (task 108)
     this.sectionTodock = null;  // current section's todock= (task 81)
     this._sailExempt = null;    // ship id exempted from todock on a sail exit (task 81)
@@ -851,7 +851,7 @@ export class Story {
     // its descendants' and no Shard is booked twice (noteSpend, task 261). The ledger it feeds
     // (ctx.spends) is per visit; this counter is per draw, because a draw after the one that
     // applied an effect re-applies nothing and so marks nothing.
-    this.spendSeen = { shards: 0, ids: new Set() };
+    this.spendSeen = { shards: 0, ids: new Set(), cws: new Set() };
     // Blessing-guarded storm/capsize outcomes (task 108): the blessings named on this
     // section's <outcome blessing="X"> hazards. A held blessing vetoes that outcome
     // (renderBranch), and a non-hidden sibling <lose blessing="X"> is the deferred
@@ -1155,21 +1155,31 @@ export class Story {
     const own = (mark.shards - this.state.data.shards) - (this.spendSeen.shards - mark.seenShards);
     const held = new Set(this.state.data.items.map((it) => it.id));
     const lost = mark.items.filter((it) => !held.has(it.id) && !this.spendSeen.ids.has(it.id));
-    if (own <= 0 && !lost.length) return;
-    const rec = this.ctx.spends.get(path) || { shards: 0, items: [] };
+    // A codeword the node crossed off is a taking like any other (task 273), and carries the
+    // counter value it had when it went — removeCodeword drops the value with the codeword.
+    const lostCw = mark.codewords.filter((cw) => !this.state.hasCodeword(cw) && !this.spendSeen.cws.has(cw));
+    if (own <= 0 && !lost.length && !lostCw.length) return;
+    const rec = this.ctx.spends.get(path) || { shards: 0, items: [], codewords: {} };
     if (own > 0) { rec.shards += own; this.spendSeen.shards += own; }
     lost.forEach((it) => { rec.items.push(it); this.spendSeen.ids.add(it.id); });
+    lostCw.forEach((cw) => { rec.codewords[cw] = mark.codewordValues[cw] || 0; this.spendSeen.cws.add(cw); });
     this.ctx.spends.set(path, rec);
   }
 
   /** The spendable sheet as it stands, for a noteSpend() comparison after the node has run. */
   spendMark() {
-    return { shards: this.state.data.shards, items: this.state.data.items.slice(), seenShards: this.spendSeen.shards };
+    return {
+      shards: this.state.data.shards,
+      items: this.state.data.items.slice(),
+      codewords: Object.keys(this.state.data.codewords),
+      codewordValues: { ...this.state.data.codewordValues },
+      seenShards: this.spendSeen.shards,
+    };
   }
 
-  /** The purse and pack a condition at `path` must read — the sheet as of its OWN position
-   *  (task 261). Returns evaluateCondition opts, or null where live state already is that
-   *  reading (the common case: nothing spent this visit, or nothing spent below this node).
+  /** The purse, pack and codewords a condition at `path` must read — the sheet as of its OWN
+   *  position (tasks 261 + 273). Returns evaluateCondition opts, or null where live state already
+   *  is that reading (the common case: nothing spent this visit, or nothing spent below this node).
    *
    *  JaFL runs a section top to bottom exactly once, so a resource test is answered where the
    *  walk reaches it, before the price it is gating has been paid. Re-deriving it against the
@@ -1181,6 +1191,16 @@ export class Story {
    *  the exit the whole initiation is FOR — scroll spent, initiation unreachable. §6.215 charges
    *  35 Shards for a blessing attempt and grayed the block the player had just paid into. This is
    *  the `walkTicks` rule (task 216) for the purse and the pack.
+   *
+   *  A CODEWORD the walk crossed off is that same taking (task 273), and its guards print the
+   *  shape more plainly than any purse does: §2.143 is "if you have the codeword Bounty, delete it
+   *  and turn to **601**. If not, turn to **625**", so a redraw left the player who HAD *Bounty*
+   *  with it spent and only the exit meant for the player who had not. Ten shipped sections gate on
+   *  a codeword, delete that same codeword inside the guard and enclose a `<goto>` (censused in
+   *  suite-corpus); eleven more enclose prose only, and those merely grayed a sentence describing
+   *  what had just happened. The counter value goes into the ledger with the codeword because
+   *  removeCodeword drops both, so a `<if name="X">` below the deletion would otherwise read 0
+   *  where the walk still had the count — the `ticks=` half of that pairing is task 216's.
    *
    *  The ledger records only what the visit TOOK, so the reading is only ever richer than live
    *  state, never poorer — and that is what makes it free of the guard's phrasing (task 261).
@@ -1194,8 +1214,8 @@ export class Story {
    *  - a GAIN below the guard, so an award or a Take still opens the choice that needs it on the
    *    next draw rather than waiting for a re-entry;
    *  - a `cache=` test, which asks after a stash and not the sheet (evaluateCondition);
-   *  - everything but the purse and pack — a `curse=`/`var=`/`codeword=`/`blessing=` test is not
-   *    a resource a spend can retract, which is what task 133's lift-from-the-sheet ("the choice
+   *  - everything but the purse, the pack and the codewords — a `curse=`/`var=`/`blessing=` test is
+   *    not a resource a spend can retract, which is what task 133's lift-from-the-sheet ("the choice
    *    turns live without re-entering") and task 181's wait-for-your-roll both require. §6.49's
    *    `<if safeAddGod="Juntoku">` and §6.215's `<if blessing="storm" not="t">` go false because
    *    the reward LANDED, and graying is then the right answer — the page says as much ("You can
@@ -1208,15 +1228,18 @@ export class Story {
     if (!this.ctx.spends.size) return null;
     let shards = 0;
     let items = null;
+    let codewords = null;
     for (const [p, rec] of this.ctx.spends) {
       if (comparePaths(p, path) <= 0) continue; // at or above this node — live state already reads it
       shards += rec.shards;
       if (rec.items.length) (items || (items = [])).push(...rec.items);
+      for (const cw of Object.keys(rec.codewords)) (codewords || (codewords = {}))[cw] = rec.codewords[cw];
     }
-    if (!shards && !items) return null;
+    if (!shards && !items && !codewords) return null;
     const opts = {};
     if (shards) opts.shardsNow = this.state.data.shards + shards;
     if (items) opts.itemsNow = this.state.data.items.concat(items);
+    if (codewords) opts.codewordsNow = codewords;
     return opts;
   }
 
@@ -1248,9 +1271,10 @@ export class Story {
    *    poor crew poor→average→good→excellent for nothing. `canUpgradeCrew` is no defence: it
    *    enforces one grade per CLICK, which each click honestly is.
    *
-   *  Task 261's ledger cannot state either. It books the purse and the pack and nothing else,
-   *  deliberately (see sheetAt — a `blessing=`/`curse=`/`var=` test must keep reading live for
-   *  task 133's lift-from-the-sheet and for §6.215's "only one Safety from Storms at a time"),
+   *  Task 261's ledger cannot state either. It books the purse, the pack and the codewords and
+   *  nothing else, deliberately (see sheetAt — a `blessing=`/`curse=`/`var=` test must keep
+   *  reading live for task 133's lift-from-the-sheet and for §6.215's "only one Safety from
+   *  Storms at a time"),
    *  half of §6.160's price is a blessing, and a crew grade is a GAIN, which the ledger reads
    *  live on purpose. Holding the branch says what the page says without asking what KIND of
    *  thing moved, and it is scoped by the memo's path, so only the branch that really acted is

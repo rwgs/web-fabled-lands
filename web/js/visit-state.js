@@ -192,7 +192,7 @@ export function serializeCtx(ctx) {
     awardCounts: [...ctx.awardCounts],
     stock: [...ctx.stock],
     boxTicks: [...ctx.boxTicks],
-    spends: [...ctx.spends].map(([p, rec]) => [p, { shards: rec.shards, items: rec.items }]),
+    spends: [...ctx.spends].map(([p, rec]) => [p, { shards: rec.shards, items: rec.items, codewords: rec.codewords }]),
     usedSourcePath,
   };
 }
@@ -290,12 +290,19 @@ export function deserializeCtx(rec, sectionEl) {
   // it had bought. Feeds a condition straight from an untrusted save, so it is coerced: a memo
   // path keyed to a non-negative Shard figure and named possessions, anything else dropped. The
   // ledger only ever makes a guard read the sheet as RICHER than it is, never poorer, so a bogus
-  // entry can at worst hold one branch of a chain in the reading it had on entry.
+  // entry can at worst hold one branch of a chain in the reading it had on entry. A crossed-off
+  // codeword rides along the same way (task 273), keyed to the counter value it carried.
   arr(r.spends).forEach((e) => {
     if (!Array.isArray(e) || e.length !== 2 || typeof e[0] !== 'string' || !e[1] || typeof e[1] !== 'object') return;
     const shards = frameNum(e[1].shards, 0, { min: 0, int: true });
     const items = arr(e[1].items).filter((it) => it && typeof it === 'object' && typeof it.name === 'string');
-    if (shards > 0 || items.length) ctx.spends.set(e[0], { shards, items });
+    const codewords = {};
+    const cwRec = e[1].codewords && typeof e[1].codewords === 'object' ? e[1].codewords : {};
+    for (const [cw, v] of Object.entries(cwRec)) {
+      const n = frameNum(v, NaN, { int: true });
+      if (cw && Number.isFinite(n)) codewords[cw] = n;
+    }
+    if (shards > 0 || items.length || Object.keys(codewords).length) ctx.spends.set(e[0], { shards, items, codewords });
   });
   if (r.usedSourcePath) ctx.usedSource = resolveNodePath(r.usedSourcePath, sectionEl);
   rebuildVisitScaffold(ctx, sectionEl);

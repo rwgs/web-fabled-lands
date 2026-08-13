@@ -4,9 +4,9 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 272 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **273 is open** under MEDIUM. File new work
-under the priority bucket that fits, and record the pass in the Review
-log. Completed detail sections are archived in
+misdiagnosis (see the Review log); **273 is complete**, so every bucket is clear.
+File new work under the priority bucket that fits, and record the pass in the
+Review log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
 
@@ -20,7 +20,9 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 273. The walk-position ledger tracks the purse and the pack but not codewords, so a block that spends the codeword gating it retracts its own exit on the next draw — §2.143 deletes *Bounty* and grays the →601 it deleted it for
+*(none open — file new MEDIUM work here)*
+
+- [x] 273. The walk-position ledger tracks the purse and the pack but not codewords, so a block that spends the codeword gating it retracts its own exit on the next draw — §2.143 deletes *Bounty* and grays the →601 it deleted it for
 
 **LOW**
 
@@ -1354,6 +1356,17 @@ codeword inside the guard; 9 of them enclose a `<goto>`** and are the ones that 
 happened, which is wrong-to-fact but costs no route. (Counted over the `^\d+[a-z]?$` basenames of
 books 1–6 only, per task 270 — `book2/temp/322old.xml` matches the shape and is excluded.)
 
+**Correction, made while fixing this (see the Review log): the census above matches the guard's
+codeword ATTRIBUTE against the `<lose>`'s and so misses a tenth goto-carrying section.** §2.633
+gates on an OR list — `<if codeword="Bastion|Brush">` — and deletes *Bastion*, *Brush* and *Boysen*
+from inside a `<group force="t">`, with `<goto section="657"/>` in the same guard. It is also the
+**sharpest** case, because the group is click-driven: the codewords go when the player presses the
+button, so the exit grays on the redraw that same click triggers. Re-measured by walking the tags
+instead of the attribute text: **26 such guards over 21 sections — 10 enclosing a `<goto>`
+(§2.633 added), 16 over 11 further sections enclosing prose only**. The 21/20/9/12 above also
+counts §2.229's five-branch `<elseif>` chain, each branch of which deletes the codeword it gates
+on, as a single guard.
+
 The fix is 261's, widened: give `spendMark`/`noteSpend` the codewords (and codeword values) the walk
 removed, and let `sheetAt` answer a codeword condition from the position the walk had reached, the
 way it already answers `shards=`/`item=`. The alternative — rewriting the 8 sections to hoist the
@@ -1362,8 +1375,10 @@ itself a trap for the next section that prints it.
 
 **Test:** `suite-render` assertions over §2.143 and §6.32 — the exit inside the guard is live on the
 first draw **and after `rerender()`**, with the codeword spent in both; the control that the "if not"
-exit is unaffected; and a `suite-corpus` census pinning those 9 goto-carrying sections, so a tenth
-arriving lands on it.
+exit is unaffected; and a `suite-corpus` census pinning those goto-carrying sections, so a further
+one arriving lands on it. (Done: §2.633's group click too, per the correction above, plus a
+synthetic `name=` guard above the deletion and the control that a codeword GAINED below a guard is
+still read live.)
 
 ---
 
@@ -1376,6 +1391,34 @@ arriving lands on it.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-13 (implementation pass, task 273): closed **273**, filing nothing — every bucket is
+now clear, so the next pass starts from `ROADMAP.md`. Took the filing's own recommendation and
+widened task 261's ledger rather than rewriting the sections: `spendMark` also snapshots the
+codewords (and their counter values), `noteSpend` books the ones the node crossed off, and
+`sheetAt` hands them to `evaluateCondition` as `opts.codewordsNow`, which `codeword=` reads through
+`matchCodewords` and `name=` through the value. Three things worth carrying forward, and the first
+is that **the filing's census was wrong in the direction that matters — it named 9 goto-carrying
+sections and the corpus holds 10.** The missing one is §2.633, and it is missing for a reason worth
+keeping: its guard is an OR list (`<if codeword="Bastion|Brush">`) and its four `<lose>` nodes sit
+inside a `<group force="t">`, so a scan matching the guard's attribute STRING against the lose's
+never paired them. Re-measured by walking the tags instead (26 guards over 21 sections; 10 enclose
+a `<goto>`, 16 over 11 further sections enclose prose only, where the filing said 21/20/9/12 — it
+also counted §2.229's five-branch `elseif` chain as one guard). §2.633 is also the sharpest case,
+because it is **click-driven**: the codewords go when the player presses the group's button, and
+the →657 the button is FOR grayed on the redraw that same click triggers, where §2.143 at least
+needed some later `rerender()`. **A census that matches attribute text cannot find the guard that
+spells its codeword differently** — the same shape as task 272's "a census filtered on the symptom
+cannot find the form that shares the cause". Second: **the value has to ride along with the
+codeword**, because `removeCodeword` deletes `codewordValues[cw]` too, so restoring the codeword
+alone would answer an `<if name="X" greaterthan="1">` above the deletion with 0 — the `ticks=` half
+of that pairing is task 216's, and no shipped section pairs `name=` with a spend today (the census
+says so), so that assertion is synthetic. Third: the reading stays **asymmetric on purpose** — only
+a taking is booked, so a codeword GAINED below a guard is still read live, exactly as a Shard is.
+Ten assertions across `suite-render` and `suite-corpus`, four of which fail with the old behaviour
+restored (drop `opts.codewordsNow` and §2.143 reports `601=gray 625=live` verbatim); the six that
+stay green with it are the first-draw controls, the never-held control, the gain-reads-live rule
+and the census. Suite **2694 → 2704**.
 
 Worked 2026-08-13 (implementation pass, task 272): closed **272**, filing nothing — the buckets are
 now clear, so the next pass starts from `ROADMAP.md`. Took the recommendation and aligned the fourth

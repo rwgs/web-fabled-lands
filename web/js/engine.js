@@ -217,7 +217,16 @@ export function evaluateCondition(el, state, opts = {}) {
   const itemPool = cacheN != null ? state.cacheItems(cacheN) : (opts.itemsNow || state.data.items);
   const safeAdd = get('safeAddGod');
 
-  add(get('codeword'), () => matchCodewords(state, get('codeword')));
+  // …and a codeword the walk has already DELETED below this node is still held here, for the same
+  // reason (task 273): §2.143 is "if you have the codeword Bounty, delete it and turn to 601",
+  // so re-deriving the guard live retracted the exit the deletion had bought. `opts.codewordsNow`
+  // maps each such codeword to the counter value it carried when it went (removeCodeword drops
+  // both), so a `name=` test below the deletion reads that value rather than 0.
+  const goneCw = opts.codewordsNow || null;
+  const hasCw = (cw) => state.hasCodeword(cw) || (goneCw != null && goneCw[cw] !== undefined);
+  const cwValue = (nm) => (goneCw != null && goneCw[nm] !== undefined ? goneCw[nm] : state.codewordValue(nm));
+
+  add(get('codeword'), () => matchCodewords(get('codeword'), hasCw));
   // A section runs SEQUENTIALLY in JaFL, so a ticks= guard reads the box count as of its OWN
   // position: `opts.ticksNow` is the entry snapshot plus the ticks this visit has already
   // applied ABOVE this node, which the renderer's walk tracks (task 216) — §4.467's
@@ -251,7 +260,7 @@ export function evaluateCondition(el, state, opts = {}) {
   add(get('dead'), () => state.isDead() === boolAttr(get('dead')));
   add(get('book'), () => bookAvailable(get('book')));
   add(get('var'), () => { const v = state.getVar(get('var')); const cmp = compare(v); return cmp == null ? v !== 0 : cmp; });
-  add(get('name'), () => { const v = state.codewordValue(get('name')); const cmp = compare(v); return cmp == null ? v !== 0 : cmp; });
+  add(get('name'), () => { const v = cwValue(get('name')); const cmp = compare(v); return cmp == null ? v !== 0 : cmp; });
   // ability= is a standalone stat test ONLY without an equipment selector; with a
   // tool=/weapon=/armour= present, ability=/bonus= describe the ITEM being sought
   // (a MAGIC+6 tool) and fold into matchEquipment's pattern — never a separate OR
@@ -404,11 +413,11 @@ function matchCargo(ship, spec) {
   return list.some((x) => canonCargo(x) === want);
 }
 
-function matchCodewords(state, spec) {
+function matchCodewords(spec, has) {
   // comma => AND, pipe => OR, single => has
-  if (spec.includes(',')) return spec.split(',').every((c) => state.hasCodeword(c.trim()));
-  if (spec.includes('|')) return spec.split('|').some((c) => state.hasCodeword(c.trim()));
-  return state.hasCodeword(spec.trim());
+  if (spec.includes(',')) return spec.split(',').every((c) => has(c.trim()));
+  if (spec.includes('|')) return spec.split('|').some((c) => has(c.trim()));
+  return has(spec.trim());
 }
 
 export function boolAttr(v, def = false) {
