@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-270 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **271, open under LOW** — file new work
+271 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **272, open under LOW** — file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -28,7 +28,8 @@ there once the buckets below are clear.
 - [x] 268. `applyAdjust`'s crew branch spells the CREW_LEVELS ordinal out a second time and has no crewless guard, so a future bare `<adjust crew= amount=>` grants the grade §5.192 charges for
 - [x] 269. `applyAdjust`'s four surviving branches each duplicate a `<gain>`/`<tick>` that already does the job, and no corpus `<adjust>` of any kind is bare — only `crew=` says so
 - [x] 270. Every by-hand corpus census globs `books/**/*.xml` and counts the 20 superseded `temp/` working copies, so task 269 was filed with 569 `<adjust>` nodes where the shipped corpus holds 558
-- [ ] 271. A strongroom's Store button is the one taker that ignores a `keep` tag, so §4.103's white sword — "you can never lose this sword" — can be left behind in §1.177's town house
+- [x] 271. A strongroom's Store button is the one taker that ignores a `keep` tag, so §4.103's white sword — "you can never lose this sword" — can be left behind in §1.177's town house
+- [ ] 272. `<transfer>` honours the keep rule for `item="*"` only, where `<lose>` honours every generic selector, so §2.105's pickpocket steals the white sword off a sheet carrying nothing else
 
 **Done**
 
@@ -1238,6 +1239,71 @@ strongroom lands on it.
 
 ---
 
+## 272. `<transfer>` honours the keep rule for `item="*"` only, where `<lose>` honours every generic selector, so §2.105's pickpocket steals the white sword off a sheet carrying nothing else
+
+**Priority: LOW — the two sections a player opts into are `force="f"`, and the one forced theft
+needs a sheet carrying the kept item and nothing else, then hands it back at §2.174. What it
+breaks, again, is a printed absolute.**
+
+*(Filed 2026-08-13, closing task 271: the strongroom was the fifth taker, and checking the fourth
+against the same doctrine found it disagreeing with the first.)*
+
+Task 271 fixed `renderItemCache` by the rule `applyKeepRule` states (`engine.js:1115-1118`): a
+**generic** selector spares a kept possession while any ordinary item satisfies it, and only an
+**explicitly named** selector with no ordinary alternative may hand it over. `loseItemMatches`
+applies that to every non-`*` selector from the player (`engine.js:1142`), which is why task 118's
+own assertion reads "`item="?"` against an only-kept inventory takes nothing".
+
+**`transferMovers` applies it to `item="*"` and nothing else.** `include.all` is
+`!kind && pattern === '*'` (`engine.js:1096`), so only that one form reaches the keep filter at
+`engine.js:1173`; every other selector falls through to `transferMatch`, which has no keep test at
+all. The comment at `engine.js:1163-1165` states this as a decision ("keep protection (plain
+`item="*"` from the player only)") — so the defect is that the decision contradicts the doctrine
+two modules over, not that the code forgot.
+
+Measured, not inferred — `transferPlan` in Node against a sheet carrying only
+`<weapon name="white sword" bonus="8" tags="keep"/>`:
+
+| node | `movers` | `canPay` |
+| --- | --- | --- |
+| §2.105 `<transfer item="?" limit="1" to="2.105">` | `["white sword"]` | `true` |
+| §6.635 `<transfer weapon="?" limit="1" to="6.635" force="f">` | `["white sword"]` | `true` |
+| §6.310 `<transfer item="?" to="6.310" force="f">` | `["white sword"]` | `true` |
+| control `<transfer item="*">` | `[]` | `false` |
+
+Censused over the shipped corpus (per task 270): **five** player-source `<transfer>` nodes carry a
+non-`*` item selector — the three above, §4.456's `item="?" bonus="1"`, and §6.635's second node,
+`item="paper sword"`, which is explicitly named and therefore **correct as it stands**.
+
+The three that matter differ in how much they cost, and the ordering is not the obvious one:
+
+- **§2.105 is the paradigm case and the only forced one.** "he stole one possession instead" — a
+  pickpocketing, which is precisely the generic theft `applyKeepRule` exists to stop. With one
+  mover and `limit="1"`, `needChoice` is false, so it applies with no prompt: the player is not
+  offered the choice the page says they have ("you choose which"). §2.174 transfers back
+  `from="2.105"`, so it is recoverable — and §2.105's own entry `<lose item="*" cache="2.105"
+  hidden="t"/>` cannot wipe it in the meantime, since that sweep spares keep items in a cache too
+  (`engine.js:642`).
+- **§6.310 is the one with no way back.** No section anywhere transfers `from="6.310"`, so an item
+  presented to the doorkeeper is gone for good. `force="f"` — the player opts in — but that is
+  exactly the strongroom's shape, and task 271 fixed the strongroom.
+- **§6.635 is the mildest**: `force="f"`, and §6.746 transfers `from="6.635"`, which is what makes
+  the page's "you might get it back" true.
+
+The fix and the fork are 271's: either make `transferMovers` apply `applyKeepRule` to its include
+selector (aligning the fourth taker with the first, and letting §6.635's named `paper sword` node
+keep working through the named-selector escape), or document at `engine.js:1163` why a transfer
+deliberately reads the rule differently from a lose. The first is the recommendation — the
+disagreement between `<lose item="?">` and `<transfer item="?">` on the same sheet is not a
+distinction any page draws.
+
+**Test:** `suite-actions` assertions over `transferPlan` for the three corpus forms against a
+kept-only sheet (movers empty), the control that an ordinary possession still moves, the control
+that §6.635's named `item="paper sword"` still moves a kept one, and the census that those five
+non-`*` player-source transfers are the whole set — so a sixth lands on it.
+
+---
+
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -1247,6 +1313,30 @@ strongroom lands on it.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-13 (implementation pass, task 271): closed **271** and filed **272** (LOW). Took the
+filing's own recommendation — option (2), offered-but-disabled with a reason — so the deposit list
+reuses the `store.disabled = true; store.title = reason` branch §2.617 already had. The rule itself
+went nowhere near the view: `isKeep` is now exported from `engine.js` and `classify` splits into
+`classifyFilters` plus a keep override, so the strongroom tests the same predicate the other four
+takers do rather than growing its own copy. Three things worth carrying forward. **The negative
+control is the part that earned its keep** — with the override stubbed out, five of the eleven new
+assertions fail, and the §1.177 line prints the defect verbatim (`Store White Sword (Combat
++8):false`, i.e. enabled). A render assertion that only ever ran green against the fix would not
+have distinguished "the button is disabled" from "the button was never built". **The keep test has
+to run AFTER the filters, not before it**, and the ordering is not cosmetic: `classify` returns
+`candidate` separately from `eligible`, and an early return would have made a kept *tool* a
+candidate at §2.617, listing a disabled button at a smithy that takes only weapons and armour —
+inventing a widget row where the bug was an over-permissive one. The suite pins that
+(`§2.617 never offers a kept item of the wrong kind`). Where both apply, keep's reason now wins over
+the filter's; both are true, and keep is the more fundamental. **Closing the fifth taker is what
+found the fourth disagreeing**, which is 272: `transferMovers` reaches its keep filter only for
+`item="*"`, so `<transfer item="?">` from the player moves a kept possession where `<lose item="?">`
+spares it — measured through `transferPlan` in Node, `movers=["white sword"]` against a control of
+`[]`, for all three of the corpus's generic player-source transfers. §6.310 is the sharpest (nothing
+transfers back `from="6.310"`), not §2.105, which is the only forced one but hands back at §2.174.
+Census: 31 `<itemcache>` nodes, 30 bare, §2.617 alone filtered — pinned in the suite, so a new
+filtered strongroom moves the count and wants reading. Suite **2673 → 2684**.
 
 Worked 2026-08-13 (docs-accuracy pass, task 270): closed **270**, filing nothing. Four things worth
 carrying forward, and the first is that the glob is worse than the task says. **`temp/` is only half

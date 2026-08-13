@@ -6,7 +6,7 @@
 // boughtItem/hookMatches/applyLinkedCargoBuys are internal helpers. The economy RULES live
 // in market.js / engine.js; this only builds the widgets and wires the clicks.
 
-import { applyEffect, applyEffectBody, boolAttr, resolveValue, applyRest, buyResurrectionDeal, readItemEffects, filterMatches, transferPlan } from './engine.js';
+import { applyEffect, applyEffectBody, boolAttr, resolveValue, applyRest, buyResurrectionDeal, readItemEffects, filterMatches, transferPlan, isKeep } from './engine.js';
 import { shopKind, goodsFrom, ownsGoods, hasCargoSpace, buyTrade, sellTrade, sellPlan, applyInlineBuy, buyOptions, sellInlineItem, sellCargo, canUpgradeCrew } from './market.js';
 import { normalize, parseTags, splitItemName, isShardsCurrency } from './state.js';
 import { canonCargo } from './rules.js';
@@ -672,7 +672,7 @@ export function renderItemCache(story, container, node, path) {
   // rejected candidate (right kind, but excluded) shows a disabled button with the
   // reason; an item of the wrong kind entirely is simply not offered. (task 97)
   const filters = Array.from(node.children).filter((c) => /^(include|exclude)$/i.test(c.tagName));
-  const classify = (it) => {
+  const classifyFilters = (it) => {
     if (!filters.length) return { eligible: true, candidate: true, reason: null };
     let member = filters[0].tagName.toLowerCase() === 'exclude'; // exclude-first ⇒ start included
     let candidate = member, reason = null;
@@ -682,6 +682,19 @@ export function renderItemCache(story, container, node, path) {
       else { member = false; reason = f.getAttribute('reason') || reason; }
     }
     return { eligible: member, candidate, reason };
+  };
+  // A strongroom is the fifth taker, and it obeys the keep rule like the other four
+  // (applyLose's item="*", itemAt=, losePaymentPlan, transferMovers): a keep-tagged
+  // possession is one the books promise cannot be lost, and §4.103's white sword must
+  // still be with you after a resurrection — which nothing parked in a cache ever is,
+  // since nothing moves a cache's contents. Offered but disabled with the reason, the
+  // way §2.617 already refuses a candidate, because a button missing from an otherwise
+  // complete list reads as a bug. A NAMED <lose item="white sword"> is untouched: that
+  // escape is applyKeepRule's and stays correct. (task 271)
+  const classify = (it) => {
+    const c = classifyFilters(it);
+    if (c.candidate && isKeep(it)) return { eligible: false, candidate: true, reason: 'You can never be parted from this.' };
+    return c;
   };
   const atLimit = limit > 0 && stored.length >= limit;
   const carried = story.state.data.items;

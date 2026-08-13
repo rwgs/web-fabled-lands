@@ -1857,4 +1857,98 @@ export async function run(ctx) {
     st19.begin(sec19, 1, '19');
     ok('task216: §1.19 third visit gains Anvil', g19.hasCodeword('Anvil'), `boxes=${g19.tickCount(1, '19')}`);
 
+    // --- task 271: a strongroom is a taker, so it obeys the keep rule too ---
+    // §4.103's white sword is "you can never lose this sword … even if you die and are
+    // resurrected elsewhere, the sword will still be with you". Nothing moves a cache's
+    // contents, so a sword parked in §1.177's town house does not follow a resurrection —
+    // and the deposit list was the one taker that offered a live button for it, where
+    // <lose item="*"/> on the same sheet spares it. Offered-but-disabled, not absent: the
+    // §2.617 affordance already says why, and a missing button reads as a bug.
+    {
+      const stores271 = (root) => Array.from(root.querySelectorAll('.item-cache .cache-deposit .btn-mini'));
+      const storeFor = (root, label) => stores271(root).find((b) => new RegExp(label, 'i').test(b.textContent));
+      const whiteSword = () => makeItem('weapon', 'white sword', 8, null, ['keep']); // §4.103, verbatim
+      const mk271 = (book, sec, path, items) => {
+        const g = GameState.create({ name: 'T271', gender: 'f', profession: 'Warrior', book, adv });
+        g.data.items = items;
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate(){}, onDeath(){}, notify(){} });
+        st.begin(sec, book, path);
+        return { g, c, st };
+      };
+
+      // (1) The bare <itemcache> — 30 of the corpus's 31 — with one kept and one ordinary item.
+      const bare271 = parse('<section name="T271"><p>Strongroom.</p><itemcache name="t271" text="Shelf"/></section>');
+      const a271 = mk271(1, bare271, 'T271', [whiteSword(), makeItem('weapon', 'axe', 1)]);
+      const swordBtn = storeFor(a271.c, 'white sword'), axeBtn = storeFor(a271.c, 'axe');
+      ok('task271: a bare strongroom still offers Store for an ordinary possession, enabled',
+         !!axeBtn && !axeBtn.disabled, axeBtn ? `disabled=${axeBtn.disabled}` : 'no button');
+      ok('task271: the kept sword\'s Store is offered but disabled, with a reason',
+         !!swordBtn && swordBtn.disabled && /never be parted/i.test(swordBtn.title || ''),
+         swordBtn ? `disabled=${swordBtn.disabled} title=${swordBtn.title}` : 'no button');
+      swordBtn.click();
+      ok('task271: clicking it leaves the sword on the sheet and the shelf empty',
+         a271.g.findItems('white sword').length === 1 && a271.g.cacheItems('t271').length === 0,
+         `carried=${a271.g.data.items.map((i) => i.name).join(',')} cache=${a271.g.cacheItems('t271').length}`);
+      axeBtn.click();
+      ok('task271: the ordinary axe still stores normally',
+         a271.g.findItems('axe').length === 0 && a271.g.cacheItems('t271').map((i) => i.name).join(',') === 'axe',
+         `cache=${a271.g.cacheItems('t271').map((i) => i.name).join(',')}`);
+
+      // (2) The reported repro, end to end: §4.103's grant in §1.177's town house.
+      const b271 = mk271(1, await data.getSection(1, '177'), '177', [whiteSword(), makeItem('item', 'rope')]);
+      ok('task271: §1.177 will not take §4.103\'s white sword',
+         !!storeFor(b271.c, 'white sword') && storeFor(b271.c, 'white sword').disabled
+         && !!storeFor(b271.c, 'rope') && !storeFor(b271.c, 'rope').disabled,
+         stores271(b271.c).map((s) => `${s.textContent}:${s.disabled}`).join(' | '));
+      // Control — the taker the deposit list disagreed with. Both now spare the sword.
+      eng.applyEffect(parse('<lose item="*"/>'), b271.g, {});
+      ok('task271: and <lose item="*"/> on the same sheet spares it too (the two paths agree)',
+         b271.g.data.items.map((i) => i.name).join(',') === 'white sword',
+         b271.g.data.items.map((i) => i.name).join(','));
+      // Not in scope and must not change: applyKeepRule's named-selector escape still takes it,
+      // so a page printing "remove the white sword from your Adventure Sheet" works.
+      eng.applyEffect(parse('<lose item="white sword"/>'), b271.g, {});
+      ok('task271: a NAMED <lose item="white sword"> still takes it (the escape is untouched)',
+         b271.g.itemCount() === 0, b271.g.data.items.map((i) => i.name).join(','));
+
+      // (3) §2.617 (Molhern's smithy), the single filtered cache: the keep rule narrows
+      // eligibility without widening the candidate set — a kept item of the wrong kind is
+      // still not offered at all, exactly as before.
+      const c271 = mk271(2, await data.getSection(2, '617'), '617',
+                         [makeItem('item', 'royal ring', 0, null, ['keep']), // §1.385
+                          makeItem('weapon', 'blessed dagger', 2, null, ['keep']),
+                          makeItem('weapon', 'sword', 3)]);
+      ok('task271: §2.617 never offers a kept item of the wrong kind (candidate rule intact)',
+         !storeFor(c271.c, 'royal ring'), stores271(c271.c).map((s) => s.textContent).join(' | '));
+      ok('task271: §2.617 offers the kept dagger disabled and the ordinary sword enabled',
+         !!storeFor(c271.c, 'blessed dagger') && storeFor(c271.c, 'blessed dagger').disabled
+         && !!storeFor(c271.c, 'sword') && !storeFor(c271.c, 'sword').disabled,
+         stores271(c271.c).map((s) => `${s.textContent}:${s.disabled}`).join(' | '));
+
+      // The census the fix was measured against, over the bundled corpus (the shipped
+      // ^\d+[a-z]?$ basenames of the published books, per task 270 — not a books/**/*.xml
+      // glob). 31 <itemcache> nodes, of which 30 are bare <itemcache name= text=>; §2.617
+      // is the only one carrying <include>/<exclude>, and it filters by kind and bonus, not
+      // by keep. The rule above sits in classify(), so every one of the 31 is covered
+      // whether it filters or not — a new bare strongroom lands on it, and a new FILTERED
+      // one moves this count and wants reading.
+      const CACHE271 = /<itemcache\b[^>]*?(?:\/>|>[\s\S]*?<\/itemcache>)/gi;
+      const all271 = [], filtered271 = [];
+      for (const b of data.availableBooks()) {
+        const raw = await data.loadBook(b);
+        for (const key of Object.keys(raw)) {
+          for (const m of raw[key].matchAll(CACHE271)) {
+            all271.push(b + '/' + key);
+            if (/<(?:include|exclude)\b/i.test(m[0])) filtered271.push(b + '/' + key);
+          }
+        }
+      }
+      ok('task271: the corpus holds 31 <itemcache> nodes, 30 of them bare',
+         all271.length === 31 && filtered271.length === 1,
+         `total=${all271.length} filtered=${filtered271.length}`);
+      ok('task271: and §2.617 is the only one that filters at all',
+         filtered271.join(' ') === '2/617', filtered271.join(' '));
+    }
+
 }

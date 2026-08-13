@@ -1109,8 +1109,9 @@ function filterByBonus(pool, bonus) {
 }
 
 // A "keep"-tagged possession is one the books say cannot be lost or stolen — the royal
-// ring (§1.385), the white sword (§4.103). Recognised anywhere a forfeit is planned.
-function isKeep(it) { return (it.tags || []).map(normalize).includes('keep'); }
+// ring (§1.385), the white sword (§4.103). Recognised anywhere a forfeit is planned, and
+// exported so a strongroom's deposit list tests the same thing the takers do (task 271).
+export function isKeep(it) { return (it.tags || []).map(normalize).includes('keep'); }
 
 // keep-tag protection for a possession forfeit (task 118). A kept item is spared while any
 // ordinary item satisfies the selector; only an explicitly NAMED selector (not the open
