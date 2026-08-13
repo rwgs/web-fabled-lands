@@ -4442,6 +4442,191 @@ export async function run(ctx) {
          under264.join(' '));
     }
 
+    // --- task 265: the last three click-time takings book at their own node too ---
+    // Task 263 hooked four commits and its own census named three more that still booked
+    // nothing: a market row's Buy/Sell, an inline <sell>, and the open-pick family (the player
+    // names which thing leaves, and the commit runs on the pick). No section in books 1-6 can
+    // reach the gap — the census at the end of this block, reproduced from the source XML and
+    // the bundled JSON alike — so every case here is synthetic, and a section arriving with the
+    // guard above one of them lands on that census instead of on a silent wrong answer.
+    {
+      const settle265 = () => new Promise((r) => setTimeout(r, 30));
+      const shut265 = (c) => Array.from(c.querySelectorAll('.cond-inactive')).map((s) => s.textContent).join(' | ');
+      const lit265 = (c, re) => re.test(c.textContent) && !re.test(shut265(c));
+      const why265 = (c) => `shut=${shut265(c).replace(/\s+/g, ' ').trim()}`;
+      const mk265 = (xml, setup) => {
+        const g = GameState.create({ name: 'T265', gender: 'f', profession: 'Warrior', book: 1, adv });
+        g.data.items = []; g.data.shards = 0;
+        if (setup) setup(g);
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate() {}, onDeath() {}, notify() {} });
+        st.begin(parse(xml), 1, 'x265');
+        return { g, c, st };
+      };
+      const btn265 = (c, re) => Array.from(c.querySelectorAll('button')).find((b) => re.test(b.textContent) && !b.disabled);
+
+      // A market row's Buy: the price leaves on the CLICK, so the guard above the stall must keep
+      // reading the purse the walk passed it with.
+      const mbuy265 = mk265('<section><p><if shards="50">The ferryman will still take you.</if>'
+        + '<else>You cannot pay the ferryman.</else>'
+        + '<market><trade item="lantern" buy="50"/></market></p></section>',
+        (g) => { g.data.shards = 50; });
+      ok('task265: a guard above a market row opens on entry',
+         lit265(mbuy265.c, /still take you/) && !!btn265(mbuy265.c, /^Buy 50$/), why265(mbuy265.c));
+      btn265(mbuy265.c, /^Buy 50$/).click(); await settle265();
+      mbuy265.st.rerender(); await settle265();
+      ok('task265: buying at the stall does not retract the guard above it',
+         mbuy265.g.data.shards === 0 && mbuy265.g.findItems('lantern').length === 1
+         && lit265(mbuy265.c, /still take you/) && !lit265(mbuy265.c, /cannot pay/),
+         `shards=${mbuy265.g.data.shards} ${why265(mbuy265.c)}`);
+
+      // The same row's Sell: the possession is handed over here (booked) and the price is a GAIN,
+      // which the ledger deliberately reads live — the cache pair's asymmetry, on one button.
+      const msell265 = mk265('<section><p><if item="rope">You still have the rope.</if>'
+        + '<else>You have no rope.</else>'
+        + '<market><trade item="rope" sell="10"/></market></p></section>',
+        (g) => { g.addItem(makeItem('item', 'rope')); });
+      ok('task265: a guard above a market row that BUYS from you opens while the rope is carried',
+         lit265(msell265.c, /still have the rope/) && !!btn265(msell265.c, /^Sell 10$/), why265(msell265.c));
+      btn265(msell265.c, /^Sell 10$/).click(); await settle265();
+      msell265.st.rerender(); await settle265();
+      ok('task265: selling the rope does not retract the guard above the stall',
+         !msell265.g.findItems('rope').length && msell265.g.data.shards === 10
+         && lit265(msell265.c, /still have the rope/) && !lit265(msell265.c, /have no rope/),
+         `carried=${msell265.g.findItems('rope').length} shards=${msell265.g.data.shards} ${why265(msell265.c)}`);
+
+      // An inline <sell> — §5.446's selenium-ore income, in miniature. (Its cargo form needs no
+      // hook: a Cargo Unit lives on a ship, outside the ledger's purse and pack.)
+      const isell265 = mk265('<section><p><if item="selenium ore">You still have the ore.</if>'
+        + '<else>You have no ore.</else>'
+        + '<sell item="selenium ore" shards="800"/></p></section>',
+        (g) => { g.addItem(makeItem('item', 'selenium ore')); });
+      ok('task265: a guard above an inline <sell> opens while the ore is carried',
+         lit265(isell265.c, /still have the ore/) && !!btn265(isell265.c, /^Sell Selenium Ore/), why265(isell265.c));
+      btn265(isell265.c, /^Sell Selenium Ore/).click(); await settle265();
+      isell265.st.rerender(); await settle265();
+      ok('task265: selling the ore does not retract the guard above the offer',
+         !isell265.g.findItems('selenium ore').length && isell265.g.data.shards === 800
+         && lit265(isell265.c, /still have the ore/) && !lit265(isell265.c, /have no ore/),
+         `carried=${isell265.g.findItems('selenium ore').length} ${why265(isell265.c)}`);
+
+      // The open-pick family, one: a bare <lose item="?"> hazard row. The forfeit is taken from
+      // the PICK, so the guard above it must read the pack the walk passed it with. Two items, so
+      // the pick is a real choice (needsForfeitChoice); the rope is the one named.
+      const forf265 = mk265('<section><p><if item="rope">You still have the rope.</if>'
+        + '<else>You have no rope.</else>'
+        + '<lose item="?">lose one item</lose></p></section>',
+        (g) => { g.addItem(makeItem('item', 'rope')); g.addItem(makeItem('item', 'lantern')); });
+      const pick265 = Array.from(forf265.c.querySelectorAll('.forfeit-choice button')).find((b) => b.textContent === 'rope');
+      ok('task265: an open forfeit offers the pick with the guard above it open',
+         lit265(forf265.c, /still have the rope/) && !!pick265, why265(forf265.c));
+      if (pick265) pick265.click();
+      await settle265();
+      forf265.st.rerender(); await settle265();
+      ok('task265: naming the rope as the forfeit does not retract the guard above the row',
+         !forf265.g.findItems('rope').length && forf265.g.findItems('lantern').length === 1
+         && lit265(forf265.c, /still have the rope/) && !lit265(forf265.c, /have no rope/),
+         `carried=${forf265.g.data.items.map((i) => i.name).join(',')} ${why265(forf265.c)}`);
+
+      // Two: an ability pick. A point is neither purse nor pack, so the corpus's open ability
+      // specs book nothing — but the node applies WHOLE, so one carrying a price is charged on
+      // the pick, and that is the case with teeth. (classifyPassive reaches 'ability-choice'
+      // rather than 'payment' because the section offers no force="f" decline.)
+      const abil265 = mk265('<section><p><if shards="10">You can still pay the scribe.</if>'
+        + '<else>You cannot pay the scribe.</else>'
+        + '<lose ability="?" shards="10">give up a point</lose></p></section>',
+        (g) => { g.data.shards = 10; });
+      const apick265 = Array.from(abil265.c.querySelectorAll('button.ability-pick'))[0];
+      ok('task265: a priced ability pick offers the picker with the guard above it open',
+         lit265(abil265.c, /still pay the scribe/) && !!apick265, why265(abil265.c));
+      if (apick265) apick265.click();
+      await settle265();
+      abil265.st.rerender(); await settle265();
+      ok('task265: the priced ability pick does not retract the guard above its cost',
+         abil265.g.data.shards === 0
+         && lit265(abil265.c, /still pay the scribe/) && !lit265(abil265.c, /cannot pay the scribe/),
+         `shards=${abil265.g.data.shards} ${why265(abil265.c)}`);
+
+      // Three: an equipment pick. This form is a <tick> that MODIFIES the possession named
+      // (addbonus/addtag/removetag), so it takes nothing — and the ledger must stay empty, which
+      // is the same asymmetry the cache Take asserts: booking a gain would read the sheet poorer
+      // than it is and shut a guard the page leaves open.
+      const eq265 = mk265('<section><p><if item="rope">You still have the rope.</if>'
+        + '<else>You have no rope.</else>'
+        + '<tick item="?" addbonus="1">bless one possession</tick></p></section>',
+        (g) => { g.addItem(makeItem('item', 'rope')); g.addItem(makeItem('item', 'lantern')); });
+      const epick265 = Array.from(eq265.c.querySelectorAll('button.ability-pick')).find((b) => /^rope/.test(b.textContent));
+      ok('task265: an equipment pick offers the possession list', !!epick265,
+         Array.from(eq265.c.querySelectorAll('button.ability-pick')).map((b) => b.textContent).join(','));
+      if (epick265) epick265.click();
+      await settle265();
+      ok('task265: an equipment pick modifies rather than takes, so it books nothing',
+         eq265.g.findItems('rope')[0].bonus === 1 && eq265.st.ctx.spends.size === 0
+         && lit265(eq265.c, /still have the rope/),
+         `bonus=${eq265.g.findItems('rope')[0].bonus} spends=${eq265.st.ctx.spends.size}`);
+
+      // The census the three hooks were measured against, reproduced from the bundled corpus (it
+      // was also run over books/**/*.xml before the hooks went in, and both sources return this
+      // same pair of sections). Two sections put a resource guard ABOVE one of these sites and
+      // NEITHER can reach the gap: §5.145's `<if item="deed to the Wrath of God">` sits above a
+      // ship market and a cargo market, and no market row there can move that deed; §5.66's
+      // `<if shards="5">` is the chain the `<lose item="?">` lives in — the else-branch forfeit
+      // takes a possession, which the guard does not test. §3.640's open forfeit carries
+      // choose="f" (a sweep, not a pick), so the WALK applies it and marks it where it stands,
+      // which is why it is not in this list at all.
+      const GUARD265 = /<(?:if|elseif)\b[^>]*>/gi;
+      const at265 = (tag, a) => { const m = new RegExp('\\b' + a + '\\s*=\\s*"([^"]*)"', 'i').exec(tag); return m ? m[1] : null; };
+      const openForfeit265 = (tag) => {
+        const spec = at265(tag, 'item') != null ? at265(tag, 'item') : at265(tag, 'cargo');
+        if (spec == null || (spec !== '?' && spec.trim() !== '')) return false;
+        const ch = at265(tag, 'choose');
+        if (ch != null && !/^(t|true|1|y|yes)$/i.test(ch)) return false;
+        return !['tags', 'bonus', 'using'].some((a) => at265(tag, a) != null);
+      };
+      const abilityPick265 = (tag) => {
+        const ab = at265(tag, 'ability');
+        if (ab == null) return false;
+        const s = ab.trim().toLowerCase();
+        return s === '?' || s.includes('|');
+      };
+      const equipPick265 = (tag) => {
+        if (!['addbonus', 'addtag', 'removetag'].some((a) => at265(tag, a) != null)) return false;
+        const k = ['weapon', 'armour', 'tool', 'item'].find((a) => at265(tag, a) != null);
+        if (k == null) return false;
+        const pat = String(at265(tag, k) || '').trim();
+        if (pat !== '?' && pat !== '') return false;
+        return !(at265(tag, 'using') || at265(tag, 'tags') || at265(tag, 'cache'));
+      };
+      const SITES265 = {
+        market: (x) => [...x.matchAll(/<market\b[^>]*>/gi)],
+        sell: (x) => [...x.matchAll(/<sell\b[^>]*>/gi)],
+        forfeit: (x) => [...x.matchAll(/<lose\b[^>]*>/gi)].filter((m) => openForfeit265(m[0])),
+        ability: (x) => [...x.matchAll(/<(?:lose|gain|tick)\b[^>]*>/gi)].filter((m) => abilityPick265(m[0])),
+        equip: (x) => [...x.matchAll(/<tick\b[^>]*>/gi)].filter((m) => equipPick265(m[0])),
+      };
+      const pairs265 = [], above265 = [];
+      for (const b of data.availableBooks()) {
+        const raw = await data.loadBook(b);
+        for (const key of Object.keys(raw)) {
+          const guards = [...raw[key].matchAll(GUARD265)].filter((m) => /\b(?:shards|item)\s*=/.test(m[0]));
+          if (!guards.length) continue;
+          for (const [kind, find] of Object.entries(SITES265)) {
+            const sites = find(raw[key]);
+            if (!sites.length) continue;
+            pairs265.push(kind + ':' + b + '/' + key);
+            if (guards.some((g) => sites.some((s) => s.index > g.index))) above265.push(kind + ':' + b + '/' + key);
+          }
+        }
+      }
+      const pad265 = (s) => s.replace(/\d+/g, (n) => n.padStart(5, '0'));
+      const sort265 = (a) => a.sort((x, y) => (pad265(x) < pad265(y) ? -1 : 1));
+      ok('task265: the corpus pairs a resource guard with one of these three sites in six places',
+         sort265(pairs265).join(' ') === 'forfeit:5/66 market:1/332 market:3/715 market:4/111 market:5/145 sell:5/446',
+         pairs265.join(' '));
+      ok('task265: and only the two measured ones put the guard ABOVE the site',
+         sort265(above265).join(' ') === 'forfeit:5/66 market:5/145', above265.join(' '));
+    }
+
     // --- task 262: §1.460 states the printed OR instead of a port-invented proxy ---
     // The page promises "If you have the codeword *Acid* or a **copper amulet**" and the section
     // guarded it with `<if codeword="1.Skabb">`, a test of neither named thing. The proxy was a

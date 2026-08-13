@@ -1107,7 +1107,8 @@ export class Story {
       // counted twice. A grayed branch applies nothing (renderConditionalBranch), so it is not
       // marked; a spend the player CLICKS for marks itself at its own node instead — the
       // transfer and group commits, plus the buy, paid rest, cache deposit and priced-pick
-      // family task 263 hooked so the rule holds without a per-site exception.
+      // family task 263 hooked, plus the market row, inline <sell> and open-pick family task 265
+      // finished, so the rule holds without a per-site exception.
       const spentBefore = this.inactive ? null : this.spendMark();
       this.renderElement(container, node, path);
       if (tag === 'tick') this.noteBoxTick(path, ticksBefore);

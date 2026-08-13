@@ -100,8 +100,14 @@ function renderShopRow(story, node, path, currency = null, marketSolds = [], mar
     b.disabled = soldOut || balance < price || noSlot || noCargoSpace;
     b.title = soldOut ? 'None left' : (balance < price ? `Not enough ${foreign ? currency : 'Shards'}` : (noSlot ? 'No room (12-item limit)' : (noCargoSpace ? 'No cargo space.' : '')));
     b.addEventListener('click', () => {
+      // A market row trades from the CLICK, so it books its taking at its own row — a resource
+      // guard ABOVE the stall keeps reading the purse the walk passed it with (tasks 261, 263).
+      // Nothing is booked when the transaction is refused, and a foreign-currency price moves
+      // no Shards, so the ledger's purse-and-pack reading is untouched by it.
+      const mark = story.spendMark();
       const res = buyTrade(story.state, goods, price, currency);
       if (!res.ok) { if (res.note) story.notify(res.note, 'warn'); return; }
+      story.noteSpend(path, mark);
       if (stockLimit != null && story.ctx) story.ctx.stock.set(path, bought + 1);
       runBoughtHooks(story, node, goods, marketBoughts); // <bought> twin of the sale hook (task 219)
       story.rerender();
@@ -120,8 +126,12 @@ function renderShopRow(story, node, path, currency = null, marketSolds = [], mar
       // Commit the sale (optionally with the player's pick) and fire <sold> hooks on the
       // possession actually removed (tasks 41, 58).
       const commit = (chooser) => {
+        // A sale hands over the possession here and pays for it, so the row books what LEFT the
+        // sheet; the price is a gain, which the ledger deliberately reads live (tasks 261, 263).
+        const mark = story.spendMark();
         const res = sellTrade(story.state, goods, price, currency, chooser ? { chooser } : {});
         if (!res.ok) return;
+        story.noteSpend(path, mark);
         runSoldHooks(story, node, res.item, marketSolds);
         story.rerender();
       };
@@ -342,7 +352,16 @@ export function renderInlineSell(story, container, node, path) {
     btn.textContent = gain ? `Sell ${titleCase(item)} (${gain} Shards)` : `Sell ${titleCase(item)}`;
     btn.disabled = !owned;
     btn.title = owned ? '' : `You have no ${item} to sell`;
-    btn.addEventListener('click', () => { if (sellInlineItem(story.state, item, gain).ok) story.rerender(); });
+    btn.addEventListener('click', () => {
+      // The possession leaves on the CLICK, so it books at this node — a guard above the offer
+      // keeps reading the pack the walk passed it with (tasks 261, 263). The cargo form below
+      // needs no hook: a Cargo Unit lives on a ship, outside the ledger's purse and pack, and
+      // its price is a gain.
+      const mark = story.spendMark();
+      if (!sellInlineItem(story.state, item, gain).ok) return;
+      story.noteSpend(path, mark);
+      story.rerender();
+    });
     container.appendChild(btn);
     return btn;
   }

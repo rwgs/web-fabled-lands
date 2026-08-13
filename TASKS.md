@@ -297,7 +297,8 @@ this order.*
 - [x] 262. §1.460 tests a port-invented codeword in place of the printed "codeword *Acid* or a **copper amulet**", which the vocabulary can now express exactly
 - [x] 263. Four click-time spend sites book nothing into the walk-position ledger, so a future guard above a bare `<buy>`, a paid `<rest>` or a cache Take reads the emptied purse
 - [x] 264. §6.160's "cross it off and turn to 551" grays →551 the moment either thing is crossed off, so the price is paid and the route it buys is gone
-- [ ] 265. Three click-time takings still book nothing into the walk-position ledger — a market row's Buy/Sell, an inline `<sell>`, and the open-pick family
+- [x] 265. Three click-time takings still book nothing into the walk-position ledger — a market row's Buy/Sell, an inline `<sell>`, and the open-pick family
+- [ ] 266. §4.605 and §4.658 give a poor crew THREE free upgrades: the `<if crew=>` chain above the click steps forward each time it is obeyed
 
 ---
 
@@ -922,6 +923,69 @@ future section arriving with the guard above one of these lands on a failing ass
 
 ---
 
+## 266. §4.605 and §4.658 give a poor crew THREE free upgrades: the `<if crew=>` chain above the click steps forward each time it is obeyed
+
+**Priority: HIGH — two shipped sections, and the failure PAYS the player unasked rather than
+merely graying something: one printed "you can upgrade Crew Quality one level" becomes
+poor → average → good → excellent for 0 Shards, in three clicks, with no deliberate
+rule-breaking. §5.145's shipyard charges 25/50/100/150 Shards for exactly those steps, so the
+free cascade is worth 300 Shards and a permanently better crew on every sea roll.**
+
+*(Filed 2026-08-12, on closing task 265 — its census asks which resource guards sit above a
+click-time taking, and the answer for the purse and the pack is "none reachable". Running the
+same question over the resources the ledger does NOT model found this.)*
+
+**Measured through the rendered page**, entering each section with a poor crew and clicking
+whatever upgrade the page then offers, until it offers none:
+
+| section | grades reached | verdict |
+| --- | --- | --- |
+| book4/605 | `poor → average → good → excellent` | **broken** — three upgrades for one instruction |
+| book4/658 | `poor → average → good → excellent` | **broken** — same, after its forced `<buy ship>` |
+| book3/161 | `poor → average` | sound (the control) |
+
+Both broken sections write the offer as a three-branch chain:
+`<if crew="poor">…<buy crew="average" shards="0"/></if>`,
+`<elseif crew="average">…<buy crew="good" shards="0"/></elseif>`,
+`<elseif crew="good">…<buy crew="excellent" shards="0"/></elseif>`.
+A `<buy crew=>` applies from the CLICK (`renderInlineBuy`'s crew branch, `render-market.js:249`),
+so the redraw re-derives the chain against a crew that has just changed: the taken branch grays
+and **the next elseif becomes the active one**, offering the next grade. `canUpgradeCrew` is no
+defence — it enforces one grade *per click*, which each click honestly is. The crew branch also
+returns before `renderInlineBuy`'s `quantity=`/`buys` memo, so it carries no per-visit cap
+either, and correctly so: §5.145's shipyard is priced and repeatable.
+
+**book3/161 is the control and it says why the shape matters, not the tag.** It has one `<if
+crew="poor">` and no elseif, so the click grays its own branch and there is nowhere to step to —
+task 264's cosmetic case, not this one. So the population is "a guarded crew offer with a SECOND
+branch below it", which is these two.
+
+**This is task 261's family, one resource out of scope.** `sheetAt` supplies `shardsNow`/
+`itemsNow` and nothing else, deliberately (a `blessing=`/`var=` test must keep reading live —
+§6.215), and task 264's branch hold keys on a `force="f"` **effect** node, which a `<buy>` is
+not. So neither existing mechanism reaches a crew grade. Three candidate fixes, and the fork
+wants deciding on authenticity rather than on cost, the way task 261's did:
+
+  (a) extend the ledger to the crew grade (a `crewAt(path)` reading, so a guard above the
+      upgrade reads the grade the walk passed it with) — states the rule where the other
+      walk-position readings live, but grows `sheetAt`'s scope, and the "richer, never poorer"
+      asymmetry has to be restated for an ordinal (is a *better* crew richer?);
+  (b) hold the whole if/elseif chain once one of its branches' click-time buys has fired this
+      visit — closest to task 264's hold, needs no view of what kind of thing moved, and would
+      also cover a future guard over any other unmodelled resource;
+  (c) memoise a `<buy crew=>` per visit like the item/ship forms, so one upgrade is all a visit
+      offers — smallest, but it is a rule about the tag rather than about the page, and it would
+      wrongly cap §5.145's priced shipyard unless scoped to `shards="0"`.
+
+**Do not pick one without measuring what else (b) would hold**, since it is the widest: a census
+of `<if>`/`<elseif>` chains with a click-time effect inside one branch and a further branch below
+it. Tests: assert each of the three sections' full grade sequence from a poor crew (the table
+above is the expected output, and §4.605's `poor->average->good->excellent` is what a fix must
+turn into `poor->average`), assert §5.145 still sells all four paid grades in one visit, and pin
+the census the chosen fix is scoped by.
+
+---
+
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -931,6 +995,35 @@ future section arriving with the guard above one of these lands on a failing ass
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-12 (implementation pass, task 265): closed **265** and filed **266** (HIGH). Four
+things worth carrying forward, and the first is the one that nearly shipped a vacuous block.
+**The teeth check itself was vacuous first, and only a second attempt found that out.** The neat
+way to neuter six hooks at once looked like one line — `if (/265/.test(path)) return;` in
+`noteSpend`, keying on the fixtures' own section name — and the suite reported the identical
+`pass=770 fail=0`, which reads exactly like "the assertions have no teeth". It was the PROBE that
+had none: `render()` seeds the walk path `'r'` (render.js:862), not the section key, so no path
+ever contains `265` and the guard never fired. Neutering the six call sites by hand then failed
+exactly 5 of the 14 new assertions, one per hook that can book. A probe that changes nothing is
+two indistinguishable findings — a toothless test, or a toothless probe — and the cheap one is
+worth ruling out first. **The sixth hook is honestly vacuous and its assertion says so instead of
+pretending otherwise.** `renderEquipmentChoice` is reached only for a `<tick item="?" addbonus=>`,
+which MODIFIES the possession the player names rather than taking it, so it books nothing today;
+its assertion pins `ctx.spends.size === 0` — the cache-Take asymmetry, which is a real property
+and fails if a gain is ever booked — rather than a guard that would stay open either way. The
+ability hook is the mirror case and *does* have teeth, because the node applies whole: a `<lose
+ability="?" shards="10">` is charged on the pick. **The cargo form of `<sell>` is deliberately not
+hooked**, and that is the one place the rule keeps an exception: a Cargo Unit lives on a ship,
+outside the ledger's purse and pack, and the form's price is a gain, so the two lines would be
+provably dead. **The census that closes this task is what found 266, and asking it about the
+resources the ledger does NOT model is what made it a HIGH.** For the purse and pack the answer is
+"no reachable case in books 1-6", reproduced from `books/**/*.xml` and `web/data/*.json` alike (six
+pairs, two guards-above, both unreachable). Re-run over crew/cargo/ship guards it returns three
+sections, and two of them — §4.605 and §4.658 — hand a poor crew `poor->average->good->excellent`
+for nothing, measured through the rendered page, because each click grays its own branch and turns
+the next `<elseif>` on. §3.161 has no second branch and is sound, which is what makes the
+population "a guarded offer with a further branch below it" rather than "a `<buy crew=>`".
+Suite **2647** (up 14).
 
 Worked 2026-08-12 (implementation pass, task 264): closed **264** and filed **265** (LOW). Four
 things worth carrying forward, and the first is the fork the task was written to make me decide

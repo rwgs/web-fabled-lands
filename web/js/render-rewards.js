@@ -298,7 +298,12 @@ function renderAbilityChoice(story, container, node, path) {
   if (!opts.length) { story.ctx.applied.add(memo); return null; } // nothing eligible
   story.pendingChoice = true; // the exits wait for the answer (task 251)
   story.appendAbilityPicker(container, opts, (ab) => {
+    // The pick commits from the CLICK, so it books at its own node (tasks 261, 263). An ability
+    // point is neither purse nor pack, so today this books nothing — but the node applies whole,
+    // so a spec carrying a price too is charged here and belongs on the ledger.
+    const mark = story.spendMark();
     const note = applyEffect(node, story.state, { chooser: () => [ab] });
+    story.noteSpend(path, mark);
     story.ctx.applied.add(memo);
     if (note) story.notify(note);
     story.rerender();
@@ -323,7 +328,12 @@ function renderEquipmentChoice(story, container, node, path) {
     btn.className = 'btn-mini ability-pick';
     btn.textContent = it.name + (it.bonus ? ` (${it.bonus >= 0 ? '+' : ''}${it.bonus})` : '');
     btn.addEventListener('click', () => {
+      // The pick commits from the CLICK, so it books at its own node (tasks 261, 263). This form
+      // is a <tick> that MODIFIES the possession the player names (addbonus/addtag/removetag), so
+      // it takes nothing today and books nothing — the mark states the rule where the node runs.
+      const mark = story.spendMark();
       applyEffect(node, story.state, { chooser: () => [it] });
+      story.noteSpend(path, mark);
       story.ctx.applied.add(memo);
       story.rerender();
     });
@@ -346,7 +356,11 @@ function renderForfeitChoice(story, container, node, path) {
   if (story.ctx.applied.has(memo)) return null; // already chosen this visit
   story.pendingChoice = true; // the exits wait for the answer (task 251)
   showForfeitPicker(story, container, losePaymentPlan(node, story.state), (chooser) => {
+    // The forfeit is taken from the PICK, not as the walk passes the row, so it books at its own
+    // node — a guard above it keeps reading the pack the walk passed it with (tasks 261, 263).
+    const mark = story.spendMark();
     const note = applyEffect(node, story.state, { chooser });
+    story.noteSpend(path, mark);
     story.ctx.applied.add(memo);
     if (note) story.notify(note);
     story.rerender();
