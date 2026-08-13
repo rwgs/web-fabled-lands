@@ -4121,6 +4121,130 @@ export async function run(ctx) {
          `shards=${g192.data.shards} ships=${g192.ships.length} shut=${shut261(c192).replace(/\s+/g, ' ').slice(0, 80)}`);
     }
 
+    // --- task 263: a spend the player CLICKS for books at its own node too ---
+    // Task 261 fed the ledger from the walk plus the two click-time commits that mattered then
+    // (<transfer>, <group>). Four more click sites booked nothing, so a guard above one of them
+    // went on re-deriving against the emptied purse — task 259's behaviour, in a place the rule
+    // the code now states does not admit. No section in books 1-6 can reach the gap (the census
+    // at the end of this block), so every case here is synthetic.
+    {
+      const settle263 = () => new Promise((r) => setTimeout(r, 30));
+      const shut263 = (c) => Array.from(c.querySelectorAll('.cond-inactive')).map((s) => s.textContent).join(' | ');
+      const lit263 = (c, re) => re.test(c.textContent) && !re.test(shut263(c));
+      const why263 = (c) => `shut=${shut263(c).replace(/\s+/g, ' ').trim()}`;
+      const mk263 = (xml, setup) => {
+        const g = GameState.create({ name: 'T263', gender: 'm', profession: 'Warrior', book: 1, adv });
+        g.data.items = []; g.data.shards = 0;
+        if (setup) setup(g);
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate() {}, onDeath() {}, notify() {} });
+        st.begin(parse(xml), 1, 'x263');
+        return { g, c, st };
+      };
+      const btn263 = (c, re) => Array.from(c.querySelectorAll('button')).find((b) => re.test(b.textContent) && !b.disabled);
+
+      // A bare <buy>: the price leaves on the CLICK, so the guard above it must keep reading the
+      // purse the walk passed it with — 50 Shards, and the ferryman still takes you.
+      const buy263 = mk263('<section><p><if shards="50">The ferryman will still take you.</if>'
+        + '<else>You cannot pay the ferryman.</else> <buy item="lantern" shards="50">a lantern</buy></p></section>',
+        (g) => { g.data.shards = 50; });
+      ok('task263: a guard above a bare <buy> opens on entry',
+         lit263(buy263.c, /still take you/) && !!btn263(buy263.c, /lantern/i), why263(buy263.c));
+      btn263(buy263.c, /lantern/i).click(); await settle263();
+      ok('task263: buying the lantern does not retract the guard above its price',
+         buy263.g.data.shards === 0 && buy263.g.findItems('lantern').length === 1
+         && lit263(buy263.c, /still take you/) && !lit263(buy263.c, /cannot pay/),
+         `shards=${buy263.g.data.shards} ${why263(buy263.c)}`);
+      buy263.st.rerender(); await settle263();
+      ok('task263: and a later draw still reads the purse the guard stood at',
+         lit263(buy263.c, /still take you/) && !lit263(buy263.c, /cannot pay/), why263(buy263.c));
+
+      // A paid <rest>: the nightly charge is the same shape. (A hidden rest applies as the walk
+      // passes it and was already marked there.)
+      const rest263 = mk263('<section><p><if shards="1">You can still afford the ferry.</if>'
+        + '<else>You cannot afford the ferry.</else> <rest shards="1" stamina="1">a bed for the night</rest></p></section>',
+        (g) => { g.data.shards = 1; g.data.stamina = 1; });
+      ok('task263: a guard above a paid <rest> opens on entry',
+         lit263(rest263.c, /still afford/) && !!btn263(rest263.c, /^Rest \(/), why263(rest263.c));
+      btn263(rest263.c, /^Rest \(/).click(); await settle263();
+      rest263.st.rerender(); await settle263();
+      ok('task263: paying for the night does not retract the guard above the charge',
+         rest263.g.data.shards === 0 && rest263.g.data.stamina === 2
+         && lit263(rest263.c, /still afford/) && !lit263(rest263.c, /cannot afford/),
+         `shards=${rest263.g.data.shards} stamina=${rest263.g.data.stamina} ${why263(rest263.c)}`);
+
+      // A priced pick: the cost and its linked reward both apply on the click, so the purchase
+      // books what it NET took at its own node.
+      const pay263 = mk263('<section><p><if shards="30">You could still buy the map.</if>'
+        + '<else>You cannot afford the map.</else> <lose shards="30" price="263.map">Pay 30 Shards</lose>'
+        + '<tick codeword="263.Map" flag="263.map" hidden="t"/></p></section>',
+        (g) => { g.data.shards = 30; });
+      ok('task263: a guard above a priced pick opens on entry',
+         lit263(pay263.c, /still buy the map/) && !!btn263(pay263.c, /Pay 30/), why263(pay263.c));
+      btn263(pay263.c, /Pay 30/).click(); await settle263();
+      pay263.st.rerender(); await settle263();
+      ok('task263: paying for the map does not retract the guard above the price',
+         pay263.g.data.shards === 0 && pay263.g.hasCodeword('263.Map')
+         && lit263(pay263.c, /still buy the map/) && !lit263(pay263.c, /cannot afford/),
+         `shards=${pay263.g.data.shards} cw=${pay263.g.hasCodeword('263.Map')} ${why263(pay263.c)}`);
+
+      // The cache pair needed a decision, not just a hook: a Store moves a possession OFF the
+      // sheet (booked), a Take moves one ON (a gain, deliberately read live). Both directions
+      // are asserted, since they are the two the decision can be wrong about.
+      const store263 = mk263('<section><p><if item="rope">You still have the rope.</if>'
+        + '<else>You have no rope.</else> <itemcache name="263.store" text="Strongroom"/></p></section>',
+        (g) => { g.addItem(makeItem('item', 'rope')); });
+      ok('task263: a guard above an <itemcache> opens while the rope is carried',
+         lit263(store263.c, /still have the rope/) && !!btn263(store263.c, /^Store Rope/), why263(store263.c));
+      btn263(store263.c, /^Store Rope/).click(); await settle263();
+      store263.st.rerender(); await settle263();
+      ok('task263: storing the rope does not retract the guard above the strongroom',
+         !store263.g.findItems('rope').length && store263.g.cacheItems('263.store').length === 1
+         && lit263(store263.c, /still have the rope/) && !lit263(store263.c, /have no rope/),
+         `carried=${store263.g.findItems('rope').length} ${why263(store263.c)}`);
+
+      const take263 = mk263('<section><p><if item="rope">You still have the rope.</if>'
+        + '<else>You have no rope.</else> <itemcache name="263.take" text="Strongroom"/></p></section>',
+        (g) => { g.cacheAddItem('263.take', makeItem('item', 'rope')); });
+      ok('task263: the same guard is shut when the rope is in the box',
+         lit263(take263.c, /have no rope/) && !!btn263(take263.c, /^Take$/), why263(take263.c));
+      btn263(take263.c, /^Take$/).click(); await settle263();
+      take263.st.rerender(); await settle263();
+      ok('task263: taking it back is a GAIN, so the guard opens on the next draw',
+         take263.g.findItems('rope').length === 1
+         && lit263(take263.c, /still have the rope/) && !lit263(take263.c, /have no rope/),
+         `carried=${take263.g.findItems('rope').length} ${why263(take263.c)}`);
+
+      // The census the fix was measured against, over the bundled corpus. 14 sections pair a
+      // resource guard (`<if|elseif shards=|item=>`) with a <buy>/<market>/<itemcache>/
+      // <moneycache>/priced <rest>, and in NOT ONE is the gap reachable: the guard sits below
+      // the spend, or tests a resource the spend cannot move (3/406 and 5/145 are ship deeds
+      // above a ship/crew purchase), or is a cache= test evaluateCondition never overrides
+      // (6/464), or wraps a <group> whose own commit books the price (5/192, task 261). A new
+      // section arriving with the guard ABOVE a bare spend lands here and wants measuring.
+      const GUARD263 = /<(?:if|elseif)\b[^>]*>/gi;
+      const SPEND263 = /<(?:buy|market|itemcache|moneycache)\b[^>]*>|<rest\b[^>]*\bshards\s*=[^>]*>/gi;
+      const pairs263 = [], above263 = [];
+      for (const b of data.availableBooks()) {
+        const raw = await data.loadBook(b);
+        for (const key of Object.keys(raw)) {
+          const guards = [...raw[key].matchAll(GUARD263)].filter((m) => /\b(?:shards|item)\s*=/.test(m[0]));
+          if (!guards.length) continue;
+          const spends = [...raw[key].matchAll(SPEND263)];
+          if (!spends.length) continue;
+          pairs263.push(b + '/' + key);
+          if (guards.some((g) => spends.some((s) => s.index > g.index))) above263.push(b + '/' + key);
+        }
+      }
+      const pad263 = (s) => s.replace(/\d+/g, (n) => n.padStart(5, '0'));
+      const sort263 = (a, b) => (pad263(a) < pad263(b) ? -1 : 1);
+      ok('task263: the corpus pairs a resource guard with one of these spends in exactly 14 sections',
+         pairs263.sort(sort263).join(' ') === '1/184 1/332 1/342 1/387 1/483 1/497 1/506 3/406 3/715 4/111 5/145 5/192 5/548 6/464',
+         pairs263.join(' '));
+      ok('task263: and only the four measured ones put the guard ABOVE the spend',
+         above263.sort(sort263).join(' ') === '3/406 5/145 5/192 6/464', above263.join(' '));
+    }
+
     // --- task 262: §1.460 states the printed OR instead of a port-invented proxy ---
     // The page promises "If you have the codeword *Acid* or a **copper amulet**" and the section
     // guarded it with `<if codeword="1.Skabb">`, a test of neither named thing. The proxy was a

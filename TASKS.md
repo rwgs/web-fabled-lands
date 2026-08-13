@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-263 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **263, open under LOW** — file new work
+264 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **264, open under MEDIUM** — file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,11 +20,11 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-*(none open — file new MEDIUM work here)*
+- [ ] 264. §6.160's "cross it off and turn to 551" grays →551 the moment either thing is crossed off, so the price is paid and the route it buys is gone
 
 **LOW**
 
-- [ ] 263. Four click-time spend sites book nothing into the walk-position ledger, so a future guard above a bare `<buy>`, a paid `<rest>` or a cache Take reads the emptied purse
+*(none open — file new LOW work here)*
 
 **Done**
 
@@ -295,7 +295,8 @@ this order.*
 - [x] 260. 18 tracked `books/**/*temp.xml` working copies declare a live section's `name=`, and every corpus census counts them twice
 - [x] 261. Task 259's spend-guard latch excludes `not=`, so §1.501's "if you didn't have enough money" turns itself on the moment you pay
 - [x] 262. §1.460 tests a port-invented codeword in place of the printed "codeword *Acid* or a **copper amulet**", which the vocabulary can now express exactly
-- [ ] 263. Four click-time spend sites book nothing into the walk-position ledger, so a future guard above a bare `<buy>`, a paid `<rest>` or a cache Take reads the emptied purse
+- [x] 263. Four click-time spend sites book nothing into the walk-position ledger, so a future guard above a bare `<buy>`, a paid `<rest>` or a cache Take reads the emptied purse
+- [ ] 264. §6.160's "cross it off and turn to 551" grays →551 the moment either thing is crossed off, so the price is paid and the route it buys is gone
 
 ---
 
@@ -818,6 +819,74 @@ redraw. Add the corpus census above as a guard against a future section arriving
 
 ---
 
+## 264. §6.160's "cross it off and turn to 551" grays →551 the moment either thing is crossed off, so the price is paid and the route it buys is gone
+
+**Priority: MEDIUM — one shipped section, confirmed broken on BOTH of its routes, and the failure
+takes the price and withholds what it bought. That is task 259's §5.376 shape (scroll crossed off,
+initiation unreachable) rather than task 263's latent one; it is off HIGH only because the player
+is not stranded — the "If not, →183" exit is still live, so the visit ends, just on the route for
+someone who had neither.**
+
+*(Filed 2026-08-12, during task 263's implementation pass — the census of click-time takings the
+four-site list did NOT cover is what found it.)*
+
+`renderForcedOptional` (`render-rewards.js`) applies a `force="f"` opt-in **on the click** and books
+nothing into the walk-position ledger, so the guard above it re-derives against the sheet the click
+just emptied. book6/160 is the section:
+
+```xml
+<if blessing="storm" item="catastrophe certificate">
+  If you have a blessing of <lose blessing="storm" force="f">Safety from Storms</lose>
+  or a <lose item="catastrophe certificate" force="f"><b>catastrophe certificate</b></lose>,
+  cross it off and <goto section="551"/>.
+</if>
+If not, <goto section="183"/>.
+```
+
+The guard is an OR over the two things the block spends, and `<goto section="551"/>` sits **inside**
+it. **Measured against a real `GameState` through the rendered page, both halves fail identically:**
+
+| entered holding | before the click | after crossing off |
+| --- | --- | --- |
+| the certificate only | `551=live 183=live` | `551=gray 183=live` (item gone) |
+| the storm blessing only | `551=live 183=live` | `551=gray 183=live` (blessing gone) |
+
+So the player does exactly what the page instructs, loses the certificate or the blessing, and the
+destination it was crossed off **for** is disabled on the spot.
+
+**Neither existing rule reaches it, and the reasons differ per half — this is the point of the
+task.** Task 259's latch is scoped to a *spend guard* (every attribute a purse/pack test), and
+`blessing=` is not one, so the whole `<if>` is excluded. Task 261/263's ledger is phrasing-free and
+would cover the **item** half as soon as `renderForcedOptional` booked its taking — two lines, the
+same `spendMark()`/`noteSpend(path, mark)` pair. The **blessing** half it cannot reach at all: the
+ledger records Shards and possessions only, deliberately (`sheetAt` leaves a `curse=`/`blessing=`
+test reading live, because task 133 needs a lift-from-the-sheet to open a choice without re-entry,
+and §6.215's `<if blessing="storm" not="t">` must go false the moment the blessing lands).
+
+So the fix needs deciding, not just writing, and the fork is the one task 261 named — **which is
+most authentic?** Options: (a) book the item half and treat the blessing half separately; (b) widen
+the ledger to any resource a `force="f"` opt-in in this position spends, which risks the §6.215
+reading; (c) hold the guarded block open once its own opt-in has been taken this visit — the
+narrowest statement of what the page means ("cross it off **and** turn to 551" is one instruction),
+and the only one that fixes both halves for the same reason. Measure (c) against §6.215 and §6.49
+before writing it.
+
+Census: `force="f"` losses under a resource guard read **1** section in books 1–6 (this one). The
+same sweep found three more click-time takings outside task 263's four sites — a market row's
+Buy/Sell (`renderShopRow`), an inline `<sell>`, and the open-pick family (`renderForfeitChoice`/
+`renderAbilityChoice`/`renderEquipmentChoice`) — and each was measured as unreachable today:
+book5/145's `<if item="deed to the Wrath of God">` sits above a ship/cargo market that cannot move
+that possession, book3/640's forfeit is `choose="f"` (a sweep, so the walk applies and marks it),
+and book5/66's `<if shards="5">` sits above a `<lose item="?">` that cannot move Shards. They want
+the two-line booking anyway, on the rule task 263 states, but no section depends on it.
+
+Tests: assert §6.160 both ways — enter holding only the certificate, cross it off, and →551 is still
+live on the redraw; the same holding only the storm blessing. Both fail today (measured), so they
+are the regression test. Re-assert §6.215's and §6.49's "the reward LANDED, so graying is right"
+cases against whichever option is chosen.
+
+---
+
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -827,6 +896,30 @@ redraw. Add the corpus census above as a guard against a future section arriving
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-12 (implementation pass, task 263): closed **263** and filed **264** (MEDIUM). Four
+things worth carrying forward. **The filing's census reproduced exactly, from two different sources,
+and that is what made the "no live case" claim checkable rather than trusted.** The same predicate
+run over `books/**.xml` and over the bundled `web/data/*.json` returns the identical 14 sections and
+the identical 4 with a guard above — so the assertion now in the suite is the filing's own
+measurement, not a restatement of it. **The cache pair's decision is the whole of its content.** A
+Store books (the possession leaves the sheet) and a Take does not (a gain is read live), and both
+directions are asserted, because the asymmetry is the only thing the hook can be wrong about: the
+Take case enters with the rope already in the box, so the guard is SHUT and must open on the next
+draw. Hooking both directions would have been the tidier-looking code and would have broken task
+261's rule. **Teeth were checked by neutering all six hooks at once**, and the actions suite failed
+exactly 5 of the new assertions — one per hooked site — each printing the guard's own words now
+grayed (`shut=The ferryman will still take you.`). The Take case and the census passed either way,
+as intended. **The census of what the four-site list did NOT cover is what found 264, and it is a
+confirmed shipped defect rather than another latent one.** Four sections put a resource guard above
+an un-hooked click-time taking; three are unreachable for stated reasons (a market that cannot move
+the deed above it, a `choose="f"` sweep the walk applies, an item forfeit under a Shards guard), and
+the fourth is **§6.160**, where crossing off the certificate — or the blessing — grays the
+`<goto section="551"/>` that the crossing-off pays for. Measured through the rendered page both
+ways before filing, because the earlier pass's lesson is that a probe is worth more than a reading:
+`551=live 183=live` before the click, `551=gray 183=live` after, for each half. The item half is two
+lines of this task's own pattern; the blessing half is outside the ledger's deliberate scope, so 264
+carries the fork rather than a fix. Suite **2610** (up 13).
 
 Worked 2026-08-12 (implementation pass, task 262): closed **262**, filing nothing. Two things worth
 carrying forward. **The proxy was sound and the fix is still a fix, which is the shape of finding to

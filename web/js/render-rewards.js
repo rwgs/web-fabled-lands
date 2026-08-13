@@ -405,7 +405,12 @@ function renderPayment(story, container, node, path) {
   // nothing (the task-117 scope note: an absent item/cargo/ship). (task 117)
   const plan = losePaymentPlan(node, story.state);
   const commit = (chooser) => {
+    // The payment applies on the CLICK, not during the walk, so it books its taking at its own
+    // node — a resource guard ABOVE the price keeps reading the sheet the walk passed it with
+    // (tasks 261, 263).
+    const mark = story.spendMark();
     applyEffect(node, story.state, chooser ? { chooser } : {});
+    story.noteSpend(path, mark);
     story.ctx.applied.add(memo);
     story.rerender();
   };
@@ -462,8 +467,12 @@ function renderOptionalPay(story, container, node, path, key) {
   // possession (the default), an ability picker names the ability of whichever node asked.
   // Keeping them apart matters — an item candidate is not a valid answer for an ability.
   const commit = (chooser, forNode = node) => {
+    // Cost and linked reward both apply on the CLICK, so the purchase books what it NET took at
+    // its own node — the reward is a gain and offsets nothing the ledger owes (tasks 261, 263).
+    const mark = story.spendMark();
     applyEffect(node, story.state, chooser && forNode === node ? { chooser } : {});
     rewards.forEach((r) => applyEffect(r, story.state, chooser && forNode === r ? { chooser } : {}));
+    story.noteSpend(path, mark);
     if (!repeatable) story.ctx.applied.add(memo);
     story.rerender();
   };
@@ -599,6 +608,15 @@ function renderChooseOnePay(story, container, node, path, key) {
   // "any object with a +1 or greater bonus" for a curse): the player names which one leaves
   // before it is taken, exactly as on the other two payment paths. (task 226)
   const armPlan = node.tagName.toLowerCase() === 'lose' ? losePaymentPlan(node, story.state) : null;
+  // Deduct the cost and set flag key (arming the choice). It runs from the CLICK, so it books its
+  // taking at its own node — a resource guard ABOVE the menu keeps reading the sheet the walk
+  // passed it with (tasks 261, 263). The reward pick that consumes the flag is a gain, read live.
+  const arm = (opts) => {
+    const mark = story.spendMark();
+    applyEffect(node, story.state, opts);
+    story.noteSpend(path, mark);
+    story.rerender();
+  };
   if (armed) {
     btn.disabled = true; btn.title = 'Paid — now choose your reward.';
   } else if (wasted) {
@@ -616,26 +634,17 @@ function renderChooseOnePay(story, container, node, path, key) {
   } else if (armPlan && armPlan.needsChoice) {
     btn.addEventListener('click', () => {
       btn.disabled = true;
-      showForfeitPicker(story, container, armPlan, (chooser) => {
-        applyEffect(node, story.state, { chooser });
-        story.rerender();
-      });
+      showForfeitPicker(story, container, armPlan, (chooser) => arm({ chooser }));
     });
   } else if (needsAbilityChoice(node)) {
     // An open ability spec buys the menu ("give up a point of any ability"): the player names
     // which point leaves, then the arming happens with that answer. (task 224)
     btn.addEventListener('click', () => {
       btn.disabled = true;
-      showAbilityPicker(story, container, node, (chooser) => {
-        applyEffect(node, story.state, { chooser });
-        story.rerender();
-      });
+      showAbilityPicker(story, container, node, (chooser) => arm({ chooser }));
     });
   } else {
-    btn.addEventListener('click', () => {
-      applyEffect(node, story.state, {}); // deduct the cost + set flag key (arms the choice)
-      story.rerender();
-    });
+    btn.addEventListener('click', () => arm({}));
   }
   container.appendChild(btn);
   return btn;
@@ -718,6 +727,14 @@ function renderRollPayment(story, container, node, path, key) {
   const btn = document.createElement('button');
   btn.className = 'btn-mini pay-action' + (armed ? ' done' : '');
   btn.textContent = (armed ? '☑ ' : '') + text;
+  // Deduct the cost and set flag key (arming the roll). Paid from the CLICK, so it books its
+  // taking at its own node, where a resource guard above the offer reads it (tasks 261, 263).
+  const arm = (opts) => {
+    const mark = story.spendMark();
+    applyEffect(node, story.state, opts);
+    story.noteSpend(path, mark);
+    story.rerender();
+  };
   if (armed) {
     btn.disabled = true; btn.title = 'Paid — now make the roll.';
   } else if (shards != null && story.state.data.shards < cost) {
@@ -730,16 +747,10 @@ function renderRollPayment(story, container, node, path, key) {
     // payment path that would otherwise commit it blind. (task 225)
     btn.addEventListener('click', () => {
       btn.disabled = true;
-      showAbilityPicker(story, container, node, (chooser) => {
-        applyEffect(node, story.state, { chooser }); // deduct the named point + set flag key
-        story.rerender();
-      });
+      showAbilityPicker(story, container, node, (chooser) => arm({ chooser })); // the named point leaves
     });
   } else {
-    btn.addEventListener('click', () => {
-      applyEffect(node, story.state, {}); // deduct the cost + set flag key (arms the roll)
-      story.rerender();
-    });
+    btn.addEventListener('click', () => arm({}));
   }
   container.appendChild(btn);
   return btn;

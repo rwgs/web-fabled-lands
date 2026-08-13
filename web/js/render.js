@@ -1105,7 +1105,9 @@ export class Story {
       // sits — a bare <lose>, a bundled price inside a <group>, a hidden <transfer> arming on
       // entry — with noteSpend netting an ancestor's mark against its descendants' so nothing is
       // counted twice. A grayed branch applies nothing (renderConditionalBranch), so it is not
-      // marked; the two spends the player CLICKS for mark themselves at their own node.
+      // marked; a spend the player CLICKS for marks itself at its own node instead — the
+      // transfer and group commits, plus the buy, paid rest, cache deposit and priced-pick
+      // family task 263 hooked so the rule holds without a per-site exception.
       const spentBefore = this.inactive ? null : this.spendMark();
       this.renderElement(container, node, path);
       if (tag === 'tick') this.noteBoxTick(path, ticksBefore);

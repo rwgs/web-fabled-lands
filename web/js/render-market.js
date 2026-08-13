@@ -256,8 +256,13 @@ export function renderInlineBuy(story, container, node, path) {
     btn.disabled = (price > 0 && story.state.data.shards < price) || !up.ok;
     if (!up.ok) btn.title = up.reason;
     btn.addEventListener('click', () => {
+      // A buy runs from the CLICK, not during the walk, so it books its taking at its own node —
+      // a resource guard ABOVE the offer must keep reading the purse the walk passed it with
+      // (tasks 261, 263). Nothing is booked when the transaction is refused.
+      const mark = story.spendMark();
       const res = applyInlineBuy(story.state, { price, crew });
       if (!res.ok) { if (res.note) story.notify(res.note, 'warn'); return; }
+      story.noteSpend(path, mark);
       story.rerender();
     });
     container.appendChild(btn);
@@ -308,8 +313,10 @@ export function renderInlineBuy(story, container, node, path) {
 
   if (!reason) {
     btn.addEventListener('click', () => {
+      const mark = story.spendMark(); // the price leaves the sheet HERE (tasks 261, 263)
       const res = applyInlineBuy(story.state, buyOptions(node, story.state)); // shared buy-node parse (task 152)
       if (!res.ok) { if (res.note) story.notify(res.note, 'warn'); return; }
+      story.noteSpend(path, mark);
       story.ctx.buys.set(memo, bought + 1);
       story.rerender();
     });
@@ -439,7 +446,12 @@ export function renderRest(story, container, node, path) {
   if (used) btn.title = 'You have already rested here';
   else if (full) btn.title = 'Already at full Stamina';
   btn.addEventListener('click', () => {
+    // The nightly charge is taken from the CLICK, so it books at its own node — a guard above
+    // the offer reads the purse the walk passed it with (tasks 261, 263). A hidden rest applies
+    // as the walk passes it instead, and is marked there.
+    const mark = story.spendMark();
     applyRest(story.state, perUse, cost);
+    story.noteSpend(path, mark);
     if (onceOnly) story.ctx.applied.add(memo);
     story.rerender();
   });
@@ -490,7 +502,15 @@ export function renderMoneyCache(story, container, node, path) {
     let amt = roundMult(Number(input.value) || 0);
     if (max >= 0) amt = Math.min(amt, max - story.state.cacheMoney(name)); // 0 bars deposits; N caps the total
     amt = Math.min(amt, story.state.data.shards);
-    if (amt > 0) { story.state.depositCacheMoney(name, amt); story.rerender(); }
+    if (amt > 0) {
+      // A deposit moves money OFF the sheet on a click, so it books its taking at this node
+      // (tasks 261, 263). A withdrawal is a GAIN, which the ledger deliberately leaves reading
+      // live — the same asymmetry that lets an award open the choice that needs it.
+      const mark = story.spendMark();
+      story.state.depositCacheMoney(name, amt);
+      story.noteSpend(path, mark);
+      story.rerender();
+    }
   });
   const wd = document.createElement('button');
   wd.className = 'btn-mini';
@@ -598,7 +618,12 @@ export function renderItemCache(story, container, node, path) {
       let amt = Math.max(0, Math.floor(Number(input.value) || 0));
       amt = Math.min(amt, moneyMax - story.state.cacheMoney(name)); // cap the stash total at max
       amt = Math.min(amt, story.state.data.shards);
-      if (amt > 0) { story.state.depositCacheMoney(name, amt); story.rerender(); }
+      if (amt > 0) { // books the deposit at this node, as the money cache does (task 263)
+        const mark = story.spendMark();
+        story.state.depositCacheMoney(name, amt);
+        story.noteSpend(path, mark);
+        story.rerender();
+      }
     });
     const wd = document.createElement('button');
     wd.className = 'btn-mini';
@@ -648,8 +673,12 @@ export function renderItemCache(story, container, node, path) {
         store.title = reason || 'This cannot be stored here.';
       } else {
         store.addEventListener('click', () => {
+          // Storing takes the possession OFF the sheet here (tasks 261, 263); Take puts one back
+          // on, and a gain is always read live.
+          const mark = story.spendMark();
           const removed = story.state.removeItemById(it.id);
           if (removed) story.state.cacheAddItem(name, removed);
+          story.noteSpend(path, mark);
           story.rerender();
         });
       }
