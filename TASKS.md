@@ -26,7 +26,8 @@ there once the buckets below are clear.
 
 - [x] 267. `<buy crew="poor">` can never be clicked, so §5.145's and §5.192's printed "25 Shards to hire a poor crew" is a free crew instead
 - [x] 268. `applyAdjust`'s crew branch spells the CREW_LEVELS ordinal out a second time and has no crewless guard, so a future bare `<adjust crew= amount=>` grants the grade §5.192 charges for
-- [ ] 269. `applyAdjust`'s four surviving branches each duplicate a `<gain>`/`<tick>` that already does the job, and no corpus `<adjust>` of any kind is bare — only `crew=` says so
+- [x] 269. `applyAdjust`'s four surviving branches each duplicate a `<gain>`/`<tick>` that already does the job, and no corpus `<adjust>` of any kind is bare — only `crew=` says so
+- [ ] 270. Every by-hand corpus census globs `books/**/*.xml` and counts the 20 superseded `temp/` working copies, so task 269 was filed with 569 `<adjust>` nodes where the shipped corpus holds 558
 
 **Done**
 
@@ -303,7 +304,8 @@ this order.*
 - [x] 266. §4.605 and §4.658 give a poor crew THREE free upgrades: the `<if crew=>` chain above the click steps forward each time it is obeyed
 - [x] 267. `<buy crew="poor">` can never be clicked, so §5.145's and §5.192's printed "25 Shards to hire a poor crew" is a free crew instead
 - [x] 268. `applyAdjust`'s crew branch spells the CREW_LEVELS ordinal out a second time and has no crewless guard, so a future bare `<adjust crew= amount=>` grants the grade §5.192 charges for
-- [ ] 269. `applyAdjust`'s four surviving branches each duplicate a `<gain>`/`<tick>` that already does the job, and no corpus `<adjust>` of any kind is bare — only `crew=` says so
+- [x] 269. `applyAdjust`'s four surviving branches each duplicate a `<gain>`/`<tick>` that already does the job, and no corpus `<adjust>` of any kind is bare — only `crew=` says so
+- [ ] 270. Every by-hand corpus census globs `books/**/*.xml` and counts the 20 superseded `temp/` working copies, so task 269 was filed with 569 `<adjust>` nodes where the shipped corpus holds 558
 
 ---
 
@@ -1130,6 +1132,43 @@ the tag is a modifier. Tests: whichever way, pin the 569/0 census beside task 26
 
 ---
 
+## 270. Every by-hand corpus census globs `books/**/*.xml` and counts the 20 superseded `temp/` working copies, so task 269 was filed with 569 `<adjust>` nodes where the shipped corpus holds 558
+
+**Priority: LOW — no shipped behaviour is wrong. What is wrong is a number in a filing, and the
+glob that produced it is how the last four tasks measured the corpus.**
+
+*(Filed 2026-08-13, on closing task 269 — the suite pins its census over the BUNDLED books, so
+the two sources had to agree, and they did not.)*
+
+Task 260 moved the superseded working copies into `books/book<N>/temp/`, and `AGENTS.md` records
+that "nothing walks" it. That is true of the build — `build-data.ps1` bundles `books/book<N>/*.xml`
+and the source gate walks the same set — and false of every census run by hand, which reaches for
+`books/**/*.xml` because that is the obvious spelling of "the corpus". The two answers differ by
+whatever the 20 temp files happen to contain.
+
+Measured for task 269's tag: `books/**/*.xml` gives **569** `<adjust>` nodes, the shipped corpus
+**558**, and the 11 extra live in six temp files — `book2/temp/322old.xml` (1),
+`book2/temp/726temp.xml` (1), `book6/temp/215temp.xml` (1), `book6/temp/533temp.xml` (4),
+`book6/temp/548temp.xml` (3), `book6/temp/731temp.xml` (1). The parent breakdown moves too
+(`random` 466 → 464, `difficulty` 89 → 80), so a filing that quotes either number without saying
+which glob produced it cannot be checked against the suite, whose assertions read
+`data.loadBook` and therefore only ever see the 558. Task 268's 346 was the same glob and happened
+to be identical both ways — no temp copy carries an `<adjust crew=>` — which is exactly why the
+trap survived that pass.
+
+Nothing in the code is wrong, so the work is the measurement and the prose:
+1. Re-run the censuses whose counts tasks 260–269 pinned **in prose** against the shipped set
+   (task 264's 147/42/6 `force="f"` sections, 265's 14, 266's three widths, 268's 346) and correct
+   any that moved. The suite's own assertions are already safe by construction — every one of them
+   walks `data.availableBooks()` — so this is a docs-accuracy pass, not a test change.
+2. Say in `AGENTS.md` what "nothing walks it" means: the build and the gate skip `temp/`, a
+   `books/**/*.xml` glob does not, and a census that means "the shipped corpus" must exclude it.
+
+No test is proposed. A suite assertion pinning "the source and the bundle agree" would be a third
+statement of what the build already guarantees, and CI's rebuild-and-diff is what enforces it.
+
+---
+
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -1139,6 +1178,36 @@ the tag is a modifier. Tests: whichever way, pin the 569/0 census beside task 26
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-13 (implementation pass, task 269): closed **269** and filed **270** (LOW). Four
+things worth carrying forward, and the first is that the filing argued its own fork the wrong way
+round. **The case for keeping the four branches was a claim about the tag, and reading the tag
+refuted it.** The filing has it that "none *misreads* its corpus form the way the crew branch did:
+an `<adjust ability="combat" amount="1"/>` applied as an effect means what it looks like". It does
+not: `adjustApplies` returns true for an unconditional modifier and `adjustAmount` returns its
+`value=`, so that node means **"+1 to THIS roll"**, and the branch applied it as a permanent +1
+Combat. Three of the four inverted a form the corpus really writes — `codeword=` is the modifier's
+CONDITION (40 nodes: `<adjust codeword="Eldritch" value="3"/>` is "+3 if you know Eldritch", and
+the branch bumped the Eldritch counter), `title=` likewise (§4.63's one node, and the branch
+GRANTED Nightstalker), and `titleVal=` is a value SOURCE (§5.343/§5.432, granted "bokh" at 0).
+So option (a) — widen the gate to every `<adjust>`, delete `applyAdjust` and its `EFFECT_APPLIERS`
+entry — is not tidiness; it removes the same defect task 268 removed, in four more attributes.
+**Two of the four branches were inert over the corpus, and saying so is what keeps the claim
+honest.** `ability=` never fired on a corpus node (`firstAbility` rejects `rank`/`stamina`, and
+every one of the 66 is one of those), and no `name=` node carries an `amount=`, so the probe's
+teeth come from the other three plus the filing's own example. The probe restored all four
+verbatim and failed one assertion reading `Eldritch=3 Nightstalker=true bokh=true combat=1` —
+four inversions in one line. **The gate had to widen without widening its reader list.** All 558
+hang under the same five parents task 268 named, so `FL_ADJUST_READERS` is unchanged and only the
+`-and $el.HasAttribute('crew')` came off; the self-test's legal-shapes fixture now exercises all
+five readers with non-crew conditions, since the check no longer looks at which attribute the node
+carries. **The filing's census did not reproduce, and the disagreement is task 270.** 569 is the
+`books/**/*.xml` glob, which counts the 20 superseded `temp/` working copies; the shipped corpus
+holds **558** (`random` 464, `difficulty` 80, `lose` 9, `rankcheck` 5), and the suite pins that
+one because `data.loadBook` cannot see any other. Task 268's 346 was identical both ways, which is
+why the trap survived that pass. Each of the three new assertions was probed to failure one at a
+time, the census by a pre-filter matching nothing (`total=0`, non-vacuous). Suite **2673** (up 3);
+the gate self-test **29** (up 2).
 
 Worked 2026-08-13 (implementation pass, task 268): closed **268** and filed **269** (LOW). Five
 things worth carrying forward, and the first is that the census only *opened* the fork — what

@@ -51,10 +51,11 @@ const BRANCH_TAGS = new Set(['success', 'failure', 'outcomes']);
 const ROLL_TAGS = new Set(['difficulty', 'random', 'rankcheck', 'training']);
 // The ROLLGATE_*/TRANSFER_GROUP wrapper tag sets moved to render-gates.js (task 119),
 // used only by the navigation-gate computations that also moved there.
-// Note: <adjust> is deliberately NOT here. In this corpus it is always a die-roll
-// MODIFIER (a child of <difficulty>/<random>/<rankcheck>, consumed by
-// childAdjustment) — never a passive effect. Auto-applying it on view would
-// silently upgrade the crew ("<adjust crew='good'>") or bump codeword counters.
+// Note: <adjust> is deliberately NOT here. It is always a die-roll MODIFIER (a child of
+// <difficulty>/<random>/<rankcheck>, consumed by childAdjustment, or of the <gain>/<lose>
+// whose amount it qualifies) — never a passive effect. Its attributes are the modifier's
+// CONDITION, so drawing one as an effect would read every node backwards: engine.js has no
+// applier for it at all now, and the build gate refuses a bare one. (task 269)
 const PASSIVE_TAGS = new Set(['lose', 'tick', 'gain', 'set', 'curse', 'disease', 'poison', 'adjustmoney']);
 // ITEM_FAMILY_TAGS / CHOOSE_ONE_TAGS moved to render-rules.js (task 119); ITEM_FAMILY_TAGS
 // is imported back for the award/label views, CHOOSE_ONE_TAGS is used only by isChooseOne.

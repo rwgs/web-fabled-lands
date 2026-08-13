@@ -429,7 +429,6 @@ const EFFECT_APPLIERS = {
   lose:        (el, state, opts) => applyLose(el, state, opts),
   tick:        (el, state, opts) => applyTick(el, state, opts),
   gain:        (el, state, opts) => applyTick(el, state, opts),
-  adjust:      (el, state, opts) => applyAdjust(el, state, opts),
   set:         (el, state, opts) => applySet(el, state, opts),
   curse:       (el, state)       => applyAffliction(el, state, 'curse'),
   disease:     (el, state)       => applyAffliction(el, state, 'disease'),
@@ -444,6 +443,23 @@ const EFFECT_APPLIERS = {
   weapon:      (el, state) => applyItemAward(el, state),
   armour:      (el, state) => applyItemAward(el, state),
   tool:        (el, state) => applyItemAward(el, state),
+  // There is deliberately no `adjust:` entry. An <adjust> MODIFIES the node above it — a
+  // die-roll contribution read by childAdjustment off its parent <random>/<difficulty>/
+  // <rankcheck>, or off the <gain>/<lose> amount it qualifies ("subtract your armour from
+  // the wound") — and is never an effect in its own right: all 558 in books 1-6 hang under
+  // one of those five readers and not one is bare. applyAdjust used to answer such a node
+  // with four branches, and they read the tag the way the crew branch they outlived (task
+  // 268) did: adjustApplies takes codeword=/title= as the modifier's CONDITION and
+  // value=/amount= as its contribution, so `<adjust codeword="Eldritch" value="3"/>` ("+3
+  // if you know Eldritch", 40 nodes) bumped the Eldritch counter, §4.63's `<adjust
+  // title="Nightstalker" value="1"/>` GRANTED the title, and §5.343's `<adjust
+  // titleVal="bokh" default="-1"/>` — a value SOURCE, "add your bokh circle" — granted
+  // "bokh" at 0. The ability=/name= branches were inert over every form the corpus writes
+  // (firstAbility rejects rank/stamina, and no name= node carries an amount), but an
+  // `<adjust ability="combat" amount="1"/>` means "+1 to THIS roll" and would have been
+  // applied as a permanent +1 Combat. A counter and a title are written by <gain>/<tick>;
+  // applyEffect returns '' for an unregistered tag, so a bare <adjust> handed here now does
+  // nothing, and validate-source.ps1 refuses one that hangs where no reader sees it. (269)
 };
 
 export function applyEffect(el, state, opts = {}) {
@@ -1250,33 +1266,6 @@ function applyTransfer(el, state, opts = {}) {
   // price= is a clear-flag gate: set the flag once the transfer has run.
   const price = el.getAttribute('price');
   if (price != null) state.setFlag(price, true);
-  return '';
-}
-
-function applyAdjust(el, state) {
-  const get = (a) => el.getAttribute(a);
-  const amount = get('value') != null ? resolveValue(state, get('value')) : (get('amount') != null ? resolveValue(state, get('amount')) : 0);
-  if (get('ability') != null && (get('value') != null || get('amount') != null)) {
-    const ab = firstAbility(get('ability')); if (ab) state.adjustAbility(ab, amount);
-  } else if (get('codeword') != null) {
-    state.adjustCodewordValue(get('codeword'), amount);
-  } else if (get('name') != null) {
-    state.adjustCodewordValue(get('name'), amount);
-  } else if (get('title') != null || get('titleVal') != null) {
-    state.addTitle(get('title') || get('titleVal'), amount);
-  }
-  // There is deliberately no crew= branch. An <adjust crew="good" amount="1"/> is a die-roll
-  // MODIFIER — "add 1 if your crew is good" — read off the roll it hangs under by
-  // adjustApplies/adjustAmount, which take crew= as the CONDITION and amount= as the
-  // contribution; all 346 in books 1-6 are children of <random>/<difficulty>, and none is
-  // bare. The branch that used to sit here read those same two attributes as "shift the grade
-  // by amount", so anything handing applyAdjust one of those nodes would have silently
-  // PROMOTED the crew — and it clamped through a second copy of the CREW_LEVELS ordinal with
-  // no crewless floor, where indexOf('none') is -1 and amount="1" therefore *granted* the
-  // grade §5.192 charges 25 Shards for (task 267's defect, one branch over). A grade is set
-  // by <gain crew="good"> and shifted by <lose crew="N">; validate-source.ps1 now refuses an
-  // <adjust crew=> that hangs where nothing reads it, so the roll modifier is the only
-  // meaning the tag has. (task 268)
   return '';
 }
 

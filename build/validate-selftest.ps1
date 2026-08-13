@@ -149,7 +149,17 @@ $CASES = @(
     @{ label = 'an <adjust crew=> hanging where no roll reads it (task 268)'
        file  = 'books/book2/1.xml'
        text  = '<section name="1"><adjust crew="good" amount="1"/></section>'
-       want  = 'a crew modifier must be a child of' }
+       want  = 'an <adjust> modifies the node above it' }
+
+    @{ label = 'a bare <adjust codeword=>, which reads as the counter bump it is not (task 269)'
+       file  = 'books/book2/1.xml'
+       text  = '<section name="1"><adjust codeword="Eldritch" value="3"/></section>'
+       want  = 'an <adjust> modifies the node above it' }
+
+    @{ label = 'an <adjust> under a wrapper that does not read it (task 269)'
+       file  = 'books/book2/1.xml'
+       text  = '<section name="1"><if crew="good"><adjust title="Nightstalker" value="1"/></if></section>'
+       want  = '<adjust> under <if>' }
 
     @{ label = 'a dangling link inside a bundled book'
        file  = 'books/book1/1.xml'
@@ -197,10 +207,10 @@ Assert 'JaFL wildcards and a crew delta are accepted values' ($ok3.Errors.Count 
 # sit loose in the book folder and neither may be read as a mis-named section.
 $ok4 = Build-Fixture @{ 'books/book1/1temp.xml' = '<section name="The War-Torn Kingdom"><p>Book title, not a section id.</p></section>' }
 Assert 'a prose-named <section> loose in a book folder is left alone' ($ok4.Errors.Count -eq 0) ($ok4.Errors -join ' | ')
-# The other half of task 268's check: the shapes the corpus really writes must stay legal -
-# under a roll (all 346 of them), and under the <lose stamina=> that reads the same modifiers.
-$ok5 = Build-Fixture @{ 'books/book2/1.xml' = '<section name="1"><random dice="2"><adjust crew="good" amount="1"/></random><difficulty ability="scouting" level="9"><adjust crew="poor" value="-1"/></difficulty><lose stamina="4"><adjust crew="excellent" amount="-1"/></lose></section>' }
-Assert 'an <adjust crew=> under a roll (or a <lose>) is left alone' ($ok5.Errors.Count -eq 0) ($ok5.Errors -join ' | ')
+# The other half of tasks 268 + 269's check: the shapes the corpus really writes must stay
+# legal - all five readers, and the non-crew conditions the widened check now also sees.
+$ok5 = Build-Fixture @{ 'books/book2/1.xml' = '<section name="1"><random dice="2"><adjust crew="good" amount="1"/><adjust codeword="Eldritch" value="3"/></random><difficulty ability="scouting" level="9"><adjust crew="poor" value="-1"/><adjust title="Nightstalker" value="1"/></difficulty><rankcheck dice="1"><adjust titleVal="bokh" default="-1"/></rankcheck><gain ability="stamina" amount="2"><adjust name="CharismaBonus"/></gain><lose stamina="4"><adjust crew="excellent" amount="-1"/></lose></section>' }
+Assert 'an <adjust> under each of the five readers is left alone' ($ok5.Errors.Count -eq 0) ($ok5.Errors -join ' | ')
 
 if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
 

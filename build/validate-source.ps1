@@ -142,7 +142,7 @@ $script:FL_CARGO = @('grain', 'furs', 'metals', 'minerals', 'spices', 'textiles'
 # The tags that READ an <adjust> child: the three roll nodes (engine.js childAdjustment, via
 # walkEffectBody and the roll widgets) plus <gain>/<lose>, whose amount= and stamina= take the
 # same conditional modifiers ("subtract your armour from the wound"). Used by the structural
-# check on <adjust crew=> below - see the note there for why only that attribute is gated.
+# check on every <adjust> below - see the note there.
 $script:FL_ADJUST_READERS = @('random', 'difficulty', 'rankcheck', 'gain', 'lose')
 
 # `type` means something different on each tag that carries it.
@@ -246,22 +246,23 @@ function Test-XmlVocabulary($el, [string]$label, [System.Collections.ArrayList]$
         $bad = Test-AttrValue $tag $name $a.Value
         if ($bad) { [void]$errors.Add("$label : <$tag> $bad") }
     }
-    # An <adjust crew=...> is a die-roll MODIFIER - "add 1 if your crew is good" - and not a
-    # grade change: adjustApplies reads crew= as the CONDITION and amount= as the contribution,
-    # and all 346 in books 1-6 hang under <random>/<difficulty>. Anywhere else nothing reads
-    # it, so it is a silent no-op that LOOKS like <gain crew="good">, which is the tag that
-    # really sets a grade (<lose crew="N"> shifts one). applyAdjust used to carry a crew branch
-    # reading the same two attributes as "shift by amount" - reachable only by handing it the
-    # node directly - and deleting it is what makes this the rule rather than a second, weaker
-    # copy of the crew ordinal. Only crew= is gated: the other <adjust> forms still have live
-    # applyAdjust branches. (task 268)
-    if ($tag -eq 'adjust' -and $el.HasAttribute('crew')) {
+    # An <adjust> MODIFIES the node above it - "add 1 if your crew is good", "subtract your
+    # armour from the wound" - and is never an effect in its own right: all 558 in books 1-6
+    # hang under one of the five readers, and none is bare. Anywhere else nothing reads it, so
+    # it is a silent no-op that LOOKS like the tag it names - and its attributes are the
+    # modifier's CONDITION, not its target, so reading one as an effect inverts it:
+    # <adjust codeword="Eldritch" value="3"/> means "+3 if you know Eldritch", where
+    # <tick codeword="Eldritch" amount="3"/> is what raises the counter. engine.js used to
+    # answer such a node with applyAdjust, whose branches did exactly that inversion (a crew
+    # promotion, task 268; a granted title, a raised Rank, a bumped counter, task 269);
+    # deleting them is what makes this the rule rather than a second, weaker reading.
+    if ($tag -eq 'adjust') {
         $parent = '(root)'
         if ($el.ParentNode -and $el.ParentNode.NodeType -eq [System.Xml.XmlNodeType]::Element) {
             $parent = $el.ParentNode.get_Name()
         }
         if ($script:FL_ADJUST_READERS -notcontains $parent) {
-            [void]$errors.Add(("{0} : <adjust crew=`"{1}`"> under <{2}> - a crew modifier must be a child of <{3}> (use <gain crew=> to set a grade, <lose crew=N> to shift one)" -f $label, $el.GetAttribute('crew'), $parent, ($script:FL_ADJUST_READERS -join '>/<')))
+            [void]$errors.Add(("{0} : <adjust> under <{1}> - an <adjust> modifies the node above it and must be a child of <{2}> (use <gain>/<tick> for an effect that writes to the sheet)" -f $label, $parent, ($script:FL_ADJUST_READERS -join '>/<')))
         }
     }
     foreach ($c in $el.ChildNodes) { Test-XmlVocabulary $c $label $errors }

@@ -5032,4 +5032,78 @@ export async function run(ctx) {
          `total=${total268} parents=${shape268} bare=${bare268.join(' ')}`);
     }
 
+    // --- task 269: an <adjust> is a modifier on the node above it, never an effect ---
+    // Task 268 deleted applyAdjust's crew branch; these are the four that outlived it, and the
+    // filing's case for keeping them — "an <adjust ability="combat" amount="1"/> applied as an
+    // effect means what it looks like" — is the reading the tag disproves. adjustApplies takes
+    // codeword=/title= as the modifier's CONDITION and value=/amount= as its contribution, and
+    // adjustAmount takes titleVal= as a value SOURCE, so three branches inverted a form the
+    // corpus really writes (40 codeword= nodes, §4.63's one title=, §5.343/§5.432's titleVal=).
+    // The ability= and name= branches were inert over every corpus form — firstAbility rejects
+    // rank/stamina, and no name= node carries an amount — but the filing's own example means
+    // "+1 to THIS roll" and would have landed as a permanent +1 Combat, which is why it is
+    // asserted here too. EFFECT_APPLIERS has no adjust entry now, so applyEffect returns ''.
+    {
+      const SHAPES269 = [
+        '<adjust codeword="Eldritch" value="3"/>',         // "+3 if you know Eldritch" (book1/88)
+        '<adjust title="Nightstalker" value="1"/>',         // "+1 if you are a Nightstalker" (book4/63)
+        '<adjust titleVal="bokh" default="-1"/>',           // "+ your bokh circle, else −1" (book5/343)
+        '<adjust ability="combat" amount="1"/>',            // an unconditional +1 to the roll
+        '<adjust name="CharismaBonus"/>',                   // reads a stored counter (book4/93)
+      ];
+      const g269 = GameState.create({ name: 'T269', gender: 'f', profession: 'Wayfarer', book: 4, adv });
+      g269.addCodeword('Eldritch');
+      const cbt269 = g269.ability('combat'), titles269 = g269.data.titles.length;
+      for (const s of SHAPES269) eng.applyEffect(parse(s), g269, {});
+      const wrote269 = [
+        `Eldritch=${g269.codewordValue('Eldritch')}`,
+        `Nightstalker=${g269.hasTitle('Nightstalker')}`,
+        `bokh=${g269.hasTitle('bokh')}`,
+        `combat=${g269.ability('combat') - cbt269}`,
+        `titles=${g269.data.titles.length - titles269}`,
+      ].join(' ');
+      ok('task269: every corpus <adjust> shape handed straight to applyEffect writes nothing to the sheet',
+         wrote269 === 'Eldritch=0 Nightstalker=false bokh=false combat=0 titles=0', wrote269);
+
+      // …and each still means what it means where it belongs: a child of the roll (or the
+      // <gain>/<lose> amount) it modifies, read by childAdjustment. The codeword condition is
+      // the one no other suite covers, and it is the largest of the four families.
+      const roll269 = (inner) => eng.childAdjustment(parse(`<random dice="2">${inner}</random>`), g269);
+      const read269 = [
+        `codeword=${roll269('<adjust codeword="Eldritch" value="3"/>')}`,
+        `absent=${roll269('<adjust codeword="Brush" value="2"/>')}`,
+        `counter=${roll269('<adjust name="CharismaBonus"/>')}`,
+      ].join(' ');
+      g269.adjustCodewordValue('CharismaBonus', 2);
+      ok('task269: …while the same nodes still add their amount to the roll they hang under',
+         read269 === 'codeword=3 absent=0 counter=0' && roll269('<adjust name="CharismaBonus"/>') === 2, read269);
+
+      // The census the deletion rests on, beside task 268's 346/0: every <adjust> in the
+      // bundled corpus — not just the crew ones — hangs under one of the five tags that READ
+      // an <adjust> child, and not one is bare. The parent breakdown is pinned too, so a scan
+      // that silently found nothing cannot pass. NOTE the total is 558, not the 569 the task
+      // was filed with: that number counts the 11 nodes in superseded books/**/temp/ working
+      // copies, which the build does not bundle (task 260's double-count, one census over).
+      const READ269 = new Set(['random', 'difficulty', 'rankcheck', 'gain', 'lose']);
+      const bare269 = [], by269 = new Map();
+      let total269 = 0;
+      for (const b of data.availableBooks()) {
+        const raw = await data.loadBook(b);
+        for (const key of Object.keys(raw)) {
+          if (!/<adjust\b/.test(raw[key])) continue;
+          const el = await data.getSection(b, key);
+          for (const a of el.querySelectorAll('adjust')) {
+            total269++;
+            const p = (a.parentElement ? a.parentElement.tagName : '(root)').toLowerCase();
+            by269.set(p, (by269.get(p) || 0) + 1);
+            if (!READ269.has(p)) bare269.push(`${b}/${key}:${p}`);
+          }
+        }
+      }
+      const shape269 = Array.from(by269.entries()).sort().map(([p, n]) => `${p}:${n}`).join(' ');
+      ok('task269: every corpus <adjust> of any kind hangs under a tag that reads it, and none is bare',
+         total269 === 558 && bare269.length === 0 && shape269 === 'difficulty:80 lose:9 random:464 rankcheck:5',
+         `total=${total269} parents=${shape269} bare=${bare269.join(' ')}`);
+    }
+
 }
