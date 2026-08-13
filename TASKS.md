@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-264 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **264, open under MEDIUM** — file new work
+266 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **267, open under LOW** — file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -24,7 +24,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 265. Three click-time takings still book nothing into the walk-position ledger — a market row's Buy/Sell, an inline `<sell>`, and the open-pick family
+- [ ] 267. `<buy crew="poor">` can never be clicked, so §5.145's and §5.192's printed "25 Shards to hire a poor crew" is a free crew instead
 
 **Done**
 
@@ -298,7 +298,8 @@ this order.*
 - [x] 263. Four click-time spend sites book nothing into the walk-position ledger, so a future guard above a bare `<buy>`, a paid `<rest>` or a cache Take reads the emptied purse
 - [x] 264. §6.160's "cross it off and turn to 551" grays →551 the moment either thing is crossed off, so the price is paid and the route it buys is gone
 - [x] 265. Three click-time takings still book nothing into the walk-position ledger — a market row's Buy/Sell, an inline `<sell>`, and the open-pick family
-- [ ] 266. §4.605 and §4.658 give a poor crew THREE free upgrades: the `<if crew=>` chain above the click steps forward each time it is obeyed
+- [x] 266. §4.605 and §4.658 give a poor crew THREE free upgrades: the `<if crew=>` chain above the click steps forward each time it is obeyed
+- [ ] 267. `<buy crew="poor">` can never be clicked, so §5.145's and §5.192's printed "25 Shards to hire a poor crew" is a free crew instead
 
 ---
 
@@ -984,6 +985,73 @@ above is the expected output, and §4.605's `poor->average->good->excellent` is 
 turn into `poor->average`), assert §5.145 still sells all four paid grades in one visit, and pin
 the census the chosen fix is scoped by.
 
+**Done — (b), scoped by the census to a STANDALONE `<buy>`.** The census asked for was run over
+`books/**/*.xml` and the bundled `web/data/*.json` alike, at three widths, and the width is the
+whole decision:
+
+| what a branch holds | branches | sections |
+| --- | --- | --- |
+| a `<buy>` | 4 | **4/605, 4/658** |
+| any click-time taking (`sell`/`market`/`rest`/cache/`transfer`/`resurrection`) | 7 | + 4/285, 6/490, 6/628 |
+| any click-time control (adding awards and `<group>`) | 10 | + 1/297, 3/165, 5/677 |
+
+The narrow width is exactly the two broken sections and nothing else, and the wider ones are
+rejected on what they reach rather than on cost. **§6.628 is the one that would really break:**
+its `<if var="y" lessthan="6">`/`<elseif var="y" equals="6">` is keyed on a die roll, so a
+re-armed roll (tasks 253 + 254) must re-derive it, and a hold triggered by the `<rest>` inside a
+branch would freeze the chain on the stale roll. **§5.677 and §1.297 are already owned** — the
+former by task 261's ledger (its `<group>` books `<lose shards="400"/>` at its own path, so
+`<if shards="400">` keeps reading the pre-payment purse), the latter by task 245's deferred-fight
+chain — so a wider hold would be a second mechanism over a stated rule.
+
+(a) is rejected on the ledger's own terms, not on cost: `noteSpend` records "only a taking — a
+gain is always read live", and a crew upgrade is a **gain**. Booking one is the mechanism §6.215
+and §6.49 depend on NOT existing. (c) keys on the wrong thing, and needing the `shards="0"` scope
+to spare §5.145 is the tell: the defect is the guard re-deriving against what the click changed,
+not a free buy repeating.
+
+Implementation: `renderInlineBuy`'s crew branch mints the `buy@<path>` memo the ship/item form
+already keeps (read as "bought once", never as a per-visit cap — §5.145 stays repeatable), and
+task 264's `forcedOptInTaken` becomes **`branchOptInTaken`**, scanning `force@` *and* `buy@`
+under the branch's own path. One rule, one scan: a second copy is where the next clause goes
+missing (264's own lesson). A `<buy>` inside a `<group>` runs headlessly through `runBuyNode` and
+mints no memo, which is what excludes §4.622's salvage and §5.192's Wrath of God.
+
+Measured after: §4.605 `poor->average` from poor and `average->good` from average, §4.658
+`poor->average`, §3.161 (the control) `poor->average`, §5.145 still `poor->average->good->
+excellent` for 300 Shards. Suite 2657 (up 10).
+
+---
+
+## 267. `<buy crew="poor">` can never be clicked, so §5.145's and §5.192's printed "25 Shards to hire a poor crew" is a free crew instead
+
+**Priority: LOW — the divergence pays the player 25 Shards, once per ship claimed with no crew,
+and the only route to it is §5.192's Wrath of God. Nothing is broken by the dead button itself;
+what is wrong is that the page says you must pay and the port has already given it away.**
+
+*(Filed 2026-08-12, on closing task 266 — asserting that §5.145 "still sells every grade in one
+visit" needed knowing which of its four crew buys are clickable at all, and the first is not.)*
+
+`canUpgradeCrew` (`market.js:291`) enforces one grade at a time with `have === target - 1`.
+`CREW_LEVELS` is `['poor', 'average', 'good', 'excellent']` (`rules.js:73`), so `<buy crew="poor">`
+has `target = 0` and needs `have === -1` — which no ship can have, because `canonCrew` maps a
+missing or unknown grade (including `initialCrew="none"`) to `'poor'`. The button is therefore
+**always disabled**, with the misleading title "Your crew is already at least that good."
+
+Both sites are the same sentence in the books' two harbourmaster scenes: §5.145 "It costs
+`<buy crew="poor" shards="25"/>` to hire a poor crew", §5.192 "You will have to pay to hire a
+crew. `<buy crew="poor" shards="25"/>` gets a poor crew". §5.192 is the live one: its
+`<buy ship="brig" … initialCrew="none">` is the corpus's only crewless ship, and the port hands
+that captain a poor crew for nothing.
+
+The fork is whether the model should carry a **crewless** grade at all. Adding one to
+`CREW_LEVELS` touches every index-based reading (`<lose crew="N">`'s shift, `value="crew"`'s
+1-based index that §4.658's `oldcrew` round-trips through, and the `initialCrew` default), so
+measure those before widening the ordinal; the alternative is to special-case a ship whose crew
+is absent, and leave the ordinal alone. Tests: assert §5.192's claim leaves the brigantine
+crewless and its 25-Shard hire clickable, that paying it yields a poor crew, and that §4.658's
+`oldcrew` round trip still carries each grade unchanged.
+
 ---
 
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
@@ -995,6 +1063,33 @@ the census the chosen fix is scoped by.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-12 (implementation pass, task 266): closed **266** and filed **267** (LOW). Four
+things worth carrying forward, and the first is that the task's own instruction — measure before
+picking — is what picked the option. **The fork was decided by the width of the census, not by
+the three paragraphs arguing it.** Run at three widths, "a `<buy>` in a branch with a further
+branch below" returns exactly the two broken sections; widening to any click-time taking adds
+three, and one of them, §6.628, would really break — its chain is keyed on a **die roll** the
+player can re-arm (tasks 253 + 254), so a hold would freeze it on the stale result. Widening
+again adds §5.677 and §1.297, which task 261's ledger and task 245's deferred-fight chain already
+own. The widest option was the one the filing called "closest to task 264's hold"; it is right
+only when scoped, and only the census could say where. **Option (a) was rejected on the ledger's
+own words rather than on cost.** `noteSpend` records "only a taking — a gain is always read
+live", and a crew upgrade is a gain, so `crewAt(path)` would have built the exact mechanism
+§6.215 and §6.49 depend on not existing. The task framed this as "is a *better* crew richer?";
+the answer is that the question does not arise, because the ledger books what LEAVES the sheet.
+**The census scanner was wrong in a way that looked like a corpus finding, and only a second
+source caught it.** Its tag regex ended `((?:"[^"]*"|[^">])*)(\/?)>` — the attribute run is
+greedy and `[^">]` matches the `/` itself, so the self-close group captured empty every time and
+every `<buy …/>` read as an OPEN tag that swallowed its siblings. The assertion duly reported
+§3.406, §4.440 and §5.145 as sections with a branch-level buy, none of which has one. Reading
+self-closure off the whole match fixed it, and the Python census run over `books/**/*.xml` is
+what said the JS was lying rather than the corpus surprising. **The two sources then disagreed a
+second time, and that disagreement was the correct answer.** The JS returns three sections where
+the Python returns four, because only the JS excludes a `<buy>` inside a `<group>` — a collapsed
+group runs its purchase through `runBuyNode`, which mints no per-node memo, so §5.192's Wrath of
+God and §4.622's salvage are out of the hold's reach by construction. The expected value tracks
+the mechanism, not the tag count. Suite **2657** (up 10).
 
 Worked 2026-08-12 (implementation pass, task 265): closed **265** and filed **266** (HIGH). Four
 things worth carrying forward, and the first is the one that nearly shipped a vacuous block.

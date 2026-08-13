@@ -4627,6 +4627,169 @@ export async function run(ctx) {
          sort265(above265).join(' ') === 'forfeit:5/66 market:5/145', above265.join(' '));
     }
 
+    // --- task 266: a branch whose own click-time <buy> has fired is the player's ---
+    // §4.605 and §4.658 print "you can upgrade Crew Quality one level" and then spell that out as
+    // a three-branch chain: `<if crew="poor">…<buy crew="average" shards="0"/>`, `<elseif
+    // crew="average">…good`, `<elseif crew="good">…excellent`. A <buy> applies from the CLICK, so
+    // the redraw re-derived the chain against the crew it had just changed — the taken branch
+    // grayed and the NEXT elseif became the active one, offering the next grade. Measured through
+    // the rendered page before the fix, a poor crew climbed poor->average->good->excellent for 0
+    // Shards: 300 Shards at §5.145's shipyard prices, and a permanently better crew on every sea
+    // roll. canUpgradeCrew is no defence — it enforces one grade PER CLICK, which each click
+    // honestly is.
+    //
+    // The fix is task 264's hold, one memo wider: a branch whose own click-time opt-in has fired
+    // is the player's for the rest of the visit, whether that opt-in was a force="f" effect node
+    // or a <buy> widget. Scoped by census (below) to a STANDALONE <buy>, which is exactly these
+    // two sections plus §3.161, whose chain ends there and where a hold only stops words graying.
+    {
+      const settle266 = () => new Promise((r) => setTimeout(r, 30));
+      const gray266 = (el) => !!(el && el.closest('.cond-inactive'));
+      const mk266 = async (book, sec, crew, setup) => {
+        const g = GameState.create({ name: 'T266', gender: 'f', profession: 'Wayfarer', book, adv });
+        g.data.items = []; g.data.shards = 0;
+        if (crew) g.addShip({ type: 'brigantine', name: 'Hull', crew, cargo: [], docked: null });
+        if (setup) setup(g);
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate() {}, onDeath() {}, notify() {} });
+        st.begin(await data.getSection(book, String(sec)), book, String(sec));
+        await settle266();
+        return { g, c, st };
+      };
+      const offer266 = (c, re) => Array.from(c.querySelectorAll('button.btn-mini'))
+        .find((b) => re.test(b.textContent) && !b.disabled && !gray266(b));
+      const grade266 = (g) => (g.currentShip() ? g.currentShip().crew : 'none');
+      // Click whatever upgrade the page then offers, redraw, and record the grade — until it
+      // offers none. The grade SEQUENCE is the assertion, which is how the defect was filed.
+      const climb266 = async (r, re) => {
+        const seq = [grade266(r.g)];
+        for (let i = 0; i < 5; i++) {
+          const b = offer266(r.c, re);
+          if (!b) break;
+          b.click();
+          await settle266();
+          r.st.rerender();
+          await settle266();
+          seq.push(grade266(r.g));
+        }
+        return seq.join('->');
+      };
+
+      const p605 = await mk266(4, 605, 'poor');
+      ok('task266: §4.605 upgrades a poor crew exactly ONE level',
+         await climb266(p605, /upgrade/i) === 'poor->average', `crew=${grade266(p605.g)}`);
+      // The held branch must still SAY what the player did, rather than graying out from under
+      // them (task 264's rule) — its words stay live and its button redraws checked and dead.
+      const done605 = Array.from(p605.c.querySelectorAll('button.btn-mini')).find((b) => /upgrade it to average/i.test(b.textContent));
+      ok('task266: §4.605 redraws the taken upgrade as a checked, dead button in a live branch',
+         !!done605 && done605.disabled && !gray266(done605) && /☑/.test(done605.textContent),
+         `btn=${done605 && done605.textContent} gray=${gray266(done605)}`);
+
+      // Entering part-way up the chain: the hold is keyed by the acting branch's own path, so an
+      // average crew takes the elseif's step and stops there too.
+      const a605 = await mk266(4, 605, 'average');
+      ok('task266: §4.605 upgrades an average crew exactly ONE level',
+         await climb266(a605, /upgrade/i) === 'average->good', `crew=${grade266(a605.g)}`);
+      const x605 = await mk266(4, 605, 'excellent');
+      ok('task266: §4.605 offers an excellent crew nothing at all',
+         await climb266(x605, /upgrade/i) === 'excellent', `crew=${grade266(x605.g)}`);
+
+      // §4.658 runs the same chain after its forced barque, which carries the lost ship's crew
+      // over via <set var="oldcrew" value="crew"/> + initialCrew="oldcrew".
+      const p658 = await mk266(4, 658, 'poor');
+      const barque266 = Array.from(p658.c.querySelectorAll('button.btn-mini')).find((b) => /Note it/i.test(b.textContent));
+      ok('task266: §4.658 offers its forced barque to a poor-crewed captain', !!barque266 && !barque266.disabled);
+      if (barque266) barque266.click();
+      await settle266(); p658.st.rerender(); await settle266();
+      ok('task266: §4.658 carries the poor crew onto the barque and upgrades it exactly ONE level',
+         await climb266(p658, /becomes/i) === 'poor->average', `crew=${grade266(p658.g)}`);
+
+      // The control the filing named: §3.161 has ONE `<if crew="poor">` and no elseif, so there
+      // was nowhere to step to and it was sound before the fix. It must stay sound.
+      const p161 = await mk266(3, 161, 'poor');
+      ok('task266: §3.161 (the control) still upgrades a poor crew exactly ONE level',
+         await climb266(p161, /upgrades them/i) === 'poor->average', `crew=${grade266(p161.g)}`);
+
+      // …and the section the hold must NOT reach: §5.145's shipyard is PRICED and repeatable, and
+      // its four crew buys sit in plain prose under no guard at all, so a visit still climbs every
+      // grade it pays for. 50 + 100 + 150 = 300 Shards.
+      const p145 = await mk266(5, 145, 'poor', (g) => { g.data.shards = 500; });
+      ok('task266: §5.145\'s priced shipyard still sells every grade in one visit',
+         await climb266(p145, /Hire .* crew/i) === 'poor->average->good->excellent' && p145.g.data.shards === 200,
+         `crew=${grade266(p145.g)} shards=${p145.g.data.shards}`);
+
+      // The census the hold is scoped by, over the bundled corpus (run over books/**/*.xml too,
+      // which returns the same sections and the same two with a branch below). A <buy> inside a
+      // <group> is deliberately NOT counted: a collapsed group runs its purchase headlessly through
+      // runBuyNode, which mints no per-node memo for the hold to key on — that excludes §4.622's
+      // three salvage buys and §5.192's Wrath of God, both group-wrapped, and both of which a
+      // census over the raw tags alone reports. Of the three standalone sites left, only §4.605 and
+      // §4.658 have a FURTHER branch below the one that buys, which is the whole defect; §3.161
+      // ends its chain, so the hold there only stops the words graying under a click just made.
+      // Self-closing is read off the whole match, not a trailing (\/?) group: the attribute run
+      // is greedy and `[^">]` matches the `/` itself, so the group captures empty every time and
+      // every `<buy …/>` reads as an OPEN tag that swallows its siblings. (measured: the census
+      // returned 3/406, 4/440 and 5/145 — sections with no branch-level buy at all.)
+      const TAG266 = /<(\/?)([a-zA-Z][\w-]*)(?:"[^"]*"|[^">])*>/g;
+      const BR266 = new Set(['elseif', 'else']);
+      const scan266 = (xml) => {
+        const root = { tag: '#root', kids: [], buy: false };
+        const stack = [root];
+        const shut = () => {
+          const frame = stack.pop();
+          const parent = stack[stack.length - 1];
+          if (frame.tag !== 'group' && frame.buy) parent.buy = true;
+          parent.kids.push(frame);
+        };
+        let m;
+        const src = xml.replace(/<!--[\s\S]*?-->/g, '');
+        TAG266.lastIndex = 0;
+        while ((m = TAG266.exec(src))) {
+          const [, close, name] = m;
+          const t = name.toLowerCase();
+          if (close) { if (stack.length > 1 && stack[stack.length - 1].tag === t) shut(); continue; }
+          stack.push({ tag: t, kids: [], buy: t === 'buy' });
+          if (/\/>$/.test(m[0])) shut();
+        }
+        while (stack.length > 1) shut();
+        // Every chain of sibling branches. Interleaved TEXT does not break one (render.js), and
+        // text is not in `kids` at all; any other ELEMENT does.
+        const out = { branches: 0, below: 0 };
+        const take = (chain) => chain.forEach((b, i) => {
+          if (!b.buy) return;
+          out.branches += 1;
+          if (chain.length - i - 1 > 0) out.below += 1;
+        });
+        const walk = (frame) => {
+          let chain = [];
+          for (const k of frame.kids) {
+            if (k.tag === 'if') { take(chain); chain = [k]; }
+            else if (BR266.has(k.tag)) { if (chain.length) chain.push(k); }
+            else { take(chain); chain = []; }
+            walk(k);
+          }
+          take(chain);
+        };
+        walk(root);
+        return out;
+      };
+      const all266 = [], deep266 = [];
+      for (const b of data.availableBooks()) {
+        const raw = await data.loadBook(b);
+        for (const key of Object.keys(raw)) {
+          const r = scan266(raw[key]);
+          if (r.branches) all266.push(b + '/' + key + ':' + r.branches);
+          if (r.below) deep266.push(b + '/' + key + ':' + r.below);
+        }
+      }
+      const pad266 = (s) => s.replace(/\d+/g, (n) => n.padStart(5, '0'));
+      const sort266 = (a) => a.sort((x, y) => (pad266(x) < pad266(y) ? -1 : 1));
+      ok('task266: three corpus sections put a standalone <buy> inside an if/elseif branch',
+         sort266(all266).join(' ') === '3/161:1 4/605:3 4/658:3', all266.join(' '));
+      ok('task266: and only §4.605 and §4.658 put a further branch BELOW the one that buys',
+         sort266(deep266).join(' ') === '4/605:2 4/658:2', deep266.join(' '));
+    }
+
     // --- task 262: §1.460 states the printed OR instead of a port-invented proxy ---
     // The page promises "If you have the codeword *Acid* or a **copper amulet**" and the section
     // guarded it with `<if codeword="1.Skabb">`, a test of neither named thing. The proxy was a

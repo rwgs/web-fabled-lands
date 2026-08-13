@@ -258,11 +258,18 @@ export function renderInlineBuy(story, container, node, path) {
   // lives in market.canUpgradeCrew (task 34); the view just gates on its verdict.
   if (crew) {
     const up = canUpgradeCrew(story.state, crew);
+    // The buy memo the ship/tool/item form keeps below, minted here too — but read only as
+    // "this node has bought once this visit", never as a per-visit CAP. §5.145's shipyard is
+    // priced and repeatable, and a grade is capped by canUpgradeCrew instead. It is what
+    // Story.branchOptInTaken keys the held branch on (task 266) and what marks the button done.
+    const memo = 'buy@' + path;
+    const bought = story.ctx.buys.get(memo) || 0;
     const btn = document.createElement('button');
-    btn.className = 'btn-mini';
+    btn.className = 'btn-mini' + (bought ? ' done' : '');
     const inner = document.createElement('span');
     story.appendChildren(inner, node, path);
-    btn.textContent = inner.textContent.trim() || (price ? `Hire ${titleCase(crew)} crew (${price} Shards)` : `${titleCase(crew)} crew`);
+    btn.textContent = (bought ? '☑ ' : '')
+      + (inner.textContent.trim() || (price ? `Hire ${titleCase(crew)} crew (${price} Shards)` : `${titleCase(crew)} crew`));
     btn.disabled = (price > 0 && story.state.data.shards < price) || !up.ok;
     if (!up.ok) btn.title = up.reason;
     btn.addEventListener('click', () => {
@@ -273,6 +280,7 @@ export function renderInlineBuy(story, container, node, path) {
       const res = applyInlineBuy(story.state, { price, crew });
       if (!res.ok) { if (res.note) story.notify(res.note, 'warn'); return; }
       story.noteSpend(path, mark);
+      story.ctx.buys.set(memo, bought + 1);
       story.rerender();
     });
     container.appendChild(btn);

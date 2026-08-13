@@ -1225,37 +1225,57 @@ export class Story {
    *  already-grayed branch is display-only, since JaFL executes only the active path. */
   decideCondition(node, path) {
     return evaluateCondition(node, this.state, { ticksNow: this.walkTicks, ...this.sheetAt(path) })
-      || this.forcedOptInTaken(path);
+      || this.branchOptInTaken(path);
   }
 
-  /** Has this branch's OWN force="f" opt-in been taken this visit? Then the branch is the
-   *  player's for the rest of the visit, whatever its guard now reads (task 264).
+  /** Has this branch's OWN click-time opt-in been taken this visit? Then the branch is the
+   *  player's for the rest of the visit, whatever its guard now reads (tasks 264 + 266).
    *
-   *  A force="f" action applies from the CLICK, so an opt-in that spends the very thing the
-   *  guard above it tests turns that guard false the moment the player obeys the page. §6.160
-   *  is the section: "If you have a blessing of Safety from Storms or a **catastrophe
-   *  certificate**, cross it off and `<goto section="551"/>`" — one instruction, with the exit
-   *  INSIDE the guard, so crossing either one off grayed the route it was crossed off FOR.
+   *  An opt-in the player CLICKS applies after the walk has passed the guard above it, so an
+   *  opt-in that changes the very thing that guard tests turns it false the moment the player
+   *  obeys the page. Two forms mint a per-node memo and both are that opt-in — kept as one rule
+   *  and one scan, because a second copy is where the next clause goes missing:
    *
-   *  Task 261's ledger cannot state this. It books the purse and the pack and nothing else,
+   *  - a **force="f" effect node** (renderForcedOptional's `force@` memo, task 264). §6.160 is
+   *    the section: "If you have a blessing of Safety from Storms or a **catastrophe
+   *    certificate**, cross it off and `<goto section="551"/>`" — one instruction, with the exit
+   *    INSIDE the guard, so crossing either one off grayed the route it was crossed off FOR.
+   *  - a **`<buy>` widget** (renderInlineBuy's `buy@` memo, task 266). §4.605 and §4.658 print
+   *    "you can upgrade Crew Quality one level" as a three-branch chain — `<if crew="poor">…
+   *    <buy crew="average" shards="0"/>`, `<elseif crew="average">…good`, `<elseif crew="good">…
+   *    excellent` — so each click grayed its own branch and turned the NEXT elseif on, handing a
+   *    poor crew poor→average→good→excellent for nothing. `canUpgradeCrew` is no defence: it
+   *    enforces one grade per CLICK, which each click honestly is.
+   *
+   *  Task 261's ledger cannot state either. It books the purse and the pack and nothing else,
    *  deliberately (see sheetAt — a `blessing=`/`curse=`/`var=` test must keep reading live for
    *  task 133's lift-from-the-sheet and for §6.215's "only one Safety from Storms at a time"),
-   *  and half of §6.160's price is a blessing. Holding the branch says what the page says
-   *  without asking what KIND of thing was spent, and it is scoped by the memo's path, so only
-   *  the branch that really took the opt-in is held — never a sibling, and never a chain the
-   *  player did nothing in. The effect cannot re-fire (its force@ memo is in ctx.applied, which
-   *  is also what a resume replays), so a held branch redraws with a checked, disabled button.
+   *  half of §6.160's price is a blessing, and a crew grade is a GAIN, which the ledger reads
+   *  live on purpose. Holding the branch says what the page says without asking what KIND of
+   *  thing moved, and it is scoped by the memo's path, so only the branch that really acted is
+   *  held — never a sibling, and never a chain the player did nothing in. Since the branch stays
+   *  active, `chainDone` keeps every later `<elseif>`/`<else>` shut, which is what stops the
+   *  cascade. Neither opt-in can re-fire, so a held branch redraws with a checked, dead button.
    *
-   *  Six sections in books 1-6 put a force="f" EFFECT node under a guard — the census is
-   *  asserted in suite-actions — and §6.160 is the only one that loses anything today. The
-   *  other five (book1/636, book2/135, book5/435's Tyrnai initiation, book3/330's renunciation,
-   *  book4/263's arena winnings) hold nothing but the button, so the hold only stops their
-   *  words graying under a tick the player has just made. A `goto force="f"` (an optional exit)
-   *  and a `difficulty force="f"` (a roll) are not opt-ins of this kind and mint no such memo,
-   *  which is why §6.49's donation roll and §6.215's blessing group are untouched. */
-  forcedOptInTaken(path) {
-    const prefix = 'force@' + path + '.';
-    for (const key of this.ctx.applied) if (key.startsWith(prefix)) return true;
+   *  Both censuses are asserted in suite-actions, so a section arriving in a future book lands
+   *  on a failing assertion rather than on a silent change:
+   *  - six sections put a force="f" EFFECT node under a guard, and §6.160 is the only one that
+   *    loses anything. The other five (book1/636, book2/135, book5/435's Tyrnai initiation,
+   *    book3/330's renunciation, book4/263's arena winnings) hold nothing but the button. A
+   *    `goto force="f"` (an optional exit) and a `difficulty force="f"` (a roll) are not opt-ins
+   *    of this kind and mint no such memo — §6.49's donation roll and §6.215's blessing group
+   *    are untouched.
+   *  - three put a STANDALONE `<buy>` inside a branch, and only §4.605 and §4.658 have a further
+   *    branch below the one that buys. §3.161's chain ends there (the filing's control, sound
+   *    before this), so the hold only stops its words graying under a click just made. A buy
+   *    inside a `<group>` runs headlessly through runBuyNode and mints no memo, which is why
+   *    §4.622's salvage and §5.192's Wrath of God are untouched; §5.145's priced shipyard sits
+   *    under no guard at all and still sells every grade in one visit. */
+  branchOptInTaken(path) {
+    const forced = 'force@' + path + '.';
+    for (const key of this.ctx.applied) if (key.startsWith(forced)) return true;
+    const bought = 'buy@' + path + '.';
+    for (const key of this.ctx.buys.keys()) if (key.startsWith(bought)) return true;
     return false;
   }
 
