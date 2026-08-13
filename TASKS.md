@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-268 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **269, open under LOW** — file new work
+270 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **271, open under LOW** — file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -28,6 +28,7 @@ there once the buckets below are clear.
 - [x] 268. `applyAdjust`'s crew branch spells the CREW_LEVELS ordinal out a second time and has no crewless guard, so a future bare `<adjust crew= amount=>` grants the grade §5.192 charges for
 - [x] 269. `applyAdjust`'s four surviving branches each duplicate a `<gain>`/`<tick>` that already does the job, and no corpus `<adjust>` of any kind is bare — only `crew=` says so
 - [x] 270. Every by-hand corpus census globs `books/**/*.xml` and counts the 20 superseded `temp/` working copies, so task 269 was filed with 569 `<adjust>` nodes where the shipped corpus holds 558
+- [ ] 271. A strongroom's Store button is the one taker that ignores a `keep` tag, so §4.103's white sword — "you can never lose this sword" — can be left behind in §1.177's town house
 
 **Done**
 
@@ -1166,6 +1167,74 @@ Nothing in the code is wrong, so the work is the measurement and the prose:
 
 No test is proposed. A suite assertion pinning "the source and the bundle agree" would be a third
 statement of what the build already guarantees, and CI's rebuild-and-diff is what enforces it.
+
+---
+
+## 271. A strongroom's Store button is the one taker that ignores a `keep` tag, so §4.103's white sword — "you can never lose this sword" — can be left behind in §1.177's town house
+
+**Priority: LOW — no section arrives at a wrong result unasked, and the move is reversible (Take
+puts the sword back). What it breaks is a printed absolute, by a route the player chooses.**
+
+*(Filed 2026-08-13, during conversion work on an unpublished book; reproduced end to end on
+books 1–6 alone, which is the evidence below.)*
+
+The `keep` tag is the engine's word for "the books say this cannot be lost or stolen" — the royal
+ring (§1.385) and the white sword (§4.103). `isKeep`/`applyKeepRule` (`engine.js:1111-1125`) state
+the rule the whole corpus follows: a **generic** selector spares a kept possession while any
+ordinary item satisfies it, and only an **explicitly named** selector with no ordinary alternative
+may deliberately hand it over — so a scripted "give up the royal ring" works and a generic theft
+never reaches it. Four takers honour that: `applyLose`'s `item="*"` sweep (`engine.js:642`),
+`itemAt=` (`engine.js:675`), `losePaymentPlan` (`engine.js:833`), and `transferMovers`, whose
+`item="*"` form is documented at `engine.js:1081` as "the only form that skips keep-tagged items
+when moving from the player".
+
+**`renderItemCache`'s deposit list is the fifth taker and honours nothing.** It is built straight
+from `state.data.items` and filtered only by the cache's own `<include>`/`<exclude>` children
+(`render-market.js`, the `classify`/`carried` block): with no filters present, `classify` returns
+eligible for every carried possession. **Censused over the shipped corpus (the `^\d+[a-z]?$`
+basenames of books 1–6, per task 270): 31 `<itemcache>` nodes, of which 30 are bare
+`<itemcache name= text=>`.** §2.617 (Molhern's smithy) is the single exception, and its
+`include`/`include`/`exclude`/`exclude` filter by kind and bonus, not by `keep`. So the gap is not
+a corner of the feature — it is the feature everywhere but one section.
+
+Measured, not inferred — a scratch page under `web/`, a `GameState` carrying §4.103's grant
+verbatim (`<weapon name="white sword" bonus="8" tags="keep"/>`), rendering §1.177:
+
+- `Store white sword` **is offered and is enabled**;
+- clicking it moves the sword out of the pack and into cache `1.177`;
+- **control**: `<lose item="*"/>` applied to the same sheet leaves the white sword carried.
+
+So the two paths disagree about the same possession on the same sheet, and the disagreeing one is
+the player-facing button. The consequence is §4.103's own sentence: "You can never lose this
+sword; it cannot be stolen from you or lost. **Even if you die and are resurrected elsewhere, the
+sword will still be with you.**" A sword parked in a town house does not follow a resurrection —
+nothing moves a cache's contents — so the page's last clause is false for a player who used a
+button the engine offered them.
+
+The fix is one eligibility test, but the *decision* is which rule the strongroom follows, and that
+is the reason this is filed rather than patched:
+
+1. **Refuse** — treat Store as a taker and skip `isKeep` possessions, matching `transferMovers`.
+   Simplest, and makes the five takers agree. Costs a player nothing real: a kept item is one they
+   were promised they would always have, so shelf space is not the point of it.
+2. **Offer disabled with a reason**, reusing the `classify` path's existing
+   `store.disabled = true; store.title = reason` branch — the same affordance §2.617 already uses
+   for a rejected candidate, so the player learns *why* rather than wondering where the button
+   went.
+
+(2) is the recommendation: the machinery is already there and a silently-absent button in an
+otherwise-complete list is the kind of thing that reads as a bug.
+
+Not in scope, and worth saying so: `applyKeepRule`'s named-selector escape is **correct** and must
+not change. A section that prints "remove the white sword from your Adventure Sheet" writes
+`<lose item="white sword">`, whose selector is explicitly named with no ordinary alternative, so it
+takes the sword exactly as the page says. Only the *undirected* routes into a stash are wrong.
+
+**Test:** a suite assertion in `suite-inventory` that renders a bare `<itemcache>` for a sheet
+carrying a keep-tagged possession and asserts the Store button for it is absent-or-disabled, plus
+the control that an ordinary possession's Store button is present and enabled — and a census that
+every corpus `<itemcache>` either carries filters or is covered by the rule, so a new bare
+strongroom lands on it.
 
 ---
 
