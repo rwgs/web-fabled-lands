@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-271 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **272, open under LOW** — file new work
+272 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log) — **no task is open**; file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -29,7 +29,7 @@ there once the buckets below are clear.
 - [x] 269. `applyAdjust`'s four surviving branches each duplicate a `<gain>`/`<tick>` that already does the job, and no corpus `<adjust>` of any kind is bare — only `crew=` says so
 - [x] 270. Every by-hand corpus census globs `books/**/*.xml` and counts the 20 superseded `temp/` working copies, so task 269 was filed with 569 `<adjust>` nodes where the shipped corpus holds 558
 - [x] 271. A strongroom's Store button is the one taker that ignores a `keep` tag, so §4.103's white sword — "you can never lose this sword" — can be left behind in §1.177's town house
-- [ ] 272. `<transfer>` honours the keep rule for `item="*"` only, where `<lose>` honours every generic selector, so §2.105's pickpocket steals the white sword off a sheet carrying nothing else
+- [x] 272. `<transfer>` honours the keep rule for `item="*"` only, where `<lose>` honours every generic selector, so §2.105's pickpocket steals the white sword off a sheet carrying nothing else
 
 **Done**
 
@@ -1275,6 +1275,13 @@ Censused over the shipped corpus (per task 270): **five** player-source `<transf
 non-`*` item selector — the three above, §4.456's `item="?" bonus="1"`, and §6.635's second node,
 `item="paper sword"`, which is explicitly named and therefore **correct as it stands**.
 
+**Correction, made while fixing this (see the Review log): the census above is filtered on the
+symptom and misses a fourth affected form.** §2.639's `<transfer armour="*" xarmour="?"
+xgroup="2.639">` selects with `*` and so is not in the five — but `include.all` is
+`!kind && pattern === '*'`, so a `kind=` selector is **never** `all`, and `armour="*"` slipped the
+old filter too, where `<lose armour="*">` spares a kept suit. The right census is "player-source
+transfers not taking the `include.all` path", which is these five **plus** §2.639.
+
 The three that matter differ in how much they cost, and the ordering is not the obvious one:
 
 - **§2.105 is the paradigm case and the only forced one.** "he stole one possession instead" — a
@@ -1313,6 +1320,29 @@ non-`*` player-source transfers are the whole set — so a sixth lands on it.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-13 (implementation pass, task 272): closed **272**, filing nothing — the buckets are
+now clear, so the next pass starts from `ROADMAP.md`. Took the recommendation and aligned the fourth
+taker with the first: `transferMovers`'s hand-rolled `item="*"` filter is gone and `applyKeepRule`
+runs once over the movers when `from` is absent, which is *smaller* than what it replaced. Two
+things worth carrying forward, and the first is that **the filing under-counted its own defect —
+measuring the fix found a fourth generic form the probe had not asked about.** §2.639's
+`<transfer armour="*" xarmour="?" xgroup="2.639">` is generic by any reading, but `include.all` is
+`!kind && pattern === '*'`, so a `kind=` selector is **never** `all` and `armour="*"` walked past a
+filter written for the bare form — while `<lose armour="*">` spares a kept suit (task 118's own
+assertion). The filing's table listed three sections because the probe listed three; the census that
+would have caught it, "five non-`*` player-source transfers", was in the filing and `armour="*"` is
+not one of them. **A census filtered on the symptom cannot find the form that shares the cause.**
+Second: **the one-line fix is exactly equivalent on the path it replaces**, which is what made it
+safe to widen — `applyKeepRule(movers, '*')` computes `ordinary` and, finding the spec unnamed,
+returns it, which is the old `pool.filter(!isKeep)` to the item. So the `all` case cannot regress by
+construction, and the diff is only about the forms that had no rule at all. Ten assertions in
+`suite-actions`, six of which fail with the old behaviour restored — the sharpest being §2.105
+applied end to end, `carried= cache=1`: the sheet emptied and §4.103's sword sitting in a
+pickpocket's stash. Controls pin the three things that must NOT change: a named
+`<transfer item="paper sword">` still moves a kept one (§6.635's second node), §6.746 still hands
+back what §6.635 took (`from=` is a stash, not a sheet), and an ordinary possession beside a kept one
+still moves. Suite **2684 → 2694**.
 
 Worked 2026-08-13 (implementation pass, task 271): closed **271** and filed **272** (LOW). Took the
 filing's own recommendation — option (2), offered-but-disabled with a reason — so the deposit list

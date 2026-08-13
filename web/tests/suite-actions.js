@@ -5111,4 +5111,84 @@ export async function run(ctx) {
          `total=${total269} parents=${shape269} bare=${bare269.join(' ')}`);
     }
 
+    // --- task 272: a <transfer> FROM the player is a forfeit, so it reads the keep rule ---
+    { // block-scoped
+      // transferMovers reached its keep filter only through include.all — `!kind && pattern
+      // === '*'` — so every OTHER generic selector moved a kept possession where the matching
+      // <lose> spares it (task 118). §2.105 is the paradigm case the doctrine exists for: "he
+      // stole one possession instead" is a pickpocketing, and with one mover under limit="1"
+      // needChoice is false, so it applied with no prompt — not even the pick the page offers.
+      const plan272 = (xml, items, book = 1) => {
+        const g = GameState.create({ name: 'T272', gender: 'f', profession: 'Warrior', book, adv });
+        g.data.items = items;
+        return { g, p: eng.transferPlan(parse(xml), g) };
+      };
+      const sword272 = () => makeItem('weapon', 'white sword', 8, null, ['keep']); // §4.103, verbatim
+      const names272 = (p) => p.movers.map((i) => i.name).join(',');
+
+      // The three corpus generic forms, against a sheet carrying ONLY the kept sword.
+      for (const [label, xml] of [
+        ['§2.105 item="?" (the pickpocket, the one forced form)', '<transfer item="?" limit="1" to="2.105"/>'],
+        ['§6.310 item="?" (nothing anywhere transfers back)', '<transfer item="?" to="6.310" force="f"/>'],
+        ['§6.635 weapon="?" ("give her any one weapon")', '<transfer weapon="?" to="6.635" force="f" limit="1"/>'],
+      ]) {
+        const { p } = plan272(xml, [sword272()]);
+        ok(`task272: ${label} moves nothing off a kept-only sheet`,
+           p.movers.length === 0 && !p.canPay, `movers=${names272(p)} canPay=${p.canPay}`);
+      }
+      // §2.639's armour="*" is generic too, and a kind= selector is never `all` — which is
+      // exactly how it slipped a filter written for the bare item="*".
+      const arm272 = plan272('<transfer to="null" armour="*" xarmour="?" xgroup="2.639"/>',
+                             [makeItem('armour', 'sacred mail', 3, null, ['keep'])], 2);
+      ok('task272: §2.639 armour="*" spares a kept suit (a kind= selector is never `all`)',
+         arm272.p.movers.length === 0, names272(arm272.p));
+
+      // Controls. (a) an ordinary possession still moves; only the kept one is spared.
+      const mix272 = plan272('<transfer item="?" limit="1" to="2.105"/>', [sword272(), makeItem('item', 'rope')], 2);
+      ok('task272: the ordinary possession still moves and the kept one is spared',
+         names272(mix272.p) === 'rope' && mix272.p.canPay, `movers=${names272(mix272.p)} canPay=${mix272.p.canPay}`);
+      // (b) §6.635's second node names the item outright — applyKeepRule's escape, and the
+      // reason a page printing "give her the paper sword" still does what it says.
+      const named272 = plan272('<transfer item="paper sword" to="6.635" force="f"/>',
+                               [makeItem('weapon', 'paper sword', 0, null, ['keep'])], 6);
+      ok('task272: an explicitly NAMED transfer still moves a kept possession (escape intact)',
+         names272(named272.p) === 'paper sword' && named272.p.canPay, names272(named272.p));
+      // (c) a cache is a deliberately stocked stash, not a sheet: §6.746 must still hand back
+      // what §6.635 took, so from= keeps the old behaviour (mirrors loseItemMatches).
+      const gback272 = GameState.create({ name: 'T272c', gender: 'f', profession: 'Warrior', book: 6, adv });
+      gback272.cacheAddItem('6.635', sword272());
+      ok('task272: §6.746 transferring FROM the cache still hands a kept item back',
+         eng.transferPlan(parse('<transfer item="*" from="6.635"/>'), gback272).movers.length === 1);
+      // (d) the applied effect, not only the plan.
+      const g105 = GameState.create({ name: 'T272d', gender: 'f', profession: 'Warrior', book: 2, adv });
+      g105.data.items = [sword272()];
+      eng.applyEffect(parse('<transfer item="?" limit="1" to="2.105"/>'), g105, {});
+      ok('task272: §2.105 applied against a kept-only sheet leaves the sword on it',
+         g105.findItems('white sword').length === 1 && g105.cacheItems('2.105').length === 0,
+         `carried=${g105.data.items.map((i) => i.name).join(',')} cache=${g105.cacheItems('2.105').length}`);
+
+      // The census the fix was measured against, over the bundled corpus (per task 270). A
+      // transfer carrying from= moves OUT of a stash and is not a forfeit; of the 15 that move
+      // FROM the player, 5 carry a non-`*` item selector — and only §6.635's `paper sword` is
+      // explicitly named, so only that one may still reach a kept possession. A sixth lands here.
+      const XFER272 = /<transfer\b[^>]*>/gi;
+      const SEL272 = /\b(item|weapon|armour|tool)\s*=\s*"([^"]*)"/i;
+      const fromPlayer272 = [], generic272 = [];
+      for (const b of data.availableBooks()) {
+        const raw = await data.loadBook(b);
+        for (const key of Object.keys(raw)) {
+          for (const m of raw[key].matchAll(XFER272)) {
+            if (/\bfrom\s*=/i.test(m[0])) continue;
+            fromPlayer272.push(b + '/' + key);
+            const sel = m[0].match(SEL272);
+            if (sel && sel[2] !== '*') generic272.push(`${b}/${key}:${sel[1]}=${sel[2]}`);
+          }
+        }
+      }
+      ok('task272: 15 corpus <transfer> nodes move FROM the player', fromPlayer272.length === 15, String(fromPlayer272.length));
+      ok('task272: and exactly these 5 select with something other than `*`',
+         generic272.sort().join(' ') === '2/105:item=? 4/456:item=? 6/310:item=? 6/635:item=paper sword 6/635:weapon=?',
+         generic272.join(' '));
+    }
+
 }

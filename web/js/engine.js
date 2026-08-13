@@ -1161,8 +1161,8 @@ function transferMatch(pool, sel) {
 }
 
 // The candidate items a transfer would move FROM its source, after the include
-// selector, keep protection (plain item="*" from the player only) and the exclude
-// selector — the pool the chooser draws from (JaFL TransferNode.getItemIndices).
+// selector, the keep rule (from the player only) and the exclude selector — the pool
+// the chooser draws from (JaFL TransferNode.getItemIndices).
 function transferMovers(el, state) {
   const from = el.getAttribute('from');
   const pool = from != null ? state.cacheItems(from) : state.data.items;
@@ -1170,7 +1170,7 @@ function transferMovers(el, state) {
   const exclude = transferSelector(el, 'x');
   let movers;
   if (include && include.all) {
-    movers = pool.filter((it) => from != null || !(it.tags || []).map(normalize).includes('keep'));
+    movers = pool.slice();
   } else if (include) {
     movers = transferMatch(pool, include);
   } else if (exclude) {
@@ -1178,6 +1178,16 @@ function transferMovers(el, state) {
   } else {
     return []; // no item selector (a pure shards transfer)
   }
+  // Moving FROM the player is a forfeit, so it reads the doctrine <lose> reads
+  // (applyKeepRule): a generic selector spares a kept possession while any ordinary item
+  // satisfies it, and only an explicitly NAMED one with no ordinary alternative — §6.635's
+  // <transfer item="paper sword"> — may hand it over. This was item="*" alone, so §2.105's
+  // pickpocket ("he stole one possession instead") took §4.103's white sword off a sheet
+  // carrying nothing else, and §2.639's armour="*" reached one too (a kind= selector is
+  // never `all`), where <lose item="?"> and <lose armour="*"> both spare it. A cache is a
+  // deliberately stocked stash, where the carried-possession rule does not apply — mirrors
+  // loseItemMatches. (task 272)
+  if (from == null) movers = applyKeepRule(movers, include ? include.pattern : '*');
   if (exclude) {
     const spared = new Set(transferMatch(pool, exclude).map((it) => it.id));
     movers = movers.filter((it) => !spared.has(it.id));
