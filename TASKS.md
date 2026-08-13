@@ -20,11 +20,11 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 264. §6.160's "cross it off and turn to 551" grays →551 the moment either thing is crossed off, so the price is paid and the route it buys is gone
+*(none open — file new MEDIUM work here)*
 
 **LOW**
 
-*(none open — file new LOW work here)*
+- [ ] 265. Three click-time takings still book nothing into the walk-position ledger — a market row's Buy/Sell, an inline `<sell>`, and the open-pick family
 
 **Done**
 
@@ -296,7 +296,8 @@ this order.*
 - [x] 261. Task 259's spend-guard latch excludes `not=`, so §1.501's "if you didn't have enough money" turns itself on the moment you pay
 - [x] 262. §1.460 tests a port-invented codeword in place of the printed "codeword *Acid* or a **copper amulet**", which the vocabulary can now express exactly
 - [x] 263. Four click-time spend sites book nothing into the walk-position ledger, so a future guard above a bare `<buy>`, a paid `<rest>` or a cache Take reads the emptied purse
-- [ ] 264. §6.160's "cross it off and turn to 551" grays →551 the moment either thing is crossed off, so the price is paid and the route it buys is gone
+- [x] 264. §6.160's "cross it off and turn to 551" grays →551 the moment either thing is crossed off, so the price is paid and the route it buys is gone
+- [ ] 265. Three click-time takings still book nothing into the walk-position ledger — a market row's Buy/Sell, an inline `<sell>`, and the open-pick family
 
 ---
 
@@ -887,6 +888,40 @@ cases against whichever option is chosen.
 
 ---
 
+## 265. Three click-time takings still book nothing into the walk-position ledger — a market row's Buy/Sell, an inline `<sell>`, and the open-pick family
+
+**Priority: LOW — task 264's own census measured all three as unreachable in books 1–6, and
+re-measured them here. This is the rule task 263 states being applied where nothing yet depends
+on it, so a new section can't arrive on the gap. Nothing is broken today.**
+
+*(Filed 2026-08-12, on closing task 264 — its filing names these three and says they "want the
+two-line booking anyway", which option (c) did not do, because (c) fixes §6.160 by holding the
+guarded block rather than by booking what the click took.)*
+
+Task 263's rule: **a spend the player CLICKS for books its taking at its own node**, so a guard
+above it keeps reading the sheet the walk passed it with. It hooked four sites; task 264's census
+found three more that still don't, each applying its effect from a click handler with no
+`spendMark()`/`noteSpend(path, mark)` pair around it:
+
+- a market row's **Buy/Sell** (`renderShopRow`, `render-market.js`);
+- an inline **`<sell>`**;
+- the **open-pick family** — `renderForfeitChoice` / `renderAbilityChoice` /
+  `renderEquipmentChoice`, where the player names which thing leaves and the commit runs on the
+  pick.
+
+Why no section depends on it today, re-measured on closing 264: **book5/145**'s
+`<if item="deed to the Wrath of God">` sits above a ship/cargo market that cannot move that
+possession; **book3/640**'s forfeit is `choose="f"` — a sweep, so the WALK applies it and marks it
+where it stands; **book5/66**'s `<if shards="5">` sits above a `<lose item="?">` that cannot move
+Shards. An ability pick moves nothing the ledger records at all.
+
+**Fix:** the same two lines as task 263's four sites, at each commit. Tests: the synthetic
+three-site shape task 263's block already uses (guard above, spend below, click, redraw, guard
+still open), plus a corpus census assertion pinning "no live case" the way task 263's does, so a
+future section arriving with the guard above one of these lands on a failing assertion.
+
+---
+
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -896,6 +931,34 @@ cases against whichever option is chosen.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-12 (implementation pass, task 264): closed **264** and filed **265** (LOW). Four
+things worth carrying forward, and the first is the fork the task was written to make me decide
+rather than write. **Option (c) was picked on the measurement, and the measurement is what made it
+safe rather than plausible.** The rule keys on a `force="f"` EFFECT node (what `renderForcedOptional`
+draws), so the population is not the 147 sections carrying `force="f"` nor the 42 that put one
+inside a branch — 35 of those are an optional `<goto>` exit and 12 a `<difficulty>` roll. **Six**
+sections remain, and §6.160 is the only one that loses anything; the other five hold nothing but
+the button, so the hold only stops their words graying under a tick just made. §6.215 and §6.49
+carry no such node at all, which is why "the reward LANDED, so graying is right" is untouched — the
+question the task asked was answerable by census, not by judgement. That census is now an assertion,
+so a seventh section arriving in a future book fails the suite instead of changing silently.
+**Teeth were checked by neutering the hold, and three of the new assertions passed anyway — they
+were vacuous, in a way worth naming.** A grayed branch renders its words and *no button*, so
+"the opt-in is not grayed" is satisfied by a lookup that finds nothing; asking for the button
+(`!!b && b.disabled && !grayed(b)`) turned 5 failures into 7, one per section the hold reaches.
+**A probe is worth more than a reading — and a probe can be vacuous too.** The hold newly exposes
+§6.160's choose-one lock (before it, the block grayed after the click and the untaken sibling drew
+no button), and `ctx.forcedChosen` keyed that lock by the shared parent ELEMENT, which
+JSON-serialises to `{}`. The first probe "confirmed" it and proved nothing: `serializeVisit`'s
+atomicity guard (task 161) returns null while the position and the Story disagree, so the resume
+rebuilt an EMPTY ctx and the section simply re-rendered fresh. Asserting the record exists is what
+made the second probe real — and it *was* real: with the element key a reload offers the second
+cross-off, taking the blessing **and** the certificate for one instruction that says "you decide
+which". The token is the parent's path now, verified by putting the element key back and watching
+it fail. **A verbatim copy of a rule is where the next clause goes missing:** `renderIfChain` held
+its own copy of "evaluate an `<if>` at the walk's position" and would have been the third clause's
+blind spot, so it calls `decideCondition` now. Suite **2633** (up 23).
 
 Worked 2026-08-12 (implementation pass, task 263): closed **263** and filed **264** (MEDIUM). Four
 things worth carrying forward. **The filing's census reproduced exactly, from two different sources,

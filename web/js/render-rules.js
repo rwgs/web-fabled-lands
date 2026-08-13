@@ -298,13 +298,20 @@ export function isOptionalForce(node) {
 // else null (an independent optional action). A ship docks at ONE place, so every force="f"
 // <set dock=> in a section is one choice (book3/405); a "cross off one of the following"
 // is two+ force="f" <lose> under a single parent (book6/160).
-export function forcedChoiceGroup(node) {
+//
+// The token is a STRING, because it is a key in ctx.forcedChosen and that map is serialised
+// with the visit: the kin group used to be keyed by its shared parent NODE, and a DOM node
+// JSON-serialises to {}, so a reload found no owner and unlocked the untaken sibling —
+// §6.160's "you decide which to cross off" would take the blessing AND the certificate. The
+// walk's own path for that shared parent (`path` minus this node's index) names it exactly
+// as well and survives the round trip. (task 264)
+export function forcedChoiceGroup(node, path) {
   const tag = node.tagName.toLowerCase();
   if (tag === 'set' && node.getAttribute('dock') != null) return 'dock';
   if (tag === 'lose' && node.parentElement) {
     const kin = Array.from(node.parentElement.children)
       .filter((c) => c.tagName.toLowerCase() === 'lose' && isOptionalForce(c));
-    if (kin.length >= 2) return node.parentElement; // key the group by its shared parent node
+    if (kin.length >= 2 && path && path.lastIndexOf('.') > 0) return 'kin@' + path.slice(0, path.lastIndexOf('.'));
   }
   return null;
 }

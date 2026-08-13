@@ -555,7 +555,7 @@ function showAbilityPicker(story, container, node, commit) {
 function renderForcedOptional(story, container, node, path) {
   const memo = 'force@' + path;
   const done = story.ctx.applied.has(memo);
-  const token = forcedChoiceGroup(node);
+  const token = forcedChoiceGroup(node, path);
   const chosen = token != null ? story.ctx.forcedChosen.get(token) : null;
   const lockedByGroup = chosen != null && chosen !== memo;
   const label = document.createElement('span');

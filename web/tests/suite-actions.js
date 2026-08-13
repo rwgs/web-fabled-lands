@@ -2948,7 +2948,13 @@ export async function run(ctx) {
       ok('task119: forcedChoiceGroup returns "dock" for a force="f" set dock', rules.forcedChoiceGroup(parse('<set dock="Sokara" force="f"/>')) === 'dock');
       const twoLose = parse('<p><lose item="a" force="f"/><lose item="b" force="f"/></p>');
       const firstLose = twoLose.querySelector('lose');
-      ok('task119: forcedChoiceGroup groups 2+ sibling force="f" losses by parent', rules.forcedChoiceGroup(firstLose) === firstLose.parentElement);
+      // Keyed by the shared parent's PATH, not the parent node: the token is a ctx.forcedChosen
+      // key and that map is serialised with the visit (task 264). Both siblings answer the same.
+      ok('task119: forcedChoiceGroup groups 2+ sibling force="f" losses by their parent\'s path',
+         rules.forcedChoiceGroup(firstLose, 'r.1.0') === 'kin@r.1'
+         && rules.forcedChoiceGroup(twoLose.querySelectorAll('lose')[1], 'r.1.1') === 'kin@r.1');
+      ok('task119: forcedChoiceGroup groups nothing for a lone force="f" loss',
+         rules.forcedChoiceGroup(parse('<p><lose item="a" force="f"/></p>').querySelector('lose'), 'r.1.0') === null);
 
       ok('task119: isEconomicPayment true for a shards spend', rules.isEconomicPayment(parse('<lose shards="10"/>')) === true);
       ok('task119: isEconomicPayment false for a stamina penalty', rules.isEconomicPayment(parse('<lose stamina="2"/>')) === false);
@@ -4243,6 +4249,197 @@ export async function run(ctx) {
          pairs263.join(' '));
       ok('task263: and only the four measured ones put the guard ABOVE the spend',
          above263.sort(sort263).join(' ') === '3/406 5/145 5/192 6/464', above263.join(' '));
+    }
+
+    // --- task 264: a branch whose own force="f" opt-in was taken stays the player's ---
+    // "If you have a blessing of Safety from Storms or a catastrophe certificate, cross it off
+    // and <goto section="551"/>" is ONE instruction, and the exit sits inside the guard that
+    // names the price. A force="f" opt-in applies from the click, so obeying the page turned
+    // that guard false and grayed →551 on the redraw: measured before the fix as `551=live
+    // 183=live` on entry and `551=gray 183=live` after the click, for EACH half. Task 261's
+    // ledger reaches neither half here — it books the purse and the pack, and this section
+    // spends a blessing or a possession under a guard that ORs the two.
+    {
+      const settle264 = () => new Promise((r) => setTimeout(r, 30));
+      const gray264 = (el) => !!(el && el.closest('.cond-inactive'));
+      const exit264 = (c, n) => Array.from(c.querySelectorAll('.goto')).find((b) => b.textContent.trim() === String(n));
+      const live264 = (c, n) => { const b = exit264(c, n); return !!b && !b.disabled && !gray264(b); };
+      const why264 = (c) => `551=${live264(c, 551) ? 'live' : 'gray'} 183=${live264(c, 183) ? 'live' : 'gray'}`;
+      const mk264 = async (book, sec, setup) => {
+        const g = GameState.create({ name: 'T264', gender: 'f', profession: 'Wayfarer', book, adv });
+        g.data.items = []; g.data.shards = 0;
+        if (setup) setup(g);
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate() {}, onDeath() {}, notify() {} });
+        st.begin(await data.getSection(book, String(sec)), book, String(sec));
+        return { g, c, st };
+      };
+      const opt264 = (c, re) => Array.from(c.querySelectorAll('button.pay-action'))
+        .find((b) => re.test(b.textContent) && !b.disabled && !gray264(b));
+      // A held branch redraws its opt-in as a CHECKED, disabled button. Asserting "not grayed"
+      // alone is vacuous: a grayed branch renders its words and no button at all, so the lookup
+      // returns nothing and the negation passes on its own. Ask for the button. (measured — three
+      // of the assertions below passed against the un-fixed engine until this said `!!b`.)
+      const held264 = (c, re) => {
+        const b = Array.from(c.querySelectorAll('button.pay-action')).find((x) => re.test(x.textContent));
+        return !!b && b.disabled && !gray264(b);
+      };
+
+      // Half one: the possession. Enter holding only the certificate.
+      const cert264 = await mk264(6, 160, (g) => g.addItem(makeItem('item', 'catastrophe certificate')));
+      ok('task264: §6.160 offers →551 and →183 to a player holding the certificate',
+         live264(cert264.c, 551) && live264(cert264.c, 183) && !!opt264(cert264.c, /certificate/i),
+         why264(cert264.c));
+      opt264(cert264.c, /certificate/i).click(); await settle264();
+      cert264.st.rerender(); await settle264();
+      ok('task264: crossing off the certificate keeps the →551 it was crossed off FOR',
+         !cert264.g.findItems('catastrophe certificate').length && live264(cert264.c, 551),
+         `held=${cert264.g.findItems('catastrophe certificate').length} ${why264(cert264.c)}`);
+
+      // Half two: the blessing — outside the ledger's scope entirely, and fixed for the same
+      // reason as the first, which is what picked this rule over booking the item half alone.
+      const bless264 = await mk264(6, 160, (g) => g.addBlessing('storm'));
+      ok('task264: §6.160 offers →551 and →183 to a player holding the storm blessing',
+         live264(bless264.c, 551) && live264(bless264.c, 183) && !!opt264(bless264.c, /Safety from Storms/i),
+         why264(bless264.c));
+      opt264(bless264.c, /Safety from Storms/i).click(); await settle264();
+      bless264.st.rerender(); await settle264();
+      ok('task264: crossing off the storm blessing keeps →551 too',
+         !bless264.g.hasBlessing('storm') && live264(bless264.c, 551),
+         `storm=${bless264.g.hasBlessing('storm')} ${why264(bless264.c)}`);
+
+      // Holding BOTH, the page says you decide which to cross off — so the untaken one locks
+      // (renderForcedOptional's choose-one group) and the block still cannot be crossed twice.
+      const both264 = await mk264(6, 160, (g) => { g.addBlessing('storm'); g.addItem(makeItem('item', 'catastrophe certificate')); });
+      opt264(both264.c, /certificate/i).click(); await settle264();
+      both264.st.rerender(); await settle264();
+      ok('task264: §6.160 holding both crosses off exactly one and keeps →551',
+         !both264.g.findItems('catastrophe certificate').length && both264.g.hasBlessing('storm')
+         && live264(both264.c, 551) && !opt264(both264.c, /Safety from Storms/i),
+         `storm=${both264.g.hasBlessing('storm')} ${why264(both264.c)}`);
+
+      // …and it must survive a reload, which is what the hold newly exposes: before the hold the
+      // block grayed after the click, so the untaken sibling rendered no button at all and its
+      // lock was never asked for. ctx.forcedChosen keyed that lock by the shared PARENT ELEMENT,
+      // and a DOM node JSON-serialises to {} — so a resumed visit found no owner for the group
+      // and offered the second cross-off as well, taking both the blessing AND the certificate
+      // for one instruction that says "you decide which". The token is the parent's PATH now.
+      const both264b = await mk264(6, 160, (g) => {
+        g.addBlessing('storm'); g.addItem(makeItem('item', 'catastrophe certificate'));
+        // serializeVisit's atomicity guard (task 161) emits NOTHING while the position and the
+        // Story disagree, so the record has to be asked for from §6.160 itself — without this the
+        // resume below rebuilds an EMPTY ctx and the assertion passes on a fresh visit instead.
+        g.data.book = 6; g.data.section = '160';
+      });
+      opt264(both264b.c, /certificate/i).click(); await settle264();
+      const rec264 = both264b.st.serializeVisit();
+      ok('task264: §6.160 serialises the visit it is asked to resume', !!rec264 && rec264.section === '160');
+      const g264r = new GameState(sanitizeData(JSON.parse(JSON.stringify({ ...both264b.g.data, visit: rec264 }))));
+      const c264r = document.createElement('div');
+      const st264r = new Story(c264r, g264r, { navigate() {}, onDeath() {}, notify() {} });
+      st264r.resume(await data.getSection(6, '160'), 6, '160', g264r.data.visit, null);
+      await settle264();
+      ok('task264: §6.160 resumed after the reload still holds →551 and still locks the second cross-off',
+         g264r.hasBlessing('storm') && live264(c264r, 551) && !opt264(c264r, /Safety from Storms/i),
+         `storm=${g264r.hasBlessing('storm')} ${why264(c264r)} second=${!!opt264(c264r, /Safety from Storms/i)}`);
+
+      // The control the hold must not break: a player with NEITHER did nothing, so nothing is
+      // held open and →183 is the only route. This is what scoping the hold to the memo's own
+      // path buys — a guard nobody acted inside reads exactly as it always did.
+      const none264 = await mk264(6, 160, () => {});
+      ok('task264: §6.160 with neither grays →551 and sends the player to →183',
+         !live264(none264.c, 551) && live264(none264.c, 183), why264(none264.c));
+
+      // The five other sections the hold can reach. None holds an exit or an effect inside the
+      // guard, so all the change does is stop the words graying under a tick just made — but
+      // each is a shipped section whose draw moves, so each is asserted.
+      const tyrnai264 = async (book, sec) => {
+        const r = await mk264(book, sec, (g) => { g.data.abilities.combat = 8; });
+        const btn = opt264(r.c, /Tyrnai/i);
+        ok(`task264: §${book}.${sec} offers the Tyrnai initiation to a COMBAT 8 godless player`, !!btn);
+        if (btn) btn.click();
+        await settle264();
+        r.st.rerender(); await settle264();
+        ok(`task264: §${book}.${sec} keeps the initiation words open once Tyrnai is written`,
+           r.g.hasGod('Tyrnai') && r.g.data.gods.length === 1 && held264(r.c, /Tyrnai/i),
+           `gods=${JSON.stringify(r.g.data.gods)} held=${held264(r.c, /Tyrnai/i)}`);
+      };
+      await tyrnai264(1, 636);
+      await tyrnai264(2, 135);
+      await tyrnai264(5, 435);
+
+      // §3.330's renunciation: the guard IS the god the opt-in gives up.
+      const ren264 = await mk264(3, 330, (g) => g.setGod('The Three Fortunes'));
+      const quit264 = opt264(ren264.c, /no longer wish/i);
+      ok('task264: §3.330 offers the renunciation to an initiate of The Three Fortunes', !!quit264);
+      if (quit264) quit264.click();
+      await settle264();
+      ren264.st.rerender(); await settle264();
+      ok('task264: §3.330 keeps the renunciation words open once the god is given up',
+         !ren264.g.hasGod('The Three Fortunes') && held264(ren264.c, /no longer wish/i),
+         `gods=${JSON.stringify(ren264.g.data.gods)} held=${held264(ren264.c, /no longer wish/i)}`);
+
+      // §4.263's arena winnings: the guard is a codeword the branch's own hidden <lose> spends
+      // as the walk passes it, so this block grayed on the draw after the payout was claimed.
+      const arena264 = await mk264(4, 263, (g) => { g.addCodeword('4.127.1'); g.setCacheMoney('4.127', 20); });
+      const claim264 = opt264(arena264.c, /add the amount/i);
+      ok('task264: §4.263 offers the winning bettor the payout', !!claim264 && !arena264.g.hasCodeword('4.127.1'));
+      if (claim264) claim264.click();
+      await settle264();
+      arena264.st.rerender(); await settle264();
+      ok('task264: §4.263 keeps the payout words open once the winnings are claimed',
+         arena264.g.cacheMoney('4.127') === 40 && held264(arena264.c, /add the amount/i),
+         `stake=${arena264.g.cacheMoney('4.127')} held=${held264(arena264.c, /add the amount/i)}`);
+
+      // …and the two sections the filing named as the ones the hold must NOT reach. Neither
+      // carries a force="f" EFFECT node, so "the reward LANDED, so graying is right" still
+      // grays them: §6.215's blessing block and §6.49's initiation block both go shut.
+      const held215 = await mk264(6, 215, (g) => { g.data.shards = 35; g.addBlessing('storm'); });
+      ok('task264: §6.215 still shuts the blessing block for a player who already has one',
+         /only one Safety from Storms/.test(Array.from(held215.c.querySelectorAll('.cond-inactive')).map((s) => s.textContent).join(' ')),
+         held215.c.textContent.replace(/\s+/g, ' ').slice(0, 120));
+      const don49 = await mk264(6, 49, (g) => { g.data.shards = 50; });
+      const pay49b = Array.from(don49.c.querySelectorAll('.pay-action')).find((b) => /50/.test(b.textContent) && !gray264(b));
+      ok('task264: §6.49 offers the 50-Shard donation to a godless player', !!pay49b);
+      if (pay49b) pay49b.click();
+      await settle264();
+      don49.st.rerender(); await settle264();
+      ok('task264: §6.49 still grays the initiation block once Juntoku is written',
+         don49.g.hasGod('Juntoku')
+         && /write Juntoku/.test(Array.from(don49.c.querySelectorAll('.cond-inactive')).map((s) => s.textContent).join(' ')),
+         `gods=${JSON.stringify(don49.g.data.gods)}`);
+
+      // The census the hold was scoped against, over the bundled corpus. Only an EFFECT node
+      // renders as the opt-in this rule keys on (renderForcedOptional): of the 147 sections
+      // carrying force="f", 42 put one inside an if/elseif/else branch, but 35 of those are an
+      // optional <goto> exit and 12 a <difficulty> roll. Six sections are left, and a seventh
+      // arriving in a future book wants measuring the way these were.
+      const OPT264 = /<(lose|gain|tick|set|transfer|adjust|adjustmoney)\b[^>]*\bforce="f"[^>]*>/gi;
+      const TAG264 = /<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g;
+      const under264 = [];
+      for (const b of data.availableBooks()) {
+        const raw = await data.loadBook(b);
+        for (const key of Object.keys(raw)) {
+          const xml = raw[key];
+          if (!OPT264.test(xml)) { OPT264.lastIndex = 0; continue; }
+          OPT264.lastIndex = 0;
+          const stack = []; let m; let hit = false;
+          TAG264.lastIndex = 0;
+          while ((m = TAG264.exec(xml))) {
+            const [, close, tag, attrs, selfClose] = m;
+            const t = tag.toLowerCase();
+            if (close) { if (stack.length && stack[stack.length - 1] === t) stack.pop(); continue; }
+            if (/\bforce="f"/.test(attrs) && /^(lose|gain|tick|set|transfer|adjust|adjustmoney)$/.test(t)
+                && (stack.includes('if') || stack.includes('elseif') || stack.includes('else'))) hit = true;
+            if (!selfClose) stack.push(t);
+          }
+          if (hit) under264.push(b + '/' + key);
+        }
+      }
+      const pad264 = (s) => s.replace(/\d+/g, (n) => n.padStart(5, '0'));
+      ok('task264: exactly six corpus sections put a force="f" effect node under a guard',
+         under264.sort((a, b) => (pad264(a) < pad264(b) ? -1 : 1)).join(' ') === '1/636 2/135 3/330 4/263 5/435 6/160',
+         under264.join(' '));
     }
 
     // --- task 262: §1.460 states the printed OR instead of a port-invented proxy ---

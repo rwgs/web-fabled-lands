@@ -1223,7 +1223,39 @@ export class Story {
    *  task 245; provisional reroll, task 181) never reaches here, and a guard inside an
    *  already-grayed branch is display-only, since JaFL executes only the active path. */
   decideCondition(node, path) {
-    return evaluateCondition(node, this.state, { ticksNow: this.walkTicks, ...this.sheetAt(path) });
+    return evaluateCondition(node, this.state, { ticksNow: this.walkTicks, ...this.sheetAt(path) })
+      || this.forcedOptInTaken(path);
+  }
+
+  /** Has this branch's OWN force="f" opt-in been taken this visit? Then the branch is the
+   *  player's for the rest of the visit, whatever its guard now reads (task 264).
+   *
+   *  A force="f" action applies from the CLICK, so an opt-in that spends the very thing the
+   *  guard above it tests turns that guard false the moment the player obeys the page. §6.160
+   *  is the section: "If you have a blessing of Safety from Storms or a **catastrophe
+   *  certificate**, cross it off and `<goto section="551"/>`" — one instruction, with the exit
+   *  INSIDE the guard, so crossing either one off grayed the route it was crossed off FOR.
+   *
+   *  Task 261's ledger cannot state this. It books the purse and the pack and nothing else,
+   *  deliberately (see sheetAt — a `blessing=`/`curse=`/`var=` test must keep reading live for
+   *  task 133's lift-from-the-sheet and for §6.215's "only one Safety from Storms at a time"),
+   *  and half of §6.160's price is a blessing. Holding the branch says what the page says
+   *  without asking what KIND of thing was spent, and it is scoped by the memo's path, so only
+   *  the branch that really took the opt-in is held — never a sibling, and never a chain the
+   *  player did nothing in. The effect cannot re-fire (its force@ memo is in ctx.applied, which
+   *  is also what a resume replays), so a held branch redraws with a checked, disabled button.
+   *
+   *  Six sections in books 1-6 put a force="f" EFFECT node under a guard — the census is
+   *  asserted in suite-actions — and §6.160 is the only one that loses anything today. The
+   *  other five (book1/636, book2/135, book5/435's Tyrnai initiation, book3/330's renunciation,
+   *  book4/263's arena winnings) hold nothing but the button, so the hold only stops their
+   *  words graying under a tick the player has just made. A `goto force="f"` (an optional exit)
+   *  and a `difficulty force="f"` (a roll) are not opt-ins of this kind and mint no such memo,
+   *  which is why §6.49's donation roll and §6.215's blessing group are untouched. */
+  forcedOptInTaken(path) {
+    const prefix = 'force@' + path + '.';
+    for (const key of this.ctx.applied) if (key.startsWith(prefix)) return true;
+    return false;
   }
 
   // Render one branch of an if/elseif/else chain. The taken branch renders
@@ -1598,7 +1630,10 @@ export class Story {
     // Undecided while it reads a provisional reroll result — the same hold the walker's
     // chain applies, so a choice-label/group conditional can't commit early either. (task 181)
     if (conditionPending(node, viewPendingVars(this))) return null;
-    const ok = evaluateCondition(node, this.state, { ticksNow: this.walkTicks, ...this.sheetAt(path) });
+    // Through decideCondition, not evaluateCondition, so "an <if> read at the walk's position"
+    // has ONE definition: this line held a verbatim copy of that expression, and a copy is where
+    // the two readings drift apart the next time the rule grows (task 264 was its third clause).
+    const ok = this.decideCondition(node, path);
     const chainKey = 'chain@' + path;
     if (ok) {
       this.ctx.applied.add(chainKey); // this branch taken
