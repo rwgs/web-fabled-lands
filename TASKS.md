@@ -4,9 +4,9 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 272 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **273 is complete**, so every bucket is clear.
-File new work under the priority bucket that fits, and record the pass in the
-Review log. Completed detail sections are archived in
+misdiagnosis (see the Review log); **274 is open** under LOW. File new work
+under the priority bucket that fits, and record the pass in the Review
+log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
 
@@ -32,6 +32,7 @@ there once the buckets below are clear.
 - [x] 270. Every by-hand corpus census globs `books/**/*.xml` and counts the 20 superseded `temp/` working copies, so task 269 was filed with 569 `<adjust>` nodes where the shipped corpus holds 558
 - [x] 271. A strongroom's Store button is the one taker that ignores a `keep` tag, so §4.103's white sword — "you can never lose this sword" — can be left behind in §1.177's town house
 - [x] 272. `<transfer>` honours the keep rule for `item="*"` only, where `<lose>` honours every generic selector, so §2.105's pickpocket steals the white sword off a sheet carrying nothing else
+- [ ] 274. Re-archive completed task details 256–273 and clear them out of the priority buckets
 
 **Done**
 
@@ -1379,6 +1380,29 @@ exit is unaffected; and a `suite-corpus` census pinning those goto-carrying sect
 one arriving lands on it. (Done: §2.633's group click too, per the correction above, plus a
 synthetic `name=` guard above the deletion and the control that a codeword GAINED below a guard is
 still read live.)
+
+---
+
+## 274. Re-archive completed task details 256–273 and clear them out of the priority buckets — LOW (process/docs)
+
+*(Filed 2026-08-13; recurring maintenance after tasks 141, 165, 211 and 255.)* Task 255 archived
+completed details 1–255, but the 256–273 burn-down has since completed every detailed task again.
+Their checked rows fill the HIGH/MEDIUM/LOW work queues while ~1,070 lines of completed detail sit
+between the checklist and the Review log, so TASKS.md is back past twice the 1,028 lines task 255
+left it at and the "first open task" workflow is harder to scan.
+
+Move completed detail sections 256–273 into TASKS-archive.md under their stable IDs, consolidate
+their summary rows into the single numeric **Done** list, and leave only open-task detail plus the
+Review log in TASKS.md. Extend the archive intro/Contents range without losing completion notes or
+historical review text. Documentation-only; validate every checklist ID has exactly one detail
+heading across the two files, then commit.
+
+**Note for the pass: the buckets and the **Done** list have drifted into duplication again**, the
+defect task 255 recorded at 28 rows. Of the 7 checked bucket rows, 4 (267–270) are *already* listed
+under **Done**, so the merge is a set union and not an append; 271, 272 and 273 are bucket-only and
+have to be added. Do the bulk move by line-slice with boundary assertions, as task 255 did — the
+first moved line is `## 256.`, the last is the closing `---`, and the next surviving line is the
+archive-range note.
 
 ---
 
