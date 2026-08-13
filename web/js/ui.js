@@ -1,6 +1,6 @@
 // ui.js — reusable UI: dice animation, Adventure Sheet, modals, toasts.
 
-import { ABILITIES, ABILITY_LABEL, rankTitle, ordinal, SHIP_TYPES, canonShipType } from './rules.js';
+import { ABILITIES, ABILITY_LABEL, rankTitle, ordinal, SHIP_TYPES, NO_CREW, canonShipType } from './rules.js';
 import { parseXml } from './data.js';
 // The canonical string/label helpers live in the dependency-free render-util (task 170), so the
 // sheet/shell and the view modules share one titleCase/escapeHtml/bonus-text implementation
@@ -363,7 +363,8 @@ export function renderSheet(state, container, opts = {}) {
       const cargo = (s.cargo || []).map(titleCase).join(', ');
       const cargoTxt = `cargo ${(s.cargo || []).length}/${cap}${cargo ? `: ${cargo}` : ''}`;
       const where = s.docked ? `docked at ${titleCase(s.docked)}` : 'at large'; // (task 73)
-      li.appendChild(el('span', 'item-txt', `${titleCase(s.name || type)} — ${label}, ${titleCase(s.crew)} crew · ${where} · ${cargoTxt}`));
+      const crewTxt = s.crew === NO_CREW ? 'no crew' : `${titleCase(s.crew)} crew`; // §5.192's unclaimed hull (task 267)
+      li.appendChild(el('span', 'item-txt', `${titleCase(s.name || type)} — ${label}, ${crewTxt} · ${where} · ${cargoTxt}`));
       ul.appendChild(li);
     });
     container.appendChild(ul);

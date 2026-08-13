@@ -5,7 +5,7 @@
 // (if anything) to toast. No DOM — unit-testable headlessly.
 
 import { makeItem, parseTags, splitItemName, isShardsCurrency, normalize } from './state.js';
-import { SHIP_TYPES, CREW_LEVELS, canonShipType, canonCargo } from './rules.js';
+import { SHIP_TYPES, CREW_LEVELS, NO_CREW, canonShipType, canonCargo } from './rules.js';
 import { resolveValue, readItemEffects } from './engine.js';
 
 const shipCap = (type) => SHIP_TYPES[canonShipType(type)]?.capacity || 1;
@@ -23,18 +23,20 @@ const walletBalance = (state, currency) => (isShardsCurrency(currency) ? state.d
 const walletSpend = (state, currency, amount) => { if (isShardsCurrency(currency)) state.adjustMoney(-amount); else state.adjustCurrency(currency, -amount); };
 const walletEarn = (state, currency, amount) => { if (isShardsCurrency(currency)) state.adjustMoney(amount); else state.adjustCurrency(currency, amount); };
 // Normalise an initialCrew= value from the books to a real crew grade. A literal
-// grade or "none" maps directly; otherwise (given `state`) resolve it as a variable
-// or number first — §4.658 stores the wrecked ship's crew with <set var="oldcrew"
-// value="crew"/> (a 1-based CREW_LEVELS index) and buys the barque with
-// initialCrew="oldcrew", so the salvaged crew must be carried over, not reset to
-// average. A blank or unresolved value falls back to average. (task 103)
+// grade maps directly and "none" stays NO_CREW; otherwise (given `state`) resolve it
+// as a variable or number first — §4.658 stores the wrecked ship's crew with <set
+// var="oldcrew" value="crew"/> (a 1-based CREW_LEVELS index, 0 for a crewless or
+// absent vessel) and buys the barque with initialCrew="oldcrew", so the salvaged crew
+// must be carried over, not reset to average — including when there was none to
+// salvage. A blank or unresolved value falls back to average. (tasks 103, 267)
 const canonCrew = (c, state = null) => {
   const raw = String(c || '').trim();
   const k = raw.toLowerCase();
   if (CREW_LEVELS.includes(k)) return k;
-  if (k === 'none') return 'poor';
+  if (k === NO_CREW) return NO_CREW;
   if (state && raw) {
     const n = resolveValue(state, raw);
+    if (n === 0) return NO_CREW;
     if (Number.isInteger(n) && n >= 1 && n <= CREW_LEVELS.length) return CREW_LEVELS[n - 1];
   }
   return 'average'; // blanks / unresolved: a serviceable default
@@ -287,7 +289,9 @@ export function applyInlineBuy(state, opts = {}) {
 /** Whether a crew upgrade to `crew` is allowed right now: you have a ship and its
  *  crew is exactly one grade below the target (crews improve one grade at a time —
  *  task 24). Returns { ok, reason } so the view can gate/tooltip the offer and
- *  applyInlineBuy can enforce it. */
+ *  applyInlineBuy can enforce it. A crewless ship (NO_CREW, off the ordinal) indexes
+ *  to -1, which is one below `poor` — so §5.192's printed "25 Shards gets a poor
+ *  crew" is the one hire it can make, and nothing else. (task 267) */
 export function canUpgradeCrew(state, crew) {
   const ship = state.currentShip();
   if (!ship) return { ok: false, reason: 'You have no ship.' };

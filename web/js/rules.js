@@ -71,6 +71,16 @@ export function canonShipType(t) {
 }
 
 export const CREW_LEVELS = ['poor', 'average', 'good', 'excellent'];
+// A ship with NO crew — §5.192's <buy ship="brig" initialCrew="none"/>, the corpus's only
+// crewless vessel, whose harbourmaster then charges 25 Shards to hire a poor one. Held
+// deliberately OFF the ordinal rather than as a fifth CREW_LEVELS entry: four readings index
+// that array, and widening it would move every one of them — <lose crew="N">'s demotion floor
+// most of all, which 14 sections lean on in print ("A poor crew can't get any worse!", §3.231),
+// and value="crew"'s 1-based index that §4.658's oldcrew round-trips. Off the scale, indexOf
+// returns -1 and each reading already says "not a grade": <if crew="poor"> is false,
+// value="crew" is 0, and canUpgradeCrew's `have === target - 1` makes poor — and only poor —
+// the grade a crewless captain may hire. (task 267)
+export const NO_CREW = 'none';
 export const CREW_LABEL = { poor: 'Poor', average: 'Average', good: 'Good', excellent: 'Excellent' };
 
 // The eight tradable commodities (JaFL's Cargo enum). Markets and the Ship's Manifest

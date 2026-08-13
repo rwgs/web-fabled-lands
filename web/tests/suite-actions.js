@@ -4830,4 +4830,140 @@ export async function run(ctx) {
          !has262(stale262.c), stale262.c.textContent.replace(/\s+/g, ' ').slice(0, 90));
     }
 
+    // --- task 267: a ship with NO crew is expressible, so its poor-crew hire can be clicked ---
+    // §5.192 claims the Wrath of God with `<buy ship="brig" … initialCrew="none">` — the corpus's
+    // only crewless vessel — and then prints "You will have to pay to hire a crew. 25 Shards gets a
+    // poor crew". canonCrew folded "none" to `poor`, so the captain already HAD the crew the page
+    // charges for: canUpgradeCrew's `have === target - 1` needs -1 for target `poor`, no ship could
+    // hold it, and the button was permanently dead under "Your crew is already at least that good."
+    //
+    // The fork was whether to carry a crewless GRADE. It is held OFF the CREW_LEVELS ordinal
+    // (NO_CREW = 'none'), because widening the array moves four index-based readings, and the
+    // demotion floor is the one that breaks: `<lose crew="1">` on a poor crew would land on the new
+    // index 0, against 14 corpus demotions the books floor in print ("A poor crew can't get any
+    // worse!", §3.231/§3.272/§4.439), and `<lose crew="3">` ("reduce to poor") would undershoot from
+    // every grade below excellent. Off the scale instead, indexOf gives -1 and each reading already
+    // reads "not a grade" with no rule change at all.
+    {
+      const settle267 = () => new Promise((r) => setTimeout(r, 30));
+      const gray267 = (el) => !!(el && el.closest('.cond-inactive'));
+      const hire267 = (c, re) => Array.from(c.querySelectorAll('button.btn-mini')).find((b) => re.test(b.textContent));
+
+      // The live route, through the rendered page: pay the 50-Shard maintenance fee, then hire.
+      const g267 = GameState.create({ name: 'T267', gender: 'f', profession: 'Wayfarer', book: 5, adv });
+      g267.data.items = []; g267.data.shards = 75;
+      g267.addItem(makeItem('item', 'deed to the Wrath of God'));
+      const c267 = document.createElement('div');
+      const st267 = new Story(c267, g267, { navigate() {}, onDeath() {}, notify() {} });
+      st267.begin(await data.getSection(5, '192'), 5, '192');
+      const claim267 = Array.from(c267.querySelectorAll('.group-action')).find((b) => !b.disabled && !gray267(b));
+      if (claim267) claim267.click();
+      await settle267();
+      st267.rerender();
+      await settle267();
+      ok('task267: §5.192\'s claim leaves the brigantine with NO crew, not a free poor one',
+         g267.ships.length === 1 && g267.currentShip().crew === 'none' && g267.data.shards === 25,
+         `crew=${g267.ships.length && g267.currentShip().crew} shards=${g267.data.shards}`);
+      // The Adventure Sheet has to say so rather than print "None crew".
+      const sheet267 = document.createElement('div');
+      renderSheet(g267, sheet267, {});
+      ok('task267: the Ship\'s Manifest shows the unhired hull as "no crew"',
+         /no crew/.test(sheet267.textContent) && !/None crew/i.test(sheet267.textContent),
+         sheet267.textContent.replace(/\s+/g, ' ').match(/Wrath[^·]*·/)?.[0] || 'no ship line');
+      // The 25-Shard hire the page prints is now clickable, and it is the ONLY one: the one-grade
+      // rule (task 24) still refuses average/good/excellent to a captain with no crew at all.
+      const poor267 = hire267(c267, /Hire Poor crew/i);
+      const avg267 = hire267(c267, /Hire Average crew/i);
+      ok('task267: §5.192 offers the printed 25-Shard poor-crew hire and no higher grade',
+         !!poor267 && !poor267.disabled && !gray267(poor267)
+         && !!avg267 && avg267.disabled && /must be poor first/.test(avg267.title || ''),
+         `poor=${poor267 && poor267.disabled} avg=${avg267 && avg267.title}`);
+      if (poor267) poor267.click();
+      await settle267();
+      st267.rerender();
+      await settle267();
+      ok('task267: paying the 25 Shards yields a poor crew',
+         g267.currentShip().crew === 'poor' && g267.data.shards === 0,
+         `crew=${g267.currentShip().crew} shards=${g267.data.shards}`);
+
+      // Every index-based reading must report "not a grade" for a crewless ship, because that is
+      // what keeps the ordinal untouched. A storm is the one that would otherwise PAY the player:
+      // `Math.max(0, indexOf('none'))` read it as poor, so `<lose crew="1">` granted the grade
+      // §5.192 charges 25 Shards for. Book 5's own seas carry no such node, but a claimed hull
+      // sails into book 3's, which carry ten.
+      const crewless267 = () => {
+        const g = GameState.create({ name: 'T267b', gender: 'm', profession: 'Mariner', book: 5, adv });
+        g.addShip({ type: 'brigantine', name: 'Wrath of God', crew: 'none', cargo: [], docked: null });
+        return g;
+      };
+      const storm267 = crewless267();
+      eng.applyEffect(parse('<lose crew="1"/>'), storm267, {});
+      const wreck267 = crewless267();
+      eng.applyEffect(parse('<lose crew="3"/>'), wreck267, {});
+      ok('task267: a storm cannot demote a crew that is not there into a free poor one',
+         storm267.currentShip().crew === 'none' && wreck267.currentShip().crew === 'none',
+         `one=${storm267.currentShip().crew} three=${wreck267.currentShip().crew}`);
+      const read267 = crewless267();
+      eng.applyEffect(parse('<set var="oldcrew" value="crew"/>'), read267, {});
+      ok('task267: a crewless ship satisfies no <if crew=…> and reads value="crew" as 0',
+         eng.evaluateCondition(parse('<if crew="poor"/>'), read267) === false
+         && eng.evaluateCondition(parse('<if crew="excellent"/>'), read267) === false
+         && read267.getVar('oldcrew') === 0,
+         `oldcrew=${read267.getVar('oldcrew')}`);
+      // …and it survives a save/load, or the next reload hands the hull a free average crew.
+      const saved267 = sanitizeData(JSON.parse(JSON.stringify(crewless267().data)));
+      ok('task267: a crewless ship is still crewless after a save/load round trip',
+         saved267.ships.length === 1 && saved267.ships[0].crew === 'none',
+         `crew=${saved267.ships.length && saved267.ships[0].crew}`);
+
+      // §4.658's oldcrew round trip: `<set var="oldcrew" value="crew"/>` above `<lose ship="t">`,
+      // then `<buy ship="barque" initialCrew="oldcrew">`. Every grade must arrive unchanged — the
+      // 1-based index is exactly what widening CREW_LEVELS would have shifted — and a crewless
+      // wreck must hand the barque nothing, which is the 0 case the same reading now carries.
+      const mk658 = async (crew) => {
+        const g = GameState.create({ name: 'T267c', gender: 'f', profession: 'Mariner', book: 4, adv });
+        g.data.items = []; g.data.shards = 0;
+        g.addShip({ type: 'brigantine', name: 'Hull', crew, cargo: [], docked: null });
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate() {}, onDeath() {}, notify() {} });
+        st.begin(await data.getSection(4, '658'), 4, '658');
+        await settle267();
+        const note = Array.from(c.querySelectorAll('button.btn-mini')).find((b) => /Note it/i.test(b.textContent));
+        if (note) note.click();
+        await settle267();
+        st.rerender();
+        await settle267();
+        return { g, c };
+      };
+      const trip267 = [];
+      for (const grade of ['poor', 'average', 'good', 'excellent', 'none']) {
+        const r = await mk658(grade);
+        trip267.push(`${grade}->${r.g.currentShip() ? r.g.currentShip().crew : 'noship'}`);
+        if (grade === 'none') {
+          // The upgrade chain below the buy is `<if crew="poor">…<elseif crew="average">…<elseif
+          // crew="good">`: none of them matches a crewless barque, so the battle improves nothing.
+          ok('task267: §4.658 offers a crewless salvaged barque no morale upgrade at all',
+             !Array.from(r.c.querySelectorAll('button.btn-mini')).some((b) => /becomes|recruits/i.test(b.textContent) && !b.disabled && !gray267(b)));
+        }
+      }
+      ok('task267: §4.658 carries every crew grade — and the absence of one — onto the barque unchanged',
+         trip267.join(' ') === 'poor->poor average->average good->good excellent->excellent none->none',
+         trip267.join(' '));
+
+      // The population, over the bundled corpus: one crewless entry point, and the two
+      // harbourmaster scenes that print the poor-crew hire. A third arriving in a future book
+      // fails here rather than changing silently.
+      const none267 = [], buy267 = [];
+      for (const b of data.availableBooks()) {
+        const raw = await data.loadBook(b);
+        for (const key of Object.keys(raw)) {
+          if (/initialCrew="none"/.test(raw[key])) none267.push(b + '/' + key);
+          if (/<buy[^>]*\bcrew="poor"/.test(raw[key])) buy267.push(b + '/' + key);
+        }
+      }
+      ok('task267: exactly one corpus section makes a crewless ship, and two print its hire',
+         none267.join(' ') === '5/192' && buy267.sort().join(' ') === '5/145 5/192',
+         `none=${none267.join(' ')} buy=${buy267.join(' ')}`);
+    }
+
 }

@@ -24,7 +24,8 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 267. `<buy crew="poor">` can never be clicked, so §5.145's and §5.192's printed "25 Shards to hire a poor crew" is a free crew instead
+- [x] 267. `<buy crew="poor">` can never be clicked, so §5.145's and §5.192's printed "25 Shards to hire a poor crew" is a free crew instead
+- [ ] 268. `applyAdjust`'s crew branch spells the CREW_LEVELS ordinal out a second time and has no crewless guard, so a future bare `<adjust crew= amount=>` grants the grade §5.192 charges for
 
 **Done**
 
@@ -299,7 +300,8 @@ this order.*
 - [x] 264. §6.160's "cross it off and turn to 551" grays →551 the moment either thing is crossed off, so the price is paid and the route it buys is gone
 - [x] 265. Three click-time takings still book nothing into the walk-position ledger — a market row's Buy/Sell, an inline `<sell>`, and the open-pick family
 - [x] 266. §4.605 and §4.658 give a poor crew THREE free upgrades: the `<if crew=>` chain above the click steps forward each time it is obeyed
-- [ ] 267. `<buy crew="poor">` can never be clicked, so §5.145's and §5.192's printed "25 Shards to hire a poor crew" is a free crew instead
+- [x] 267. `<buy crew="poor">` can never be clicked, so §5.145's and §5.192's printed "25 Shards to hire a poor crew" is a free crew instead
+- [ ] 268. `applyAdjust`'s crew branch spells the CREW_LEVELS ordinal out a second time and has no crewless guard, so a future bare `<adjust crew= amount=>` grants the grade §5.192 charges for
 
 ---
 
@@ -1054,6 +1056,40 @@ crewless and its 25-Shard hire clickable, that paying it yields a poor crew, and
 
 ---
 
+## 268. `applyAdjust`'s crew branch spells the CREW_LEVELS ordinal out a second time and has no crewless guard, so a future bare `<adjust crew= amount=>` grants the grade §5.192 charges for
+
+**Priority: LOW — no corpus section reaches it, measured. What is wrong is that the ordinal is
+now written in two places that disagree about how many grades there are, and the copy that is
+not `CREW_LEVELS` is the one with no floor.**
+
+*(Filed 2026-08-13, on closing task 267 — deciding whether the new NO_CREW guard belonged on
+this branch too needed knowing whether anything reaches it, and nothing does.)*
+
+`applyAdjust` (`engine.js:1261`) shifts the crew grade through a literal
+`['poor', 'average', 'good', 'excellent']` rather than through `CREW_LEVELS` — the only such
+copy left after task 267 moved the ordinal's own documentation onto the array. It also has no
+`NO_CREW` guard, where its sibling `applyShipLose` now does: `indexOf('none')` is -1, so
+`Math.max(0, Math.min(3, -1 + amount))` reads a crewless ship as poor and an `amount="1"`
+*grants* the grade §5.192 charges 25 Shards for — task 267's defect, one branch over.
+
+**Nothing in books 1–6 reaches it.** The corpus carries 346 `<adjust crew=…>` nodes and every
+one is a roll modifier inside a `<random>`/`<difficulty>`/`<rankcheck>` (§1.124's storm: "add 1
+if your crew is good"), which the roll machinery consumes via `rollAdjustTotal` — measured over
+`books/**/*.xml` by walking each node's ancestors, and the count of bare ones outside a roll is
+**0**. `adjust` is also absent from `PASSIVE_BODY_TAGS` and excluded from `groupPlan`'s effect
+set by name (`render-rules.js:354`), and no view module dispatches it, so `applyEffect` reaches
+this branch only when a caller hands it an `<adjust>` node directly.
+
+The fork is whether the branch should exist at all. Either read `CREW_LEVELS` and add the
+`NO_CREW` guard so the two shift sites agree, or delete the branch and let the allowlist in
+`validate-source.ps1` refuse a bare `<adjust crew= amount=>` outright — which states "an
+`<adjust crew=>` is a roll modifier" as a rule instead of leaving a second, weaker ordinal in
+place. Measure whether any *unpublished* book uses the bare form before choosing the second.
+Tests: whichever way, assert the 0-section census so a future bare form fails the suite rather
+than landing on this branch silently.
+
+---
+
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -1063,6 +1099,36 @@ crewless and its 25-Shard hire clickable, that paying it yields a poor crew, and
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-13 (implementation pass, task 267): closed **267** and filed **268** (LOW). Four
+things worth carrying forward, and the first is that the fork was settled by *running* the
+counterfactual rather than reasoning about it. **Widening `CREW_LEVELS` is a one-line edit and a
+test run, and the suite answered in a minute what three paragraphs could not.** With
+`['none', 'poor', 'average', 'good', 'excellent']` in place the full suite failed 6, and only 3
+of those were the `none→poor` fold this task is about — the other 3 are the ordinal's OWN
+pre-existing guard rails. "crew demotion below poor stays poor" returned **`none`**: the floor
+that 14 corpus demotions lean on in print ("A poor crew can't get any worse!", §3.231/§3.272/
+§4.439) is exactly what a fifth grade at index 0 removes, and `<lose crew="3">` ("reduce to
+poor") would undershoot from every grade below excellent as well. `initialCrew="oldcrew"=3
+gives a GOOD crew` returned **`average`**: the 1-based index §4.658 round-trips really does
+shift. So NO_CREW is held OFF the array, and the filing's "measure those before widening" was
+the whole of the decision. **Off the ordinal, the fix needed no rule change at all.**
+`canUpgradeCrew`'s `have === target - 1` was already right — a crewless ship indexes to -1,
+which IS one below `poor` — so §5.192's printed 25-Shard hire became clickable, and average/
+good/excellent stayed refused under "Your crew must be poor first", without touching the
+function. The same -1 makes `<if crew=…>` false and `value="crew"` 0. The bug was never in the
+rule; it was that the state the rule needed could not be spelled. **Making a crewless ship
+expressible opened a NEW free-crew route, and the guard for it is the same shape as the books'
+own floor.** `applyShipLose`'s `Math.max(0, indexOf(crew))` reads an off-scale grade as poor, so
+a storm's `<lose crew="1">` would *grant* what §5.192 charges 25 Shards for — this task's defect
+one node over. Book 5's seas carry no such node; a claimed hull sails into book 3's ten. Probed
+by removing the guard: `one=poor three=poor`. **Three pre-existing assertions pinned the defect,
+and only the FULL suite found them.** `-Suite actions` printed a clean pass while `none→poor`
+was still asserted twice in `suite-inventory` and once in `suite-economy` (§5.192's own claim,
+task 126) — a focused run over the suite you edited says nothing about the suites that own the
+same behaviour. Each of the 10 new assertions was probed to failure, one neutered site at a
+time. Unrelated and left alone: `CREW_LABEL` (`rules.js`) is exported and read by nothing.
+Suite **2667** (up 10).
 
 Worked 2026-08-12 (implementation pass, task 266): closed **266** and filed **267** (LOW). Four
 things worth carrying forward, and the first is that the task's own instruction — measure before

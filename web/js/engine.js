@@ -1,7 +1,7 @@
 // engine.js — the rules engine: dice, condition evaluation, and passive effects.
 // Reads attributes off the parsed XML elements and applies them to a GameState.
 
-import { ABILITIES, canonShipType, CREW_LEVELS, SHIP_TYPES, canonCargo } from './rules.js';
+import { ABILITIES, canonShipType, CREW_LEVELS, NO_CREW, SHIP_TYPES, canonCargo } from './rules.js';
 import { makeItem, normalize, globMatch, matchItems, matchItemQuery, isShardsCurrency, currencyAward, splitItemName, parseTags } from './state.js';
 import { bookAvailable } from './edition.js'; // the DOM-free registry, never data.js (task 195)
 
@@ -844,10 +844,16 @@ function applyShipLose(el, state, opts = {}) {
     // demotes, a negative N (the crew *upgrade* idiom, e.g. crew="-1"/"-2") promotes.
     // Clamp BOTH ends — an upgrade past "excellent" used to index off the array and
     // silently reset the crew to "poor" (book1/38 et al.); an unknown crew starts at poor.
-    const idx = Math.max(0, CREW_LEVELS.indexOf(ship.crew));
-    const d = parseInt(el.getAttribute('crew'), 10) || 1;
-    const next = Math.min(CREW_LEVELS.length - 1, Math.max(0, idx - d));
-    ship.crew = CREW_LEVELS[next];
+    // A ship with NO crew has no quality to shift: it is off the ordinal, so the clamp
+    // would read it as poor and a storm would *grant* the grade §5.192 charges for. The
+    // books' own floor is the same shape one grade up — "A poor crew can't get any
+    // worse!" (§3.231, §3.272, §4.439) — so a crewless ship simply stays crewless. (task 267)
+    if (ship.crew !== NO_CREW) {
+      const idx = Math.max(0, CREW_LEVELS.indexOf(ship.crew));
+      const d = parseInt(el.getAttribute('crew'), 10) || 1;
+      const next = Math.min(CREW_LEVELS.length - 1, Math.max(0, idx - d));
+      ship.crew = CREW_LEVELS[next];
+    }
   }
   if (el.getAttribute('cargo') != null) {
     const c = el.getAttribute('cargo');

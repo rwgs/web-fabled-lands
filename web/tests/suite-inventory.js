@@ -677,11 +677,12 @@ export async function run(ctx) {
     applyInlineBuy(gbship, { price: 0, cargo: 'grain' });
     r23 = applyInlineBuy(gbship, { price: 0, cargo: 'timber' });
     ok('galleon carries 3 cargo units, 4th refused', gbship.ships[0].cargo.length === 3 && r23.ok === false, `cargo=${JSON.stringify(gbship.ships[0].cargo)}`);
-    // brig alias canonicalises to brigantine; initialCrew="none" ⇒ poor
+    // brig alias canonicalises to brigantine; initialCrew="none" ⇒ NO_CREW, not a free poor
+    // crew — §5.192's harbourmaster charges 25 Shards for that one (task 267).
     const gbrig = GameState.create({ name:'BR', gender:'m', profession:'Warrior', book:5, adv });
     gbrig.data.shards = 100;
     applyInlineBuy(gbrig, { price: 50, ship: 'brig', initialCrew: 'none' });
-    ok('buy ship="brig" canonicalises to brigantine (cap 2)', gbrig.ships[0].type === 'brigantine' && gbrig.ships[0].crew === 'poor' && gbrig.data.shards === 50, JSON.stringify(gbrig.ships[0]||{}));
+    ok('buy ship="brig" canonicalises to brigantine (cap 2)', gbrig.ships[0].type === 'brigantine' && gbrig.ships[0].crew === 'none' && gbrig.data.shards === 50, JSON.stringify(gbrig.ships[0]||{}));
 
     // --- task 24: canonical ship-type conditions + crew-upgrade clamping ---
     // A <trade ship="brig"> row buys a brigantine (capacity 2) — canonicalised at purchase.
@@ -732,8 +733,8 @@ export async function run(ctx) {
       applyInlineBuy(gcv2, { ship:'barque', initialCrew:'none' });
       applyInlineBuy(gcv2, { ship:'barque', initialCrew:null });
       applyInlineBuy(gcv2, { ship:'barque', initialCrew:'excellent' });
-      ok('initialCrew fallbacks preserved: none→poor, blank→average, literal grade kept',
-        gcv2.ships[0].crew === 'poor' && gcv2.ships[1].crew === 'average' && gcv2.ships[2].crew === 'excellent', gcv2.ships.map((s)=>s.crew).join(','));
+      ok('initialCrew fallbacks preserved: none→NO_CREW, blank→average, literal grade kept',
+        gcv2.ships[0].crew === 'none' && gcv2.ships[1].crew === 'average' && gcv2.ships[2].crew === 'excellent', gcv2.ships.map((s)=>s.crew).join(','));
 
       // end-to-end §4.658: wreck a GOOD-crew brig at sea, salvage the barque, upgrade one grade.
       const g658 = GameState.create({ name:'W658', gender:'m', profession:'Warrior', book:4, adv });

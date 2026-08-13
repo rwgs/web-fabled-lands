@@ -2367,7 +2367,8 @@ export async function run(ctx) {
     { // block-scoped
       // §5.192: claim the derelict Wrath of God — one group bundles "buy the brig for
       // 50 Shards" with "cross off the deed". Clicking must add the ship (docked here in
-      // Kunrir, crew poor from initialCrew="none"), charge 50, and take the deed.
+      // Kunrir, crewless from initialCrew="none" — the page charges 25 Shards to hire a
+      // poor crew, task 267), charge 50, and take the deed.
       const g192 = GameState.create({ name:'T192', gender:'m', profession:'Warrior', book:5, adv });
       g192.data.shards = 100; g192.data.ships = [];
       g192.addItem(makeItem('item', 'deed to the Wrath of God'));
@@ -2378,7 +2379,7 @@ export async function run(ctx) {
       ok('task126: §192 shows the "50 Shards" claim group', !!grp192);
       ok('task126: §192 does not buy the ship on entry', g192.data.ships.length === 0 && g192.data.shards === 100);
       grp192.click();
-      ok('task126: §192 claiming adds the brigantine, docked in Kunrir, crew poor', g192.data.ships.length === 1 && g192.data.ships[0].type === 'brigantine' && g192.data.ships[0].docked === 'Kunrir' && g192.data.ships[0].crew === 'poor', JSON.stringify(g192.data.ships));
+      ok('task126: §192 claiming adds the brigantine, docked in Kunrir, with no crew', g192.data.ships.length === 1 && g192.data.ships[0].type === 'brigantine' && g192.data.ships[0].docked === 'Kunrir' && g192.data.ships[0].crew === 'none', JSON.stringify(g192.data.ships));
       ok('task126: §192 claiming charges 50 Shards and crosses off the deed', g192.data.shards === 50 && g192.findItems('deed to the Wrath of God').length === 0, `sh=${g192.data.shards} deed=${g192.findItems('deed to the Wrath of God').length}`);
 
       // §4.622: salvage free cargo from a wreck — each commodity is a group bundling a

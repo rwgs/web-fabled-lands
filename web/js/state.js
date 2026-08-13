@@ -1230,6 +1230,9 @@ function sanitizeShip(s) {
     id: asStr(o.id).trim() || nid(),
     type,
     name: asStr(o.name, 'Ship') || 'Ship',
+    // Any non-empty grade survives, which is what carries a crewless ship (NO_CREW, off
+    // the CREW_LEVELS ordinal) through a reload — narrowing this to the four grades would
+    // hand §5.192's unhired hull a free average crew on the next load. (task 267)
     crew: asStr(o.crew, 'average') || 'average',
     cargo: asArr(o.cargo).filter((c) => typeof c === 'string').map(canonCargo), // fold abbreviated units to canonical (task 127)
     docked: o.docked == null ? null : asStr(o.docked),
