@@ -146,6 +146,11 @@ $CASES = @(
        text  = '<section name="2"><tick codeword="Ready" hidden="ture"/></section>'
        want  = 'hidden="ture" is not a truth flag' }
 
+    @{ label = 'an <adjust crew=> hanging where no roll reads it (task 268)'
+       file  = 'books/book2/1.xml'
+       text  = '<section name="1"><adjust crew="good" amount="1"/></section>'
+       want  = 'a crew modifier must be a child of' }
+
     @{ label = 'a dangling link inside a bundled book'
        file  = 'books/book1/1.xml'
        text  = '<section name="1"><p>Start. <goto section="999"/></p></section>'
@@ -192,6 +197,10 @@ Assert 'JaFL wildcards and a crew delta are accepted values' ($ok3.Errors.Count 
 # sit loose in the book folder and neither may be read as a mis-named section.
 $ok4 = Build-Fixture @{ 'books/book1/1temp.xml' = '<section name="The War-Torn Kingdom"><p>Book title, not a section id.</p></section>' }
 Assert 'a prose-named <section> loose in a book folder is left alone' ($ok4.Errors.Count -eq 0) ($ok4.Errors -join ' | ')
+# The other half of task 268's check: the shapes the corpus really writes must stay legal -
+# under a roll (all 346 of them), and under the <lose stamina=> that reads the same modifiers.
+$ok5 = Build-Fixture @{ 'books/book2/1.xml' = '<section name="1"><random dice="2"><adjust crew="good" amount="1"/></random><difficulty ability="scouting" level="9"><adjust crew="poor" value="-1"/></difficulty><lose stamina="4"><adjust crew="excellent" amount="-1"/></lose></section>' }
+Assert 'an <adjust crew=> under a roll (or a <lose>) is left alone' ($ok5.Errors.Count -eq 0) ($ok5.Errors -join ' | ')
 
 if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
 

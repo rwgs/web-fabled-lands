@@ -1264,12 +1264,19 @@ function applyAdjust(el, state) {
     state.adjustCodewordValue(get('name'), amount);
   } else if (get('title') != null || get('titleVal') != null) {
     state.addTitle(get('title') || get('titleVal'), amount);
-  } else if (get('crew') != null && state.currentShip()) {
-    const ship = state.currentShip();
-    const idx = ['poor', 'average', 'good', 'excellent'].indexOf(ship.crew);
-    ship.crew = ['poor', 'average', 'good', 'excellent'][Math.max(0, Math.min(3, idx + amount))] || ship.crew;
-    state.changed();
   }
+  // There is deliberately no crew= branch. An <adjust crew="good" amount="1"/> is a die-roll
+  // MODIFIER — "add 1 if your crew is good" — read off the roll it hangs under by
+  // adjustApplies/adjustAmount, which take crew= as the CONDITION and amount= as the
+  // contribution; all 346 in books 1-6 are children of <random>/<difficulty>, and none is
+  // bare. The branch that used to sit here read those same two attributes as "shift the grade
+  // by amount", so anything handing applyAdjust one of those nodes would have silently
+  // PROMOTED the crew — and it clamped through a second copy of the CREW_LEVELS ordinal with
+  // no crewless floor, where indexOf('none') is -1 and amount="1" therefore *granted* the
+  // grade §5.192 charges 25 Shards for (task 267's defect, one branch over). A grade is set
+  // by <gain crew="good"> and shifted by <lose crew="N">; validate-source.ps1 now refuses an
+  // <adjust crew=> that hangs where nothing reads it, so the roll modifier is the only
+  // meaning the tag has. (task 268)
   return '';
 }
 

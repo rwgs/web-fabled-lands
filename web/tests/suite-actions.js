@@ -4966,4 +4966,70 @@ export async function run(ctx) {
          `none=${none267.join(' ')} buy=${buy267.join(' ')}`);
     }
 
+    // --- task 268: an <adjust crew=…> is a die-roll modifier and nothing else ---
+    // applyAdjust carried a crew branch that read `<adjust crew="X" amount="N"/>` as "shift the
+    // grade by N", clamping through a literal ['poor','average','good','excellent'] — a second
+    // copy of the CREW_LEVELS ordinal, and the copy with no crewless floor, so indexOf('none')
+    // = -1 made amount="1" *grant* the poor crew §5.192 charges 25 Shards for (task 267's
+    // defect one branch over). But that is not what the tag means: adjustApplies reads crew= as
+    // the CONDITION and amount= as the contribution ("add 1 if your crew is good"), so the
+    // branch misread the only form the corpus writes, and a bare one would have promoted the
+    // crew rather than doing nothing. The branch is gone: a grade is set by <gain crew=> and
+    // shifted by <lose crew="N">, and validate-source.ps1 refuses an <adjust crew=> that hangs
+    // where nothing reads it.
+    {
+      const mk268 = (crew) => {
+        const g = GameState.create({ name: 'T268', gender: 'm', profession: 'Mariner', book: 3, adv });
+        g.addShip({ type: 'brigantine', name: 'Hull', crew, cargo: [], docked: null });
+        return g;
+      };
+      // Handed straight to applyEffect (the only way to reach it — <adjust> is not in
+      // PASSIVE_BODY_TAGS, groupPlan excludes it, and no view module dispatches it), every
+      // grade must come back untouched, the crewless hull most of all.
+      const shift268 = [];
+      for (const crew of ['none', 'poor', 'average', 'good', 'excellent']) {
+        const g = mk268(crew);
+        eng.applyEffect(parse('<adjust crew="good" amount="1"/>'), g, {});
+        eng.applyEffect(parse('<adjust crew="poor" value="-1"/>'), g, {});
+        shift268.push(`${crew}->${g.currentShip().crew}`);
+      }
+      ok('task268: a bare <adjust crew=…> shifts no grade — least of all a crewless hull into a free poor crew',
+         shift268.join(' ') === 'none->none poor->poor average->average good->good excellent->excellent',
+         shift268.join(' '));
+      // …while the same node still contributes its amount to the roll it hangs under, which is
+      // the meaning that remains: an exact grade match, so a "good crew" bonus skips excellent.
+      const roll268 = '<random dice="2"><adjust crew="good" amount="1"/><adjust crew="poor" amount="-1"/></random>';
+      const seen268 = ['none', 'poor', 'average', 'good', 'excellent']
+        .map((crew) => `${crew}:${eng.childAdjustment(parse(roll268), mk268(crew))}`);
+      ok('task268: …and still adds its amount to the roll it hangs under, matching the grade exactly',
+         seen268.join(' ') === 'none:0 poor:-1 average:0 good:1 excellent:0', seen268.join(' '));
+
+      // The census the deletion rests on, over the bundled corpus: all 346 <adjust crew=…>
+      // nodes hang under a <random> or a <difficulty>, and not one is bare. The parent
+      // breakdown is asserted too, so a scan that silently found nothing cannot pass; the
+      // pre-filter is only a filter, and an <adjust crew=> it missed would fail the 346.
+      // A future bare one now fails here AND at the build gate rather than landing on a
+      // branch that promoted the crew.
+      const READ268 = new Set(['random', 'difficulty', 'rankcheck', 'gain', 'lose']);
+      const bare268 = [], by268 = new Map();
+      let total268 = 0;
+      for (const b of data.availableBooks()) {
+        const raw = await data.loadBook(b);
+        for (const key of Object.keys(raw)) {
+          if (!/<adjust[^>]*\bcrew=/.test(raw[key])) continue;
+          const el = await data.getSection(b, key);
+          for (const a of el.querySelectorAll('adjust[crew]')) {
+            total268++;
+            const p = (a.parentElement ? a.parentElement.tagName : '(root)').toLowerCase();
+            by268.set(p, (by268.get(p) || 0) + 1);
+            if (!READ268.has(p)) bare268.push(`${b}/${key}:${p}`);
+          }
+        }
+      }
+      const shape268 = Array.from(by268.entries()).sort().map(([p, n]) => `${p}:${n}`).join(' ');
+      ok('task268: every corpus <adjust crew=…> hangs under a roll that reads it, and none is bare',
+         total268 === 346 && bare268.length === 0 && shape268 === 'difficulty:13 random:333',
+         `total=${total268} parents=${shape268} bare=${bare268.join(' ')}`);
+    }
+
 }

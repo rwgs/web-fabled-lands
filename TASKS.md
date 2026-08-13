@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-266 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **267, open under LOW** — file new work
+268 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **269, open under LOW** — file new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -25,7 +25,8 @@ there once the buckets below are clear.
 **LOW**
 
 - [x] 267. `<buy crew="poor">` can never be clicked, so §5.145's and §5.192's printed "25 Shards to hire a poor crew" is a free crew instead
-- [ ] 268. `applyAdjust`'s crew branch spells the CREW_LEVELS ordinal out a second time and has no crewless guard, so a future bare `<adjust crew= amount=>` grants the grade §5.192 charges for
+- [x] 268. `applyAdjust`'s crew branch spells the CREW_LEVELS ordinal out a second time and has no crewless guard, so a future bare `<adjust crew= amount=>` grants the grade §5.192 charges for
+- [ ] 269. `applyAdjust`'s four surviving branches each duplicate a `<gain>`/`<tick>` that already does the job, and no corpus `<adjust>` of any kind is bare — only `crew=` says so
 
 **Done**
 
@@ -301,7 +302,8 @@ this order.*
 - [x] 265. Three click-time takings still book nothing into the walk-position ledger — a market row's Buy/Sell, an inline `<sell>`, and the open-pick family
 - [x] 266. §4.605 and §4.658 give a poor crew THREE free upgrades: the `<if crew=>` chain above the click steps forward each time it is obeyed
 - [x] 267. `<buy crew="poor">` can never be clicked, so §5.145's and §5.192's printed "25 Shards to hire a poor crew" is a free crew instead
-- [ ] 268. `applyAdjust`'s crew branch spells the CREW_LEVELS ordinal out a second time and has no crewless guard, so a future bare `<adjust crew= amount=>` grants the grade §5.192 charges for
+- [x] 268. `applyAdjust`'s crew branch spells the CREW_LEVELS ordinal out a second time and has no crewless guard, so a future bare `<adjust crew= amount=>` grants the grade §5.192 charges for
+- [ ] 269. `applyAdjust`'s four surviving branches each duplicate a `<gain>`/`<tick>` that already does the job, and no corpus `<adjust>` of any kind is bare — only `crew=` says so
 
 ---
 
@@ -1090,6 +1092,44 @@ than landing on this branch silently.
 
 ---
 
+## 269. `applyAdjust`'s four surviving branches each duplicate a `<gain>`/`<tick>` that already does the job, and no corpus `<adjust>` of any kind is bare — only `crew=` says so
+
+**Priority: LOW — nothing reaches them, measured. What is open is whether the rule task 268
+stated for `crew=` is the rule for the whole tag.**
+
+*(Filed 2026-08-13, on closing task 268 — the census that cleared the crew branch counted every
+other `<adjust>` on the way past.)*
+
+Task 268 deleted `applyAdjust`'s crew branch because `<adjust crew="good" amount="1"/>` is a
+die-roll modifier ("add 1 if your crew is good") and the branch read the same two attributes as
+a grade shift, and it gated that one form in `validate-source.ps1` so a bare one fails the
+build. The same census answers the wider question it did not ask: books 1-6 carry **569
+`<adjust>` nodes and not one of them is bare** — 466 under `<random>`, 89 under `<difficulty>`,
+9 under `<lose>` (the wound modifiers, "subtract your armour from the roll") and 5 under
+`<rankcheck>`, measured over `books/**/*.xml` by walking each node's ancestors.
+
+So the four branches left in `applyAdjust` (`engine.js:1256`) are reachable exactly as the crew
+branch was — only by handing `applyEffect` an `<adjust>` node directly — and each duplicates a
+tag that already does the job:
+
+| branch | what it does | the tag that already does it |
+| --- | --- | --- |
+| `ability=` | `state.adjustAbility(ab, amount)` | `<gain ability="combat" amount="1">` (applyTick) |
+| `codeword=` / `name=` | `state.adjustCodewordValue(…)` | `<tick name="X" amount="N">` (`engine.js:930`) |
+| `title=` / `titleVal=` | `state.addTitle(…, amount)` | `<tick title="X" titleAdjust="N">` (`engine.js:919`) |
+
+The fork is task 268's, one scope wider: either widen the gate from `crew=` to **every**
+`<adjust>` and delete `applyAdjust` with its `EFFECT_APPLIERS` entry — which states "an
+`<adjust>` modifies the node above it and is never an effect in its own right" — or keep the
+four as a documented fallback and say so in a comment. The case for keeping them is that none
+*misreads* its corpus form the way the crew branch did: an `<adjust ability="combat"
+amount="1"/>` applied as an effect means what it looks like, so a bare one would be a harmless
+duplicate rather than a wrong answer. The case against is that `EFFECT_APPLIERS` is this port's
+statement of what writes to the Adventure Sheet, and `<adjust>` does not belong on that list if
+the tag is a modifier. Tests: whichever way, pin the 569/0 census beside task 268's 346/0 one.
+
+---
+
 > **Completed task details (tasks 1–255) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -1099,6 +1139,37 @@ than landing on this branch silently.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-13 (implementation pass, task 268): closed **268** and filed **269** (LOW). Five
+things worth carrying forward, and the first is that the census only *opened* the fork — what
+closed it was reading what the tag means. The filing offered "read `CREW_LEVELS` and add the
+`NO_CREW` guard so the two shift sites agree" or "delete the branch". **Agreement between two
+ordinals is not the same as one right reading.** `adjustApplies` takes `crew=` as the
+CONDITION and `amount=` as the contribution, so `<adjust crew="good" amount="1"/>` — the shape
+of all 346 in the corpus — means "add 1 to this roll if your crew is good". The branch read
+those same two attributes as "shift the grade by 1", which is not a weaker version of the right
+answer but a different one, and option (a) would have left it misreading every node the corpus
+writes while *looking* correct. That is visible in the probe: restoring the branch failed the
+new assertion with `none->poor … excellent->good`, both defects at once — the free crew the
+task filed, and a demotion that really applied. **The filing named a function that does not
+exist.** It has the roll machinery consuming these through `rollAdjustTotal`; the readers are
+`childAdjustment`, `adjustApplies` and `adjustAmount`. The claim was right and the identifier
+was invented, so it cost a grep — worth doing before trusting any name a filing hands you.
+**The gate had to allow more parents than the corpus uses, and that is the difference between a
+census and a rule.** The 346 hang under `<random>` and `<difficulty>` only, but `<gain>` and
+`<lose>` read `<adjust>` children too (`engine.js:167` and `:570`, "subtract your armour from
+the wound"), so `FL_ADJUST_READERS` names all five. Gating to the two the data happens to use
+would have been a tighter fit and a false rule — a future `<lose stamina="4"><adjust crew="good"
+amount="-1"/></lose>` is meaningful today. **Only `crew=` is gated, deliberately, and asking why
+became 269.** The other four `applyAdjust` branches are live, so refusing every bare `<adjust>`
+would refuse forms the engine still handles — but the same walk says none of those is bare
+either (569 nodes, 0 bare), and each duplicates a `<gain>`/`<tick>` that already does the job.
+**Each of the three new assertions was probed to failure one at a time**, and the census probe
+is the one that mattered: a pre-filter changed to match nothing failed it on `total=0`, which is
+what makes the 346-and-parent-breakdown pin non-vacuous rather than decorative — without it a
+scan that silently found nothing would have reported "none is bare" and passed. The build gate
+was probed the same way, by short-circuiting its `if` to `$false`. Suite **2670** (up 3); the
+gate self-test **27** (up 2).
 
 Worked 2026-08-13 (implementation pass, task 267): closed **267** and filed **268** (LOW). Four
 things worth carrying forward, and the first is that the fork was settled by *running* the
