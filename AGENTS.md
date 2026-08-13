@@ -14,6 +14,17 @@ combat, markets, ships, live adventure sheet). Plain HTML/CSS/ES modules —
   where a file declaring a `<section name=>` that is not its own filename now fails the
   build gate, because such a file reads as a second copy of a live section to any by-hand
   census of the corpus (task 260).
+  **"Nothing walks it" means the build and the gate, not your glob.** The shipped corpus is
+  the **`^\d+[a-z]?$` basenames of the published books only** — 4,369 files today — because
+  that is the filter `build-data.ps1` bundles and `validate-source.ps1` checks, and it is
+  what `data.loadBook`/`availableBooks()` can see. A `books/**/*.xml` glob returns **4,437**:
+  it adds the 20 superseded `temp/` copies *and* the 48 files that are not sections at all
+  (`Adventurers.xml`, `New.xml` and the six pregen biographies, per book). Both inflate a
+  census — task 269 was filed with 569 `<adjust>` nodes where the corpus holds 558, and the
+  `force="f"` census reads 187 sections by that glob against the shipped 147, because every
+  pregen biography ends in `<goto section="1" force="f"/>`. **A census that means "the
+  shipped corpus" must exclude both**, and a filing that quotes a count must say which set it
+  measured (task 270).
 - **`books/books.ini`** — the edition registry. `Published=` is the **single source** of
   which books a build ships: it drives validation, the per-book JSON, the copied maps and
   art, `sw.js`'s offline inventory and the every-section scan. Publishing/withdrawing a

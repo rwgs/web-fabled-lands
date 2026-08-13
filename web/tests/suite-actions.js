@@ -4411,9 +4411,14 @@ export async function run(ctx) {
 
       // The census the hold was scoped against, over the bundled corpus. Only an EFFECT node
       // renders as the opt-in this rule keys on (renderForcedOptional): of the 147 sections
-      // carrying force="f", 42 put one inside an if/elseif/else branch, but 35 of those are an
-      // optional <goto> exit and 12 a <difficulty> roll. Six sections are left, and a seventh
-      // arriving in a future book wants measuring the way these were.
+      // carrying force="f", 42 put one inside an if/elseif/else branch, but 27 of those are an
+      // optional <goto> exit, 8 a <difficulty> roll and 1 a <group> (§1.187). Six sections are
+      // left, and a seventh arriving in a future book wants measuring the way these were.
+      // The counts are SECTIONS throughout, and they partition the 42 exactly; by NODE the same
+      // set reads 35 <goto> and 12 <difficulty>, which is the pair task 264 was written up with.
+      // Both are over the BUNDLED corpus: `books/**/*.xml` reports 187 sections carrying
+      // force="f", not 147, because it also walks the 20 superseded temp/ copies and the 48
+      // files that are not sections (every pregen biography ends `<goto section="1" force="f"/>`).
       const OPT264 = /<(lose|gain|tick|set|transfer|adjust|adjustmoney)\b[^>]*\bforce="f"[^>]*>/gi;
       const TAG264 = /<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g;
       const under264 = [];

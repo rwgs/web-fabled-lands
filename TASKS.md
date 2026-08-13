@@ -27,7 +27,7 @@ there once the buckets below are clear.
 - [x] 267. `<buy crew="poor">` can never be clicked, so §5.145's and §5.192's printed "25 Shards to hire a poor crew" is a free crew instead
 - [x] 268. `applyAdjust`'s crew branch spells the CREW_LEVELS ordinal out a second time and has no crewless guard, so a future bare `<adjust crew= amount=>` grants the grade §5.192 charges for
 - [x] 269. `applyAdjust`'s four surviving branches each duplicate a `<gain>`/`<tick>` that already does the job, and no corpus `<adjust>` of any kind is bare — only `crew=` says so
-- [ ] 270. Every by-hand corpus census globs `books/**/*.xml` and counts the 20 superseded `temp/` working copies, so task 269 was filed with 569 `<adjust>` nodes where the shipped corpus holds 558
+- [x] 270. Every by-hand corpus census globs `books/**/*.xml` and counts the 20 superseded `temp/` working copies, so task 269 was filed with 569 `<adjust>` nodes where the shipped corpus holds 558
 
 **Done**
 
@@ -305,7 +305,7 @@ this order.*
 - [x] 267. `<buy crew="poor">` can never be clicked, so §5.145's and §5.192's printed "25 Shards to hire a poor crew" is a free crew instead
 - [x] 268. `applyAdjust`'s crew branch spells the CREW_LEVELS ordinal out a second time and has no crewless guard, so a future bare `<adjust crew= amount=>` grants the grade §5.192 charges for
 - [x] 269. `applyAdjust`'s four surviving branches each duplicate a `<gain>`/`<tick>` that already does the job, and no corpus `<adjust>` of any kind is bare — only `crew=` says so
-- [ ] 270. Every by-hand corpus census globs `books/**/*.xml` and counts the 20 superseded `temp/` working copies, so task 269 was filed with 569 `<adjust>` nodes where the shipped corpus holds 558
+- [x] 270. Every by-hand corpus census globs `books/**/*.xml` and counts the 20 superseded `temp/` working copies, so task 269 was filed with 569 `<adjust>` nodes where the shipped corpus holds 558
 
 ---
 
@@ -1179,6 +1179,34 @@ statement of what the build already guarantees, and CI's rebuild-and-diff is wha
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
 
+Worked 2026-08-13 (docs-accuracy pass, task 270): closed **270**, filing nothing. Four things worth
+carrying forward, and the first is that the glob is worse than the task says. **`temp/` is only half
+of what `books/**/*.xml` over-counts; the other half is 48 files that are not sections at all.** The
+shipped corpus is the `^\d+[a-z]?$` basenames of the published books — **4,369** files, because that
+is the filter `build-data.ps1` bundles and `validate-source.ps1` checks — while the glob returns
+**4,437**: the 20 superseded working copies *plus* `Adventurers.xml`, `New.xml` and six pregen
+biographies per book. That second set is the bigger distortion of the two for the census this pass
+re-ran: every pregen bio ends `<goto section="1" force="f"/>`, so `force="f"` reads **187** sections
+by the glob against the shipped **147** — 36 of the 40 extra sections are bios, only 4 are `temp/`.
+The gate already knows the distinction (`validate-source.ps1` step 2b deliberately passes a file
+whose `<section name=>` is a person or a book title), so this is a fact about by-hand globs alone,
+and it is now in `AGENTS.md` beside "nothing walks it". **Re-running all nine censuses found the
+error was units, not the glob — three times out of four.** 263/265's 14-and-4 and 6-and-2, 266's
+3-and-2, 267's 14 demotions, 268's 346 and 261's 15 `not=` guards are all identical over both
+sources; the only count the glob really moves is 269's, exactly as filed (558 vs 569, `random`
+464 → 466, `difficulty` 80 → 89, the 11 extras in the six temp files the task names). **Task 264's
+"35 `<goto>` and 12 `<difficulty>`" is a NODE count sitting in a sentence that reads as sections**,
+which is why it did not sum: by section the 42 partition as 27 `<goto>`, 8 `<difficulty>`, 1
+`<group>` (§1.187) and the 6 effect nodes the hold is scoped to — exactly 42, where 35 + 12 + 6
+was 53 and should have been the tell. Corrected in the review log and in the suite comment that
+repeats it, with both units named so the next reader can check either. **Two more prose counts were
+simply wrong and neither came from the glob.** Task 266's "the JS returns three where the Python
+returns four" is **five** — the group exclusion drops §4.622 and §5.192, both of which that same
+entry names, so its own list contradicted its number; and task 267's "book 3's ten" is **eleven**
+(book 3 carries 11 of the corpus's 14 `<lose crew="N">` demotions, in 11 sections, and book 5
+carries none, which is the part the sentence was making). No code changed and no assertion moved:
+suite **2673**, unchanged, as a docs pass should leave it.
+
 Worked 2026-08-13 (implementation pass, task 269): closed **269** and filed **270** (LOW). Four
 things worth carrying forward, and the first is that the filing argued its own fork the wrong way
 round. **The case for keeping the four branches was a claim about the tag, and reading the tag
@@ -1232,7 +1260,9 @@ would have been a tighter fit and a false rule — a future `<lose stamina="4"><
 amount="-1"/></lose>` is meaningful today. **Only `crew=` is gated, deliberately, and asking why
 became 269.** The other four `applyAdjust` branches are live, so refusing every bare `<adjust>`
 would refuse forms the engine still handles — but the same walk says none of those is bare
-either (569 nodes, 0 bare), and each duplicates a `<gain>`/`<tick>` that already does the job.
+either (558 nodes, 0 bare — recorded here as 569, which is the `books/**/*.xml` glob counting
+the superseded `temp/` copies; task 270), and each duplicates a `<gain>`/`<tick>` that already
+does the job.
 **Each of the three new assertions was probed to failure one at a time**, and the census probe
 is the one that mattered: a pre-filter changed to match nothing failed it on `total=0`, which is
 what makes the 346-and-parent-breakdown pin non-vacuous rather than decorative — without it a
@@ -1261,7 +1291,7 @@ rule; it was that the state the rule needed could not be spelled. **Making a cre
 expressible opened a NEW free-crew route, and the guard for it is the same shape as the books'
 own floor.** `applyShipLose`'s `Math.max(0, indexOf(crew))` reads an off-scale grade as poor, so
 a storm's `<lose crew="1">` would *grant* what §5.192 charges 25 Shards for — this task's defect
-one node over. Book 5's seas carry no such node; a claimed hull sails into book 3's ten. Probed
+one node over. Book 5's seas carry no such node; a claimed hull sails into book 3's eleven. Probed
 by removing the guard: `one=poor three=poor`. **Three pre-existing assertions pinned the defect,
 and only the FULL suite found them.** `-Suite actions` printed a clean pass while `none→poor`
 was still asserted twice in `suite-inventory` and once in `suite-economy` (§5.192's own claim,
@@ -1292,7 +1322,7 @@ every `<buy …/>` read as an OPEN tag that swallowed its siblings. The assertio
 self-closure off the whole match fixed it, and the Python census run over `books/**/*.xml` is
 what said the JS was lying rather than the corpus surprising. **The two sources then disagreed a
 second time, and that disagreement was the correct answer.** The JS returns three sections where
-the Python returns four, because only the JS excludes a `<buy>` inside a `<group>` — a collapsed
+the Python returns five, because only the JS excludes a `<buy>` inside a `<group>` — a collapsed
 group runs its purchase through `runBuyNode`, which mints no per-node memo, so §5.192's Wrath of
 God and §4.622's salvage are out of the hold's reach by construction. The expected value tracks
 the mechanism, not the tag count. Suite **2657** (up 10).
@@ -1331,8 +1361,8 @@ things worth carrying forward, and the first is the fork the task was written to
 rather than write. **Option (c) was picked on the measurement, and the measurement is what made it
 safe rather than plausible.** The rule keys on a `force="f"` EFFECT node (what `renderForcedOptional`
 draws), so the population is not the 147 sections carrying `force="f"` nor the 42 that put one
-inside a branch — 35 of those are an optional `<goto>` exit and 12 a `<difficulty>` roll. **Six**
-sections remain, and §6.160 is the only one that loses anything; the other five hold nothing but
+inside a branch — 27 of those are an optional `<goto>` exit, 8 a `<difficulty>` roll and 1 a
+`<group>` (§1.187). **Six** sections remain, and §6.160 is the only one that loses anything; the other five hold nothing but
 the button, so the hold only stops their words graying under a tick just made. §6.215 and §6.49
 carry no such node at all, which is why "the reward LANDED, so graying is right" is untouched — the
 question the task asked was answerable by census, not by judgement. That census is now an assertion,
