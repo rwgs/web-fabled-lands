@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 272 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log) — **no task is open**; file new work
+misdiagnosis (see the Review log); **273 is open** under MEDIUM. File new work
 under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,7 +20,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-*(none open — file new MEDIUM work here)*
+- [ ] 273. The walk-position ledger tracks the purse and the pack but not codewords, so a block that spends the codeword gating it retracts its own exit on the next draw — §2.143 deletes *Bounty* and grays the →601 it deleted it for
 
 **LOW**
 
@@ -1308,6 +1308,62 @@ distinction any page draws.
 kept-only sheet (movers empty), the control that an ordinary possession still moves, the control
 that §6.635's named `item="paper sword"` still moves a kept one, and the census that those five
 non-`*` player-source transfers are the whole set — so a sixth lands on it.
+
+---
+
+## 273. The walk-position ledger tracks the purse and the pack but not codewords, so a block that spends the codeword gating it retracts its own exit on the next draw — §2.143 deletes *Bounty* and grays the →601 it deleted it for
+
+**Priority: MEDIUM — the first draw is correct, so this needs a redraw before the player clicks
+(a sheet drop, an item Use, a market row, a fight round — every `story.rerender()` site). What it
+then costs is a printed destination: the codeword is already spent, and the only live exit left is
+the page's "if not" one. 9 shipped sections carry the shape.**
+
+*(Filed 2026-08-13, found during conversion work on an unpublished book.)*
+
+Tasks 259 and 261 established the rule: JaFL runs a section top to bottom exactly once, so a
+test is answered where the walk reaches it, **before** the price it gates has been paid. Re-deriving
+it against the live sheet on a later draw let the payment retract what it had bought — measured then
+in §5.376 (a **scroll of Ebron** crossed off to join the church, whose guard then grayed the
+`<goto section="509"/>` the whole initiation is *for*) and §6.215 (35 Shards charged, then the block
+the player had just paid into grayed).
+
+**`spendMark` records `shards` and `items` and nothing else** (`render.js:1166`), and `noteSpend`
+compares exactly those two (`render.js:1154-1163`). A codeword is neither, so `sheetAt` has nothing
+to offer a codeword condition and `<if codeword="X">` is always re-derived live. The same holds for
+a codeword *value* — `<if name="X">` over `codewordValues` — which no shipped section pairs with a
+spend today, but which the box-tick rule (`walkTicks`, task 216) covers for `ticks=` and this does
+not for `name=`.
+
+**Measured in the browser, not inferred.** A `Story` over §2.143 with *Bounty* held:
+
+| draw | `hasCodeword('Bounty')` | →601 (inside the guard) | →625 (the "if not") |
+| --- | --- | --- | --- |
+| first | false — spent on the walk | **live** | live |
+| after `story.rerender()` | false | **dead** | live |
+
+§6.32 (*Dog*, →358 inside the guard, →96 outside) behaves identically. Both pages print the shape
+plainly — §2.143 is "If you have the codeword Bounty, delete it and turn to **601**. If not, turn to
+**625**" — so after a redraw the player who *had* the codeword has lost it and can reach only the
+exit meant for the player who had not.
+
+**The census: 21 such guards across 20 shipped sections gate on a codeword and delete that same
+codeword inside the guard; 9 of them enclose a `<goto>`** and are the ones that lose a destination
+— §2.143, §2.361, §3.20, §3.48, §3.167, §3.196, §3.433, §5.487, §6.32. The other 12 guards (§1.10,
+§1.196, §1.532, §1.657, §2.229, §2.277, §4.78, §4.157, §4.215, §4.263 — which carries two, on
+`4.127.1` and `4.127.2` — and §5.152) enclose prose only: those gray a sentence describing what just
+happened, which is wrong-to-fact but costs no route. (Counted over the `^\d+[a-z]?$` basenames of
+books 1–6 only, per task 270 — `book2/temp/322old.xml` matches the shape and is excluded.)
+
+The fix is 261's, widened: give `spendMark`/`noteSpend` the codewords (and codeword values) the walk
+removed, and let `sheetAt` answer a codeword condition from the position the walk had reached, the
+way it already answers `shards=`/`item=`. The alternative — rewriting the 8 sections to hoist the
+`<lose>` below the `<goto>` — is markup written to defeat the renderer, and would leave the shape
+itself a trap for the next section that prints it.
+
+**Test:** `suite-render` assertions over §2.143 and §6.32 — the exit inside the guard is live on the
+first draw **and after `rerender()`**, with the codeword spent in both; the control that the "if not"
+exit is unaffected; and a `suite-corpus` census pinning those 9 goto-carrying sections, so a tenth
+arriving lands on it.
 
 ---
 
