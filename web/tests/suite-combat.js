@@ -690,6 +690,14 @@ export async function run(ctx) {
     const gp75 = GameState.create({ name:'P75', gender:'m', profession:'Warrior', book:6, adv });
     eng.applyEffect(parse('<tick profession="priest"/>'), gp75, {});
     ok('§6.731 <tick profession="priest"> changes the profession to Priest', gp75.data.profession === 'Priest');
+    // task 276: the pipe-list the engine deliberately declines (the view's picker owns it) is
+    // inert, not bare — the view gates that picker on !hidden, and applyEffectBody has no view.
+    const gpl276 = GameState.create({ name:'PL276', gender:'m', profession:'Priest', book:6, adv });
+    gpl276.data.section = '118';
+    const note276 = eng.applyEffect(parse('<tick profession="mage|rogue|troubadour|warrior|wayfarer" hidden="t"/>'), gpl276, {});
+    ok('§6.118 a pipe-list profession <tick> the engine declines ticks no box and stays Priest',
+       gpl276.tickCount(6, '118') === 0 && gpl276.data.profession === 'Priest' && !/box ticked/.test(note276),
+       `t=${gpl276.tickCount(6, '118')} prof=${gpl276.data.profession} note="${note276}"`);
 
     // DOM: <tick weapon="?" addbonus="1"> with TWO weapons prompts a choice; picking raises one.
     const gdw75 = GameState.create({ name:'DW75', gender:'m', profession:'Warrior', book:6, adv });

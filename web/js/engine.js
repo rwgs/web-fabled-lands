@@ -998,7 +998,10 @@ function applyTick(el, state, opts) {
   }
   // Change profession (book6/731 "become a Priest"); a pipe-list ("mage|rogue|…") is a
   // player choice handled by the view's picker (book6/118), so apply only a single one here.
-  if (get('profession') != null && !get('profession').includes('|')) { state.setProfession(get('profession')); did = true; }
+  // Declining to act on the list still marks the node handled: the view owns only the VISIBLE
+  // case (classifyPassive gates its picker on !hidden, and applyEffectBody has no view at all),
+  // and a recognised-but-declined attribute must not read as a bare box tick. (tasks 275, 276)
+  if (get('profession') != null) { if (!get('profession').includes('|')) state.setProfession(get('profession')); did = true; }
 
   // Bare <tick> (no meaningful attrs): tick the visit box(es) for this section.
   if (!did) {

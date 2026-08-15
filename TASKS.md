@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-275 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **276 is open** under LOW. File new
+276 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **nothing is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -24,7 +24,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 276. `applyTick`'s profession branch drops a pipe-list on the floor without setting `did`, so a hidden or effect-body `<tick profession="a|b">` ticks a section box instead of doing nothing — the second half of task 275's guard, with 0 corpus nodes today
+*(none open — file new LOW work here)*
 
 **Done**
 
@@ -308,6 +308,7 @@ this order.*
 - [x] 273. The walk-position ledger tracks the purse and the pack but not codewords, so a block that spends the codeword gating it retracts its own exit on the next draw — §2.143 deletes *Bounty* and grays the →601 it deleted it for
 - [x] 274. Re-archive completed task details 256–273 and clear them out of the priority buckets
 - [x] 275. `applyTick`'s equipment branch is the one recognised attribute that does not set `did` when it matches nothing, so §5.386's enchant and §6.731's shrine boon tick a section box and toast "box ticked" at a player carrying no weapon
+- [x] 276. `applyTick`'s profession branch drops a pipe-list on the floor without setting `did`, so a hidden or effect-body `<tick profession="a|b">` ticks a section box instead of doing nothing — the second half of task 275's guard, with 0 corpus nodes today
 
 ---
 
@@ -443,6 +444,20 @@ leaves `tickCount` at 0 and the profession unchanged.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-15 (implementation pass, task 276): closed **276**, filing nothing — every bucket
+is clear again, so the next pass starts from `ROADMAP.md`. The one line the filing named, plus one
+assertion (a `hidden="t"` pipe-list leaves `tickCount` at 0, the profession at Priest, and returns
+no note); JS-only, stamp not rebuild; **`RESULT ALL PASS pass=2708 fail=0`**. One thing worth
+carrying forward, and it is about the *code*, not the defect: with both halves fixed, **every
+branch of `applyTick` now sets `did`, so the flag no longer distinguishes anything** — the
+fallthrough fires exactly when the element carries none of the ~18 recognised attributes, which is
+a property of the element alone. A future pass could replace the running flag with one predicate
+read off the node (and get a testable "is this a bare tick?" out of it), but that is a refactor of
+working code with no defect behind it, so it belongs in `ROADMAP.md` if anywhere and is not filed
+here. What is worth *keeping* either way are the four comments now standing over those branches:
+they are the only record that "recognised but declined" and "recognised and applied" must land in
+the same place, which is the rule both 275 and 276 broke.
 
 Worked 2026-08-15 (implementation pass, task 275): closed **275** and filed **276**, its own
 second half. The fix is the one line the filing predicted — `did = true` hoisted out of
