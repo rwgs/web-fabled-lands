@@ -989,7 +989,12 @@ function applyTick(el, state, opts) {
       if (addt) { it.tags = it.tags || []; if (!it.tags.map(normalize).includes(normalize(addt))) it.tags.push(addt); }
       if (remt) it.tags = (it.tags || []).filter((t) => normalize(t) !== normalize(remt));
     });
-    if (targets.length) { if (cacheN == null) state.reconcileEquipment(); state.changed(); did = true; }
+    if (targets.length) { if (cacheN == null) state.reconcileEquipment(); state.changed(); }
+    // A recognized attribute that matched nothing is inert but still sets `did` — a
+    // selector with no carried match (no weapon, a using="t" with empty hands, a tags=
+    // that misses, an empty cache=) is not a bare <tick>, so it must never fall through
+    // to the box tick, as with ability= and crew=/cargo= above. (task 275)
+    did = true;
   }
   // Change profession (book6/731 "become a Priest"); a pipe-list ("mage|rogue|…") is a
   // player choice handled by the view's picker (book6/118), so apply only a single one here.

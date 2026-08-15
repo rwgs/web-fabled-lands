@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-274 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **275 is open** under LOW. File new
+275 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **276 is open** under LOW. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -24,7 +24,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 275. `applyTick`'s equipment branch is the one recognised attribute that does not set `did` when it matches nothing, so §5.386's enchant and §6.731's shrine boon tick a section box and toast "box ticked" at a player carrying no weapon
+- [ ] 276. `applyTick`'s profession branch drops a pipe-list on the floor without setting `did`, so a hidden or effect-body `<tick profession="a|b">` ticks a section box instead of doing nothing — the second half of task 275's guard, with 0 corpus nodes today
 
 **Done**
 
@@ -307,6 +307,7 @@ this order.*
 - [x] 272. `<transfer>` honours the keep rule for `item="*"` only, where `<lose>` honours every generic selector, so §2.105's pickpocket steals the white sword off a sheet carrying nothing else
 - [x] 273. The walk-position ledger tracks the purse and the pack but not codewords, so a block that spends the codeword gating it retracts its own exit on the next draw — §2.143 deletes *Bounty* and grays the →601 it deleted it for
 - [x] 274. Re-archive completed task details 256–273 and clear them out of the priority buckets
+- [x] 275. `applyTick`'s equipment branch is the one recognised attribute that does not set `did` when it matches nothing, so §5.386's enchant and §6.731's shrine boon tick a section box and toast "box ticked" at a player carrying no weapon
 
 ---
 
@@ -385,11 +386,85 @@ guard: nothing moved, so nothing needs settling or saving.
 
 ---
 
+## 276. `applyTick`'s profession branch drops a pipe-list on the floor without setting `did`, so a hidden or effect-body `<tick profession="a|b">` ticks a section box instead of doing nothing — the second half of task 275's guard, with 0 corpus nodes today
+
+**Priority: LOW — unreachable in the shipped corpus (censused below: the one pipe-list
+profession tick is visible prose, which the view intercepts), so nothing misbehaves today. It is
+filed because it is the *same* defect task 275 just fixed one line above it, left standing in the
+one branch the fix did not cover, and because the shape it needs is a `<tick profession="a|b">`
+written as hidden or inside an effect body — both ordinary things for a new book to write.**
+
+*(Filed 2026-08-15, found while fixing task 275.)*
+
+`applyTick` (`engine.js:996`) closes its cascade with:
+
+```js
+// Change profession (book6/731 "become a Priest"); a pipe-list ("mage|rogue|…") is a
+// player choice handled by the view's picker (book6/118), so apply only a single one here.
+if (get('profession') != null && !get('profession').includes('|')) { state.setProfession(get('profession')); did = true; }
+```
+
+The comment is right about *why* the pipe-list is skipped, but skipping it also skips `did`, so
+the node falls through to the bare-tick box — the exact failure task 275 fixed for `weapon=`/
+`armour=`/`tool=`/`item=`, and the exact thing `ability=` (`:948`) and `crew=`/`cargo=` (`:959`)
+each carry a comment about avoiding. A recognised attribute the engine deliberately declines to
+act on is *inert*, not bare.
+
+**Reachability — two paths, both real, neither exercised by today's corpus.**
+
+* `classifyPassive` gates all three player-choice modes on `!hidden`
+  (`render-rules.js:1041-1043`), so `hidden="t"` skips the picker and falls to `mode: 'apply'`,
+  which calls `applyTick` with the raw node.
+* `applyEffectBody` walks `PASSIVE_BODY_TAGS` — which includes `tick` (`engine.js:484`) — and
+  calls `applyEffect` directly with no view and therefore no picker, so a pipe-list profession
+  tick written inside a `<fightdamage>`/`<success>`/`<outcomes>` body box-ticks regardless of
+  `hidden=`.
+
+**Census (shipped corpus only — `books/book[1-6]/` numeric basenames, per task 270): 2
+`<tick profession=>` nodes total.** §6.731 `profession="priest"` (single, handled) and §6.118
+`profession="mage|rogue|troubadour|warrior|wayfarer"` — the post-dragon Priest disqualification,
+visible prose inside `<if profession="priest">`, so it renders the five-way picker and never
+reaches `applyTick` with the list. **0 hidden pipe-lists, 0 inside an effect body.**
+
+**The fix is the same one line** — set `did = true` whenever `profession` is present, and keep
+`setProfession` behind the single-value test:
+
+```js
+if (get('profession') != null) { if (!get('profession').includes('|')) state.setProfession(get('profession')); did = true; }
+```
+
+Add the assertion beside task 275's in `suite-combat.js`: a hidden pipe-list profession tick
+leaves `tickCount` at 0 and the profession unchanged.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-15 (implementation pass, task 275): closed **275** and filed **276**, its own
+second half. The fix is the one line the filing predicted — `did = true` hoisted out of
+`if (targets.length)` in `applyTick`'s equipment branch, with `reconcileEquipment()`/`changed()`
+left inside it, since an empty match moved nothing and has nothing to settle or save. Three
+assertions in `suite-combat.js` beside the task-75 equipment cluster: §5.386's
+`<tick weapon="?" addtag="Tz">` at an empty pack ticks no box and returns no note, §6.731's
+`<tick weapon="?" addbonus="1">` at a bare-handed player likewise, and — the one that matters for
+a `did` change — a genuinely bare `<tick>` still ticks. JS-only, so `stamp-version.ps1` and not a
+data rebuild; **`RESULT ALL PASS pass=2707 fail=0`**. Two things worth carrying forward. **The
+"one recognised attribute" in 275's title was one short**: `profession=` skips a pipe-list without
+setting `did` for a *documented* reason (the view owns the picker), which reads as deliberate and
+is why neither the filing's read of the cascade nor its census caught it — the census asked for
+`addbonus`/`addtag`/`removetag` and a pipe-list carries none of them. So the generalisation to
+keep is that **`did` is broken by any branch that declines to act, whatever its reason**, and the
+three comments in the function that spell that rule out are worth more than the two lines of code
+they guard. **The second path is the one a `!hidden` audit would miss**: `applyEffectBody` walks
+`PASSIVE_BODY_TAGS` — `tick` is in it — with no view at all, so every view-side gate
+(`classifyPassive`'s picker modes, the fight gate, the forfeit hold) is absent by construction for
+an effect written inside a `<fightdamage>`/`<success>`/`<outcomes>` body. Any future "the view
+handles this case" comment in a rule module is therefore a claim about *one* of two callers, and
+should say which.
 
 Worked 2026-08-13 (maintenance pass, task 274): filed and closed **274**, the fourth re-archive
 (after 141, 165, 211 and 255). Documentation only — no code, data, build or test file touched, so

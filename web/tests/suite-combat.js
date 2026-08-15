@@ -668,6 +668,23 @@ export async function run(ctx) {
     gu75.data.items = []; const kept75 = gu75.addItem(makeItem('weapon', 'oath blade', 3, null, ['keep']));
     eng.applyEffect(parse('<tick weapon="?" using="t" removetag="keep"/>'), gu75, {});
     ok('§6.135 <tick weapon="?" using="t" removetag="keep"> strips keep from the wielded weapon', !(kept75.tags || []).includes('keep'));
+    // task 275: an equipment <tick> whose selector matches nothing is INERT — it must not
+    // fall through to the bare-tick box, which is uncapped on a boxless section and would
+    // grow without bound across visits (and mis-read a future <if ticks="0"> guard).
+    const gnone275 = GameState.create({ name:'N275', gender:'m', profession:'Warrior', book:5, adv });
+    gnone275.data.items = []; gnone275.data.section = '386';
+    const note275 = eng.applyEffect(parse('<tick weapon="?" addtag="Tz"/>'), gnone275, {});
+    ok('§5.386 enchant with NO weapon carried ticks no box and says nothing',
+       gnone275.tickCount(5, '386') === 0 && !/box ticked/.test(note275), `t=${gnone275.tickCount(5, '386')} note="${note275}"`);
+    const gbare275 = GameState.create({ name:'B275', gender:'m', profession:'Warrior', book:6, adv });
+    gbare275.data.items = []; gbare275.data.section = '731';
+    eng.applyEffect(parse('<tick weapon="?" addbonus="1"/>'), gbare275, {});
+    ok('§6.731 shrine boon at a bare-handed player leaves the box alone on repeat entries',
+       gbare275.tickCount(6, '731') === 0, `t=${gbare275.tickCount(6, '731')}`);
+    // The bare <tick> the fallthrough exists for is untouched.
+    eng.applyEffect(parse('<tick>place a tick in it now</tick>'), gbare275, {});
+    ok('a genuinely bare <tick> still ticks the section box',
+       gbare275.tickCount(6, '731') === 1, `t=${gbare275.tickCount(6, '731')}`);
 
     // Profession: a single <tick profession="priest"> changes the profession.
     const gp75 = GameState.create({ name:'P75', gender:'m', profession:'Warrior', book:6, adv });
