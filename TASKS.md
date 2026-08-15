@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 274 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **nothing is open** in any bucket. File new
+misdiagnosis (see the Review log); **275 is open** under LOW. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -24,7 +24,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-*(none open — file new LOW work here)*
+- [ ] 275. `applyTick`'s equipment branch is the one recognised attribute that does not set `did` when it matches nothing, so §5.386's enchant and §6.731's shrine boon tick a section box and toast "box ticked" at a player carrying no weapon
 
 **Done**
 
@@ -311,6 +311,77 @@ this order.*
 ---
 
 > **Completed task details (tasks 1–274) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
+
+---
+
+## 275. `applyTick`'s equipment branch is the one recognised attribute that does not set `did` when it matches nothing, so §5.386's enchant and §6.731's shrine boon tick a section box and toast "box ticked" at a player carrying no weapon
+
+**Priority: LOW — no shipped section pairs an equipment `<tick>` with `boxes=` or an
+`<if ticks=>` guard (censused: 0 overlap), so today the whole cost is one spurious write into
+the saved `boxes` map and one wrong toast. It is filed because the write is silent, persistent
+and uncapped, and because the guard that prevents it is already written twice in the same
+function for other attributes.**
+
+*(Filed 2026-08-15, found during conversion work on an unpublished book.)*
+
+`applyTick` (`engine.js:912`) is a cascade of `if (get('attr') != null)` branches over one
+`<tick>`, each setting `did = true`, closed by a fallthrough:
+
+```js
+// Bare <tick> (no meaningful attrs): tick the visit box(es) for this section.
+if (!did) { state.addTick(null, null, count); notes.push('box ticked'); }
+```
+
+The fallthrough is right — a bare `<tick>place a tick in it now</tick>` is how the books write a
+section box. What makes it a defect is that **`did` is meant to mean "a recognised attribute was
+present", not "the effect changed something"**, and the function says so twice in its own
+comments:
+
+* `ability=` (`:948`) — *"mark `did` so a recognized-but-zero effect never falls through to the
+  box tick"*.
+* `crew=`/`cargo=` (`:959`) — *"a recognized attribute with no vessel present is inert but still
+  sets `did` (no bare-tick box fallthrough)"*.
+
+The equipment branch (`:983`) is the exception:
+
+```js
+const eqAttr = ['weapon', 'armour', 'tool', 'item'].find((k) => get(k) != null);
+if (eqAttr != null && (get('addbonus') != null || get('addtag') != null || get('removetag') != null)) {
+  const targets = selectEquipment(el, state, eqAttr, cacheN, opts);
+  …
+  if (targets.length) { …; did = true; }   // <- only when something matched
+}
+```
+
+`selectEquipment` returns `[]` whenever the selector matches nothing — no weapon of that kind
+carried, a `using="t"` narrowing with nothing wielded or worn, a `tags=` filter that misses, or
+an empty `cache=`. Every one of those is an ordinary reachable state, and each falls straight
+through to `addTick`.
+
+**Measured in the browser against a real `GameState`, not inferred.** §5.386 (Targdaz's enchant,
+whose first node is `<tick weapon="?" addtag="Tz">one weapon</tick>`) entered by a player carrying
+no weapon:
+
+| player | `boxes['5.386']` after entry | notification |
+| --- | --- | --- |
+| no weapon | **1** | **"box ticked"** |
+| one sword | absent | none |
+
+**Census of the shape: 12 nodes across 4 sections** — `books/book[1-6]/[0-9]*.xml`, `<tick>`
+carrying `addbonus=`/`addtag=`/`removetag=`: **§2.665** (6, all `item="*" cache="2.617"` — the
+strongroom, empty for a player who left nothing), **§5.386** (4, `weapon="?"`), **§6.135** (1,
+`weapon="?" using="t"` — Mister Dragon snaps "whatever weapon you are using", which a
+bare-handed player is not using), **§6.731** (1, the roll-1 shrine boon
+`<tick weapon="?" addbonus="1">`). None of the four carries `boxes=`, and no section in the
+corpus carries both `boxes=` and an equipment `<tick>` — which is exactly why this is LOW and
+exactly why it should not be left: `addTick` deliberately leaves **a boxless section uncapped**
+(`state.js:778` caps only when `_sectionBoxes > 0`), so the count grows without bound across
+visits, and the first page written with both would read its own `<if ticks="0">` guard wrong.
+
+**The fix is one line** — hoist `did = true` out of the `if (targets.length)` guard, so a
+recognised `eqAttr` + modifier pair marks the node handled whether or not it matched, matching
+the two branches above. `state.reconcileEquipment()`/`state.changed()` should stay inside the
+guard: nothing moved, so nothing needs settling or saving.
 
 ---
 
