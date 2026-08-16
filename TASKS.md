@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-277 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **278, 279 and 280 are open**. File new
+278 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **279 and 280 are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -14,10 +14,6 @@ This file is for **defects**. New features are scoped in
 [`ROADMAP.md`](ROADMAP.md) instead, as ordered phases — pick up a phase from
 there once the buckets below are clear.
 
-**HIGH**
-
-- [ ] 278. `renderTraining` reads its `var=` to hold a `<while>` pass but never writes it, so §2.554's "lose 1 MAGIC if you roll a two" can never fire
-
 **MEDIUM**
 
 - [ ] 280. The market header row renders `header1=` and drops `header2=`/`header3=`, so 23 authored column headings ("To buy", "To sell") never reach the page
@@ -25,6 +21,7 @@ there once the buckets below are clear.
 **LOW**
 
 - [ ] 279. Sweep the remaining tag families for task 277's shape — a shared helper only some of a sibling set calls
+- [ ] 281. Sweep for renderers whose click handler no assertion ever fires — `renderTraining`'s never was, which is why task 172's parity pass could not see 278
 
 **Done**
 
@@ -310,6 +307,7 @@ this order.*
 - [x] 275. `applyTick`'s equipment branch is the one recognised attribute that does not set `did` when it matches nothing, so §5.386's enchant and §6.731's shrine boon tick a section box and toast "box ticked" at a player carrying no weapon
 - [x] 276. `applyTick`'s profession branch drops a pipe-list on the floor without setting `did`, so a hidden or effect-body `<tick profession="a|b">` ticks a section box instead of doing nothing — the second half of task 275's guard, with 0 corpus nodes today
 - [x] 277. `renderRankcheck`/`renderTraining` never render their node's own words, so 45 shipped sections silently drop the printed roll instruction
+- [x] 278. `renderTraining` reads its `var=` to hold a `<while>` pass but never writes it, so §2.554's "lose 1 MAGIC if you roll a two" can never fire
 
 ---
 
@@ -684,11 +682,82 @@ next census re-finding them.
 
 ---
 
+## 281. Sweep for renderers whose click handler no assertion ever fires — `renderTraining`'s never was, which is why task 172's parity pass could not see 278
+
+**Priority: LOW — an audit of the suite, not a known defect, filed for the same reason as 279:
+it ends either in defects or in a recorded "checked, clean", and both are worth a task.**
+
+*(Filed 2026-08-16 while closing task 278.)*
+
+Task 172 was explicitly a *parity* pass over the four roll renderers, and it did not find 278.
+The reason is mechanical and confirmed: **before task 278 no assertion in the suite had ever
+clicked a `<training>` roll button**, so `renderTraining`'s click handler — the only place the
+missing `writeRollVar` could have shown — never ran in the browser at all.
+
+Two independent things hid it, and each is worth looking for elsewhere:
+
+- **The shared selector silently does not match.** The task-172 block's helper is
+  `rollBtn = (c) => Array.from(c.querySelectorAll('.roll .btn-roll')).find((b) =>
+  /Roll|Rank check/.test(b.textContent))`. A `<training>` button reads `Train MAGIC (roll two
+  dice)` — lower-case `roll`, so the case-sensitive alternation misses it and `rollBtn` returns
+  `undefined`. Nothing warns; the cases that would have used it simply were not written.
+- **The one parity list `<training>` is absent from is the one that clicks.** `gatedCases` covers
+  `<difficulty>`/`<random>`/`<rankcheck>` and rolls each, and excluding `<training>` is correct
+  and documented (it has no pay gate). But that exclusion removed it from the *only* list in the
+  block whose body calls `.click()` — `descCases`/`bareCases` include `<training>` and assert on
+  static DOM. So the tag was present in the parity block throughout and still never driven.
+
+The rest of the suite does not cover the gap: `suite-engine` exercises `eng.rollTraining` — the
+*rule*, which is correct and was never in question — and `suite-render:130` drives §5.59's bare
+`<training>` only as far as the six-ability picker, stopping before the roll. `suite-corpus`
+renders every section but clicks nothing.
+
+**The sweep**: for each `render*` view module, list the handlers passed to `rollButton`,
+`appendChild`-ed `button`s and `addEventListener('click', …)`, and check whether any assertion
+reaches each one. A cheap first cut is to instrument — set a flag in each handler, run the full
+suite, report the handlers still unset — which needs no static analysis and cannot be fooled by
+a selector that does not match. Record the clean ones so the next pass does not re-derive them.
+
+Two candidate fixes fall out whatever the sweep finds, neither of them urgent: widen `rollBtn`'s
+regex (or match on `.btn-roll` alone, as this task's `trainBtn` does) so a renamed button label
+cannot silently drop a case, and give the parity block a `rollCases` list that every roll tag
+joins, separate from `gatedCases` which only the gated three can join.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-16 (implementation pass, task 278): closed **278** and filed **281** (LOW). The
+fix is the one line the filing predicted, at both sites `renderTraining` stores a result (the
+roll button and the Luck reroll), writing `res.total` and not the `res.margin` its siblings
+write; eight assertions in `suite-render.js`, appended to the same task-172 parity block that
+holds 277's. JS-only, so `stamp-version.ps1` and not a data rebuild; **`RESULT ALL PASS
+pass=2724 fail=0`**, and `node web/tests/node-import.mjs` clean. **The census re-ran exactly** —
+4,369 shipped files, 62 `<training>` nodes, 1 with `var=`, 0 with `flag=` — so the documented
+missing `rollGate` call stays unreachable and untouched, as filed.
+
+Two things worth carrying forward, and the first is a correction to the filing's own test plan.
+**"A rolled 2 fires the `<if>`" cannot be read off the rendered text, and the first attempt to
+assert it failed.** This app follows JaFL in *showing* an untaken `<if>` branch rather than
+hiding it — `renderConditionalBranch` grays it (`.cond-inactive`), disables its buttons and
+suppresses its effects — so "lose 1 MAGIC if you roll a two" is on the page before the roll, in
+the broken build and the fixed one alike. The assertion that the penalty was "hidden" pre-roll
+was therefore wrong about the engine, not about the fix, and a `textContent` probe here would
+have been unable to tell the defect from the repair in either direction. The rule: **in this
+app "printed" never implies "applied" — assert a conditional off `.cond-inactive` or off the
+sheet, never off the words.** That is the same shape as 277's note about anchoring to DOM
+position rather than `textContent`, arrived at from the opposite side.
+
+**The negative check is what made the assertions worth having.** Backing the single line out and
+re-running reproduced the filed defect exactly — `x=0`, MAGIC still 6 after snake eyes, the guard
+still grayed — with 4 of the 8 failing and the other 4 (the pre-roll baseline, the `+1` training
+gain) correctly indifferent. Worth doing because two of the new assertions genuinely do *not*
+bind to this defect: §2.554's "a ten trains +1" passes either way, since the training gain never
+depended on the var. Without the backed-out run that would have looked like coverage it is not.
 
 Worked 2026-08-16 (implementation pass, task 277): closed **277** and filed **278** (HIGH),
 **279** (LOW) and **280** (MEDIUM). The fix is the two lines the filing

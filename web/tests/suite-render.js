@@ -314,6 +314,56 @@ export async function run(ctx) {
            !!m && +m[1] >= 3, r.c.textContent.replace(/\s+/g, ' ').slice(0, 80));
       }
 
+      // (var parity, task 278) renderTraining held its var= pending for the <while> but never
+      // assigned it — the fourth renderer missing the writeRollVar its three siblings call. It
+      // writes the RAW 2-dice total (what §2.554 tests), not the margin its siblings write.
+      // (a <training> button reads "Train X (roll …)", which rollBtn's /Roll|Rank check/ misses)
+      const trainBtn = (c) => Array.from(c.querySelectorAll('.roll .btn-roll')).find((b) => !b.disabled);
+      {
+        const t = mkRoll('<section name="VT"><training ability="MAGIC" var="x"/></section>', 'VT');
+        ok('task278: an unrolled <training var=> has not written its var', !t.g.hasVar('x'));
+        trainBtn(t.c).click(); await settle172();
+        ok('task278: rolling a <training var=> writes + memoises its var',
+           t.g.hasVar('x') && t.st.ctx.wroteVars.has('x') && t.st.ctx.rolledVars.has('x'));
+        const shown = /Rolled (\d+) vs MAGIC/.exec(t.c.textContent);
+        ok('task278: the var holds the raw dice total, not a success margin',
+           !!shown && t.g.getVar('x') === +shown[1], `x=${t.g.getVar('x')} shown=${shown && shown[1]}`);
+      }
+
+      // …and §2.554 itself, the one shipped <training var=> node: snake eyes must fire its
+      // "lose 1 MAGIC if you roll a two" guard, a higher roll must not. Seed 7 forces [1,1]
+      // and seed 5 forces [5,5]; assert the seeds first so a PRNG mismatch fails loudly here.
+      {
+        eng.seedRng(7); ok('task278: forcing seed 7 rolls snake eyes', eng.rollDice(2).total === 2);
+        eng.seedRng(5); ok('task278: forcing seed 5 rolls a ten', eng.rollDice(2).total === 10);
+        const sec554 = await data.getSection(2, '554');
+        const mk554 = async () => {
+          const g = GameState.create({ name:'T278', gender:'m', profession:'Warrior', book:2, adv });
+          g.ephemeral = true; g.data.abilities.magic = 6;   // natural ≥ 2, so `deduct` resolves to 1
+          const c = document.createElement('div');
+          const st = new Story(c, g, { navigate(){}, onDeath(){}, notify(){} });
+          g.setVisitProvider(() => st.serializeVisit());
+          st.begin(sec554, 2, '554');
+          return { g, c, st };
+        };
+        // The guard's words always print (an untaken <if> shows grayed, JaFL's model), so read
+        // whether it FIRED off .cond-inactive and the MAGIC score, never off the text.
+        const guardOff = (c) => Array.from(c.querySelectorAll('.cond-inactive')).some((s) => /lose 1 MAGIC/i.test(s.textContent));
+        const lo = await mk554();
+        ok('§2.554 before the roll the snake-eyes guard is grayed and costs nothing',
+           guardOff(lo.c) && lo.g.data.abilities.magic === 6, `magic=${lo.g.data.abilities.magic} off=${guardOff(lo.c)}`);
+        eng.seedRng(7); trainBtn(lo.c).click(); await settle172();
+        ok('§2.554 a rolled two assigns x and fires the guard — it costs 1 MAGIC',
+           lo.g.getVar('x') === 2 && !guardOff(lo.c) && lo.g.data.abilities.magic === 5,
+           `x=${lo.g.getVar('x')} magic=${lo.g.data.abilities.magic} off=${guardOff(lo.c)}`);
+        const hi = await mk554();
+        eng.seedRng(5); trainBtn(hi.c).click(); await settle172();
+        ok('§2.554 a ten beats MAGIC 6, so it trains +1 and leaves the guard grayed',
+           hi.g.getVar('x') === 10 && guardOff(hi.c) && hi.g.data.abilities.magic === 7,
+           `x=${hi.g.getVar('x')} magic=${hi.g.data.abilities.magic} off=${guardOff(hi.c)}`);
+        eng.seedRng(null);                // revert to Math.random for later tests
+      }
+
       window.__FL_INSTANT_DICE__ = false;
     }
 

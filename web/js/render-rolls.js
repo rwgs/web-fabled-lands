@@ -377,7 +377,11 @@ export function renderTraining(story, container, node, path) {
     showDiceResult(widget, stored.dice, `Rolled ${stored.total} vs ${ab.toUpperCase()} ${stored.natural}`, stored.success ? `+1 ${ab.toUpperCase()}` : 'No gain', stored.success);
     // Only Luck rerolls a training roll (self-improvement, not an ability *test*).
     offerReroll(story, widget, path, stored, () => {
-      story.ctx.rolls.set(key, rollTraining(story.state, ab, dice, add));
+      const res = rollTraining(story.state, ab, dice, add);
+      // The raw 2-dice total, NOT a margin: §2.554's `<if var="x" equals="2">` tests the
+      // dice, where <difficulty>/<rankcheck> write res.margin for their success tests. (task 278)
+      writeRollVar(story, node.getAttribute('var'), res.total);
+      story.ctx.rolls.set(key, res);
     });
     return widget;
   }
@@ -388,7 +392,9 @@ export function renderTraining(story, container, node, path) {
     return widget;
   }
   widget.appendChild(rollButton(story, `Train ${ability.toUpperCase()} (roll ${diceWord(dice)})`, widget, () => {
-    story.ctx.rolls.set(key, rollTraining(story.state, ability, dice, add));
+    const res = rollTraining(story.state, ability, dice, add);
+    writeRollVar(story, node.getAttribute('var'), res.total); // see the reroll above (task 278)
+    story.ctx.rolls.set(key, res);
     story.rerender();
   }));
   return widget;
