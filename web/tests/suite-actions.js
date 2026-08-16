@@ -142,6 +142,39 @@ export async function run(ctx) {
       ok('§t151 renders an unaffordable, disabled forced payment', !!payBtn && payBtn.disabled);
       ok('§t151 the post-payment decline goto is blocked (not rendered)', !goto142);
       ok('§t151 the dead-end fallback fires when only a disabled control remains', !!c151.querySelector('.end-fate'));
+
+      // task 281: this block renders both of these controls and had never CLICKED either, so
+      // renderPayment's plain commit and the fallback's own handler had never run in a browser.
+      // The affordable twin of the same section: paying takes the Shards, unblocks the walk and
+      // reveals the decline goto that the unpaid toll held back.
+      const g151b = GameState.create({ name:'P151', gender:'m', profession:'Warrior', book:1, adv });
+      g151b.data.shards = 50;
+      const c151b = document.createElement('div');
+      const st151b = new Story(c151b, g151b, { navigate(){}, onDeath(){}, notify(){} });
+      st151b.begin(parse('<section name="t151b"><p>You must pay a toll. <lose shards="20">Pay the toll</lose>.</p><p>Or turn back: <goto section="142" force="f"/>.</p></section>'), 1, 't151b');
+      const goto142b = () => Array.from(c151b.querySelectorAll('.goto')).some((b) => b.textContent.trim() === '142');
+      const pay151b = c151b.querySelector('.pay-action');
+      ok('§t151b an affordable forced payment renders live and blocks the rest of the section',
+         !!pay151b && pay151b.disabled === false && st151b.blocked === true && !goto142b(),
+         `blocked=${st151b.blocked} goto=${goto142b()}`);
+      pay151b.click();
+      ok('§t151b paying takes the Shards, unblocks the walk and reveals the decline goto',
+         g151b.data.shards === 30 && st151b.blocked === false && goto142b(),
+         `sh=${g151b.data.shards} blocked=${st151b.blocked} goto=${goto142b()}`);
+      ok('§t151b a section with a live control offers no dead-end fallback', !c151b.querySelector('.end-fate'));
+
+      // …and the fallback button itself, whose click is the ONLY way out of a section with no
+      // live control: it hands over to the host's onDeath (the same route a fatal wound takes).
+      let deaths151 = 0;
+      const g151c = GameState.create({ name:'F151', gender:'m', profession:'Warrior', book:1, adv });
+      g151c.data.shards = 0;
+      const c151c = document.createElement('div');
+      const st151c = new Story(c151c, g151c, { navigate(){}, onDeath(){ deaths151++; }, notify(){} });
+      st151c.begin(parse('<section name="t151c"><p>You must pay a heavy toll. <lose shards="9999">Pay the toll</lose>.</p></section>'), 1, 't151c');
+      const fate151 = c151c.querySelector('.end-fate');
+      ok('§t151c the dead-end fallback renders, and nothing has called onDeath yet', !!fate151 && deaths151 === 0, `deaths=${deaths151}`);
+      fate151.click();
+      ok('§t151c clicking "accept your fate" hands control to onDeath', deaths151 === 1, `deaths=${deaths151}`);
     }
 
     // --- task 107: <transfer> is a player action (chooser/filter/price/force) ---

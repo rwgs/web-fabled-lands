@@ -460,6 +460,14 @@ export async function run(ctx) {
       ok('§6.512 deposits up to 5000 Shards', g512.cacheMoney('6.512') === 5000 && g512.data.shards === 1000, `stash=${g512.cacheMoney('6.512')} sh=${g512.data.shards}`);
       amt512().value = '1'; dep512().click();
       ok('§6.512 a 5001st Shard is refused (max cap)', g512.cacheMoney('6.512') === 5000 && g512.data.shards === 1000, `stash=${g512.cacheMoney('6.512')} sh=${g512.data.shards}`);
+      // task 281: the item cache's money Withdraw is the twin of the Deposit above, and no
+      // assertion had ever clicked it — the money-cache widget's own pair was covered, this
+      // second pair only half. A cabinet you can pay into and not draw from is a trap.
+      const wd512 = () => Array.from(c512.querySelectorAll('.item-cache button')).find((b)=>/Withdraw/.test(b.textContent));
+      ok('§6.512 offers a live Withdraw beside the Deposit', !!wd512() && wd512().disabled === false);
+      amt512().value = '2000'; wd512().click();
+      ok('§6.512 withdrawing credits the purse and leaves the rest stored',
+         g512.cacheMoney('6.512') === 3000 && g512.data.shards === 3000, `stash=${g512.cacheMoney('6.512')} sh=${g512.data.shards}`);
       // items still capped at itemlimit="6": six stored + one carried offers no Store button
       g512.data.items = [makeItem('item', 'spare rope')];
       for (let i = 0; i < 6; i++) g512.cacheAddItem('6.512', makeItem('item', 'trinket' + i));

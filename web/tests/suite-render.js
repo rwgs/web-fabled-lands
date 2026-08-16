@@ -235,7 +235,13 @@ export async function run(ctx) {
         st.begin(parse(xml), 1, name);
         return { g, c, st };
       };
-      const rollBtn = (c) => Array.from(c.querySelectorAll('.roll .btn-roll')).find((b) => /Roll|Rank check/.test(b.textContent));
+      // Matched on STRUCTURE, never on the label (task 281). This read
+      // /Roll|Rank check/.test(b.textContent), which a <training> button ("Train MAGIC (roll two
+      // dice)") misses on the lower-case "roll" — so a case that used it silently got undefined
+      // and was simply never written. A renamed button must fail loudly, not drop a case: the
+      // only .btn-roll inside a .roll widget is the roll button, and showDiceResult clears the
+      // widget when it resolves, so this also reads null exactly when the roll is spent.
+      const rollBtn = (c) => c.querySelector('.roll .btn-roll');
 
       // (gated parity) each roll type is disabled until its flag is paid, then armed; rolling
       // consumes the flag and writes its var into the visit memo (wroteVars + rolledVars).
@@ -252,6 +258,28 @@ export async function run(ctx) {
         rollBtn(r.c).click(); await settle172();
         ok(`task172-gate(${tc.name}): rolling consumes the payment flag`, r.g.getFlag('g') === false);
         ok(`task172-gate(${tc.name}): rolling writes + memoises its var`, r.g.hasVar(tc.v) && r.st.ctx.wroteVars.has(tc.v) && r.st.ctx.rolledVars.has(tc.v));
+      }
+
+      // (roll parity, task 281) the list every roll tag joins, and whose body CLICKS. gatedCases
+      // above is the only other clicking list, and <training> cannot join it — it has no pay gate
+      // — which is exactly how renderTraining's handler came to have never run in the browser at
+      // all, so task 172's parity pass could not see the missing writeRollVar that became 278.
+      // This list gates on nothing, so all four belong to it: any roll renderer added later must
+      // be added here too.
+      const rollCases = [
+        { xml: '<section name="RD"><difficulty ability="COMBAT" level="4"/></section>', name: 'RD' },
+        { xml: '<section name="RN"><random dice="2"/></section>', name: 'RN' },
+        { xml: '<section name="RK"><rankcheck dice="1"/></section>', name: 'RK' },
+        { xml: '<section name="RT"><training ability="MAGIC"/></section>', name: 'RT' },
+      ];
+      for (const tc of rollCases) {
+        const r = mkRoll(tc.xml, tc.name);
+        ok(`task281-roll(${tc.name}): the widget offers a live roll button and has rolled nothing yet`,
+           !!rollBtn(r.c) && rollBtn(r.c).disabled === false && r.st.ctx.rolls.size === 0,
+           `btn=${!!rollBtn(r.c)} rolls=${r.st.ctx.rolls.size}`);
+        rollBtn(r.c).click(); await settle172();
+        ok(`task281-roll(${tc.name}): clicking rolls, memoises the result and spends the button`,
+           r.st.ctx.rolls.size === 1 && !rollBtn(r.c), `rolls=${r.st.ctx.rolls.size} btn=${!!rollBtn(r.c)}`);
       }
 
       // (while-pending parity) an unrolled roll inside a <while> holds the loop: the roll is
@@ -317,12 +345,12 @@ export async function run(ctx) {
       // (var parity, task 278) renderTraining held its var= pending for the <while> but never
       // assigned it — the fourth renderer missing the writeRollVar its three siblings call. It
       // writes the RAW 2-dice total (what §2.554 tests), not the margin its siblings write.
-      // (a <training> button reads "Train X (roll …)", which rollBtn's /Roll|Rank check/ misses)
-      const trainBtn = (c) => Array.from(c.querySelectorAll('.roll .btn-roll')).find((b) => !b.disabled);
+      // (this used its own trainBtn, because rollBtn matched on the label and missed a <training>
+      // button; rollBtn now matches on structure, so the local copy is gone — task 281)
       {
         const t = mkRoll('<section name="VT"><training ability="MAGIC" var="x"/></section>', 'VT');
         ok('task278: an unrolled <training var=> has not written its var', !t.g.hasVar('x'));
-        trainBtn(t.c).click(); await settle172();
+        rollBtn(t.c).click(); await settle172();
         ok('task278: rolling a <training var=> writes + memoises its var',
            t.g.hasVar('x') && t.st.ctx.wroteVars.has('x') && t.st.ctx.rolledVars.has('x'));
         const shown = /Rolled (\d+) vs MAGIC/.exec(t.c.textContent);
@@ -352,12 +380,12 @@ export async function run(ctx) {
         const lo = await mk554();
         ok('§2.554 before the roll the snake-eyes guard is grayed and costs nothing',
            guardOff(lo.c) && lo.g.data.abilities.magic === 6, `magic=${lo.g.data.abilities.magic} off=${guardOff(lo.c)}`);
-        eng.seedRng(7); trainBtn(lo.c).click(); await settle172();
+        eng.seedRng(7); rollBtn(lo.c).click(); await settle172();
         ok('§2.554 a rolled two assigns x and fires the guard — it costs 1 MAGIC',
            lo.g.getVar('x') === 2 && !guardOff(lo.c) && lo.g.data.abilities.magic === 5,
            `x=${lo.g.getVar('x')} magic=${lo.g.data.abilities.magic} off=${guardOff(lo.c)}`);
         const hi = await mk554();
-        eng.seedRng(5); trainBtn(hi.c).click(); await settle172();
+        eng.seedRng(5); rollBtn(hi.c).click(); await settle172();
         ok('§2.554 a ten beats MAGIC 6, so it trains +1 and leaves the guard grayed',
            hi.g.getVar('x') === 10 && guardOff(hi.c) && hi.g.data.abilities.magic === 7,
            `x=${hi.g.getVar('x')} magic=${hi.g.data.abilities.magic} off=${guardOff(hi.c)}`);

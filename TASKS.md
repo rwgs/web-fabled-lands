@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-278 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **279 and 281 are open**. File new
+281 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **282 is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,7 +16,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 281. Sweep for renderers whose click handler no assertion ever fires — `renderTraining`'s never was, which is why task 172's parity pass could not see 278
+- [ ] 282. Six click handlers still fire for no assertion — three modal-opening renderers and the Adventure Sheet's Wield/Move-down/Drop (the tail of task 281's sweep)
 
 **Done**
 
@@ -304,6 +304,7 @@ this order.*
 - [x] 277. `renderRankcheck`/`renderTraining` never render their node's own words, so 45 shipped sections silently drop the printed roll instruction
 - [x] 278. `renderTraining` reads its `var=` to hold a `<while>` pass but never writes it, so §2.554's "lose 1 MAGIC if you roll a two" can never fire
 - [x] 279. Sweep the remaining tag families for task 277's shape — a shared helper only some of a sibling set calls *(five gaps found, every one unreachable — documented in place)*
+- [x] 281. Sweep for renderers whose click handler no assertion ever fires — `renderTraining`'s never was, which is why task 172's parity pass could not see 278 *(9 of 71 cold; 3 covered, 6 filed as 282)*
 - [x] 280. The market header row renders `header1=` and drops `header2=`/`header3=`, so 23 authored column headings ("To buy", "To sell") never reach the page *(adjudicated a deliberate simplification — documented, not changed)*
 
 ---
@@ -722,11 +723,89 @@ joins, separate from `gatedCases` which only the gated three can join.
 
 ---
 
+## 282. Six click handlers still fire for no assertion — three modal-opening renderers and the Adventure Sheet's Wield/Move-down/Drop
+
+**Priority: LOW — the tail of task 281's sweep, filed rather than left in the Review log because
+it is a concrete list with a measurement behind it, not a suspicion. Every one is a control a
+player uses; none is known to be broken.**
+
+*(Filed 2026-08-16 while closing task 281.)*
+
+Task 281 instrumented `addEventListener` and ran the full suite: **71 click-handler sites, 9 of
+which no assertion ever fired.** Three were covered while closing it. These six remain, and they
+fall into two groups that want different work.
+
+**The three that open a modal** — the reason they were skipped is the same for all three, and it
+is the interesting part: each hands off to `ui.js`'s `modal()`, which returns a promise resolved
+by a button in a dialog appended to `document.body`, so an assertion has to drive a control
+*outside* the story container and `await` a result. Nothing in `web/tests/` does that yet, which
+is why the gap is uniform rather than incidental:
+
+- `render-market.js:422` — the inline `<sell cargo>` click (1 registration). Its `cargo="?"` form
+  asks *which* commodity through `modal()`; the single-commodity path resolves without one, so
+  even a partial test is worth more than none.
+- `render.js:999` — the `<image>` inline link (6), which opens the illustration modal (§3.75's
+  map of Bazalek, task 62).
+- `render.js:1574` — the `<sectionview>` oracle link (2). Task 101 records it as pure divination
+  flavour that "arms no controls and never touches the player's section/history/state" — so the
+  assertion worth writing is exactly that: click it and prove the sheet, section and history are
+  untouched.
+
+**The three on the Adventure Sheet** (`ui.js`, outside the `render*` modules 281 scoped itself
+to, which is why they are listed and not fixed): `ui.js:293` Wield/Wear (33 registrations),
+`ui.js:307` Move down (55) and `ui.js:310` Drop (55, also modal-gated). **Move *up* is warm and
+move *down* is cold**, which is the sharpest single result in the sweep — the pair is written as
+one control and covered as half. The order matters to a rule, not just to tidiness: §1.521/§248's
+theft takes "possessions listed first", so the reorder buttons decide what a robbery costs.
+
+Method, unchanged from 281 and cheap to repeat: wrap `EventTarget.prototype.addEventListener` in
+a classic script ahead of the modules, key each `click` registration by the `/web/js/…:line:col`
+frame in `new Error().stack`, wrap the listener to count firings, and report the sites with
+`fired === 0` after the suite. **It has one blind spot worth knowing**: a handler on a branch the
+suite never *renders* registers zero times and so never appears at all — `renderPayment`'s
+forfeit-picker branch is one such, invisible to both this method and the report.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-16 (implementation pass, task 281): closed **281** and filed **282** (LOW).
+Instrumented as the filing suggested rather than read statically, and the instrumentation is what
+made it worth doing: a throwaway `web/_coverage.html` (deleted again) wrapping
+`EventTarget.prototype.addEventListener`, keying each `click` registration by the `/web/js/…`
+frame of `new Error().stack` and counting firings. **71 handler sites, 9 never fired.** Three
+covered here, six filed as 282. `RESULT ALL PASS pass=2739 fail=0` (from 2724: +8 roll parity,
++5 at task 151, +2 at §6.512), and the probe re-run on the finished tree reports **cold 9 → 6**
+with exactly the three targeted now warm — which is the check that the new assertions do the
+thing the task was about, and not merely pass.
+
+The three closed, each a genuine hole rather than a technicality: **`render.js:907`**, the
+"accept your fate" dead-end fallback — registered **148 times** across the suite and clicked by
+nothing, though it is the only way out of a section with no live control; **`render-rewards.js:447`**,
+`renderPayment`'s plain commit, so no assertion had ever *paid* a forced economic payment (the
+task-151 block builds one and deliberately cannot afford it, and every other `.pay-action` click
+in the suite lands on `renderOptionalPay`/`renderChooseOnePay`); and **`render-market.js:672`**,
+the item cache's money Withdraw, whose Deposit twin was covered — §6.512's cabinet could be paid
+into and never drawn from.
+
+Both of the filing's suggested fixes were taken. `rollBtn` now matches on structure
+(`.roll .btn-roll`) instead of `/Roll|Rank check/`, which retires the local `trainBtn` task 278
+had to add, and a new **`rollCases`** list joins all four roll tags in a body that clicks —
+separate from `gatedCases`, which only the gated three can join and which was the only clicking
+list before.
+
+**Two things this method taught that the static reading in the filing could not.** First, the
+sharpest result was a *pair*: the Adventure Sheet's Move-up is warm and Move-down is cold, both
+halves of one control, which no amount of listing handlers per module would have surfaced —
+counting firings does. Second, and it belongs in 282 as a caveat on the method: **a handler on a
+branch the suite never renders registers zero times and so is invisible to the probe entirely**.
+`renderPayment`'s forfeit-picker branch is exactly that, and it does not appear in the cold list
+or anywhere else. A coverage report over registrations can only ever be a lower bound on what is
+untested.
 
 Worked 2026-08-16 (implementation pass, task 279): closed **279** as **checked, clean — five
 gaps of exactly 277's shape, every one unreachable**, so the deliverable is five comments and no
