@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-281 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **282 is open**. File new
+282 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **283 is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,7 +16,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 282. Six click handlers still fire for no assertion — three modal-opening renderers and the Adventure Sheet's Wield/Move-down/Drop (the tail of task 281's sweep)
+- [ ] 283. The click-coverage probe keys a site by the frame that *registers* the listener, so `rollButton`'s seven callers collapse into one warm frame — the very shape of gap (task 278's cold `<training>` roll) that started the 281/282 sweep is invisible to it
 
 **Done**
 
@@ -305,6 +305,7 @@ this order.*
 - [x] 278. `renderTraining` reads its `var=` to hold a `<while>` pass but never writes it, so §2.554's "lose 1 MAGIC if you roll a two" can never fire
 - [x] 279. Sweep the remaining tag families for task 277's shape — a shared helper only some of a sibling set calls *(five gaps found, every one unreachable — documented in place)*
 - [x] 281. Sweep for renderers whose click handler no assertion ever fires — `renderTraining`'s never was, which is why task 172's parity pass could not see 278 *(9 of 71 cold; 3 covered, 6 filed as 282)*
+- [x] 282. Six click handlers still fire for no assertion — three modal-opening renderers and the Adventure Sheet's Wield/Move-down/Drop *(all six now driven; the probe reports cold 6 → 0)*
 - [x] 280. The market header row renders `header1=` and drops `header2=`/`header3=`, so 23 authored column headings ("To buy", "To sell") never reach the page *(adjudicated a deliberate simplification — documented, not changed)*
 
 ---
@@ -767,11 +768,129 @@ forfeit-picker branch is one such, invisible to both this method and the report.
 
 ---
 
+## 283. The click-coverage probe collapses a shared registering helper's callers into one frame, so a cold caller reads as warm
+
+**Priority: LOW — an accuracy limit in an audit tool, not in the app. Nothing a player touches is
+known to be broken; what is wrong is a number two tasks have now been steered by.**
+
+*(Filed 2026-08-16 while closing task 282.)*
+
+The probe tasks 281 and 282 both ran keys each `click` registration by **the first `/web/js/…`
+frame in `new Error().stack`** — which is the frame that *called* `addEventListener`, not the
+frame that supplied the listener. Where a module registers a handler on its own line those are
+the same thing, and for 69 of the 71 sites they are. Where a **shared helper** builds the control
+and attaches a handler passed in by its caller, they are not: every caller collapses into the
+helper's single frame, and that frame is warm the moment *any one* caller is clicked.
+
+Two such helpers exist today, and the first is the one that matters:
+
+- **`render-rolls.js:33`, inside `rollButton(story, label, widget, onRoll)` — seven callers**
+  (`renderDifficulty` ×2, `renderRandom` ×2, `renderRankcheck` ×2, `renderTraining`). One frame,
+  one warm/cold bit, seven distinct controls. **This is exactly the gap that started the whole
+  line of work**: task 278 was a `<training>` roll button no assertion had ever clicked, and had
+  the probe existed then it would have reported `render-rolls.js:33` warm and moved on. Task 281
+  found 278 by reading the parity lists, not by measuring — the measurement could not have found
+  it, and 281's write-up does not say so.
+- **`render-combat.js:188`, inside `makeFleeButton(story, fleeNode, markFled)` — two callers**
+  (the section-fight and the standalone-fight control rows). Two controls, one bit.
+
+So the honest figure is **78 controls behind 71 frames**, and `cold=0` means "no frame is cold",
+which is a weaker statement than the one tasks 281 and 282 were read as making. Nothing found by
+either task is retracted by this — every site they covered is genuinely covered, and 282's
+before/after `6 → 0` is a true measurement of the frames it measured. What is wrong is only the
+denominator, and the confidence "0 cold" invites.
+
+Two things this task should settle, in order:
+
+1. **Key by the caller, not the registrar.** Walk the stack past frames belonging to the module
+   that called `addEventListener` and record *both* frames — `render-rolls.js:394 →
+   render-rolls.js:33` — so the seven roll buttons separate. A cheaper variant that needs no
+   stack heuristics: have the probe additionally key on the control's own `className` +
+   `textContent`, which distinguishes `Train MAGIC (roll one die)` from `Roll two dice` without
+   caring where the listener came from.
+2. **Then re-run and re-report the real cold list.** With the seven `rollButton` callers
+   separated, some may well be cold — a cold caller is what 278 was. Whatever it finds is the
+   next task, and if it finds nothing that is the "checked, clean" worth recording.
+
+Also worth confirming while there, since it is one command and settles 282's recorded blind spot
+rather than leaving it a suspicion: the seven view modules hold exactly **71** static
+`addEventListener('click'` sites (`app.js`'s 19 are out of scope — `_test.html` never imports it),
+and the probe saw 71 frames. Those two numbers matching is consistent with every in-scope site
+registering at least once, i.e. with the "a branch the suite never renders never appears at all"
+blind spot **not** biting today — but it is not proof, since two sites sharing a line would
+collapse and a genuinely-never-registered site could be masked by a coincidence in the totals.
+Diff the probe's full frame list against the static line numbers and the point is settled either
+way.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-16 (implementation pass, task 282): closed **282** and filed **283** (LOW).
+Rebuilt 281's throwaway probe (`web/_coverage.html`, deleted again) and ran
+it first as a baseline: it reproduced the filing exactly — **71 sites, 6 cold**, at the same six
+`/web/js/…:line:col` frames and the same registration counts. Seventeen assertions later it
+reports **cold 6 → 0** with the suite at `RESULT ALL PASS pass=2756 fail=0` (from 2739). Measuring
+before and after is the point: the count is what proves the new assertions reach the handlers the
+task named rather than merely passing.
+
+The filing's premise — "an assertion has to drive a control *outside* the story container, and
+nothing in `web/tests/` does that yet" — was **half wrong, and the wrong half is why these six
+survived 281**. The suite already drives `document.body` dialogs: task 112's curse-Lift and
+task 133's rerender both click a `.modal-overlay .modal-buttons .btn` and `await` a settle. The
+capability was there; what was missing was reaching for it from a *renderer's* test, where the
+established habit is to query the story container the fixture owns. So no new harness was needed
+and none was written — every one of the six is driven with the idiom already in the file.
+
+What each one now asserts, and what it was worth:
+
+- **`render-market.js:422`** (`suite-economy`, §3.538 — the corpus's only `<sell cargo>`): the
+  captain's barter, driven three ways. Two commodities aboard and the click asks which hold to
+  break into, then the chosen Unit leaves and the linked `[flag=x] <buy cargo="minerals">` reward
+  arrives (`timber,furs` → `furs,minerals`) — the reward side had never been exercised through
+  the click that applies it. A single-commodity hold resolves with **no modal at all** (asserted
+  by overlay count, not by absence of a click), and an empty hold leaves the offer disabled with
+  the task-89 title. The one-shot memo is checked on the rerender, not just in the state.
+- **`render.js:999`** (`suite-inventory`, §3.75): the `<image>` link opened its modal and the
+  assertion reads the `figure.illus img` src back through `decodeURIComponent`, which is the part
+  that matters — the filename carries spaces and the encode is the thing that could rot.
+- **`render.js:1574`** (`suite-engine`, §5.114): the oracle *link*. `openSectionView` was already
+  called directly further down the same block, so what was untested was the only route a player
+  has to it.
+  It waits for the first vision to land before judging — the reveal is the step that would touch
+  state if anything did — then asserts the whole of `data`, the current section, the history and
+  `navigate` are all exactly as before.
+- **`ui.js:293`** (`suite-inventory`, §186): every `setEquipped` assertion in that block called
+  the rule directly, and the only sheet the block rendered was §6.135's **locked** one, where all
+  the controls are disabled — so the button was covered precisely in the state where it cannot be
+  pressed. An unlocked sheet now shows the wielded blade pressed (`aria-pressed`) and the other
+  live, and clicking Wield moves the wield, drops the Jade Defender's +3 aura and fires
+  `onSheetChange` once.
+- **`ui.js:307` and `ui.js:310`** (`suite-inventory`, the reorder block): ▼ and ✕. ▲ was warm
+  through task 133's `onSheetChange` unit and ▼ cold, though the two are written as one control.
+  Drop is asserted both ways — Cancel keeps the item and fires nothing, Drop removes it — because
+  a confirm dialog whose Cancel is untested is a dialog you cannot trust.
+
+One property of the probe worth recording for whoever runs it next: **it is stable enough to
+diff**. Two independent runs a change apart agreed on `sites=71` and on the identity of every
+cold frame, so the cold list is a comparable measurement and not a sample.
+
+That reliability is what made the second look worth taking, and it turned up **283**: the probe
+keys a site by the frame that *registers* the listener, so a shared helper that attaches a
+caller-supplied handler shows its callers as one frame. `rollButton` has **seven** callers behind
+`render-rolls.js:33`, and `makeFleeButton` two behind `render-combat.js:188` — **78 controls
+behind 71 frames**. The sting is that this hides precisely the shape of gap the sweep was started
+to find: task 278's cold `<training>` roll button is one of those seven, so a probe run before 281
+would have called that frame warm. Nothing 281 or 282 covered is retracted — only the
+denominator, and the confidence "cold 0" invites. The blind spot 282 recorded (a handler on a
+branch the suite never *renders* never appears at all) looks, on a count taken this pass, not to
+be biting: the seven view modules hold exactly 71 static `addEventListener('click'` sites against
+71 observed frames, with `app.js`'s 19 out of scope. Consistent, not proof; 283 says how to
+settle it.
 
 Worked 2026-08-16 (implementation pass, task 281): closed **281** and filed **282** (LOW).
 Instrumented as the filing suggested rather than read statically, and the instrumentation is what

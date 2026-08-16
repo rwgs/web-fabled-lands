@@ -2442,6 +2442,54 @@ export async function run(ctx) {
       ok('task127: sanitize folds stored "grai"/"meta"/"slav" to canonical names', dirty.ships[0].cargo.join(',') === 'grain,metals,slaves', JSON.stringify(dirty.ships[0].cargo));
     }
 
+    // --- task 282: §3.538's inline <sell cargo="?"> barter, driven from its button ----
+    { // block-scoped
+      // The corpus's only <sell cargo>: a captain who trades a Cargo Unit of minerals for one
+      // of any other commodity. The click IS the transaction — it asks which hold to break
+      // into when several kinds are aboard (a modal outside the story container, which is why
+      // this handler stayed cold), gives that Unit up, then applies the linked [flag=x]
+      // <buy cargo="minerals"> reward.
+      const settle538 = () => new Promise((r) => setTimeout(r, 0));
+      const mk538 = async (cargo) => {
+        const g = GameState.create({ name:'T538', gender:'m', profession:'Warrior', book:3, adv });
+        g.data.ships = [];
+        g.addShip({ type:'brigantine', name:'Trader', crew:'poor', cargo: cargo.slice(), docked:null }); // at sea with you
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate(){}, onDeath(){}, notify(){} });
+        st.begin(await data.getSection(3, '538'), 3, '538');
+        const btn = () => Array.from(c.querySelectorAll('.btn-mini')).find((b) => /Cargo Unit/i.test(b.textContent));
+        return { g, c, btn };
+      };
+
+      // Two kinds aboard: the click has to ask which one leaves.
+      const two538 = await mk538(['timber', 'furs']);
+      ok('task282: §3.538 offers the barter while a laden hold is here', !!two538.btn() && !two538.btn().disabled, two538.btn() ? `disabled=${two538.btn().disabled}` : 'no button');
+      two538.btn().click();
+      const pick538 = Array.from(document.querySelectorAll('.modal-overlay')).pop();
+      ok('task282: §3.538 with two kinds aboard asks which Cargo Unit to give',
+         !!pick538 && /Give which cargo/i.test(pick538.textContent) && pick538.querySelectorAll('.modal-buttons .btn').length === 2,
+         pick538 ? pick538.textContent : 'no modal');
+      Array.from(pick538.querySelectorAll('.modal-buttons .btn')).find((b) => b.textContent === 'Timber').click();
+      await settle538();
+      ok('task282: the chosen Unit leaves and the bartered minerals come aboard',
+         (two538.g.currentShip().cargo || []).join(',') === 'furs,minerals', JSON.stringify(two538.g.currentShip().cargo));
+      ok('task282: the barter is one-shot — the rerender shows it taken, not offered again',
+         !two538.btn() && !!two538.c.querySelector('.fx.paid'), two538.c.textContent.replace(/\s+/g, ' ').slice(0, 200));
+
+      // One kind aboard: nothing to ask, so the click resolves with no modal at all.
+      const one538 = await mk538(['grain']);
+      const overlays0 = document.querySelectorAll('.modal-overlay').length;
+      one538.btn().click();
+      await settle538();
+      ok('task282: a single-commodity hold barters without asking',
+         document.querySelectorAll('.modal-overlay').length === overlays0 && (one538.g.currentShip().cargo || []).join(',') === 'minerals',
+         `overlays=${document.querySelectorAll('.modal-overlay').length}/${overlays0} cargo=${JSON.stringify(one538.g.currentShip().cargo)}`);
+
+      // Nothing in the hold: the offer is dead, and its title says why (task 89).
+      const none538 = await mk538([]);
+      ok('task282: an empty hold leaves the barter disabled', !!none538.btn() && none538.btn().disabled && /no cargo here/i.test(none538.btn().title), none538.btn() ? none538.btn().title : 'no button');
+    }
+
     // --- task 95: replace= transforms a possession in place (no duplicate) ------
     { // block-scoped
       // §5.118: three replaces on the §5.238 tomb haul — empty replace="" upgrades the

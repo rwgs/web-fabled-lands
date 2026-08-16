@@ -513,6 +513,26 @@ export async function run(ctx) {
       const svLink = cSV.querySelector('.sectionview-link');
       ok('§5.114 renders the <sectionview> oracle as a read-only link', !!svLink && /up to six paragraphs/i.test(svLink.textContent));
 
+      // Drive the LINK, not just openSectionView below: it is the player's only way into the
+      // trance, and the whole promise of task 101 is that taking it costs nothing. Wait for the
+      // first vision to land before judging — the reveal is what would touch state if anything
+      // did. (task 282)
+      const svDataBefore = JSON.stringify(gSV.data);
+      const svSectionBefore = gSV.data.section;
+      const svHistBefore = JSON.stringify(gSV.data.history || null);
+      svLink.click();
+      let svClicked = document.querySelector('.modal-overlay .sectionview-modal');
+      for (let i = 0; i < 200 && !(svClicked && svClicked.querySelector('.sectionview-cap')); i++) {
+        await new Promise((r) => setTimeout(r, 10));
+        svClicked = document.querySelector('.modal-overlay .sectionview-modal');
+      }
+      ok('§5.114 clicking the oracle link opens the vision', !!svClicked && !!svClicked.querySelector('.sectionview-cap') && !!svClicked.querySelector('.sectionview-prose'));
+      ok('§5.114 the clicked oracle leaves the sheet, the section and the history untouched',
+         JSON.stringify(gSV.data) === svDataBefore && gSV.data.section === svSectionBefore && JSON.stringify(gSV.data.history || null) === svHistBefore && svNav === null,
+         svNav ? 'navigated' : 'state changed by the clicked oracle');
+      Array.from(svClicked.querySelectorAll('.modal-buttons .btn')).find((b) => !b.classList.contains('btn-primary')).click();
+      ok('§5.114 closing the clicked oracle takes the vision off the page', !document.querySelector('.sectionview-modal'));
+
       // previewProse renders a known section's prose read-only: content present, no controls.
       const prose = previewProse(await data.getSection(5,'114'));
       ok('previewProse renders the section prose (content present)', /priestess/i.test(prose.textContent) && prose.querySelectorAll('p').length >= 1);

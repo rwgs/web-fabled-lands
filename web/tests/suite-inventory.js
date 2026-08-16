@@ -177,6 +177,28 @@ export async function run(ctx) {
     renderSheet(go, csheet);
     ok('sheet renders up/down controls per item', csheet.querySelectorAll('.item-move').length === go.data.items.length * 2, String(csheet.querySelectorAll('.item-move').length));
     ok('sheet disables the top-up and bottom-down controls', csheet.querySelectorAll('.item-move:disabled').length === 2, String(csheet.querySelectorAll('.item-move:disabled').length));
+    // Drive the controls, not just their disabled state. ▲ was warm and ▼ cold, though the
+    // pair is written as one control, and ✕ is modal-gated so nothing had ever confirmed a
+    // drop. The order these settle is what a "possessions listed first" theft takes. (task 282)
+    const settleDrop = () => new Promise((r) => setTimeout(r, 0));
+    let goChanges = 0;
+    const cmove = document.createElement('div');
+    renderSheet(go, cmove, { onSheetChange: () => { goChanges++; } });
+    const rowFor = (nm) => Array.from(cmove.querySelectorAll('.item')).find((li) => li.querySelector('.item-txt').textContent.trim() === nm);
+    rowFor('gamma').querySelectorAll('.item-move')[1].click(); // ▼
+    ok('sheet ▼ moves the item down a place and reports the change', order() === 'alpha,gamma,beta' && goChanges === 1, `${order()} changes=${goChanges}`);
+    rowFor('beta').querySelector('.item-drop').click();
+    const dropAsk = Array.from(document.querySelectorAll('.modal-overlay')).pop();
+    ok('sheet ✕ asks before dropping, naming the item',
+       !!dropAsk && /Drop item\?/.test(dropAsk.textContent) && /beta/.test(dropAsk.querySelector('.modal-body').textContent),
+       dropAsk ? dropAsk.textContent : 'no modal');
+    Array.from(dropAsk.querySelectorAll('.modal-buttons .btn')).find((b) => b.textContent === 'Cancel').click();
+    await settleDrop();
+    ok('sheet ✕ Cancel keeps the item and changes nothing', order() === 'alpha,gamma,beta' && goChanges === 1, `${order()} changes=${goChanges}`);
+    rowFor('beta').querySelector('.item-drop').click();
+    Array.from(Array.from(document.querySelectorAll('.modal-overlay')).pop().querySelectorAll('.modal-buttons .btn')).find((b) => b.textContent === 'Drop').click();
+    await settleDrop();
+    ok('sheet ✕ Drop removes the item', order() === 'alpha,gamma' && goChanges === 2, `${order()} changes=${goChanges}`);
 
     // --- task 57: adventure sheet shows afflictions by name; diseases/poisons visible
     const gaf = GameState.create({ name:'Af', gender:'m', profession:'Warrior', book:1, adv });
@@ -309,6 +331,16 @@ export async function run(ctx) {
     st75.begin(await data.getSection(3, '75'), 3, '75');
     const link75 = c75.querySelector('.image-link');
     ok('§75 renders the inline <image> as a link, keeping its prose', !!link75 && /illustration/i.test(link75.textContent), link75 ? link75.textContent : 'none');
+    // Drive the link, not just its markup: it is the only way a player sees the picture, and
+    // the modal it opens lives on document.body, outside the story container. (task 282)
+    link75.click();
+    const imgOverlay = Array.from(document.querySelectorAll('.modal-overlay')).pop();
+    const fig75 = imgOverlay && imgOverlay.querySelector('figure.illus img');
+    ok('§75 clicking the inline <image> link opens the illustration in a modal',
+       !!fig75 && /Bazalek/i.test(decodeURIComponent(fig75.getAttribute('src') || '')),
+       fig75 ? fig75.getAttribute('src') : (imgOverlay ? imgOverlay.innerHTML.slice(0, 200) : 'no overlay'));
+    Array.from(imgOverlay.querySelectorAll('.modal-buttons .btn')).find((b) => b.textContent === 'Close').click();
+    ok('§75 closing the illustration modal takes it back off the page', !document.body.contains(imgOverlay));
     const take75 = Array.from(c75.querySelectorAll('.take-item')).find((b) => /map of bazalek/i.test(b.textContent));
     ok('§75 offers the map of Bazalek to take', !!take75 && !take75.disabled);
     take75.click();
@@ -1597,6 +1629,22 @@ export async function run(ctx) {
       const cbJade = e186.g.ability('combat'), defJade = e186.g.defence();
       ok('§186 switching to the plain +4 trades 2 Defence for 1 COMBAT', e186.g.setEquipped('weapon', e186.plain.id) === true && e186.g.ability('combat') === cbJade + 1 && e186.g.defence() === defJade - 2 && e186.g.auraBonus('defence') === 0, `combat=${e186.g.ability('combat')}/${cbJade} def=${e186.g.defence()}/${defJade}`);
       ok('§186 switching back restores the wielded Defence effect and the flags', e186.g.setEquipped('weapon', e186.jade.id) === true && e186.g.auraBonus('defence') === 3 && e186.g.defence() === defJade && e186.jade.wielded === true && e186.plain.wielded === false);
+      // setEquipped is the rule; the sheet's Wield button is the only way a player reaches it,
+      // and every assertion above calls the rule directly. Drive the button on an UNLOCKED
+      // slot — the locked case below covers only the disabled state. (task 282)
+      const eSheet = await mk186();
+      eSheet.g.setEquipped('weapon', eSheet.jade.id);
+      let wieldChanges = 0;
+      const wieldSheet = document.createElement('div');
+      renderSheet(eSheet.g, wieldSheet, { onSheetChange: () => { wieldChanges++; } });
+      const wieldBtn = (nm) => Array.from(wieldSheet.querySelectorAll('.item')).find((li) => li.textContent.includes(nm)).querySelector('.item-equip');
+      ok('§186 the sheet shows the wielded blade pressed and the other one live',
+         wieldBtn('Jade Defender').disabled === true && wieldBtn('Jade Defender').getAttribute('aria-pressed') === 'true'
+         && wieldBtn('broadsword').disabled === false && wieldBtn('broadsword').getAttribute('aria-pressed') === 'false');
+      wieldBtn('broadsword').click();
+      ok('§186 clicking Wield on the sheet moves the wield and reports the change',
+         eSheet.g.wieldedWeapon() === eSheet.plain && eSheet.jade.wielded === false && eSheet.g.auraBonus('defence') === 0 && wieldChanges === 1,
+         `wielded=${eSheet.g.wieldedWeapon().name} aura=${eSheet.g.auraBonus('defence')} changes=${wieldChanges}`);
       // The choice is what a `using="t"` loss takes (§6.135 snaps the weapon you are using).
       const lose186 = parse('<lose weapon="?" using="t"/>');
       const eKeep = await mk186();
