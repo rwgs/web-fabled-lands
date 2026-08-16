@@ -491,6 +491,10 @@ export class Story {
     // begin() atomic with the section it names. groupLimits/rollLockCaches are re-derived
     // on resume (visit-state.js), so populating those further down is harmless. (task 154)
     this.ctx = this._newCtx();
+    // Of the section element's own attributes, start="t" (6 nodes, section 1 of each book)
+    // is DELIBERATELY unread: it marks where JaFL finalises whichever pregenerated character
+    // the player picked, and this app finalises its own on the creation screen, before
+    // section 1 is ever entered. Nothing is left to settle here. (task 280)
     // Remember this section's todock= so the wrapped navigate applies it on leaving. (task 81)
     this.sectionTodock = sectionEl.getAttribute('todock') || null;
     // Snapshot the box-tick count as this section is ENTERED (before its <tick/> runs), so

@@ -33,6 +33,14 @@ export function renderMarket(story, container, node, path) {
       hasHeader = true;
       // Prefer the explicit header1= column title (book4/111 "Potions"/"Artifacts");
       // fall back to the type= keyword's label, then a generic heading (task 29).
+      // header2=/header3= are DELIBERATELY unread (23 nodes: "To buy", "To sell",
+      // "Sale price"). They head the price columns of the aligned table JaFL lays a
+      // market out as; this app renders one row per good with the price on its own
+      // button ("Buy 60"/"Sell 55"), so every row already carries its column's word
+      // and there is no column for a heading to sit over. Rows within one market also
+      // differ in which prices they carry — §4.111's Shadar scroll is sell-only under
+      // a header naming both — so a fixed pair of headings would claim a column some
+      // rows lack. Adding the table is a layout change, not a heading fix. (task 280)
       const h1 = child.getAttribute('header1');
       const title = (h1 && h1.trim()) || MARKET_TITLES[child.getAttribute('type')] || 'Goods for sale';
       const h = document.createElement('div');

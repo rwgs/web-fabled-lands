@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 278 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **279 and 280 are open**. File new
+misdiagnosis (see the Review log); **279 and 281 are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -13,10 +13,6 @@ records each audit pass and is where new work is filed.
 This file is for **defects**. New features are scoped in
 [`ROADMAP.md`](ROADMAP.md) instead, as ordered phases — pick up a phase from
 there once the buckets below are clear.
-
-**MEDIUM**
-
-- [ ] 280. The market header row renders `header1=` and drops `header2=`/`header3=`, so 23 authored column headings ("To buy", "To sell") never reach the page
 
 **LOW**
 
@@ -308,6 +304,7 @@ this order.*
 - [x] 276. `applyTick`'s profession branch drops a pipe-list on the floor without setting `did`, so a hidden or effect-body `<tick profession="a|b">` ticks a section box instead of doing nothing — the second half of task 275's guard, with 0 corpus nodes today
 - [x] 277. `renderRankcheck`/`renderTraining` never render their node's own words, so 45 shipped sections silently drop the printed roll instruction
 - [x] 278. `renderTraining` reads its `var=` to hold a `<while>` pass but never writes it, so §2.554's "lose 1 MAGIC if you roll a two" can never fire
+- [x] 280. The market header row renders `header1=` and drops `header2=`/`header3=`, so 23 authored column headings ("To buy", "To sell") never reach the page *(adjudicated a deliberate simplification — documented, not changed)*
 
 ---
 
@@ -730,6 +727,39 @@ joins, separate from `gatedCases` which only the gated three can join.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-16 (implementation pass, task 280): closed **280** as **an undocumented
+simplification, now documented — no behaviour change and no regression test**, which is the
+call its own filing set up and left to this pass. Comments only, in three places; nothing was
+filed. **`RESULT ALL PASS pass=2724 fail=0`** (unchanged, as it must be when no assertion is
+added), `node web/tests/node-import.mjs` clean, `stamp-version.ps1` and not a data rebuild.
+
+**The evidence that decided it is in the corpus, not in the layout argument.** The filing framed
+the choice as "does the row layout stand", which is a matter of taste; two facts settle it
+without appealing to taste. First, **the information is not actually dropped**: `header2=`/
+`header3=` are always "To buy"/"To sell"/"Sale price", and this app puts the verb on the button
+beside the price — `Buy 60`, `Sell 55` — so every row carries its own column's word already.
+That is what makes this *unlike* task 277, whose dropped words had no substitute anywhere on the
+page; the rubric match in the filing's own header ("authored words that never reach the page")
+is real but the consequence is not, and 277's precedent does not carry. Second, **a fixed pair of
+headings would be wrong for some rows**: §4.111's Artifacts block sits under `header2="To buy"
+header3="To sell"` and its Shadar scroll row is sell-only, so a "To buy" heading would claim a
+column that row has not got. The JaFL spec confirms the shape it was written for — `<trade>` "is
+arranged as a table with aligned columns" (`rules/JaFL-XML-Tags.md:834`) — and this app is not
+that shape. Census re-ran exactly as filed: **15 `header2=`, 8 `header3=`, 23 across 12 sections**
+(§4.111 carries two headers), all in published books, all on `<header>` inside a `<market>`.
+
+**Both riders were settled here too**, as the filing suggested: `<goto visit="t">` (§4.231, 1
+node) is commented at `renderGoto` — the spec calls it optional and `renderReturn` walks the
+navigation history, so there is nothing for an advance declaration to feed — and `<section
+start="t">` (6 nodes, section 1 of each book) at `begin()`'s `todock=` read, where the section
+element's own attributes are taken. Both had been checked and passed over before (the 2026-07-16
+pass records `visit="t"` as "a spec'd no-op") without leaving a mark in the code, which is
+exactly how a census re-finds them; **a decision recorded only in this log gets re-derived, so
+the comment is the deliverable, not the note.** Worth carrying for the next such census: the
+useful question about an unread attribute is not whether it is read, but whether anything it
+would have carried is missing from the page — for all three settled here the answer was no, and
+that is a cheaper test than reasoning about the layout it was written for.
 
 Worked 2026-08-16 (implementation pass, task 278): closed **278** and filed **281** (LOW). The
 fix is the one line the filing predicted, at both sites `renderTraining` stores a result (the

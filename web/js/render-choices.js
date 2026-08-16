@@ -164,6 +164,10 @@ function deadGate(story, node, btn) {
   return true;
 }
 
+// visit= is DELIBERATELY unread (§4.231, the corpus's one node): it declares that the
+// target will be <return>ed from, and the JaFL spec itself calls it optional — "at the
+// moment this is unnecessary, but is probably good practice". renderReturn walks the
+// navigation history, so it needs no advance notice from the jump that led there. (task 280)
 export function renderGoto(story, container, node, path) {
   const section = node.getAttribute('section');
   if (section == null) return null;
