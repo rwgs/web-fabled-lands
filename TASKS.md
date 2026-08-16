@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 277 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **278 and 279 are open**. File new
+misdiagnosis (see the Review log); **278, 279 and 280 are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,7 +20,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-*(none open — file new MEDIUM work here)*
+- [ ] 280. The market header row renders `header1=` and drops `header2=`/`header3=`, so 23 authored column headings ("To buy", "To sell") never reach the page
 
 **LOW**
 
@@ -637,14 +637,61 @@ warrants a comment and nothing more.
 
 ---
 
+## 280. The market header row renders `header1=` and drops `header2=`/`header3=`, so 23 authored column headings ("To buy", "To sell") never reach the page
+
+**Priority: MEDIUM — task 277's shape and task 277's rubric: authored words that never reach
+the page, with no rules consequence (every price, buy and sell control works). Smaller than 277
+at 23 nodes rather than 45 sections, but the same call.**
+
+*(Filed 2026-08-16 while closing task 277, from an "allowlisted attribute the app never reads"
+census — a different sweep from task 279, and the only real finding in it. See the Review log.)*
+
+`renderMarket` (`render-market.js:36`) reads one of the three:
+
+```js
+const h1 = child.getAttribute('header1');
+const title = (h1 && h1.trim()) || MARKET_TITLES[child.getAttribute('type')] || 'Goods for sale';
+```
+
+so `<header header1="Item" header2="To buy" header3="To sell"/>` (§1.292) renders the single
+heading `Item` and drops the other two. Census over the shipped corpus: **15 `header2=` and 8
+`header3=`**, always on `<header>` inside a market.
+
+**This may be a defect or an undocumented simplification, and deciding which is most of the
+work.** The three attributes are *column* titles for a three-column price table — item, buy
+price, sell price — where this app renders a market as a list of rows carrying their own
+buy/sell buttons, so there is no column for a column heading to sit over. If that layout stands,
+the right change is a comment at the `header1` read saying the other two are deliberately dropped
+and why (the same courtesy `renderTraining` already pays its missing pay gate). If the headings
+should show, the natural place is the `.market-head` row, and the labels then need to survive a
+narrow screen — check `web/css/` for how `.market-row` wraps on mobile before adding two more
+strings to that line. **Do not add a three-column table for this**; that is a layout change well
+beyond a dropped-heading fix, and belongs in `ROADMAP.md` if it is wanted at all.
+
+Assertion for `suite-economy.js` (which owns the market views), once the decision is made: either
+§1.292's market shows "To buy"/"To sell", or a regression test is not warranted and the comment
+is the whole deliverable — say which in the Review log.
+
+**Two riders from the same census, neither filed as its own task, both cheap to settle while
+here.** `<goto visit="t">` (§4.231, 1 node) is unread, and the JaFL spec says it may stay that
+way — "*whether the section being jumped to is one that will be returned from. At the moment this
+is unnecessary, but is probably good practice*" (`rules/JaFL-XML-Tags.md:87`). `<section start="t">`
+(6 nodes, section 1 of every book) is unread because its spec meaning — "*the first section of a
+new book … whichever character the player has chosen will be finalised*" — describes a JaFL
+character-selection step this app completes on its own creation screen before section 1 is ever
+entered. Both are correctly unread; a one-line comment naming each as deliberate would stop the
+next census re-finding them.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
 
-Worked 2026-08-16 (implementation pass, task 277): closed **277** and filed **278** (HIGH) and
-**279** (LOW). The fix is the two lines the filing
+Worked 2026-08-16 (implementation pass, task 277): closed **277** and filed **278** (HIGH),
+**279** (LOW) and **280** (MEDIUM). The fix is the two lines the filing
 predicted, one `appendRollDescription` call immediately before each renderer's `makeRollWidget`;
 eight assertions in `suite-render.js` inside the task-172 parity block, which is where the
 "all four roll renderers do X" claims already live. JS-only, so `stamp-version.ps1` and not a data
@@ -678,6 +725,35 @@ calls only the second. One of the two gaps is documented and unreachable (no `<t
 in the corpus); the other is a live HIGH defect, §2.554's unwritten `x`. The claim was load-bearing
 for the filing's own argument and had gone unchecked through two passes. **A supporting claim in a
 filing is not evidence until it is re-read** — this one cost nothing to check and was worth a task.
+
+Asked afterwards whether anything else had gone unfiled, this pass ran a second and different
+sweep — **allowlisted attribute the app never reads**, distinct from 279 in that it finds an
+attribute *no* renderer honours, where 279 finds a helper only *some* siblings call. Method:
+extract `FL_TAG_ATTRS` from `validate-source.ps1` (129 attributes), subtract everything appearing
+as a quoted string anywhere in `web/js`, census the remainder against the shipped corpus. Yield:
+7 candidates, 33 corpus nodes, **one real finding** (280). The other six are worth recording so
+the next census does not re-open them: `xitem`/`xarmour`/`xgroup` ARE implemented —
+`transferSelector(el, prefix)` builds the name as `prefix + a`, so they never appear as literals;
+`visit` is spec'd as unnecessary; `start` describes a JaFL character-finalisation step this app
+does on its creation screen.
+
+**The lesson is about the method, and it is the same lesson twice in one pass.** A string search
+for attribute names has **false positives wherever the name is built dynamically**, and on the
+strength of that search alone this pass came within one read of filing a HIGH defect claiming
+`<transfer>` ignores its exclusion filters — which would have been wrong, and wrong in the
+alarming direction (§4.586's own XML comment says it excepts keys, so the filing would have
+"confirmed" itself against the corpus while the code was correct all along). What caught it was
+opening `engine.js` at the line the *comments* mentioned. **A census over source text is a list
+of candidates, never a list of findings; every candidate is confirmed by reading its owner.**
+Also worth carrying: §2.554's `deduct` looked wrong on the way past (`2` where the printed text
+says "lose 1 MAGIC") and is right — a roll of 2 beats a natural 0 or 1, so the training succeeds
+and the extra point cancels the `+1`, netting the printed −1 either way.
+
+Not filed, and named here so the decision is visible: the gate allowlists an attribute without
+requiring anything to read it, so "passes `validate-source.ps1`" does not mean "honoured". A
+cross-check — every allowlisted attribute is read somewhere, with an explicit opt-out list for
+the deliberate no-ops — would have found 280 mechanically. That is a build-tooling *feature*, so
+per `AGENTS.md` it belongs in `ROADMAP.md`, not here.
 
 Filed 2026-08-16 (reading pass, no code changed): **277**, found while reading `render-rolls.js`
 for an unrelated question about conditional die counts during conversion work on an unpublished
