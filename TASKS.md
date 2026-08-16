@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 284 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **no task is open**. File new
+misdiagnosis (see the Review log); **285 is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -13,6 +13,10 @@ records each audit pass and is where new work is filed.
 This file is for **defects**. New features are scoped in
 [`ROADMAP.md`](ROADMAP.md) instead, as ordered phases — pick up a phase from
 there once the buckets below are clear.
+
+**MEDIUM**
+
+- [ ] 285. A `<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes whichever blessing was acquired first
 
 **LOW**
 
@@ -886,11 +890,128 @@ which of its "cold" results are artifacts rather than gaps.
 
 ---
 
+## 285. A `<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes whichever blessing was acquired first
+
+**Priority: MEDIUM — task 231's finding on a different currency, and the same call. Live in three
+published sections (book1/333, book1/377, book4/641), one of which prints the choice in so many
+words. Nothing is over-charged (one blessing leaves either way) and it only bites a player holding
+two or more, but which one leaves is decided by acquisition order and the player is never asked.**
+
+*(Filed 2026-08-16 during conversion work on an unpublished book, whose page prints "you choose
+which" on the same construct. The evidence below is all in the published books.)*
+
+**The engine is already right; the view never asks.** `applyLose`'s open-blessing branch takes a
+chooser and only falls back when it is given none (`engine.js:602-612`):
+
+```js
+} else if (b === '?') {
+  if (state.data.blessings.length) {
+    const pick = opts.chooser ? opts.chooser(state.data.blessings.slice(), 1, 'blessing') : null;
+    const chosen = (pick && pick.length) ? pick[0] : state.data.blessings[0];
+    if (state.removeBlessing(chosen)) notes.push('lost blessing');
+  }
+}
+```
+
+No caller ever supplies one. `classifyPassive` (`render-rules.js`) offers three player-choice
+verdicts — `ability-choice`, `equipment-choice`, `profession-choice` — and a fourth,
+`forfeit-choice`, whose test is `needsForfeitChoice` → `losePaymentPlan(...).kind` ∈
+`ITEM_FAMILY_TAGS`. **`losePaymentPlan` enumerates `item`/`weapon`/`armour`/`tool`/`cargo`/`ship`
+and returns `present: false` for a blessing** (`engine.js:827-861`), so none of the four fires and
+the node falls through to `apply`, which commits it with the chooser explicitly nulled — the same
+line task 231 quotes:
+
+```js
+const note = applyEffect(node, story.state, { chooser: null });
+```
+
+`state.data.blessings[0]` is therefore what leaves, and that array is append-ordered by
+`addBlessing`, so **the blessing the player has held longest is the one taken**.
+
+Measured on a real `GameState` rendering book4/641 through `Story`:
+
+| blessings held at entry | after the render | pickers drawn |
+| --- | --- | --- |
+| `["combat","scouting"]` | `["scouting"]` | `.ability-choice=0 .ability-pick=0` |
+| `["scouting","combat"]` | `["combat"]` | — |
+
+Same page, same two blessings, opposite outcome — decided by which was acquired first.
+
+The three shipped sections:
+
+- **book4/641** — the rejected offering: "Tambu is displeased!
+  `<lose blessing="?">Lose a blessing</lose>` **(your choice)**, if you have one." The printed
+  instruction the app ignores, verbatim.
+- **book1/333** — a travel-encounter row: "A water sprite curses you —
+  `<lose blessing="?">lose a Blessing</lose>`, if you have one".
+- **book1/377** — a hazard row: "Bad omen — `<lose blessing="?">lose one Blessing</lose>`".
+
+The last two print no choice, but they are the same tag on the same path, and the engine's own
+comment above the branch calls all three "punitive robbery" — so whatever the fix does, it should
+do it once for the form rather than once for the sentence.
+
+**One sharper consequence than task 231's.** `removeBlessing` splices the name out of
+`permanentBlessings` as well, so a permanent blessing (task 90's "never used up" Safety from
+Storms) acquired before an ordinary one is what an unasked `?` forfeit destroys. A player who
+bought the permanent early and picked up a Luck later loses the permanent and keeps the Luck,
+which is the exact inverse of what anyone would choose.
+
+**The fix is a fifth verdict, not a new picker widget.** `needsAbilityChoice` is the shape to
+copy: a `needsBlessingChoice(node)` — a non-hidden, unpriced, unflagged `<lose blessing="?">` with
+two or more blessings held — routing to a `blessing-choice` verdict that renders the existing
+`story.appendAbilityPicker` row with `blessingLabel` (`render-util.js`) for the button text and
+commits `applyEffect(node, state, { chooser: () => [b] })` on click, exactly as
+`renderAbilityChoice` does. One held blessing needs no picker and must keep falling through to
+`apply`, or a hazard row grows a pointless button.
+
+What must **not** start asking:
+
+- **`<lose blessing="*">`** — "lose all your blessings" is a sweep, and `applyLose` handles it
+  through `removeAllBlessings`. There is nothing to choose.
+- **A named `<lose blessing="X">`** — task 90's spend, and by far the commonest form (70 nodes):
+  the blessing being *invoked* for its protection. It names itself; a picker would be wrong.
+- **`<if blessing="?">`** — task 132's *test* ("if you already have a blessing of any sort"), not
+  a loss. book5/365 is the only instance and it must stay a condition.
+
+Census for the fixture: `<lose blessing="?">` is **3** nodes in **3** sections corpus-wide, and
+there is no open `gain`/`tick` blessing selector at all (`0`), so no grant path needs the same
+treatment. The assertion to write is the table above — render book4/641 on a state holding two
+blessings in each order and check that the picker appears and that the *named* blessing is the one
+that leaves.
+
+**Why neither task 279 nor task 284 could see this.** Both swept the question "which renderers
+call the pickers that exist" — `showForfeitPicker` and `showAbilityPicker` — and adjudicated four
+gaps as unreachable. A currency with **no picker at all** is invisible to that question: there is
+no call site to find cold, and `render-rewards.js`'s sweep note is complete and correct as written.
+The census that finds this one runs the other way round — over the *engine's* `opts.chooser` hooks,
+asking which of them any view ever supplies.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-16 (filing pass, no task open at the time): filed **285** (MEDIUM) — a
+`<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes
+whichever blessing was acquired first. Documentation only; no code, no stamp, and the suite is
+unmoved at `RESULT ALL PASS pass=2756 fail=0`.
+
+**The census runs the opposite way to 279's and 284's, and that is the whole finding.** Those two
+asked "which renderers call the pickers we have?" and adjudicated four gaps as unreachable — a
+sound sweep, and it cannot see a currency with **no** picker. `applyLose` takes `opts.chooser` for
+five things (ability, item/equipment, cargo, profession, blessing) and the view supplies it for
+four; the fifth was never on any list because there is no cold call site to find. So: **census the
+engine's chooser hooks and ask which the view supplies**, rather than censusing the view's picker
+calls and asking which fire. It costs one grep for `opts.chooser` in `engine.js`.
+
+Measured before filing, on a real `GameState` rendering book4/641 through `Story`: two blessings
+held in one order and the other, same page, opposite blessing taken, no picker drawn either way.
+**A picker gap is the one defect class where the order of the fixture's own setup is the
+measurement** — a single-blessing probe would have shown the correct blessing leaving and read as
+a pass.
 
 Worked 2026-08-16 (implementation pass, task 284): closed **284** as **unreachable — the outcome
 is a comment**, and filed nothing new. The suite stands at `RESULT ALL PASS pass=2756 fail=0`,
