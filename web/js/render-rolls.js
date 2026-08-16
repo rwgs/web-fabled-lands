@@ -123,8 +123,9 @@ function makeRollWidget(story, container, node, path) {
   return { key: 'roll@' + path, widget };
 }
 
-// The descriptive text a <difficulty>/<random> node carries before its widget (task 172):
-// rendered only when it actually has words, so an empty node adds no stray span.
+// The descriptive text a roll node carries before its widget (task 172): rendered only when
+// it actually has words, so an empty node adds no stray span. All FOUR roll renderers call it
+// — <rankcheck>/<training> did not until task 277, and dropped their words in 45 sections.
 function appendRollDescription(story, container, node, path) {
   const desc = document.createElement('span');
   story.appendChildren(desc, node, path);
@@ -332,6 +333,7 @@ export function renderRandom(story, container, node, path) {
 export function renderRankcheck(story, container, node, path) {
   const dice = parseInt(node.getAttribute('dice') || '1', 10);
   const add = parseInt(node.getAttribute('add') || '0', 10);
+  appendRollDescription(story, container, node, path); // its own descriptive text (task 277)
   const { key, widget } = makeRollWidget(story, container, node, path);
   // Pay-to-roll gate (task 51), as for <difficulty>/<random>.
   const { flag, gated, armed, stored } = rollGate(story, node, key);
@@ -366,6 +368,7 @@ export function renderTraining(story, container, node, path) {
   const multi = spec === '' || spec === '?' || spec.includes('|');
   const dice = parseInt(node.getAttribute('dice') || '2', 10);
   const add = parseInt(node.getAttribute('add') || '0', 10);
+  appendRollDescription(story, container, node, path); // its own descriptive text (task 277)
   const { key, widget } = makeRollWidget(story, container, node, path);
   const stored = story.ctx.rolls.get(key); // <training> has no pay gate — a plain memo lookup
   markWhilePending(story, stored, path, node.getAttribute('var')); // hold a <while> pass (tasks 100 + 181)

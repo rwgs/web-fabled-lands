@@ -274,6 +274,46 @@ export async function run(ctx) {
         ok('task172-reroll: using the reroll consumes the Luck blessing', !b.g.hasBlessing('luck'));
       }
 
+      // (description parity, task 277) all four roll renderers print the words their own node
+      // carries, in a span immediately BEFORE the widget — <rankcheck>/<training> reached the
+      // widget without ever walking their children and dropped those words in 45 sections
+      // (§1.262 lost its entire roll instruction; §5.59 a clause from mid-sentence). A wordless
+      // node still adds no stray span, and an <adjust>-only node is that same case: walking the
+      // subtree for prose prints nothing and does not consume the modifier childAdjustment reads.
+      const descBefore = (c) => c.querySelector('.roll').previousElementSibling;
+      const descCases = [
+        { xml: '<section name="DD"><difficulty ability="COMBAT" level="4">Test your COMBAT</difficulty></section>', name: 'DD', words: 'Test your COMBAT' },
+        { xml: '<section name="DN"><random dice="2">Roll two dice</random></section>', name: 'DN', words: 'Roll two dice' },
+        { xml: '<section name="DK"><rankcheck dice="1" add="-1">Roll a die and subtract one</rankcheck></section>', name: 'DK', words: 'Roll a die and subtract one' },
+        { xml: '<section name="DT"><training dice="2">roll two dice</training></section>', name: 'DT', words: 'roll two dice' },
+      ];
+      for (const tc of descCases) {
+        const r = mkRoll(tc.xml, tc.name);
+        const before = descBefore(r.c);
+        ok(`task277-desc(${tc.name}): the node's own words render above its widget`,
+           !!before && before.tagName === 'SPAN' && before.textContent.includes(tc.words),
+           r.c.textContent.replace(/\s+/g, ' ').slice(0, 90));
+      }
+      const bareCases = [
+        { xml: '<section name="BK"><rankcheck dice="2"/></section>', name: 'BK' },
+        { xml: '<section name="BT"><training dice="2" ability="COMBAT"/></section>', name: 'BT' },
+        { xml: '<section name="BA"><rankcheck dice="1"><adjust value="2"/></rankcheck></section>', name: 'BA' },
+      ];
+      for (const tc of bareCases) {
+        const r = mkRoll(tc.xml, tc.name);
+        ok(`task277-desc(${tc.name}): a wordless node adds no stray span`, descBefore(r.c) === null,
+           descBefore(r.c) ? descBefore(r.c).outerHTML.slice(0, 80) : 'null');
+      }
+      {
+        // …and the <adjust> the wordless node carries still reaches the roll: +2 on one die
+        // puts the total at 3 or more, which a bare 1d6 could not always reach.
+        const r = mkRoll('<section name="BA2"><rankcheck dice="1"><adjust value="2"/></rankcheck></section>', 'BA2');
+        rollBtn(r.c).click(); await settle172();
+        const m = /Rolled (\d+) vs Rank/.exec(r.c.textContent);
+        ok('task277-desc(BA2): walking for prose does not consume the <adjust> modifier',
+           !!m && +m[1] >= 3, r.c.textContent.replace(/\s+/g, ' ').slice(0, 80));
+      }
+
       window.__FL_INSTANT_DICE__ = false;
     }
 

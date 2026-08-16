@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-276 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **277 is open**. File new
+277 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **nothing is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,7 +20,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 277. `renderRankcheck`/`renderTraining` never render their node's own words, so 45 shipped sections silently drop the printed roll instruction
+*(none open — file new MEDIUM work here)*
 
 **LOW**
 
@@ -309,6 +309,7 @@ this order.*
 - [x] 274. Re-archive completed task details 256–273 and clear them out of the priority buckets
 - [x] 275. `applyTick`'s equipment branch is the one recognised attribute that does not set `did` when it matches nothing, so §5.386's enchant and §6.731's shrine boon tick a section box and toast "box ticked" at a player carrying no weapon
 - [x] 276. `applyTick`'s profession branch drops a pipe-list on the floor without setting `did`, so a hidden or effect-body `<tick profession="a|b">` ticks a section box instead of doing nothing — the second half of task 275's guard, with 0 corpus nodes today
+- [x] 277. `renderRankcheck`/`renderTraining` never render their node's own words, so 45 shipped sections silently drop the printed roll instruction
 
 ---
 
@@ -536,6 +537,26 @@ Assertions for `suite-render.js`, beside the task-172 description tests: a
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-16 (implementation pass, task 277): closed **277**, filing nothing — every bucket
+is clear again, so the next pass starts from `ROADMAP.md`. The fix is the two lines the filing
+predicted, one `appendRollDescription` call immediately before each renderer's `makeRollWidget`;
+eight assertions in `suite-render.js` inside the task-172 parity block, which is where the
+"all four roll renderers do X" claims already live. JS-only, so `stamp-version.ps1` and not a data
+rebuild; **`RESULT ALL PASS pass=2716 fail=0`**. Three things worth carrying forward. **The census
+re-ran exactly** — 54 `<rankcheck>`/22 with text, 62 `<training>`/23 with text, 45 sections — which
+is the first filing since task 270 whose count survived re-measurement unchanged, and it did
+because the filing said which set it measured. **The element-children census is the check the
+filing did not name and the one that made the fix safe**: walking a subtree for prose renders
+whatever elements it holds, so "does text render?" is only half the question. Across both tags the
+corpus holds exactly 5 element children, all `<adjust>` on `<rankcheck>` and all self-closing, so
+the walk adds text and nothing else — had a `<success>` lived inside one of these nodes the same
+two lines would have drawn a branch inside the description span. **The assertions are anchored to
+DOM position, not to `textContent`**: each checks `.roll`'s `previousElementSibling` is the span
+carrying the words, because a `textContent.includes()` test would have passed just as happily with
+the description appended *below* the widget — and "the words come first" is the whole defect. The
+sweep the filing suggested (other tag families for a helper only some siblings call) has still not
+been run; it remains the obvious next reading pass.
 
 Filed 2026-08-16 (reading pass, no code changed): **277**, found while reading `render-rolls.js`
 for an unrelated question about conditional die counts during conversion work on an unpublished
