@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-282 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **283 is open**. File new
+283 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **284 is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,7 +16,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 283. The click-coverage probe keys a site by the frame that *registers* the listener, so `rollButton`'s seven callers collapse into one warm frame — the very shape of gap (task 278's cold `<training>` roll) that started the 281/282 sweep is invisible to it
+- [ ] 284. `renderPayment`'s open-forfeit branch is the one in-scope click handler that never registers in the whole suite, so the picker a forced "give up which?" payment opens has never been rendered — and task 279's reachability sweep left it out
 
 **Done**
 
@@ -307,6 +307,7 @@ this order.*
 - [x] 281. Sweep for renderers whose click handler no assertion ever fires — `renderTraining`'s never was, which is why task 172's parity pass could not see 278 *(9 of 71 cold; 3 covered, 6 filed as 282)*
 - [x] 282. Six click handlers still fire for no assertion — three modal-opening renderers and the Adventure Sheet's Wield/Move-down/Drop *(all six now driven; the probe reports cold 6 → 0)*
 - [x] 280. The market header row renders `header1=` and drops `header2=`/`header3=`, so 23 authored column headings ("To buy", "To sell") never reach the page *(adjudicated a deliberate simplification — documented, not changed)*
+- [x] 283. The click-coverage probe keys a site by the frame that *registers* the listener, so `rollButton`'s seven callers collapse into one warm frame — the very shape of gap (task 278's cold `<training>` roll) that started the 281/282 sweep is invisible to it *(re-keyed by caller: 78 controls, 74 warm, 3 cold-by-construction; the 71=71 count was a coincidence, and the one real gap is filed as 284)*
 
 ---
 
@@ -824,11 +825,124 @@ way.
 
 ---
 
+## 284. `renderPayment`'s open-forfeit branch is the one in-scope click handler that never registers in the whole suite, so the picker a forced "give up which?" payment opens has never been rendered
+
+**Priority: LOW — an untested branch of shipped code, not a known defect. Whether a player can
+reach it at all is precisely the open question; if none can, the outcome is a comment.**
+
+*(Filed 2026-08-16 while closing task 283.)*
+
+Task 283's re-keyed probe run settled the count question 282 left open, and settled it the other
+way. The seven view modules hold **71** static `addEventListener('click'` sites and the probe
+observed **71** frames — but one of the observed frames is **`app.js:837`** (the Adventure Sheet
+backdrop, registered because `suite-economy.js` imports `installSheetDrawer` from `../js/app.js`),
+so only **70** in-scope sites ever register. The equal totals were a coincidence, and it hid
+exactly the failure they were quoted as ruling out. Diffing the two lists names the missing one:
+
+**`render-rewards.js:445`** — the `plan.needsChoice` arm of `renderPayment`:
+
+```js
+} else if (plan.needsChoice) {
+  btn.addEventListener('click', () => { btn.disabled = true; showForfeitPicker(story, container, plan, commit); });
+} else {
+  btn.addEventListener('click', () => commit(null));   // :447 — covered by task 282
+}
+```
+
+A **forced** economic payment whose cost is an open `"?"` possession/equipment/cargo forfeit with
+more candidates than it takes. Its two siblings are covered — the ineligible arm is asserted
+disabled (task 117, §2.90) and the plain commit was driven by task 282 — and `showForfeitPicker`
+itself is exercised, but only through `renderOptionalPay` (`:515`) and the §2.90 route. Nothing in
+the suite has ever rendered *this* call to it.
+
+Task 281 named this shape as the probe's blind spot ("a handler on a branch the suite never
+renders registers zero times and so is invisible to the probe entirely") and named this very
+branch as its example — but could only assert it, since a registration probe cannot see what does
+not register. The static diff is the proof, and it is now known to be the **only** in-scope
+instance.
+
+Task 279's sweep note lives in `render-rewards.js` immediately above `showForfeitPicker` and
+adjudicates three picker gaps as unreachable. It lists `renderPayment` among the renderers that
+**do** ask, so this branch fell outside the sweep entirely — it is a fourth case, and the sweep's
+own rule (census the corpus *before* filing) has not been applied to it.
+
+What to settle, in order:
+
+1. **Can a shipped section reach it?** Per 279's note the corpus's only open-forfeit costs are
+   **§2.90, §4.456 and §5.152**. For each, check which payment renderer the `dispatch` in
+   `render-rewards.js:269` picks — `isEconomicPayment` routes to `'payment'`, and the optional /
+   choose-one / roll arms take the rest — and whether `losePaymentPlan` can report
+   `needsChoice: true` there (an open selector *and* more candidates than `multiple=` takes).
+2. **Then act on the answer.** Reachable: a fixture in `suite-actions` beside the task 117/226
+   block that renders the forced payment, clicks it, and asserts the picker appears, that the
+   button disables itself first (this branch is the only one that does), and that the chosen
+   candidate — not whatever the engine finds first — is what leaves. Unreachable: extend the 279
+   block's comment to a fourth case naming why, in the same terms as the other three.
+
+Note for whoever runs the probe again: it is throwaway (`web/_coverage.html`, deleted after each
+use) and it must be **caller-keyed** to be worth trusting — see task 283 for the shape, and for
+which of its "cold" results are artifacts rather than gaps.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-16 (implementation pass, task 283): closed **283** as **measured, and the number
+was wrong twice over**; filed **284** (LOW). No app or suite code changed — the whole task is a
+measurement — and the suite stands at `RESULT ALL PASS pass=2756 fail=0`, unmoved.
+
+Rebuilt the throwaway `web/_coverage.html` (deleted again) with the filing's first fix: key each
+`click` registration by the **pair** (registrar frame, caller frame) — the first two `/web/js/…`
+frames of `new Error().stack` — instead of the registrar alone. The registrar roll-up is kept
+alongside so the new run is comparable with the old, and it reproduced 282's finished state
+exactly: **71 frames, 0 cold**. Under pair keying: **99 pairs, 18 cold**.
+
+**The seven-caller split is real, and all seven are accounted for.** `rollButton` showed exactly
+the seven caller frames 283 predicted from static reading, and `makeFleeButton` exactly two — so
+**78 controls behind 71 frames** is confirmed as measured, not inferred. Three of the seven are
+cold: `render-rolls.js:262`, `:324` and `:349`. All three are the same thing — the
+`gated && !armed` arm of `<difficulty>`/`<random>`/`<rankcheck>`, which builds the button with
+`onRoll = () => {}` and immediately sets `btn.disabled = true`. **Cold by construction**: an
+unclickable control whose handler is a deliberate no-op, and whose *rendered* state is already
+asserted both ways by `suite-render`'s `gatedCases` (disabled unpaid, armed on payment) and by
+`suite-combat`'s task-51 block. Both `makeFleeButton` callers are warm. So the honest tally is
+**78 controls: 74 warm, 3 unclickable-by-design, 1 that never renders at all** (below).
+
+**The other 15 cold pairs are all artifacts of the new keying, and the pattern is worth recording
+so the next run does not chase them.** Every one has a warm sibling with the same registrar — the
+same handler source reached down a different call path — in two flavours. Ten are a renderer
+called both directly and from its own in-place redraw: `render-combat.js:371/:418/:429` are
+`drawFight` reached from `renderFight` (`:63`) or from its `redraw` (`:332`), `:314` the same for
+`drawGroupFight`, `render.js:907` the end-fate fallback reached from four render paths, and
+`render-rolls.js:451` `revealBranch` from either of its two call sites. Five have a caller frame
+of `-`: the stack held **one** `/web/js/` frame because an `await` upstream truncated it, so the
+identical call site appears twice under two shapes (`ui.js:195` registers twice via `app.js:783`
+and twice with the frame gone). **Pair keying trades a false-warm for a false-cold**, and the
+false-colds are mechanical: a cold pair whose registrar has a warm sibling is only interesting
+where the caller supplies the *handler*, which is `rollButton` and `makeFleeButton` and nothing
+else. Judgement, not a filter — the discriminator (does the registrar close over a
+caller-supplied callback?) is not observable from outside.
+
+**The count check 282 recorded as "consistent, not proof" was a coincidence, and it hid the thing
+it was quoted as ruling out.** 71 static in-scope sites against 71 observed frames — but one
+observed frame is `app.js:837`, the sheet backdrop, which registers because `suite-economy.js`
+imports `installSheetDrawer` from `../js/app.js`. `app.js` is therefore not wholly out of scope
+(1 of its 19), only **70** in-scope sites ever register, and the diff names the missing one:
+**`render-rewards.js:445`**, `renderPayment`'s open-forfeit arm. That is 281's stated blind spot,
+proven rather than suspected, and now known to be the only in-scope instance. Filed as **284**,
+with the reachability census 279's sweep never applied to it — 279's note lists `renderPayment`
+among the renderers that *do* ask `showForfeitPicker`, so this branch fell outside that sweep.
+
+Two conclusions for the method. **The pair list is the honest denominator and the frame list is
+the honest one to diff** — the split found the real controls, the diff found the real gap, and
+neither would have been found by the other. And **a coverage probe over registrations still only
+bounds what is untested from below**: the diff closes that gap for the seven view modules today,
+but only because the static line list is a cheap independent census. Where no such census exists,
+the bound stands.
 
 Worked 2026-08-16 (implementation pass, task 282): closed **282** and filed **283** (LOW).
 Rebuilt 281's throwaway probe (`web/_coverage.html`, deleted again) and ran
