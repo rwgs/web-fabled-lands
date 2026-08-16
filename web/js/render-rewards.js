@@ -538,6 +538,21 @@ function renderOptionalPay(story, container, node, path, key) {
 // nodes name a concrete item, codeword, god or blessing. Any of the three becomes real the
 // moment such a node is authored — the picker call, not a new helper, is the fix.
 //
+// A FOURTH gap of the same kind, which that sweep missed because it is on the "does ask" side:
+// renderPayment's own call at the plan.needsChoice arm is UNREACHABLE too (swept task 284).
+// 'payment' wants a non-hidden <lose> with no price=, in a section holding an optional goto,
+// and isEconomicPayment admits only shards/item/cargo/ship — so the open "?"/blank spec
+// losePaymentPlan needs must sit on item= or cargo=. weapon/armour/tool alone make
+// isEconomicPayment false (all 10 open ones in the corpus carry no economic attribute, so they
+// route past 'payment' entirely), and shards/ship never report needsChoice. The shipped corpus
+// holds 38 priceless open item/cargo forfeits across 37 sections and exactly ONE sits in a
+// section with an optional goto — §6.496's "if you refuse to hand these over, turn to 291" —
+// whose <lose item="?"/> is bundled inside a <group force="t">. renderGroup consumes it as one
+// of plan.effects, so it never reaches classifyPassive; its picker is groupForfeitChoice above,
+// which names §6.496 for exactly this reason (task 229). Un-bundle that lose, or author a
+// priceless open item/cargo forfeit into any section carrying a decline goto, and this arm
+// goes live — the call is already written, so there is nothing to add.
+//
 // Reveal a "give up which?" picker for an open "?" possession/equipment/cargo forfeit, so the
 // exact item/cargo the player chooses is what leaves — not whatever the engine finds first.
 // A <lose multiple="N"> forfeit takes N of them, so the picker collects N answers before it

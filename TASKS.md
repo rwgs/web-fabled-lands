@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-283 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **284 is open**. File new
+284 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **no task is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,7 +16,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 284. `renderPayment`'s open-forfeit branch is the one in-scope click handler that never registers in the whole suite, so the picker a forced "give up which?" payment opens has never been rendered — and task 279's reachability sweep left it out
+*(none open)*
 
 **Done**
 
@@ -308,6 +308,7 @@ this order.*
 - [x] 282. Six click handlers still fire for no assertion — three modal-opening renderers and the Adventure Sheet's Wield/Move-down/Drop *(all six now driven; the probe reports cold 6 → 0)*
 - [x] 280. The market header row renders `header1=` and drops `header2=`/`header3=`, so 23 authored column headings ("To buy", "To sell") never reach the page *(adjudicated a deliberate simplification — documented, not changed)*
 - [x] 283. The click-coverage probe keys a site by the frame that *registers* the listener, so `rollButton`'s seven callers collapse into one warm frame — the very shape of gap (task 278's cold `<training>` roll) that started the 281/282 sweep is invisible to it *(re-keyed by caller: 78 controls, 74 warm, 3 cold-by-construction; the 71=71 count was a coincidence, and the one real gap is filed as 284)*
+- [x] 284. `renderPayment`'s open-forfeit branch is the one in-scope click handler that never registers in the whole suite, so the picker a forced "give up which?" payment opens has never been rendered — and task 279's reachability sweep left it out *(censused UNREACHABLE — the corpus's one candidate, §6.496, is group-bundled; 279's note extended to a fourth case)*
 
 ---
 
@@ -890,6 +891,36 @@ which of its "cold" results are artifacts rather than gaps.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-16 (implementation pass, task 284): closed **284** as **unreachable — the outcome
+is a comment**, and filed nothing new. The suite stands at `RESULT ALL PASS pass=2756 fail=0`,
+unmoved: the only code change is the extended sweep note in `render-rewards.js`, plus the build
+stamp it moves.
+
+**The census 279 never ran on this branch says no shipped section can reach it.** Working the
+filing's step 1 back from `classifyPassive`: `'payment'` wants a non-hidden `<lose>` with no
+`price=`, in a section holding an optional `<goto>`, and `isEconomicPayment` admits only
+`shards`/`item`/`cargo`/`ship` — so the open `"?"`/blank spec `losePaymentPlan` needs for
+`needsChoice` has to sit on `item=` or `cargo=`. That rules the equipment kinds out **twice
+over**: `weapon`/`armour`/`tool` alone make `isEconomicPayment` false, and all **10** open ones
+in the corpus (§1.354, §1.370 ×2, §2.90 ×2, §2.290, §5.386, §6.36 ×2, §6.135) carry no economic
+attribute to rescue them. `shards` and `ship` never report `needsChoice` at all.
+
+That leaves **38** priceless open `item`/`cargo` forfeits across **37** shipped sections, and
+**exactly one** sits in a section with an optional goto: **§6.496**, "if you refuse to hand these
+over, turn to 291". Its `<lose item="?"/>` is inside a `<group force="t">`, so `renderGroup`
+takes it as one of `plan.effects` and it never reaches `classifyPassive` — and its picker is
+already `groupForfeitChoice`, which names §6.496 in its own comment (task 229). The one section
+whose page says "decide which item you are handing over" is served by a *different* call to
+`showForfeitPicker` than the one under audit. §2.90/§4.456/§5.152 — 279's open-forfeit costs —
+all carry `price=`, so they route to `optional-pay`/`choose-one` above the payment gate.
+
+So the 279 block gains a fourth case, phrased in the same terms. It differs from the other three
+in kind, and that is why the sweep missed it: those are pickers a renderer **never calls**, this
+is a call that **exists and never fires**. 279's shape was "which renderers ask?" — a question
+`renderPayment` answers *yes* to, which put it on the safe side of the list while one of its two
+`showForfeitPicker` call sites was as dead as the renderers that ask nothing. **The lesson for
+the next sweep: ask per call site, not per renderer.**
 
 Worked 2026-08-16 (implementation pass, task 283): closed **283** as **measured, and the number
 was wrong twice over**; filed **284** (LOW). No app or suite code changed — the whole task is a
