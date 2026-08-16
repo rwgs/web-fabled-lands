@@ -39,6 +39,15 @@ function fillDefaultWords(story, container, span, node) {
 }
 
 // The shared "show the effect's words" span (class fx), appended only when non-empty.
+//
+// Of the four player-choice renderers only renderForfeitChoice calls this; renderAbilityChoice,
+// renderEquipmentChoice and renderProfessionChoice open-code the same span and so skip
+// fillDefaultWords. That gap is INERT, not an oversight: defaultEffectWords has no label for
+// the selectors those three route on — an ability= effect, a profession= list and a wildcard
+// possession all return '' by design — and no corpus node on the three routes carries a second
+// labelled attribute that would print (8 open-ability nodes, 2 equipment, 1 profession; every
+// one writes its own words). The fx class two of them also drop is styled by an empty rule and
+// selected by nothing. Give this a second look only if a labelled default is added. (task 279)
 export function appendFxWords(story, container, node, path) {
   const span = document.createElement('span');
   span.className = 'fx';
@@ -516,6 +525,19 @@ function renderOptionalPay(story, container, node, path, key) {
   return btn;
 }
 
+// Neither picker is called by the whole payment family, and all three gaps are UNREACHABLE
+// rather than missed (swept task 279). showForfeitPicker: renderPayment / renderOptionalPay /
+// renderChooseOnePay ask, renderRollPayment and renderForcedOptional do not. showAbilityPicker:
+// renderOptionalPay / renderChooseOnePay / renderRollPayment ask, renderPayment and
+// renderForcedOptional do not. Why each is out of reach — renderPayment can never hold an
+// ability, because isEconomicPayment returns false the moment ability= is present, so such a
+// node routes to 'ability-choice' instead (structural, not a corpus accident); renderRollPayment
+// needs an open "?" forfeit whose price key is a roll gate, and the corpus's only open-forfeit
+// costs are §2.90, §4.456 and §5.152, none of which holds a random/rankcheck/difficulty;
+// renderForcedOptional needs force="f" on an open selector, and all 21 force="f" gain/tick/lose
+// nodes name a concrete item, codeword, god or blessing. Any of the three becomes real the
+// moment such a node is authored — the picker call, not a new helper, is the fix.
+//
 // Reveal a "give up which?" picker for an open "?" possession/equipment/cargo forfeit, so the
 // exact item/cargo the player chooses is what leaves — not whatever the engine finds first.
 // A <lose multiple="N"> forfeit takes N of them, so the picker collects N answers before it

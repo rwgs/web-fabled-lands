@@ -143,6 +143,11 @@ function appendChildrenList(story, container, nodeList, basePath) {
 
 // ---- navigation -------------------------------------------------------------
 
+// renderGoto's only caller. renderChoice computes the same thing as a local const of the same
+// name (shadowing this one), and renderReturn needs neither — nothing in the corpus writes a
+// <return> with book= or dead=. The parallel gate deadGate below is likewise renderGoto-only:
+// a <choice> takes its dead=/book= rulings from choiceGate, the DOM-free planner, which is a
+// different seam rather than a missing call. Nothing to unify; both were checked. (task 279)
 function targetBook(story, node) {
   const b = node.getAttribute('book');
   return b ? Number(b) : story.book;

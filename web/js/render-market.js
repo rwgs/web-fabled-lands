@@ -161,6 +161,12 @@ function renderShopRow(story, node, path, currency = null, marketSolds = [], mar
   return row;
 }
 
+// Only renderShopRow fires these; the inline <buy>/<sell> pair below never does. UNREACHABLE
+// rather than missed (swept task 279): the corpus holds exactly two <sold> nodes — §3.318's
+// market-level filter and §3.86's row child — both inside a <market>, and no <bought> at all
+// (task 219 implemented the documented twin ahead of any node using it). An inline sell can
+// therefore never carry a hook to fire. Wire them here if one is ever authored outside a market.
+//
 // Fire the <sold> side-effects when a good is sold: the row's own <sold> child
 // always fires (book3/86 pirate captain's head — it is the sale of that row), plus
 // any market-level <sold item="?" tags="…"> whose filter matches the possession

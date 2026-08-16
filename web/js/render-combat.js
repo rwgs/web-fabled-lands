@@ -78,6 +78,11 @@ function renderGroupFight(story, container, node, group) {
   });
   const dmgNode = findInSection(story, 'fightdamage');
   const fleeNode = findInSection(story, 'flee');
+  // renderFight looks up a third node here — <fightround>, the between-round rules of task 99 —
+  // and this does not, so drawGroupFight takes no roundNode. UNREACHABLE rather than missed
+  // (swept task 279): the two sets are disjoint in the corpus, <fightround> living only in
+  // §5.24/383/689 and every group fight in §6.192/273/291/618. Authoring one into a group fight
+  // means adding the lookup and threading it through drawGroupFight as drawFight already does.
   // A shared proxy drives the fight gate + death guard for the whole group: a
   // win once every foe is down; a (non-death) "lose" when the player is slain
   // and the section has an "if you lose…" branch; otherwise unresolved/death.

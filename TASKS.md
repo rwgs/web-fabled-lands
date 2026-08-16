@@ -16,7 +16,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 279. Sweep the remaining tag families for task 277's shape — a shared helper only some of a sibling set calls
 - [ ] 281. Sweep for renderers whose click handler no assertion ever fires — `renderTraining`'s never was, which is why task 172's parity pass could not see 278
 
 **Done**
@@ -304,6 +303,7 @@ this order.*
 - [x] 276. `applyTick`'s profession branch drops a pipe-list on the floor without setting `did`, so a hidden or effect-body `<tick profession="a|b">` ticks a section box instead of doing nothing — the second half of task 275's guard, with 0 corpus nodes today
 - [x] 277. `renderRankcheck`/`renderTraining` never render their node's own words, so 45 shipped sections silently drop the printed roll instruction
 - [x] 278. `renderTraining` reads its `var=` to hold a `<while>` pass but never writes it, so §2.554's "lose 1 MAGIC if you roll a two" can never fire
+- [x] 279. Sweep the remaining tag families for task 277's shape — a shared helper only some of a sibling set calls *(five gaps found, every one unreachable — documented in place)*
 - [x] 280. The market header row renders `header1=` and drops `header2=`/`header3=`, so 23 authored column headings ("To buy", "To sell") never reach the page *(adjudicated a deliberate simplification — documented, not changed)*
 
 ---
@@ -727,6 +727,56 @@ joins, separate from `gatedCases` which only the gated three can join.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-16 (implementation pass, task 279): closed **279** as **checked, clean — five
+gaps of exactly 277's shape, every one unreachable**, so the deliverable is five comments and no
+code change. `RESULT ALL PASS pass=2724 fail=0`, node-import clean, stamp only. The four
+families, with the call-site count against the family size:
+
+- **`render-rewards.js`, choosers (`appendFxWords` 1-of-4)** — only `renderForfeitChoice` calls
+  it; `renderAbilityChoice`/`renderEquipmentChoice`/`renderProfessionChoice` open-code the same
+  span and so skip `fillDefaultWords` (task 215's default label). Inert, and for a reason worth
+  keeping: `defaultEffectWords` returns `''` for exactly the selectors those three route on — an
+  `ability=` effect, a `profession=` list, a wildcard possession — so there is no label to lose.
+  All 11 corpus nodes on the three routes (8 open-ability, 2 equipment, 1 profession) write their
+  own words and carry no second labelled attribute. Two of the three also drop the `fx` class,
+  which is an empty CSS rule selected by no JS and no assertion.
+- **`render-rewards.js`, payments (both pickers 3-of-5)** — `showForfeitPicker` is missing from
+  `renderRollPayment` and `renderForcedOptional`; `showAbilityPicker` from `renderPayment` and
+  `renderForcedOptional`. **The three reasons are not the same kind, and one is much stronger than
+  the other two.** `renderPayment` can never hold an ability at all: `isEconomicPayment` returns
+  false the moment `ability=` is present, so the node routes to `'ability-choice'` — structural,
+  and it stays true however the books are edited. The other two are corpus facts and could expire:
+  `renderRollPayment` needs an open `?` forfeit whose price key is a roll gate, and the only
+  open-forfeit costs (§2.90's weapon/armour, §4.456's two, §5.152's two) sit in sections holding
+  no `random`/`rankcheck`/`difficulty`; `renderForcedOptional` needs `force="f"` on an open
+  selector, and all 21 `force="f"` `gain`/`tick`/`lose` nodes name a concrete item, codeword, god
+  or blessing.
+- **`render-market.js` (hooks 1-of-3)** — only `renderShopRow` fires `runSoldHooks`/
+  `runBoughtHooks`; the inline `<buy>`/`<sell>` pair never does. The corpus holds two `<sold>`
+  nodes, both inside a `<market>` (§3.318 market-level, §3.86 row child), and **zero `<bought>`**
+  — task 219 built the documented twin ahead of any node using it — so an inline sell can never
+  carry a hook to fire.
+- **`render-combat.js` (clean on the named helpers; one gap a rank above them)** — `statsRow`,
+  `playerStatsRow`, `logRow`, `makeFleeButton` and `afterAction` are 2-of-2, which is task 171
+  holding. The gap is in the *callers*: `renderFight` looks up three section nodes and
+  `renderGroupFight` two, so a group fight ignores `<fightround>` (task 99). Disjoint in the
+  corpus — `<fightround>` only in §5.24/383/689, every group fight in §6.192/273/291/618.
+- **`render-choices.js` (`deadGate`/`targetBook` 1-of-3, and neither is a gap)** — a `<choice>`
+  takes its `dead=`/`book=` rulings from `choiceGate`, the DOM-free planner, which is a different
+  seam rather than a missing call, and no corpus `<return>` carries either attribute.
+  `renderChoice` does duplicate `targetBook` as a local `const` **of the same name**, shadowing
+  the module function; identical in result, but it makes `sailThenGo(…, targetBook, …)` read at a
+  glance as if the function were being passed. Left alone as out of scope for a comment pass.
+
+**Method note for the next sweep, because the counting is the cheap part and the adjudication is
+not.** All five gaps were found in about one grep per module; every one then cost a corpus census
+to settle, and the censuses are what the comments record. Two of the five turned on a fact the
+call-site count cannot see — `isEconomicPayment` refusing `ability=`, and `defaultEffectWords`
+returning `''` for the very selectors its non-callers route on — so **a helper's absence is only
+a defect if the node that would reach it can exist**, and that is a question about the *routing
+predicate*, not about the family. The comments say which unreachability is structural and which
+is merely a corpus fact today, since only the second kind can expire.
 
 Worked 2026-08-16 (implementation pass, task 280): closed **280** as **an undocumented
 simplification, now documented — no behaviour change and no regression test**, which is the
