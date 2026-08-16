@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 277 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **nothing is open**. File new
+misdiagnosis (see the Review log); **278 and 279 are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,7 +16,7 @@ there once the buckets below are clear.
 
 **HIGH**
 
-*(none open — file new HIGH work here)*
+- [ ] 278. `renderTraining` reads its `var=` to hold a `<while>` pass but never writes it, so §2.554's "lose 1 MAGIC if you roll a two" can never fire
 
 **MEDIUM**
 
@@ -24,7 +24,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-*(none open — file new LOW work here)*
+- [ ] 279. Sweep the remaining tag families for task 277's shape — a shared helper only some of a sibling set calls
 
 **Done**
 
@@ -532,14 +532,119 @@ Assertions for `suite-render.js`, beside the task-172 description tests: a
 
 ---
 
+## 278. `renderTraining` reads its `var=` to hold a `<while>` pass but never writes it, so §2.554's "lose 1 MAGIC if you roll a two" can never fire
+
+**Priority: HIGH — this one *is* mis-adjudicated, which is the line task 277's filing drew
+between HIGH and MEDIUM. The player escapes a printed penalty entirely. It is one section, not
+45, and the stake is small (1–2 MAGIC), so a reader who weighted blast radius over correctness
+could argue MEDIUM; the rubric weights correctness, so it is filed HIGH.**
+
+*(Filed 2026-08-16 while closing task 277, from a claim in 277's own filing that turned out to
+be wrong — see the Review log.)*
+
+Task 277's filing asserted that "the other three roll-adjacent helpers (`rollGate`,
+`markWhilePending`, `writeRollVar`) are called by all four" roll renderers, and used that as the
+evidence that `appendRollDescription` was an omission rather than a decision. **Two thirds of
+that is false.** `renderTraining` (`render-rolls.js:362`) calls `markWhilePending` but neither
+`rollGate` (deliberate and documented — "`<training>` has no pay gate — a plain memo lookup")
+nor `writeRollVar`. So the real asymmetry is 3-of-4 twice over, and one of the two is a defect.
+
+`renderTraining` reads its `var=` — once:
+
+```js
+const stored = story.ctx.rolls.get(key);
+markWhilePending(story, stored, path, node.getAttribute('var')); // hold a <while> pass
+…
+story.ctx.rolls.set(key, rollTraining(story.state, ability, dice, add));
+```
+
+It reads the attribute to declare the var *pending*, and then never assigns it. The other three
+renderers all follow their `ctx.rolls.set` with `writeRollVar(story, node.getAttribute('var'), …)`.
+
+**§2.554 is the one shipped node that carries a `var`** (census over the shipped corpus: 62
+`<training>` nodes, exactly 1 with `var=`, 0 with `flag=` — so the missing `rollGate` call is
+unreachable and needs no change):
+
+```xml
+<training ability="magic" var="x"/>. Gain 1 on MAGIC if you get higher than your current score, but
+<if var="x" equals="2">
+    <lose ability="magic" amount="deduct"><i>lose</i> 1 MAGIC</lose> if you roll a two.
+</if>
+```
+
+`x` is never assigned, so the guard reads an unwritten var. That does **not** throw and does not
+warn: `engine.js:262` resolves it through `state.getVar`, which returns `0` for an undefined var
+(`engine.js:1538`), and `0 === 2` is false. The snake-eyes penalty is silently unreachable, and
+the printed sentence "if you roll a two" describes a rule the engine cannot apply.
+
+**The fix is one line**, mirroring the other three renderers, in both places `renderTraining`
+stores a result (the first roll and the Luck reroll). `rollTraining` already returns `total` —
+the 2-dice sum, which is exactly what `equals="2"` tests:
+
+```js
+const res = rollTraining(story.state, ability, dice, add);
+writeRollVar(story, node.getAttribute('var'), res.total);
+story.ctx.rolls.set(key, res);
+```
+
+**Note the value differs from its siblings and that is correct**: `renderDifficulty` and
+`renderRankcheck` write `res.margin` (a success *margin* is what their sections test), where
+`<training>`'s section tests the raw dice total. Do not copy the margin line.
+
+Assertions for `suite-render.js`: a `<training ability="MAGIC" var="x"/>` assigns `x` after the
+roll and memoises it (`wroteVars`/`rolledVars`, as the task-172 gated cases assert for the other
+three), and — driving §2.554 itself with a forced seed — a rolled 2 fires the `<if var="x"
+equals="2">` and takes the MAGIC loss, where a higher roll does not. `suite-render.js` already
+seeds the RNG this way for §6.700.
+
+---
+
+## 279. Sweep the remaining tag families for task 277's shape — a shared helper only some of a sibling set calls
+
+**Priority: LOW — an audit, not a known defect. It is filed rather than left in the Review log
+because the one family that *has* been swept produced a HIGH defect (278) on the first look, so
+"probably nothing" is not a safe assumption to leave unrecorded.**
+
+*(Filed 2026-08-16. Suggested in the Review log by task 277's filing pass, repeated by its
+implementation pass, and filed as a task only on the third mention — see the Review log.)*
+
+Task 277's defect shape: a module-private helper factored out for a family of sibling renderers,
+which only some of the family calls. It is invisible to tests, because every assertion about the
+siblings is about what they *do* rather than what they share, and invisible to reading one
+renderer at a time — it only shows up when the siblings are read side by side.
+
+**The roll family (`render-rolls.js`) is done** — swept while closing 277, which found the
+`appendRollDescription` gap (277) and the `writeRollVar` gap (278), and confirmed the missing
+`rollGate` call in `renderTraining` is deliberate and unreachable (0 `<training flag=>` in the
+corpus). **The other families have not been swept.** In rough order of how much rule they carry:
+
+- **`render-rewards.js`** — the chooser family (`renderAbilityChoice`, `renderEquipmentChoice`,
+  `renderForfeitChoice`, `renderProfessionChoice`) against `atSentenceStart`, `fillDefaultWords`,
+  `showForfeitPicker`, `showAbilityPicker`; and the payment family (`renderPayment`,
+  `renderOptionalPay`, `renderChooseOnePay`, `renderRollPayment`, `renderForcedOptional`).
+- **`render-market.js`** — `renderShopRow` against `runSoldHooks`/`runBoughtHooks`/`hookMatches`.
+- **`render-combat.js`** — `drawFight` against `drawGroupFight`, over `statsRow`,
+  `playerStatsRow`, `logRow`, `makeFleeButton`, `afterAction`.
+- **`render-choices.js`** — `deadGate`/`targetBook` across the goto/choice renderers.
+
+Method that worked, and it is cheap: list each module's `^function ` declarations (one `grep`),
+then for each helper count its call sites against the size of the family it serves. A helper
+called by *all* of its family, or by exactly *one*, is uninteresting. **The 2-of-4 and 3-of-4
+cases are the whole yield.** For each, decide whether the gap is deliberate — say so in a comment
+where it is, as `renderTraining` already does for its pay gate — and, where it is not, census the
+corpus for a node that reaches it *before* filing, since an unreachable gap (the `rollGate` one)
+warrants a comment and nothing more.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
 
-Worked 2026-08-16 (implementation pass, task 277): closed **277**, filing nothing — every bucket
-is clear again, so the next pass starts from `ROADMAP.md`. The fix is the two lines the filing
+Worked 2026-08-16 (implementation pass, task 277): closed **277** and filed **278** (HIGH) and
+**279** (LOW). The fix is the two lines the filing
 predicted, one `appendRollDescription` call immediately before each renderer's `makeRollWidget`;
 eight assertions in `suite-render.js` inside the task-172 parity block, which is where the
 "all four roll renderers do X" claims already live. JS-only, so `stamp-version.ps1` and not a data
@@ -554,9 +659,25 @@ the walk adds text and nothing else — had a `<success>` lived inside one of th
 two lines would have drawn a branch inside the description span. **The assertions are anchored to
 DOM position, not to `textContent`**: each checks `.roll`'s `previousElementSibling` is the span
 carrying the words, because a `textContent.includes()` test would have passed just as happily with
-the description appended *below* the widget — and "the words come first" is the whole defect. The
-sweep the filing suggested (other tag families for a helper only some siblings call) has still not
-been run; it remains the obvious next reading pass.
+the description appended *below* the widget — and "the words come first" is the whole defect.
+
+Two process notes, both corrections to this pass rather than to the code. **The sweep 277's filing
+suggested was left in this log for a third time and only became task 279 when challenged** — the
+filing pass wrote it here, this pass repeated it here and then restated it in conversation, which
+is exactly the "findings only in conversation" the workflow forbids. The reasoning for not filing
+it was that an audit with no confirmed defect is not a defect and so belongs in the log (the
+precedent being task 276's declined refactor). That reasoning is wrong for an audit specifically:
+a refactor of working code ends in no defect by construction, where a sweep ends in defects or in
+a recorded "checked, clean" — and either is worth a task. **The rule to carry: if a finding is
+worth repeating in a second Review log entry, it was worth filing in the first.**
+
+And the thing that makes that concrete: **277's filing contained a false claim, and checking it
+before repeating it produced task 278.** The filing argued the omission was an omission because
+"`rollGate`, `markWhilePending`, `writeRollVar` are called by all four" — but `renderTraining`
+calls only the second. One of the two gaps is documented and unreachable (no `<training flag=>`
+in the corpus); the other is a live HIGH defect, §2.554's unwritten `x`. The claim was load-bearing
+for the filing's own argument and had gone unchecked through two passes. **A supporting claim in a
+filing is not evidence until it is re-read** — this one cost nothing to check and was worth a task.
 
 Filed 2026-08-16 (reading pass, no code changed): **277**, found while reading `render-rolls.js`
 for an unrelated question about conditional die counts during conversion work on an unpublished
