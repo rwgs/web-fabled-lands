@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 276 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **nothing is open**. File new
+misdiagnosis (see the Review log); **277 is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,7 +20,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-*(none open — file new MEDIUM work here)*
+- [ ] 277. `renderRankcheck`/`renderTraining` never render their node's own words, so 45 shipped sections silently drop the printed roll instruction
 
 **LOW**
 
@@ -439,11 +439,115 @@ leaves `tickCount` at 0 and the profession unchanged.
 
 ---
 
+## 277. `renderRankcheck`/`renderTraining` never render their node's own words, so 45 shipped sections silently drop the printed roll instruction
+
+**Priority: MEDIUM — a visible prose loss in 45 sections across five books, with no rules
+consequence: the roll itself is correct in every one of them, and the widget's generic label
+("Rank check (roll 1 die)") stands where the author's sentence should be. It is filed MEDIUM
+rather than HIGH because nothing is mis-adjudicated and no exit is mis-gated; it is not LOW
+because the dropped words are load-bearing English — §1.262's paragraph loses its entire roll
+instruction and §5.59's loses a clause from the middle of a sentence, leaving a doubled comma.**
+
+*(Filed 2026-08-16, found while reading the roll renderers for an unrelated question about
+conditional die counts.)*
+
+Every roll renderer in `render-rolls.js` shares one helper for the descriptive text its node
+carries:
+
+```js
+// The descriptive text a <difficulty>/<random> node carries before its widget (task 172):
+// rendered only when it actually has words, so an empty node adds no stray span.
+function appendRollDescription(story, container, node, path) { … }
+```
+
+`renderDifficulty` (`render-rolls.js:235`) and `renderRandom` (`:290`) call it.
+**`renderRankcheck` (`:332`) and `renderTraining` (`:362`) do not** — and neither reaches the
+node's children by any other route: each goes straight to `makeRollWidget`, and the only other
+read of the subtree is `childAdjustment(node, state)`, which collects `<adjust>` elements and no
+text. `renderElement`'s "unknown element: render children so we don't lose prose" fallback
+(`render.js:1397`) cannot help either, because both tags ARE in `TAG_RENDERERS`.
+
+So the words are parsed, walked past, and dropped. The widget's own label is all that renders.
+
+**The clearest instance is §1.262**, whose second paragraph is nothing but the roll:
+
+```xml
+<p>
+    <rankcheck dice="1" add="-1">Roll a die and subtract one from the result</rankcheck>.
+    <success>If you score less than or equal to your Rank, <goto section="546"/>.</success>
+    <failure>Otherwise, <goto section="133"/>.</failure>
+</p>
+```
+
+The player reads `Rank check (roll 1 die).` and is then told "If you score less than or equal to
+your Rank" — with the −1 the printed sentence explains applied invisibly. §1.139 is the same
+shape with the surrounding clause left behind: it renders `Rank check (roll 1 die), and subtract
+one from the score.`, a sentence beginning with a comma.
+
+**§5.59 is the `<training>` half and the more damaging kind**, because the dropped words are
+mid-sentence:
+
+```xml
+As a reward … Choose the ability of your choice (i.e. COMBAT, CHARISMA, and so on),
+<training>roll two dice</training>,
+and if the result is higher than that ability, you can add one to it permanently.
+```
+
+which renders as `…and so on), , and if the result is higher…`.
+
+**Census (shipped corpus only — `books/book[1-6]/` numeric basenames, per task 270).** 54
+`<rankcheck>` nodes, of which **22 carry text**: §1.139, §1.168, §1.260, §1.262, §1.263, §1.284,
+§1.467, §4.5, §4.253, §4.306, §4.329, §4.370, §4.521, §4.529, §4.540, §5.65, §5.92, §5.167,
+§5.308, §5.357, §5.510, §5.606. 62 `<training>` nodes, of which **23 carry text**: §2.89,
+§2.453, §2.631, §2.673, §3.37, §3.316, §3.427, §5.32, §5.59, §5.63, §5.108, §5.187, §5.197,
+§5.283, §5.315, §5.347, §5.408, §5.462, §5.484, §5.507, §5.652, §5.668, §6.235. **45 sections in
+all**; the other 71 nodes are self-closing or hold only `<adjust>` children and lose nothing.
+
+**The fix is one call in each renderer**, placed exactly as the two working ones place it —
+immediately before `makeRollWidget`, so the words precede the widget:
+
+```js
+export function renderRankcheck(story, container, node, path) {
+  const dice = parseInt(node.getAttribute('dice') || '1', 10);
+  const add = parseInt(node.getAttribute('add') || '0', 10);
+  appendRollDescription(story, container, node, path); // its own descriptive text
+  const { key, widget } = makeRollWidget(story, container, node, path);
+  …
+```
+
+and the same line in `renderTraining` before its `makeRollWidget`. `appendRollDescription`
+already appends nothing for an empty node, so the 71 wordless nodes are untouched.
+
+**Two things to check when writing it, both cheap.** `<training ability="a|b">` renders an
+ability picker into the widget when no choice has been made yet — the description belongs
+*above* that, which the placement above gives for free. And `childAdjustment` reads `<adjust>`
+children directly off the node, so walking the same subtree for text does not consume them
+(`renderRandom` has done both since task 172); confirm on §1.324, whose `<random>` carries text
+and three `<adjust>`s together.
+
+Assertions for `suite-render.js`, beside the task-172 description tests: a
+`<rankcheck dice="1">Roll a die</rankcheck>` renders "Roll a die", a self-closing
+`<rankcheck dice="2"/>` adds no stray span, and the same pair for `<training>`.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-16 (reading pass, no code changed): **277**, found while reading `render-rolls.js`
+for an unrelated question about conditional die counts during conversion work on an unpublished
+book. Nothing was open when the pass started and the defect is not one a test could have caught —
+every assertion about these two tags is about the *roll*, and the roll is right. What found it was
+comparing the four roll renderers side by side and noticing that two of them call
+`appendRollDescription` and two do not; the census that turned one asymmetry into 45 sections took
+one command. The lesson worth carrying is that **a shared helper only two of four siblings call is
+a defect shape in itself** — the other three roll-adjacent helpers (`rollGate`,
+`markWhilePending`, `writeRollVar`) are called by all four, which is why this one reads as an
+omission rather than a decision. A sweep of the remaining tag families for the same asymmetry has
+not been run and may be worth a pass.
 
 Worked 2026-08-15 (implementation pass, task 276): closed **276**, filing nothing — every bucket
 is clear again, so the next pass starts from `ROADMAP.md`. The one line the filing named, plus one
