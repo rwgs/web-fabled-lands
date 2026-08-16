@@ -909,6 +909,25 @@ export function forfeitPoolPending(node, view) {
   return view.state.data.items.filter((it) => it.group === group).length < offered;
 }
 
+// Does a punitive <lose blessing="?"> ask the player WHICH blessing leaves? applyLose has
+// taken a chooser for this since task 76 and no view ever supplied one, so it fell back to
+// state.data.blessings[0] — append order, i.e. the blessing held LONGEST. §4.641 prints
+// "(your choice)" in so many words; §1.333 and §1.377 are the same tag on the same path.
+// The sharper cost is that removeBlessing splices permanentBlessings too, so a permanent
+// Safety from Storms bought before an ordinary Luck is what an unasked forfeit destroys.
+//
+// Only the "?" form asks. "*" is the sweep applyLose runs through removeAllBlessings, a named
+// <lose blessing="X"> is task 90's SPEND (the blessing being invoked for its protection, and
+// by far the commonest form), and <if blessing="?"> is task 132's test, not a loss. The spec
+// is compared raw, exactly as applyLose compares it, so the classifier and the engine can
+// never disagree about which nodes are open. Fewer than two held is no choice at all: one
+// falls through to 'apply' and commits, none is a no-op. (task 285)
+export function needsBlessingChoice(node, state) {
+  if (node.tagName.toLowerCase() !== 'lose') return false;
+  if (node.getAttribute('blessing') !== '?') return false;
+  return state.data.blessings.length > 1;
+}
+
 // A <tick profession="a|b|c"> asks the player to choose a new profession. (task 75)
 export function needsProfessionChoice(node) {
   if (node.tagName.toLowerCase() !== 'tick') return false;
@@ -942,6 +961,7 @@ export function isFightHeld(view, node) {
 //   { mode:'roll-payment'|'optional-pay'|'choose-one-reward', key }
 //   { mode:'forced-optional'|'payment'|'ability-choice'|'equipment-choice'|'profession-choice' }
 //   { mode:'forfeit-choice' }              — an open possession forfeit: pick which leaves
+//   { mode:'blessing-choice' }             — an open blessing forfeit: pick which leaves
 //   { mode:'apply', showWords, setVarName, rollOwned, rerunnable } — the plain effect;
 //     rollOwned freezes a <set> whose var a roll owns (task 61), rerunnable re-evaluates
 //     an absolute <set value=…> every render.
@@ -1057,6 +1077,11 @@ export function classifyPassive(node, view) {
   // forfeit written after a <fight> must stay held until that fight resolves, rather than
   // committing the loss through a picker on a branch that may never be taken.
   if (!hidden && needsForfeitChoice(node, view.state)) return { mode: 'forfeit-choice' };
+
+  // A punitive open blessing forfeit is the same shape on a different currency, so it sits in
+  // the same place: below the fight gate, because a blessing charged through a picker on a
+  // branch that may never be taken cannot be given back. (task 285)
+  if (!hidden && needsBlessingChoice(node, view.state)) return { mode: 'blessing-choice' };
 
   const setVarName = tag === 'set' ? node.getAttribute('var') : null;
   // A roll this visit has taken ownership of this var: freeze the <set> so it can

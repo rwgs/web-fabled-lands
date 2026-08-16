@@ -5224,4 +5224,123 @@ export async function run(ctx) {
          generic272.join(' '));
     }
 
+    // --- task 285: an open <lose blessing="?"> must ask WHICH blessing leaves ---
+    // applyLose has taken a chooser for this since task 76 and no view ever supplied one, so it
+    // fell back to state.data.blessings[0] — append order, i.e. the blessing held LONGEST. §4.641
+    // prints "(your choice)" in so many words. The measurement IS the order of the fixture's own
+    // setup: a single-blessing probe shows the right blessing leaving and reads as a pass.
+    {
+      const mk285 = async (blessings, xml = null) => {
+        const g = GameState.create({ name: 'T285', gender: 'f', profession: 'Warrior', book: 4, adv });
+        g.data.blessings = []; g.data.permanentBlessings = [];
+        blessings.forEach(([b, perm]) => g.addBlessing(b, perm));
+        const c = document.createElement('div');
+        const el = xml ? parse(xml) : await data.getSection(4, '641');
+        new Story(c, g, { navigate(){}, onDeath(){}, notify(){} }).begin(el, 4, xml ? 'x285' : '641');
+        return { g, c };
+      };
+      const picks285 = (c) => Array.from(c.querySelectorAll('.ability-choice .ability-pick'));
+      const held285 = (g) => g.data.blessings.join(',');
+
+      // The table the filing measured: same page, same two blessings, opposite acquisition
+      // order — and now the same answer, because the player names it.
+      {
+        const a = await mk285([['combat', false], ['scouting', false]]);
+        ok('task285: §4.641 asks which blessing leaves, taking none yet',
+           picks285(a.c).length === 2 && held285(a.g) === 'combat,scouting',
+           `picks=${picks285(a.c).length} ${held285(a.g)}`);
+        ok('task285: the buttons print the book\'s names, not the stored keys',
+           picks285(a.c).map((b) => b.textContent).join('|') === '− COMBAT|− SCOUTING',
+           picks285(a.c).map((b) => b.textContent).join('|'));
+        picks285(a.c).find((b) => /SCOUTING/.test(b.textContent)).click();
+        ok('task285: the blessing named is the one taken (combat kept)', held285(a.g) === 'combat', held285(a.g));
+
+        const b = await mk285([['scouting', false], ['combat', false]]);
+        picks285(b.c).find((x) => /SCOUTING/.test(x.textContent)).click();
+        ok('task285: the answer no longer depends on which was acquired first',
+           held285(b.g) === 'combat', held285(b.g));
+      }
+
+      // The commit is durable across the re-render: the picker is gone and nothing else goes.
+      {
+        const { g, c } = await mk285([['luck', false], ['travel', false], ['combat', false]]);
+        picks285(c).find((b) => /Safe Travel/.test(b.textContent)).click();
+        ok('task285: the pick is spent — no second picker and no second loss',
+           picks285(c).length === 0 && held285(g) === 'luck,combat', `picks=${picks285(c).length} ${held285(g)}`);
+      }
+
+      // The sharper consequence the filing names: removeBlessing splices permanentBlessings too,
+      // so an unasked forfeit destroyed a permanent Safety from Storms bought BEFORE an ordinary
+      // Luck. The picker is what lets the player keep it.
+      {
+        const { g, c } = await mk285([['storm', true], ['luck', false]]);
+        ok('task285: a permanent blessing is offered like any other',
+           picks285(c).map((b) => b.textContent).join('|') === '− Safety from Storms|− Luck',
+           picks285(c).map((b) => b.textContent).join('|'));
+        picks285(c).find((b) => /Luck/.test(b.textContent)).click();
+        ok('task285: naming the ordinary blessing keeps the permanent one',
+           held285(g) === 'storm' && g.isBlessingPermanent('storm'),
+           `${held285(g)} perm=${g.data.permanentBlessings.join(',')}`);
+      }
+
+      // One blessing is no choice at all, and none is a no-op: both must keep committing on
+      // entry, or §1.333's and §1.377's hazard rows grow a pointless button.
+      {
+        const one = await mk285([['luck', false]]);
+        ok('task285: a lone blessing commits with no picker',
+           picks285(one.c).length === 0 && held285(one.g) === '', `picks=${picks285(one.c).length} ${held285(one.g)}`);
+        const none = await mk285([]);
+        ok('task285: no blessing asks nothing and takes nothing', picks285(none.c).length === 0);
+      }
+
+      // The three forms that must NOT start asking, rendered for real: the "*" sweep, the named
+      // spend (task 90's blessing invoked for its protection), and a hidden loss.
+      {
+        const sweep = await mk285([['luck', false], ['combat', false]],
+          '<section><p><lose blessing="*">lose all your blessings</lose></p></section>');
+        ok('task285: the blessing="*" sweep never asks and takes them all',
+           picks285(sweep.c).length === 0 && held285(sweep.g) === '', `picks=${picks285(sweep.c).length} ${held285(sweep.g)}`);
+        const named = await mk285([['luck', false], ['combat', false]],
+          '<section><p><lose blessing="luck">cross off Luck</lose></p></section>');
+        ok('task285: a NAMED blessing spend never asks', picks285(named.c).length === 0 && held285(named.g) === 'combat',
+           `picks=${picks285(named.c).length} ${held285(named.g)}`);
+        const hid = await mk285([['luck', false], ['combat', false]],
+          '<section><p><lose hidden="t" blessing="?"/></p></section>');
+        ok('task285: a hidden open forfeit has no control to hang a picker on', picks285(hid.c).length === 0);
+      }
+
+      // (planner) the rule, DOM-free.
+      {
+        const g285 = GameState.create({ name: 'T285p', gender: 'f', profession: 'Warrior', book: 4, adv });
+        g285.data.blessings = ['luck', 'combat'];
+        const needs = (xml) => rules.needsBlessingChoice(parse(xml), g285);
+        ok('task285: an open blessing forfeit with a spare blessing asks', needs('<lose blessing="?"/>') === true);
+        ok('task285: the "*" sweep never asks', needs('<lose blessing="*"/>') === false);
+        ok('task285: a named blessing never asks', needs('<lose blessing="luck"/>') === false);
+        ok('task285: <if blessing="?"> stays a test, not a loss (task 132)', needs('<if blessing="?"/>') === false);
+        ok('task285: a <gain blessing="?"> is not a forfeit', needs('<gain blessing="?"/>') === false);
+        g285.data.blessings = ['luck'];
+        ok('task285: one blessing held is no choice', needs('<lose blessing="?"/>') === false);
+      }
+
+      // The census the fix was scoped against, over the bundled corpus (per task 270): three
+      // open blessing forfeits in three sections, and no open gain/tick selector at all — so no
+      // grant path needs the same treatment.
+      {
+        const LOSE285 = /<lose\b[^>]*\bblessing\s*=\s*"\?"/gi;
+        const GRANT285 = /<(gain|tick)\b[^>]*\bblessing\s*=\s*"\?"/gi;
+        const open285 = [], grants285 = [];
+        for (const b of data.availableBooks()) {
+          const raw = await data.loadBook(b);
+          for (const key of Object.keys(raw)) {
+            [...raw[key].matchAll(LOSE285)].forEach(() => open285.push(b + '/' + key));
+            [...raw[key].matchAll(GRANT285)].forEach(() => grants285.push(b + '/' + key));
+          }
+        }
+        ok('task285: exactly these 3 corpus sections carry an open blessing forfeit',
+           open285.sort().join(' ') === '1/333 1/377 4/641', open285.join(' '));
+        ok('task285: and no open gain/tick blessing selector exists', grants285.length === 0, grants285.join(' '));
+      }
+    }
+
 }

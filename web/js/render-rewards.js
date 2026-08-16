@@ -40,14 +40,15 @@ function fillDefaultWords(story, container, span, node) {
 
 // The shared "show the effect's words" span (class fx), appended only when non-empty.
 //
-// Of the four player-choice renderers only renderForfeitChoice calls this; renderAbilityChoice,
-// renderEquipmentChoice and renderProfessionChoice open-code the same span and so skip
-// fillDefaultWords. That gap is INERT, not an oversight: defaultEffectWords has no label for
-// the selectors those three route on — an ability= effect, a profession= list and a wildcard
-// possession all return '' by design — and no corpus node on the three routes carries a second
-// labelled attribute that would print (8 open-ability nodes, 2 equipment, 1 profession; every
-// one writes its own words). The fx class two of them also drop is styled by an empty rule and
-// selected by nothing. Give this a second look only if a labelled default is added. (task 279)
+// Of the five player-choice renderers, renderForfeitChoice and renderBlessingChoice call this;
+// renderAbilityChoice, renderEquipmentChoice and renderProfessionChoice open-code the same span
+// and so skip fillDefaultWords. That gap is INERT, not an oversight: defaultEffectWords has no
+// label for the selectors those three route on — an ability= effect, a profession= list and a
+// wildcard possession all return '' by design — and no corpus node on the three routes carries a
+// second labelled attribute that would print (8 open-ability nodes, 2 equipment, 1 profession;
+// every one writes its own words). The fx class two of them also drop is styled by an empty rule
+// and selected by nothing. Give this a second look only if a labelled default is added.
+// (tasks 279, 285 — the blessing route's own default is '', blessingLabel("?") naming nothing)
 export function appendFxWords(story, container, node, path) {
   const span = document.createElement('span');
   span.className = 'fx';
@@ -270,6 +271,7 @@ export function renderPassive(story, container, node, path) {
     case 'ability-choice':    return renderAbilityChoice(story, container, node, path);
     case 'equipment-choice':  return renderEquipmentChoice(story, container, node, path);
     case 'forfeit-choice':    return renderForfeitChoice(story, container, node, path);
+    case 'blessing-choice':   return renderBlessingChoice(story, container, node, path);
     case 'profession-choice': return renderProfessionChoice(story, container, node, path);
     default: { // 'apply' — the plain effect, memoised per-visit
       const key = 'fx@' + path;
@@ -375,6 +377,42 @@ function renderForfeitChoice(story, container, node, path) {
     story.rerender();
   });
   return null;
+}
+
+// A punitive <lose blessing="?">: print its words, then stand a picker where the effect would
+// have applied, so the blessing the player names is the one that leaves rather than whichever
+// was acquired first. The label is the shared blessingLabel, so the button reads the name the
+// book prints ("Safety from Storms") and not the stored key; the "−" prefix matches the ability
+// loss picker this row is modelled on. The memo is the SAME fx@ key the plain path uses, for
+// renderForfeitChoice's reasons: marking it applied before the pick commits would void the loss
+// on the re-render, and sharing it means a state that stops needing a choice (one blessing left)
+// falls back through 'apply' already applied. (task 285)
+function renderBlessingChoice(story, container, node, path) {
+  const memo = 'fx@' + path;
+  appendFxWords(story, container, node, path);
+  if (story.ctx.applied.has(memo)) return null; // already chosen this visit
+  story.pendingChoice = true; // the exits wait for the answer (task 251)
+  const box = document.createElement('span');
+  box.className = 'ability-choice';
+  story.state.data.blessings.slice().forEach((b) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-mini ability-pick';
+    btn.textContent = '− ' + (blessingLabel(b) || b);
+    btn.addEventListener('click', () => {
+      // The blessing goes from the CLICK, so the node books at its own position (tasks 261, 263).
+      // A blessing is neither purse nor pack, so today this books nothing — but the node applies
+      // whole, and a spec carrying a taking too is charged here and belongs on the ledger.
+      const mark = story.spendMark();
+      const note = applyEffect(node, story.state, { chooser: () => [b] });
+      story.noteSpend(path, mark);
+      story.ctx.applied.add(memo);
+      if (note) story.notify(note);
+      story.rerender();
+    });
+    box.appendChild(btn);
+  });
+  container.appendChild(box);
+  return box;
 }
 
 function renderProfessionChoice(story, container, node, path) {

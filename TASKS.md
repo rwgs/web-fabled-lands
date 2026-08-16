@@ -16,7 +16,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 285. A `<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes whichever blessing was acquired first
+- [x] 285. A `<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes whichever blessing was acquired first
 
 **LOW**
 
@@ -892,6 +892,37 @@ which of its "cold" results are artifacts rather than gaps.
 
 ## 285. A `<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes whichever blessing was acquired first
 
+**DONE** — a fifth player-choice verdict, exactly as the filing scoped it. `needsBlessingChoice`
+(`render-rules.js`) reports a `<lose blessing="?">` with two or more blessings held, and
+`classifyPassive` routes it to `blessing-choice` **below the fight gate**, beside `forfeit-choice`
+and for its reason: a blessing charged through a picker on a branch that may never be taken cannot
+be given back. `renderBlessingChoice` (`render-rewards.js`) prints the effect's words through the
+shared `appendFxWords`, then stands a `.ability-choice` row of `blessingLabel`-labelled buttons —
+so §4.641 reads "− COMBAT / − SCOUTING" and §6.159's permanent reads "− Safety from Storms", the
+name the book prints rather than the stored key — and commits `applyEffect(node, state,
+{ chooser: () => [b] })` on the click, on the **same `fx@` memo** the plain path uses. Sharing
+that key is what makes a state which stops needing a choice fall back through `apply` already
+applied, and what stops the loss being voided by the re-render.
+
+The spec is compared **raw** (`getAttribute('blessing') !== '?'`), exactly as `applyLose` compares
+it, so the classifier and the engine can never disagree about which nodes are open. The three
+forms the filing ruled out stay ruled out, each with a rendered assertion of its own: the `"*"`
+sweep, the named spend (task 90's blessing invoked for its protection, 70 nodes), and
+`<if blessing="?">` (task 132's test). Fewer than two held still commits on entry, so §1.333's and
+§1.377's hazard rows grow no pointless button.
+
+20 new assertions in `suite-actions`, and the suite moves `2756 → 2776`. The filing's table is the
+first of them: §4.641 rendered on two blessings held in one order and the other, same answer both
+ways, where before it took whichever was acquired first. The permanent case is asserted too —
+`removeBlessing` splices `permanentBlessings`, so an unasked forfeit destroyed a Safety from Storms
+bought before an ordinary Luck; naming the Luck now keeps it. The census is re-measured over the
+bundled corpus per task 270: **3** open forfeits in `1/333 1/377 4/641`, and **0** open
+`gain`/`tick` blessing selectors, so no grant path needs the same treatment.
+
+`render-rewards.js`'s task-279 sweep note is extended rather than left stale: there are five
+player-choice renderers now, two of which call `appendFxWords`, and the blessing route's own
+default is `''` because `blessingLabel("?")` names nothing to print.
+
 **Priority: MEDIUM — task 231's finding on a different currency, and the same call. Live in three
 published sections (book1/333, book1/377, book4/641), one of which prints the choice in so many
 words. Nothing is over-charged (one blessing leaves either way) and it only bites a player holding
@@ -993,6 +1024,31 @@ asking which of them any view ever supplies.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-16 (implementation pass, task 285): closed **285** — the fifth chooser hook now has
+a view that supplies it — and filed nothing new. The suite moves `RESULT ALL PASS pass=2756 fail=0`
+→ `pass=2776 fail=0`; `web/` only, so the change is a stamp and no data rebuild.
+
+**The fix is smaller than the finding, and that is the point.** No new picker widget: a
+`needsBlessingChoice` predicate beside `needsForfeitChoice`, one `blessing-choice` line in
+`classifyPassive`'s cascade, and a `renderBlessingChoice` that open-codes the same
+`.ability-choice` row `renderEquipmentChoice` and `renderProfessionChoice` already do. The filing
+suggested `story.appendAbilityPicker`, but that helper labels through `ABILITY_LABEL[ab] ||
+ab.toUpperCase()`, which prints a blessing key raw — "STORM" where the book says "Safety from
+Storms". The two siblings that also carry non-ability labels open-code the box for exactly that
+reason, so this is the third, not a new pattern.
+
+**Placement in the cascade was the only real decision.** `needsAbilityChoice` sits ABOVE the
+fight gate and `needsForfeitChoice` deliberately below it, so a loss written after a `<fight>`
+stays held rather than committing through a picker on a branch that may never be taken. A blessing
+is a forfeit off the sheet, not an ability point, so it went below — even though no corpus node
+can tell the two placements apart today (all three live in plain prose or a travel outcome). The
+comment says which of those two it was copying, so a future node in fight prose lands the way the
+rule intends rather than the way the corpus happened not to test.
+
+**And the order of the fixture's own setup is the assertion.** Every probe holds two blessings in
+a named order and picks the *second*; a single-blessing fixture would have shown the correct
+blessing leaving and read as a pass, which is why nothing before this caught it.
 
 Filed 2026-08-16 (filing pass, no task open at the time): filed **285** (MEDIUM) — a
 `<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes
