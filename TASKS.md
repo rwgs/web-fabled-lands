@@ -20,7 +20,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 286. A `<group>` never asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page states
+- [x] 286. A `<group>` never asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page states
 
 **Done**
 
@@ -1022,6 +1022,39 @@ asking which of them any view ever supplies.
 
 ## 286. A `<group>` never asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page states
 
+**DONE** — `groupForfeitChoice` becomes `groupBundledChoice` (`render-rewards.js`), which answers
+"what must this button ask before it commits?" instead of "which forfeit must it ask about?". Two
+arms, in that order: an open possession/equipment/cargo `<lose>` whose `losePaymentPlan` reports
+`needsChoice` — now including a `multiple=` count that is a **literal integer**, per the new
+`fixedForfeitCount` — and, failing that, an open `needsAbilityChoice` node whose
+`abilityChoiceOptions` leaves more than one eligible ability. `renderGroup`'s click dispatches to
+`showAbilityPicker` or `showForfeitPicker` accordingly; everything else is unchanged, because task
+229 had already moved the group's whole body — effects, awards, buys, rests, `<goto>`/`<return>`/
+revival — behind a `commit(chooser)` the picker calls, and a second kind of picker calls the same
+one.
+
+Exactly **one** question is asked and the forfeit wins where both are present: no corpus group
+carries two open selectors, so chaining pickers would be machinery for a shape nobody has authored.
+A single eligible ability commits straight through, matching the lone-possession case task 229
+already had — `abilityTargets`' own `cands[0]` *is* that option, so a one-button row would decide
+nothing. The printed floor ("you cannot choose an ability that already has a value of 1") needed no
+code here at all: `abilityChoiceOptions`' `forLoss` filter drops those before the picker sees them,
+which is also what makes "more than one eligible" the right test rather than "more than one listed".
+
+`renderGroupWithRoll` is untouched, for task 229's reason unchanged: both var-count groups live
+there and neither asks. The two stale comment references to the old helper name are updated, and
+`render-rewards.js`'s task-279/284 sweep note gains the one line that keeps its caller census
+complete — outside the payment family both pickers have exactly one more caller, and it is
+`renderGroup` for both.
+
+17 new assertions in `suite-actions`, and the suite moves `2776 → 2793`. Task 229's `multiple=`
+assertion is re-pinned rather than deleted: it now drives a `<set var="x" value="2"/>` outside the
+group so the walk writes the count before the group is classified, and asserts the var form is
+still engine-chosen — the fixed form is asserted the other way in the new block. The census is
+re-measured in the suite over `data.availableBooks()` (per task 270) and pinned at **0** groups with
+a fixed-count open forfeit and **0** with an open ability selector, so a section arriving in either
+list lands here and wants measuring.
+
 **Priority: LOW — latent on both arms. Censused over the bundled corpus: no group in the six
 published books carries an open ability selector, and none carries a fixed-count open forfeit. Like
 task 228 this is a shape the renderer cannot serve rather than a page it serves wrongly, and it is
@@ -1113,6 +1146,24 @@ half of its evidence, and must be re-pinned to the var form it was actually argu
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-16 (implementation pass, task 286): closed **286** — the group's one picker becomes
+the group's one *question*, with an ability arm and a fixed-count forfeit arm — and filed nothing
+new. The suite moves `RESULT ALL PASS pass=2776 fail=0` → `pass=2793 fail=0`; `web/` only, so the
+change is a stamp and no data rebuild.
+
+**Both arms are inert for the shipped corpus, and that is the deliverable.** The suite's own census
+pins **0** and **0**, so nothing in six published books renders differently — this closes a latent
+case before something authors it, which is task 228's shape rather than task 229's. The value is in
+the pin: the two census assertions are tripwires, and a section arriving in either list is a page
+whose printed choice the app would otherwise ignore.
+
+**Re-pinning task 229's assertion cost more thought than the fix did.** Deleting it would have lost
+the rule it was really defending (a rolled count stays engine-chosen); leaving it would have failed.
+The var form needs a var, and a group's classification happens on the render — so the `<set>` goes
+*outside* the group, where the walk reaches it first. That is worth knowing generally: a bundled
+`<random>` writes its var on the roll path, but a plain group is classified before its own button is
+ever clicked, so anything its plan reads must already be written.
 
 Filed 2026-08-16 (filing pass, no task open at the time): filed **286** (LOW) — a `<group>` never
 asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page

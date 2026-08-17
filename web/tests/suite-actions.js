@@ -2107,13 +2107,19 @@ export async function run(ctx) {
              `picks=${picks226(c).length} ${names226(g)}`);
         }
 
-        // A multiple= forfeit stays engine-chosen: §3.273/§3.629 bundle "lose the first 1-6 of
+        // A VAR-count forfeit stays engine-chosen: §3.273/§3.629 bundle "lose the first 1-6 of
         // your possessions" with the roll that sets the count, and neither page offers a choice.
+        // Task 229 wrote this assertion with a fixed multiple="2", which read the rule off the
+        // wrong half of its own evidence — task 286 narrows it to the var form and asserts the
+        // fixed one the other way (below). The <set> sits OUTSIDE the group so the walk writes
+        // `x` before the group is classified; a bundled die does it on the roll path instead.
         {
-          const { g, c } = mk229(grp229('<lose item="?" multiple="2"/>'),
+          const varGrp = '<section><p><set var="x" value="2"/><group force="t"><text>hand it over</text>'
+            + '<lose item="?" multiple="x"/><goto section="149"/></group></p></section>';
+          const { g, c } = mk229(varGrp,
             [makeItem('item', 'rope'), makeItem('item', 'lantern'), makeItem('item', 'flask')]);
           c.querySelector('.group-action').click();
-          ok('task229: a multiple= group forfeit is never a choice — it still takes the first',
+          ok('task229: a var-count group forfeit is never a choice — it still takes the first',
              picks226(c).length === 0 && names226(g) === 'flask', `picks=${picks226(c).length} ${names226(g)}`);
         }
 
@@ -5340,6 +5346,169 @@ export async function run(ctx) {
         ok('task285: exactly these 3 corpus sections carry an open blessing forfeit',
            open285.sort().join(' ') === '1/333 1/377 4/641', open285.join(' '));
         ok('task285: and no open gain/tick blessing selector exists', grants285.length === 0, grants285.join(' '));
+      }
+    }
+
+    // --- task 286: a <group> must ask which ability an open spec takes, and honour a forfeit
+    // count the page states ---
+    // A group is ONE button applying a whole bundle, so every chooser hook inside it committed on
+    // a candidate nobody was asked about. Two of them: abilityTargets fell to cands[0] (CHARISMA
+    // for almost every character), and task 229's blanket multiple= exclusion — reasoned from
+    // §3.273's ROLLED count, which is the case that genuinely cannot be asked about — also
+    // silenced a count the page prints as a constant, which is task 228's priced offer.
+    {
+      const SCORES286 = { charisma: 4, combat: 8, magic: 3, sanctity: 3, scouting: 5, thievery: 5 };
+      const mk286 = (xml, seed = () => {}) => {
+        const g = GameState.create({ name: 'T286', gender: 'm', profession: 'Warrior', book: 1, adv });
+        g.data.items = []; g.data.shards = 30;
+        Object.assign(g.data.abilities, SCORES286);
+        seed(g);
+        const c = document.createElement('div');
+        const nav = [];
+        new Story(c, g, { navigate(b, s) { nav.push(b + '/' + s); }, onDeath() {}, notify() {} })
+          .begin(parse(xml), 1, 'x286');
+        return { g, c, nav };
+      };
+      const abPicks286 = (c) => Array.from(c.querySelectorAll('.ability-choice .ability-pick'));
+      const picks286 = (c) => Array.from(c.querySelectorAll('.forfeit-choice .btn-mini'));
+      const names286 = (g) => g.data.items.map((i) => i.name).join(',');
+      const grp286 = (body) => '<section><p><group force="t"><text>accept the rite</text>'
+        + body + '<goto section="358"/></group></p></section>';
+      // The shape the fix exists for: one click owing three things, one of which is a question.
+      const RITE286 = '<lose ability="?" amount="1"/><lose shards="10"/><tick codeword="Nahual"/>';
+
+      // The whole bundle waits for the answer, then lands together — the ability the player
+      // names, the money and the codeword. Before this the click spent all three at once and
+      // took CHARISMA, the first candidate above 1.
+      {
+        const a = mk286(grp286(RITE286));
+        const btn = a.c.querySelector('.group-action');
+        ok('task286: the group renders one live button and no ability picker yet',
+           !!btn && btn.disabled === false && abPicks286(a.c).length === 0,
+           btn ? `dis=${btn.disabled} picks=${abPicks286(a.c).length}` : 'no group button');
+        btn.click();
+        ok('task286: a bundled open ability loss asks which, spending nothing yet',
+           abPicks286(a.c).length === 6 && a.g.data.shards === 30
+           && !a.g.hasCodeword('Nahual') && a.nav.length === 0,
+           `picks=${abPicks286(a.c).length} sh=${a.g.data.shards} nav=${a.nav.join()}`);
+        ok('task286: the group button is spent while the picker is open', btn.disabled === true);
+        abPicks286(a.c).find((b) => /Thievery/.test(b.textContent)).click();
+        ok('task286: the ability named is the one that drops — not the first candidate',
+           a.g.data.abilities.thievery === 4 && a.g.data.abilities.charisma === 4,
+           `thi=${a.g.data.abilities.thievery} cha=${a.g.data.abilities.charisma}`);
+        ok('task286: and the rest of the bundle lands with it, only then following the goto',
+           a.g.data.shards === 20 && a.g.hasCodeword('Nahual') && a.nav.join() === '1/358',
+           `sh=${a.g.data.shards} cw=${a.g.hasCodeword('Nahual')} nav=${a.nav.join()}`);
+      }
+
+      // The printed floor — "you cannot choose an ability that already has a value of 1" —
+      // is abilityChoiceOptions' forLoss filter, so the picker inherits it with no code here.
+      {
+        const a = mk286(grp286(RITE286), (g) => { g.data.abilities.thievery = 1; g.data.abilities.magic = 1; });
+        a.c.querySelector('.group-action').click();
+        ok('task286: an ability already at 1 is not offered',
+           abPicks286(a.c).map((b) => b.textContent).join('|') === '− Charisma|− Combat|− Sanctity|− Scouting',
+           abPicks286(a.c).map((b) => b.textContent).join('|'));
+      }
+
+      // One eligible option is no question: abilityTargets' own cands[0] IS that option, so the
+      // click must commit exactly as it did before rather than stand a one-button row.
+      {
+        const a = mk286(grp286(RITE286), (g) => {
+          Object.keys(SCORES286).forEach((k) => { g.data.abilities[k] = 1; });
+          g.data.abilities.sanctity = 6;
+        });
+        a.c.querySelector('.group-action').click();
+        ok('task286: a lone eligible ability commits on the click, with no picker',
+           abPicks286(a.c).length === 0 && a.g.data.abilities.sanctity === 5
+           && a.g.hasCodeword('Nahual') && a.nav.join() === '1/358',
+           `picks=${abPicks286(a.c).length} san=${a.g.data.abilities.sanctity} nav=${a.nav.join()}`);
+      }
+
+      // A NAMED ability in a group asks nothing — §3.165 and §6.664 bundle five of them and
+      // must keep applying straight through.
+      {
+        const a = mk286(grp286('<lose ability="combat" amount="1"/>'));
+        a.c.querySelector('.group-action').click();
+        ok('task286: a named ability in a group still asks nothing',
+           abPicks286(a.c).length === 0 && a.g.data.abilities.combat === 7 && a.nav.join() === '1/358',
+           `picks=${abPicks286(a.c).length} com=${a.g.data.abilities.combat}`);
+      }
+
+      // An "a|b" spec offers exactly the two listed, on the same route.
+      {
+        const a = mk286(grp286('<lose ability="combat|sanctity" amount="1"/>'));
+        a.c.querySelector('.group-action').click();
+        ok('task286: an a|b spec offers exactly those two',
+           abPicks286(a.c).map((b) => b.textContent).join('|') === '− Combat|− Sanctity',
+           abPicks286(a.c).map((b) => b.textContent).join('|'));
+        abPicks286(a.c).find((b) => /Sanctity/.test(b.textContent)).click();
+        ok('task286: and takes the one named', a.g.data.abilities.sanctity === 2 && a.g.data.abilities.combat === 8,
+           `san=${a.g.data.abilities.sanctity} com=${a.g.data.abilities.combat}`);
+      }
+
+      // A gain is the same form on the other sign — the arm reads needsAbilityChoice, which
+      // covers <lose>/<gain>/<tick>, so a bundled "add a point to any ability" asks too.
+      {
+        const a = mk286(grp286('<gain ability="?" amount="1"/>'));
+        a.c.querySelector('.group-action').click();
+        abPicks286(a.c).find((b) => /Magic/.test(b.textContent)).click();
+        ok('task286: a bundled open GAIN asks as well, and adds where told',
+           a.g.data.abilities.magic === 4 && a.g.data.abilities.charisma === 4,
+           `mag=${a.g.data.abilities.magic} cha=${a.g.data.abilities.charisma}`);
+      }
+
+      // The forfeit half: a count the page states is task 228's picker, collecting exactly that
+      // many answers before anything leaves — and the group's <goto> still waits for the last one.
+      {
+        const a = mk286(grp286('<lose item="?" multiple="2"/>'),
+          (g) => { [makeItem('item', 'rope'), makeItem('item', 'lantern'), makeItem('item', 'flask')].forEach((it) => g.addItem(it)); });
+        a.c.querySelector('.group-action').click();
+        ok('task286: a fixed-count group forfeit offers every possession and counts from zero',
+           picks286(a.c).length === 3 && /0 of 2 chosen/.test(a.c.querySelector('.forfeit-choice').textContent)
+           && names286(a.g) === 'rope,lantern,flask',
+           `picks=${picks286(a.c).length} ${a.c.querySelector('.forfeit-choice').textContent.trim()}`);
+        picks286(a.c).find((b) => /rope/i.test(b.textContent)).click();
+        ok('task286: the first pick takes nothing, strikes its item off and holds the goto',
+           picks286(a.c).length === 2 && names286(a.g) === 'rope,lantern,flask' && a.nav.length === 0,
+           `picks=${picks286(a.c).length} ${names286(a.g)} nav=${a.nav.join()}`);
+        picks286(a.c).find((b) => /flask/i.test(b.textContent)).click();
+        ok('task286: the second takes BOTH named possessions and only then moves on',
+           names286(a.g) === 'lantern' && a.nav.join() === '1/358', `${names286(a.g)} nav=${a.nav.join()}`);
+      }
+
+      // Exactly enough candidates is no choice: two possessions for a multiple="2" forfeit has
+      // nothing to spare, so needsChoice stays false and the click commits as it always did.
+      {
+        const a = mk286(grp286('<lose item="?" multiple="2"/>'),
+          (g) => { [makeItem('item', 'rope'), makeItem('item', 'lantern')].forEach((it) => g.addItem(it)); });
+        a.c.querySelector('.group-action').click();
+        ok('task286: a forfeit with no surplus asks nothing and takes them both',
+           picks286(a.c).length === 0 && names286(a.g) === '' && a.nav.join() === '1/358',
+           `picks=${picks286(a.c).length} ${names286(a.g)}`);
+      }
+
+      // The census the fix was scoped against, over the bundled corpus (per task 270). Both arms
+      // are INERT for the published edition — no group carries a fixed-count open forfeit, and
+      // none carries an open ability selector — so this is a latent case closed before it ships,
+      // like task 228's. A section arriving in either list wants measuring, not assuming.
+      {
+        const GRP286 = /<group\b[^>]*>[\s\S]*?<\/group>/gi;
+        const FIXED286 = /<lose\b[^>]*\bmultiple\s*=\s*"\d+"[^>]*>/gi;
+        const OPENSEL286 = /\b(?:item|cargo|weapon|armour|tool)\s*=\s*"\s*\??\s*"/i;
+        const ABSEL286 = /<(?:lose|gain|tick)\b[^>]*\bability\s*=\s*"(?:\s*\?\s*|[a-z]+\|[a-z|]+)"/i;
+        const fixed286 = [], ability286 = [];
+        for (const b of data.availableBooks()) {
+          const raw = await data.loadBook(b);
+          for (const key of Object.keys(raw)) {
+            for (const g of raw[key].match(GRP286) || []) {
+              if ((g.match(FIXED286) || []).some((n) => OPENSEL286.test(n))) fixed286.push(b + '/' + key);
+              if (ABSEL286.test(g)) ability286.push(b + '/' + key);
+            }
+          }
+        }
+        ok('task286: no corpus group carries a fixed-count OPEN forfeit', fixed286.length === 0, fixed286.join(' '));
+        ok('task286: and no corpus group carries an open ability selector', ability286.length === 0, ability286.join(' '));
       }
     }
 

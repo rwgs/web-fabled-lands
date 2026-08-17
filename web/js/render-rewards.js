@@ -60,20 +60,50 @@ export function appendFxWords(story, container, node, path) {
 
 // ---- group: an optional, click-to-apply action -----------------------------
 
-// The one bundled forfeit a group must ask about before it commits: an open "?"/blank
-// possession/equipment/cargo <lose> with more candidates than it takes. A group collapses to
-// ONE button and consults no payment plan, so its click fell through to applyLose's
-// no-chooser branch and took whatever came first in pack order — even on §6.496, whose page
-// says "decide which item you are handing over" and then gave no way to decide. A multiple=
-// forfeit is excluded on purpose: the corpus's only group ones are §3.273/§3.629's "lose the
-// first 1-6 of your possessions", a rolled-count sweep the book never offers a choice over,
-// and the count is a var — so it stays engine-chosen whatever that roll comes to. That also
-// leaves renderGroupWithRoll (where both of those live) with nothing to ask. (task 229)
-function groupForfeitChoice(story, effects) {
+// A <lose multiple=> whose count the page states as a CONSTANT, so the picker knows up front
+// how many answers it owes. No multiple= at all is a count of one. A var count (§3.273/§3.629's
+// `multiple="x"`, written by a bundled die) is not one of these — see below. (task 286)
+function fixedForfeitCount(el) {
+  const n = el.getAttribute('multiple');
+  return n == null || /^\d+$/.test(String(n).trim());
+}
+
+// The one bundled choice a group must put to the player before it commits. A group collapses to
+// ONE button and consults no payment plan, so its click applied every child with an empty options
+// object and every engine chooser hook inside it fell back to a candidate nobody was asked about
+// — even on §6.496, whose page says "decide which item you are handing over" and then gave no way
+// to decide. Two kinds reach it:
+//
+//   (a) an open "?"/blank possession/equipment/cargo <lose> with more candidates than it takes,
+//       which applyLose would take first-in-pack (task 229); and
+//   (b) an open ability spec ("?" or "a|b") on a bundled <lose>/<gain>/<tick>, which
+//       abilityTargets resolves to cands[0] — CHARISMA for almost every character (task 286).
+//
+// **A multiple= forfeit asks only where the page states the count.** Task 229 excluded every
+// multiple= outright, on evidence that is really about the VAR form: the corpus's group ones are
+// §3.273/§3.629's "lose the first 1-6 of your possessions", where the count is written by a die,
+// the page names no choice, and asking would be incoherent anyway (a roll of 1 would ask and a
+// roll of 6 would not). A fixed count is the opposite case — task 228's priced offer, where the
+// page names the number and the player names the items — and it is the one the count-aware picker
+// was built for. Both var groups still live in renderGroupWithRoll, which asks nothing, so that
+// path needs no change now for the same reason it needed none then.
+//
+// Only ONE question is asked, and the forfeit wins where a group holds both: no corpus group
+// carries two open selectors, so chaining pickers would be machinery for a shape nobody has
+// written. An ability spec with a single eligible option is not a choice either — abilityTargets'
+// own cands[0] IS that option — so it commits on the click like a lone possession does.
+function groupBundledChoice(story, effects) {
   for (const fx of effects) {
-    if (fx.tagName.toLowerCase() !== 'lose' || fx.hasAttribute('multiple')) continue;
+    if (fx.tagName.toLowerCase() !== 'lose' || !fixedForfeitCount(fx)) continue;
     const plan = losePaymentPlan(fx, story.state);
-    if (plan.needsChoice) return { node: fx, plan };
+    if (plan.needsChoice) return { kind: 'forfeit', node: fx, plan };
+  }
+  for (const fx of effects) {
+    if (!needsAbilityChoice(fx)) continue;
+    const forLoss = fx.tagName.toLowerCase() === 'lose';
+    if (abilityChoiceOptions(fx.getAttribute('ability'), story.state, forLoss).length > 1) {
+      return { kind: 'ability', node: fx };
+    }
   }
   return null;
 }
@@ -96,12 +126,13 @@ export function renderGroup(story, container, node, path) {
   btn.disabled = done;
   btn.textContent = (done ? '☑ ' : '☐ ') + plan.label;
   if (!done) {
-    // A bundled open forfeit is named by the player BEFORE any of this runs: the group is one
-    // button, so its other effects, awards, buys, rests and any <goto>/<return>/revival all
-    // wait for the picker — firing the navigation first would leave the section before the
-    // forfeit was chosen. The losses still precede the awards (a recipe frees the slot its
-    // reward needs), because the whole body simply moves behind the pick. (task 229)
-    const forfeit = groupForfeitChoice(story, plan.effects);
+    // A bundled open forfeit — or an open ability spec — is named by the player BEFORE any of
+    // this runs: the group is one button, so its other effects, awards, buys, rests and any
+    // <goto>/<return>/revival all wait for the picker — firing the navigation first would leave
+    // the section before the choice was made. The losses still precede the awards (a recipe
+    // frees the slot its reward needs), because the whole body simply moves behind the pick.
+    // (tasks 229, 286)
+    const forfeit = groupBundledChoice(story, plan.effects);
     const commit = (chooser) => {
       // The whole body applies on the CLICK, not during the walk, so the group books its taking
       // at its own node — the button is the position a bundled price was paid at (task 261).
@@ -139,7 +170,8 @@ export function renderGroup(story, container, node, path) {
     btn.addEventListener('click', () => {
       if (!forfeit) { commit(null); return; }
       btn.disabled = true; // the pick replaces the button — never let a second click re-run it
-      showForfeitPicker(story, container, forfeit.plan, commit);
+      if (forfeit.kind === 'ability') showAbilityPicker(story, container, forfeit.node, commit);
+      else showForfeitPicker(story, container, forfeit.plan, commit);
     });
   }
   container.appendChild(btn);
@@ -575,6 +607,8 @@ function renderOptionalPay(story, container, node, path, key) {
 // renderForcedOptional needs force="f" on an open selector, and all 21 force="f" gain/tick/lose
 // nodes name a concrete item, codeword, god or blessing. Any of the three becomes real the
 // moment such a node is authored — the picker call, not a new helper, is the fix.
+// Outside that family both pickers have one more caller each, and it is the same one:
+// renderGroup, through groupBundledChoice (tasks 229, 286).
 //
 // A FOURTH gap of the same kind, which that sweep missed because it is on the "does ask" side:
 // renderPayment's own call at the plan.needsChoice arm is UNREACHABLE too (swept task 284).
@@ -586,7 +620,7 @@ function renderOptionalPay(story, container, node, path, key) {
 // holds 38 priceless open item/cargo forfeits across 37 sections and exactly ONE sits in a
 // section with an optional goto — §6.496's "if you refuse to hand these over, turn to 291" —
 // whose <lose item="?"/> is bundled inside a <group force="t">. renderGroup consumes it as one
-// of plan.effects, so it never reaches classifyPassive; its picker is groupForfeitChoice above,
+// of plan.effects, so it never reaches classifyPassive; its picker is groupBundledChoice above,
 // which names §6.496 for exactly this reason (task 229). Un-bundle that lose, or author a
 // priceless open item/cargo forfeit into any section carrying a decline goto, and this arm
 // goes live — the call is already written, so there is nothing to add.
