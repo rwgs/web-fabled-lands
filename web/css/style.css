@@ -471,6 +471,22 @@ img { max-width: 100%; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(20,12,4,0.62); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; }
 .modal { background: var(--card); border-radius: 14px; border: 1px solid var(--parchment-edge); max-width: 640px; width: 100%; max-height: 88vh; overflow-y: auto; padding: 1.3rem 1.4rem; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
 .modal h2 { font-family: var(--display); color: var(--crimson); margin: 0 0 0.8rem; }
+/* The header of a scrolling dialog stays put, so its ✕ never scrolls out of reach (task 287).
+   Negative margins pull the row out to the box's padding edges (.modal is the scroll container).
+   `top` is offset by the same -1.3rem because a sticky offset positions the MARGIN box: at
+   `top: 0` the row would come to rest 1.3rem down, and scrolled text showed through the gap. */
+.modal-head {
+  position: sticky; top: -1.3rem; z-index: 1; display: flex; align-items: flex-start; gap: 0.8rem;
+  background: var(--card); margin: -1.3rem -1.4rem 0.8rem; padding: 1.3rem 1.4rem 0.6rem;
+  border-bottom: 1px solid var(--parchment-edge); border-radius: 14px 14px 0 0;
+}
+.modal-head h2 { flex: 1; margin: 0; }
+.modal-close {
+  flex: none; margin-left: auto; width: 2.5rem; height: 2.5rem;
+  background: var(--btn-soft-1); border: 1px solid var(--parchment-edge);
+  color: var(--ink-soft); border-radius: 8px; font-size: 1rem; line-height: 1;
+}
+.modal-close:hover { background: var(--btn-soft-hover-1); color: var(--ink); }
 .modal-body { line-height: 1.6; }
 .modal-buttons { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.2rem; flex-wrap: wrap; }
 .menu-list { display: flex; flex-direction: column; }

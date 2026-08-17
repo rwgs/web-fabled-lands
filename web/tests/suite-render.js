@@ -10,7 +10,7 @@ import { buyOptions, payChoiceCost } from '../js/market.js';
 import { Story } from '../js/render.js';
 import { appendRerollControls } from '../js/render-rolls.js';
 import { Narrator } from '../js/tts.js';
-import { modal, renderSheet } from '../js/ui.js';
+import { modal, mountDialog, renderSheet } from '../js/ui.js';
 import { titleCase, escapeHtml, bonusSuffix, itemLabel, blessingLabel } from '../js/render-util.js';
 
 export async function run(ctx) {
@@ -934,10 +934,13 @@ export async function run(ctx) {
       ok('task177 modal: moves initial focus to the primary button', document.activeElement === btnA);
       ok('task177 modal: freezes the background (inert + aria-hidden)', opener.hasAttribute('inert') && opener.getAttribute('aria-hidden') === 'true');
       // Tab from the last control wraps to the first; Shift+Tab from the first wraps to the last.
+      // The first control is the header ✕, which precedes the button bar in the box (task 287);
+      // initial focus stays on the primary button above.
+      const headX = box.querySelector('.modal-close');
       btnB.focus();
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
-      ok('task177 modal: Tab wraps last → first', document.activeElement === btnA);
-      btnA.focus();
+      ok('task177 modal: Tab wraps last → first', document.activeElement === headX);
+      headX.focus();
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
       ok('task177 modal: Shift+Tab wraps first → last', document.activeElement === btnB);
       btnB.click();
@@ -980,6 +983,64 @@ export async function run(ctx) {
       const vBack = await pBack;
       ok('task177 modal: backdrop closes a dismissable dialog (resolves null)', vBack === null && !document.body.contains(ovBack) && document.activeElement === opener);
       opener.remove();
+    }
+
+    // task 287: a dialog long enough to scroll used to open at its LAST line, with no exit in
+    // view. .modal is its own scroll container, and mountDialog focused the button bar at the
+    // bottom of it — the browser then scrolled that into view, so the Rules doc on the title
+    // screen opened showing the end of the rules, and its only way out was down there too.
+    {
+      // (a) The scroll. Exercised on a real scroll container: the test page loads no stylesheet,
+      // so the box carries .modal's geometry inline and the bottom control is genuinely
+      // off-screen at mount. Without preventScroll this box mounts scrolled to its end.
+      const box287 = document.createElement('div');
+      box287.style.cssText = 'max-height: 80px; overflow-y: auto;';
+      const tall287 = document.createElement('div');
+      tall287.style.cssText = 'height: 600px;';
+      box287.appendChild(tall287);
+      const deep287 = document.createElement('button');
+      deep287.textContent = 'Close';
+      box287.appendChild(deep287);
+      const shell287 = mountDialog(box287, { label: 'Long', initialFocus: deep287 });
+      ok('287: a scrolling dialog opens at the top, not at its focused bottom control',
+         box287.scrollTop === 0 && document.activeElement === deep287,
+         `scrollTop=${box287.scrollTop} focus=${document.activeElement && document.activeElement.textContent}`);
+      shell287.close();
+
+      // (b) The way out at the top: a labelled ✕ in the header, resolving null exactly as
+      // Escape and the backdrop do.
+      const opener287 = document.createElement('button');
+      document.body.appendChild(opener287); opener287.focus();
+      const pX = modal({ title: 'Rules of the Fabled Lands', body: 'long text', buttons: [{ label: 'Close', value: 'btn' }] });
+      const boxX = [...document.querySelectorAll('.modal-overlay')].pop().querySelector('.modal');
+      const x287 = boxX.querySelector('.modal-head .modal-close');
+      ok('287: a dismissable dialog carries a labelled ✕ beside its title',
+         !!x287 && x287.getAttribute('aria-label') === 'Close'
+         && boxX.querySelector('.modal-head h2').textContent === 'Rules of the Fabled Lands');
+      ok('287: the header is the first thing in the box, ahead of the body and the button bar',
+         boxX.firstElementChild.className === 'modal-head');
+      x287.click();
+      const vX = await pX;
+      ok('287: the ✕ closes the dialog, resolving null and restoring focus',
+         vX === null && document.activeElement === opener287);
+
+      // A dialog you must answer keeps its title and gains no ✕ — its buttons are the only exit.
+      const pLocked = modal({ title: 'You have died', body: 'x', buttons: [{ label: 'OK', value: 'ok' }], dismissable: false });
+      const boxLocked = [...document.querySelectorAll('.modal-overlay')].pop().querySelector('.modal');
+      ok('287: a non-dismissable dialog gets no ✕',
+         !boxLocked.querySelector('.modal-close') && boxLocked.querySelector('.modal-head h2').textContent === 'You have died');
+      pLocked.close(null);
+      await pLocked;
+      opener287.remove();
+
+      // (c) The CSS that keeps the ✕ reachable once the reader scrolls away from the top. The
+      // -1.3rem offset cancels .modal's padding-top: a sticky offset positions the MARGIN box,
+      // and this row's top margin is negative, so `top: 0` rested it 1.3rem down and scrolled
+      // text showed through the gap above it.
+      const cssSrc287 = await (await fetch('./css/style.css')).text();
+      ok('287: the header row is sticky, flush with the top of the scrolling box',
+         /\.modal-head \{[^}]*position: sticky; top: -1\.3rem;/.test(cssSrc287)
+         && /\.modal-head \{[^}]*margin: -1\.3rem -1\.4rem 0\.8rem;/.test(cssSrc287));
     }
 
     // task 152.4: Narrator.handleRerender drops the chunk list even when not playing, so it

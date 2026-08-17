@@ -129,7 +129,12 @@ export function mountDialog(box, { label = null, dismissable = true, initialFocu
   }
   document.addEventListener('keydown', onKey, true);
   if (dismissable) overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-  (initialFocus || box).focus();
+  // preventScroll, because the box is its own scroll container (.modal is max-height +
+  // overflow-y) and the initial focus target is usually the button bar at its BOTTOM: scrolling
+  // that into view opened every long dialog at its last line — the Rules doc on the title screen
+  // showed the reader the end of the rules. Focus still moves; only the scroll is suppressed,
+  // and a freshly built box is already at scrollTop 0. (task 287)
+  (initialFocus || box).focus({ preventScroll: true });
   return { overlay, box, close };
 }
 
@@ -138,7 +143,32 @@ export function modal({ title, body, buttons = [{ label: 'OK', value: true }], d
   const p = new Promise((resolve) => {
     const box = document.createElement('div');
     box.className = 'modal';
-    if (title) { const h = document.createElement('h2'); h.textContent = title; box.appendChild(h); }
+    // The action that closes the dialog decides the resolved value; dismissal (Escape, the
+    // backdrop, the header ✕) leaves it null. mountDialog runs the shared teardown + focus
+    // restore, then onClose settles the promise exactly once.
+    let result = null;
+    let close = () => {};
+    // Header row: the title, plus — whenever the dialog is dismissable at all — an explicit ✕
+    // for the exit Escape and a backdrop click already give silently. It earns its place on a
+    // dialog long enough to scroll (the Rules doc), where the button bar is off-screen from the
+    // first line and this row, which CSS sticks to the top, is the only way out in view. A
+    // non-dismissable dialog (the death screen) gets the title alone: there its buttons ARE the
+    // only exit, and a ✕ would offer a way past a choice that has to be made. (task 287)
+    if (title || dismissable) {
+      const head = document.createElement('div');
+      head.className = 'modal-head';
+      if (title) { const h = document.createElement('h2'); h.textContent = title; head.appendChild(h); }
+      if (dismissable) {
+        const x = document.createElement('button');
+        x.className = 'modal-close';
+        x.textContent = '✕';
+        x.title = 'Close';
+        x.setAttribute('aria-label', 'Close');
+        x.addEventListener('click', () => { result = null; close(); });
+        head.appendChild(x);
+      }
+      box.appendChild(head);
+    }
     const content = document.createElement('div');
     content.className = 'modal-body';
     if (typeof body === 'string') content.innerHTML = body; else if (body) content.appendChild(body);
@@ -146,11 +176,6 @@ export function modal({ title, body, buttons = [{ label: 'OK', value: true }], d
     const bar = document.createElement('div');
     bar.className = 'modal-buttons';
     box.appendChild(bar);
-    // The action that closes the dialog decides the resolved value; dismissal (Escape/backdrop)
-    // leaves it null. mountDialog runs the shared teardown + focus restore, then onClose settles
-    // the promise exactly once.
-    let result = null;
-    let close = () => {};
     let primaryBtn = null;
     buttons.forEach((b) => {
       const btn = document.createElement('button');

@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-285 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **286 is open**. File new
+287 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **no task is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,11 +16,11 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-*(none open)*
+- [x] 287. The Rules dialog opens scrolled to its last line, and a dialog long enough to scroll has no exit in view
 
 **LOW**
 
-- [x] 286. A `<group>` never asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page states
+*(none open)*
 
 **Done**
 
@@ -314,6 +314,7 @@ this order.*
 - [x] 283. The click-coverage probe keys a site by the frame that *registers* the listener, so `rollButton`'s seven callers collapse into one warm frame — the very shape of gap (task 278's cold `<training>` roll) that started the 281/282 sweep is invisible to it *(re-keyed by caller: 78 controls, 74 warm, 3 cold-by-construction; the 71=71 count was a coincidence, and the one real gap is filed as 284)*
 - [x] 284. `renderPayment`'s open-forfeit branch is the one in-scope click handler that never registers in the whole suite, so the picker a forced "give up which?" payment opens has never been rendered — and task 279's reachability sweep left it out *(censused UNREACHABLE — the corpus's one candidate, §6.496, is group-bundled; 279's note extended to a fourth case)*
 - [x] 285. A `<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes whichever blessing was acquired first *(a fifth player-choice verdict; 20 assertions, and a census pinning the three shipped sections)*
+- [x] 286. A `<group>` never asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page states *(one control, one question — an ability arm and a fixed-count forfeit arm; both census-pinned at 0 for the shipped corpus)*
 
 ---
 
@@ -1141,11 +1142,79 @@ half of its evidence, and must be re-pinned to the var form it was actually argu
 
 ---
 
+## 287. The Rules dialog opens scrolled to its last line, and a dialog long enough to scroll has no exit in view
+
+**DONE** — two one-line causes in `ui.js`, both in the shared dialog shell, and both only visible
+on a dialog long enough to scroll. Reported from the title screen: **Rules** opens showing the end
+of the rules, and there is nothing at the top to close it.
+
+**The scroll.** `.modal` is its own scroll container (`max-height: 88vh; overflow-y: auto`), and
+`mountDialog` ends with `(initialFocus || box).focus()`. For `modal()` that target is the primary
+button — or, failing one, the first button in `.modal-buttons`, which is the LAST thing in the box.
+The browser then does exactly what focus asks and scrolls it into view, so every dialog taller than
+the viewport mounted at its bottom. `focus({ preventScroll: true })` moves focus without the scroll,
+and a freshly built box is already at `scrollTop` 0. The a11y contract is untouched: focus still
+lands where it did, and the Rules dialog's own Close button is still the first Tab stop after the ✕.
+
+**The exit.** `modal()` put the title in a bare `<h2>` and every control in the bottom bar, so on a
+long body the only ways out were Escape, a backdrop click, and a button below the fold — two of them
+undiscoverable and the third off-screen. The title now sits in a `.modal-head` row that also carries
+a labelled `.modal-close` ✕ **whenever the dialog is dismissable**, i.e. exactly when Escape and the
+backdrop already close it: the ✕ adds no new way out, it makes the existing one visible. A
+non-dismissable dialog (the death screen, `dismissable: false`) keeps the title alone — there the
+buttons ARE the exit, and a ✕ would offer a way past a choice that has to be made.
+
+**The CSS holds one trap worth keeping.** `.modal-head` is `position: sticky` so the ✕ survives
+scrolling, and negative margins pull the row out to the box's padding edges. `top: 0` then rests it
+**1.3rem too low** — a sticky offset positions the *margin* box, and this row's top margin is
+negative — leaving a gap at the top of the dialog that scrolled text slid up into. The offset is
+`top: -1.3rem`, cancelling `.modal`'s `padding-top`; the test pins both numbers together, because
+they are only correct as a pair.
+
+6 new assertions in `suite-render`, and the suite moves `2793 → 2799`. The scroll one is the load-
+bearing one and it is written to be able to fail: the test page loads no stylesheet, so it mounts
+its own inline-styled scroll container (80px tall, 600px of content, the focus target at the bottom)
+through `mountDialog` and asserts `scrollTop === 0`. Reverting `preventScroll` reports it as
+`scrollTop=541`. Task 177's two focus-trap assertions are updated rather than deleted: the wrap
+targets move to the ✕, which is now the box's first focusable, while initial focus stays on the
+primary button. Both states were also confirmed in a real browser against the real stylesheet — the
+dialog at the top on open, and the header still pinned with the ✕ reachable after scrolling.
+
+**Priority: MEDIUM — user-reported, on the title screen, on the one dialog every new player is
+told to read. Nothing is lost or mis-computed, and Escape always worked, but a reader who does not
+know that meets the rules from the wrong end with no visible way back out.**
+
+*(Filed and closed 2026-08-17 in one pass, from a user report rather than an audit.)*
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-17 (user report, filed and closed in one pass, task 287): closed **287** — the Rules
+dialog opened at its last line with no exit in view. `mountDialog` focuses with `preventScroll`, and
+`modal()` grows a sticky `.modal-head` carrying a ✕ on every dismissable dialog. The suite moves
+`RESULT ALL PASS pass=2793 fail=0` → `pass=2799 fail=0`; `web/` only, so the change is a stamp and
+no data rebuild. 286's checklist line also moves into **Done**, which its own commit left in the LOW
+bucket.
+
+**A defect no test could have caught, in code the tests cover heavily.** Task 177's block asserts
+the whole dialog contract — initial focus, the trap, the freeze, the restore — and every assertion
+still passed while the dialog opened at its own last line, because `web/_test.html` loads no
+stylesheet: with no `max-height`/`overflow-y` there is no scroll container, and `scrollTop` is 0 for
+the trivial reason. **A DOM-only harness cannot see a bug whose cause is a layout property**, so the
+new assertion brings its own geometry inline rather than waiting for CSS the page will never load.
+That is the pattern for the next one: if the behaviour under test needs layout, the fixture has to
+carry it.
+
+**The two symptoms had one root, which is why the ✕ is not just a button.** Focus scrolled the box
+to the bottom *because* the only control was at the bottom. Anything that makes the top of a long
+dialog self-sufficient — a header exit — is the same fix as suppressing the scroll, and the pair is
+what makes the dialog usable from the first line. Worth remembering where a "cosmetic" report and a
+"behavioural" one arrive together: they were one bug reported twice.
 
 Worked 2026-08-16 (implementation pass, task 286): closed **286** — the group's one picker becomes
 the group's one *question*, with an ability arm and a fixed-count forfeit arm — and filed nothing
