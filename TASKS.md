@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-284 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **285 is open**. File new
+285 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **286 is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,11 +16,11 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [x] 285. A `<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes whichever blessing was acquired first
+*(none open)*
 
 **LOW**
 
-*(none open)*
+- [ ] 286. A `<group>` never asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page states
 
 **Done**
 
@@ -313,6 +313,7 @@ this order.*
 - [x] 280. The market header row renders `header1=` and drops `header2=`/`header3=`, so 23 authored column headings ("To buy", "To sell") never reach the page *(adjudicated a deliberate simplification — documented, not changed)*
 - [x] 283. The click-coverage probe keys a site by the frame that *registers* the listener, so `rollButton`'s seven callers collapse into one warm frame — the very shape of gap (task 278's cold `<training>` roll) that started the 281/282 sweep is invisible to it *(re-keyed by caller: 78 controls, 74 warm, 3 cold-by-construction; the 71=71 count was a coincidence, and the one real gap is filed as 284)*
 - [x] 284. `renderPayment`'s open-forfeit branch is the one in-scope click handler that never registers in the whole suite, so the picker a forced "give up which?" payment opens has never been rendered — and task 279's reachability sweep left it out *(censused UNREACHABLE — the corpus's one candidate, §6.496, is group-bundled; 279's note extended to a fourth case)*
+- [x] 285. A `<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes whichever blessing was acquired first *(a fifth player-choice verdict; 20 assertions, and a census pinning the three shipped sections)*
 
 ---
 
@@ -1019,11 +1020,122 @@ asking which of them any view ever supplies.
 
 ---
 
+## 286. A `<group>` never asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page states
+
+**Priority: LOW — latent on both arms. Censused over the bundled corpus: no group in the six
+published books carries an open ability selector, and none carries a fixed-count open forfeit. Like
+task 228 this is a shape the renderer cannot serve rather than a page it serves wrongly, and it is
+filed so it is closed before something authors it rather than after.**
+
+*(Filed 2026-08-16 during conversion work on an unpublished book, one of whose pages prices an
+opt-in rite at an ability point the player chooses and bundles two further consequences onto the
+same click, and another of which prices an offer at two possessions of the player's choosing. The
+evidence below is all in the published books.)*
+
+**One control, and more than one chooser hook under it.** `renderGroup` (`render-rewards.js`)
+collapses a `<group>` to a single button and applies the whole body on the click:
+
+```js
+plan.effects.forEach((fx) => applyEffect(fx, story.state, chooser && fx === forfeit.node ? { chooser } : {}));
+```
+
+Task 229 gave that click **one** picker — `groupForfeitChoice`, an open `"?"`/blank
+possession/equipment/cargo `<lose>` with a candidate to spare. Every other effect in the bundle is
+still applied with `{}`, and `applyEffect` reaches more than one place that would have taken an
+answer. Two of them matter, and this is the run of task 285's census (the *engine's* hooks, not the
+view's call sites) over the one control that was never on it.
+
+**(a) The ability hook has no group picker at all.** `abilityTargets` (`engine.js:132`) takes
+`opts.chooser` for a `"?"`/`"a|b"` spec and falls back when it gets none:
+
+```js
+const picked = opts.chooser ? opts.chooser(cands, 1, 'ability') : null;
+const chosen = (picked && picked.length) ? picked[0] : cands[0];
+```
+
+`cands` is `abilityChoiceOptions`, which is `ABILITIES` order — `charisma` first — minus anything
+already at 1 on a loss. So a bundled `<lose ability="?">` takes **CHARISMA** from almost every
+character, and the player is never asked. `classifyPassive`'s `ability-choice` verdict cannot save
+it: `renderGroup` consumes the node as one of `plan.effects` and it never reaches the classifier at
+all — structurally the same reason task 284 gave for `renderPayment`'s branch being unreachable on
+§6.496.
+
+**(b) The forfeit hook skips a count the page states, on evidence about a count it does not.**
+`groupForfeitChoice` reads:
+
+```js
+if (fx.tagName.toLowerCase() !== 'lose' || fx.hasAttribute('multiple')) continue;
+```
+
+Task 229 argued that exclusion from §3.273/§3.629 — `<random dice="1" var="x"/>` bundled with
+`<lose item="?" multiple="x"/>`, "lose **the first** 1-6 of your possessions". That argument is
+sound and still is: the page names no choice, and a **var** count cannot be asked about coherently
+(a roll of 1 would ask and a roll of 6 would not). But it was written as `hasAttribute('multiple')`,
+which also silences a count the page prints as a constant — and that is the *opposite* case, task
+228's priced offer, where the number is the author's and the items are the player's. Task 228 built
+the count-aware picker for exactly it; the group is the one path that then refused to call it.
+The two var groups both live in `renderGroupWithRoll`, which asks nothing at all, so that path needs
+no change now for the same reason it needed none then.
+
+**The census, over the bundled corpus (per task 270).** Both arms are inert for the published
+edition, and the near-misses are worth recording because each looks like a hit:
+
+- **`<lose multiple=>` inside a group: 4 nodes.** book3/273 and book3/629 are the `multiple="x"`
+  rolled sweeps above. book6/191 carries **two** with a literal `multiple="12"` — but on *named*
+  items (`item="dead head"`, `item="ghoul's head"`), so `losePaymentPlan`'s `openForm` is false and
+  `needsChoice` was already false whatever this task does. **0** fixed-count *open* forfeits.
+- **`ability=` inside a group: 36 nodes across 24 sections, all named.** book3/165 and book6/664
+  bundle five apiece. The only *open* spec inside any group is book6/741's
+  `<difficulty ability="combat|sanctity" level="16"/>` — a roll's ability alternation, not an
+  effect, and `needsAbilityChoice` admits only `<lose>`/`<gain>`/`<tick>`, so it is out by
+  construction rather than by luck.
+- The corpus's one open `<lose ability="?">` is **book2/157**, and it is not in a group: it carries
+  `flag=`, so `openAbilityNode` routes it and task 224's picker already asks.
+
+**The fix is two reads of state that already exists, not a new widget.** `losePaymentPlan` already
+reports `count` and `needsChoice` for a `multiple=` forfeit (task 228) and `showForfeitPicker`
+already collects `count` answers; `showAbilityPicker` already exists and already commits
+`applyEffect(node, state, { chooser: () => [ab] })`. So: narrow the `multiple=` skip to a count that
+is **not** a literal integer, and give the group a second arm that finds an open
+`needsAbilityChoice` node with more than one eligible option and opens the ability picker instead.
+Ask **one** question — no corpus group carries two open selectors, so chaining pickers would be
+machinery for a shape nobody has authored — and let a single eligible ability commit straight
+through, because `cands[0]` *is* that option and a one-button row decides nothing.
+
+`suite-actions` beside the task 226/228/229 block, and one edit inside it: task 229's own
+`multiple=` assertion is written with a fixed `multiple="2"`, which reads its rule off the wrong
+half of its evidence, and must be re-pinned to the var form it was actually arguing for.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-16 (filing pass, no task open at the time): filed **286** (LOW) — a `<group>` never
+asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page
+states. Documentation only; no code, no stamp, and the suite is unmoved at `RESULT ALL PASS
+pass=2776 fail=0`. 285's checklist line also moves into **Done**, which its own commit left in the
+MEDIUM bucket.
+
+**This is task 285's census run once more, over the one control it could not see.** That census —
+the engine's `opts.chooser` hooks, asking which the view supplies — is a question about *renderers*,
+and it was answered renderer by renderer. `renderGroup` is not one renderer: it is a control that
+applies an arbitrary bundle, so "does the group supply a chooser?" has as many answers as there are
+hooks in `applyEffect`, and task 229 answered it for exactly one of them. **Where a single control
+applies a whole body, census the body's tags against the hooks, not the control against the
+question.** The ability hook was the miss; `<transfer>`'s and the blessing one are worth the same
+look the moment a group is authored carrying either.
+
+**The second half is a lesson about an exclusion's evidence.** Task 229 skipped every `multiple=`
+forfeit and gave a *correct* reason for it — §3.273's rolled count cannot be asked about — but wrote
+the skip as `hasAttribute('multiple')`, one generalisation wider than the evidence. Its own test
+then pinned the wider rule with a **fixed** `multiple="2"` fixture, so the assertion documents a
+case the argument never made. An exclusion is worth re-reading against the sentence that justified
+it: the fixture is where the drift shows, because it has to name a concrete value the prose left
+abstract.
 
 Worked 2026-08-16 (implementation pass, task 285): closed **285** — the fifth chooser hook now has
 a view that supplies it — and filed nothing new. The suite moves `RESULT ALL PASS pass=2756 fail=0`
