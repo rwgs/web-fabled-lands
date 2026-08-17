@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 287 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **no task is open**. File new
+misdiagnosis (see the Review log); **288 is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,7 +20,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-*(none open)*
+- [ ] 288. Task 191's narrow-header block measures an iframe whose stylesheet may not have applied, and fails intermittently
 
 **Done**
 
@@ -1188,11 +1188,71 @@ know that meets the rules from the wrong end with no visible way back out.**
 
 ---
 
+## 288. Task 191's narrow-header block measures an iframe whose stylesheet may not have applied, and fails intermittently
+
+**OPEN.** Task 191's block in `suite-economy.js` builds each header strip in an iframe of a given
+CSS width, links the real `web/css/style.css` into it, waits for the frame's `load` event, and then
+measures. Observed once in a run that had changed nothing outside `books/`:
+
+```
+FAIL task191: at 360px exactly More / narration / Save / Sheet remain :: ☰ ↩️ 📖 🗺 🌙 🔊 🔁 1× 💾 📜
+FAIL task191: at 360px the remaining touch targets are at least 44px :: min side=21
+```
+
+An identical re-run of the same command against the same tree passed. **Both values are the
+signature of a frame measured before `style.css` applied**, not of a stylesheet rule being wrong:
+all ten controls visible is the DOM with no `@media (max-width: 600px)` narrow-chrome rules, and
+`min side=21` is an unstyled `<button>`'s default height. The 320px call immediately before it, and
+the 601px/900px calls after, were fine in the same run — so it is per-frame, not per-run.
+
+**Two of the block's four assertions at that width pass VACUOUSLY in exactly that state, which is
+why the failure reads like a real regression.** With no stylesheet applied, `.header-actions` is a
+plain block, its buttons wrap in normal flow and nothing overflows, so "does not overflow" passes;
+and no control is hidden, so `hiddenAllNone` is `[].every(…)` — true. The companion assertion also
+confirms `r.vw === 360`, so the iframe width is not what moved. Only the two assertions that
+actually depend on the stylesheet fail, and they fail with values a reader has to know the fix's CSS
+to recognise.
+
+**The seam is `await new Promise((res) => frame.addEventListener('load', res, {once: true}))`.** The
+frame's `load` is the block's only barrier, and it does not guarantee that a linked stylesheet was
+fetched *and applied* — a subresource that errors or is aborted still lets the event fire, and the
+suite issues these seven frame loads back-to-back alongside the rest of its fetching. Nothing here
+is a defect in the app or in the stylesheet: it is a test that measures rendered geometry across an
+unsynchronised subresource boundary.
+
+**Fix: take the subresource out of the frame.** Fetch `css/style.css` **once** at the top of the
+block and inline it into each `srcdoc` as a `<style>` element, so the document the `load` event
+announces is already styled and there is nothing left to race. That keeps what the block is for —
+the assertions still run against the real shipped stylesheet, not a copy — while making the barrier
+exact. (A weaker alternative, if inlining is unwanted, is to spin on a sentinel computed style
+before measuring, but that trades a silent flake for a timeout.)
+
+**Priority: LOW — no player-visible behaviour is involved and the run fails loudly rather than
+falsely passing.** What it costs is a wasted run plus the reading time to work out that the failure
+names a suite the change could not have touched; the standing "re-run to confirm" rule (task 236)
+covers it in the meantime.
+
+*(Filed 2026-08-17 during conversion work on an unpublished book, from a run whose only change was
+section XML.)*
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-17 (filed from a run, no code change): filed **288** — task 191's narrow-header block
+measures an iframe across an unsynchronised stylesheet load and can fail intermittently with the two
+assertions that depend on the stylesheet, while the other two in the same block pass vacuously.
+Nothing in the app is involved; the fix is to inline the fetched `style.css` into each `srcdoc` so
+the frame's `load` event is an exact barrier. Left OPEN and unfixed: the failure is loud rather than
+silent, and it was seen once, so the fix wants a run of its own rather than riding on the pass that
+found it. **Filed as a defect in a test, which this backlog has not had before** — the previous
+entry's lesson was that a test can pass while the app is wrong; this one is that a test can fail
+while the app is right, and the tell is the same in both directions: read what the assertion's own
+output *means* before reading it as a verdict on the change in hand.
 
 Worked 2026-08-17 (user report, filed and closed in one pass, task 287): closed **287** — the Rules
 dialog opened at its last line with no exit in view. `mountDialog` focuses with `preventScroll`, and
