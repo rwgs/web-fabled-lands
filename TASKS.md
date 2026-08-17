@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-287 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **288 is open**. File new
+288 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **no task is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,11 +16,11 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [x] 287. The Rules dialog opens scrolled to its last line, and a dialog long enough to scroll has no exit in view
+*(none open)*
 
 **LOW**
 
-- [ ] 288. Task 191's narrow-header block measures an iframe whose stylesheet may not have applied, and fails intermittently
+- [x] 288. Task 191's narrow-header block measures an iframe whose stylesheet may not have applied, and fails intermittently
 
 **Done**
 
@@ -315,6 +315,7 @@ this order.*
 - [x] 284. `renderPayment`'s open-forfeit branch is the one in-scope click handler that never registers in the whole suite, so the picker a forced "give up which?" payment opens has never been rendered — and task 279's reachability sweep left it out *(censused UNREACHABLE — the corpus's one candidate, §6.496, is group-bundled; 279's note extended to a fourth case)*
 - [x] 285. A `<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes whichever blessing was acquired first *(a fifth player-choice verdict; 20 assertions, and a census pinning the three shipped sections)*
 - [x] 286. A `<group>` never asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page states *(one control, one question — an ability arm and a fixed-count forfeit arm; both census-pinned at 0 for the shipped corpus)*
+- [x] 287. The Rules dialog opens scrolled to its last line, and a dialog long enough to scroll has no exit in view *(`preventScroll` on the initial focus, plus a sticky `.modal-head` carrying a ✕ on every dismissable dialog)*
 
 ---
 
@@ -1190,7 +1191,7 @@ know that meets the rules from the wrong end with no visible way back out.**
 
 ## 288. Task 191's narrow-header block measures an iframe whose stylesheet may not have applied, and fails intermittently
 
-**OPEN.** Task 191's block in `suite-economy.js` builds each header strip in an iframe of a given
+**DONE** — a defect in a test, not in the app. Task 191's block in `suite-economy.js` builds each header strip in an iframe of a given
 CSS width, links the real `web/css/style.css` into it, waits for the frame's `load` event, and then
 measures. Observed once in a run that had changed nothing outside `books/`:
 
@@ -1220,20 +1221,32 @@ suite issues these seven frame loads back-to-back alongside the rest of its fetc
 is a defect in the app or in the stylesheet: it is a test that measures rendered geometry across an
 unsynchronised subresource boundary.
 
-**Fix: take the subresource out of the frame.** Fetch `css/style.css` **once** at the top of the
-block and inline it into each `srcdoc` as a `<style>` element, so the document the `load` event
-announces is already styled and there is nothing left to race. That keeps what the block is for —
-the assertions still run against the real shipped stylesheet, not a copy — while making the barrier
-exact. (A weaker alternative, if inlining is unwanted, is to spin on a sentinel computed style
-before measuring, but that trades a silent flake for a timeout.)
+**Fixed by taking the subresource out of the frame.** `css/style.css` is fetched **once** at the
+top of the block and inlined into each `srcdoc` as a `<style>` element, so the document the `load`
+event announces is already styled and there is nothing left to race. The seven frames now issue
+zero subresource requests between them. That keeps what the block is for — the assertions still
+run against the real shipped stylesheet, fetched from the served tree rather than copied into the
+suite — while making the barrier exact. (The weaker alternative, spinning on a sentinel computed
+style before measuring, trades a silent flake for a timeout and was not taken.)
+
+**Inlining is only safe because this stylesheet has no relative references.** A `<style>` element's
+`url()` and `@import` resolve against the *document's* base URL, not the stylesheet's, and a srcdoc
+frame inherits its parent's base — so a `url(../assets/…)` that resolved correctly through the
+`<link>` would silently 404 once inlined. `style.css` contains no `url(`, no `@import` and no
+`</style>`, checked before the change; a future rule that adds one has to be weighed against this
+block.
+
+The seventh assertion added to the block is the guard the old form did not have: the fetched text
+must contain both `@media (max-width: 600px)` and `.icon-btn.in-menu { display: none; }`. A fetch
+that quietly returned a 404 body would otherwise reproduce the exact unstyled state this task is
+about, and `await (await fetch(…)).text()` does not throw on one. The suite moves `2799 → 2800`.
 
 **Priority: LOW — no player-visible behaviour is involved and the run fails loudly rather than
-falsely passing.** What it costs is a wasted run plus the reading time to work out that the failure
-names a suite the change could not have touched; the standing "re-run to confirm" rule (task 236)
-covers it in the meantime.
+falsely passing.** What it cost was a wasted run plus the reading time to work out that the failure
+named a suite the change could not have touched.
 
 *(Filed 2026-08-17 during conversion work on an unpublished book, from a run whose only change was
-section XML.)*
+section XML. Closed 2026-08-17.)*
 
 ---
 
@@ -1242,6 +1255,21 @@ section XML.)*
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-17 (implementation pass, task 288): closed **288** — task 191's seven header frames
+inline the stylesheet fetched once at the top of the block instead of `<link>`ing it, so the frame's
+`load` event is an exact barrier and there is no subresource left to race. Nothing outside
+`web/tests/` changed, and the stamp deliberately excludes the harness (`stamp-version.ps1` skips
+`_test.html` and `web/tests/`), so this pass moves no build stamp at all — the first task in a while
+whose correct outcome is an unchanged `version.js`. The suite moves `RESULT ALL PASS pass=2799
+fail=0` → `pass=2800 fail=0`; nothing new filed.
+
+**The passing run is itself the proof.** The two assertions that flaked — the glyph list and the
+44px touch target at 320/360px — are exactly the two that cannot pass without the stylesheet
+applied, so a green run of this block is a positive statement that every frame was styled when it
+was measured. That is the check to keep in mind for the class: when a fixture races a subresource,
+look for an assertion that *fails* in the unsynchronised state, and if every assertion in the block
+would pass vacuously there, the block has no barrier at all — it just has not been unlucky yet.
 
 Worked 2026-08-17 (filed from a run, no code change): filed **288** — task 191's narrow-header block
 measures an iframe across an unsynchronised stylesheet load and can fail intermittently with the two

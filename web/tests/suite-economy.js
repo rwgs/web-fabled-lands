@@ -1615,6 +1615,15 @@ export async function run(ctx) {
         ['💾', ''],                              // Save & quit         — essential
         ['📜', 'sheet-toggle'],                  // Adventure Sheet     — essential
       ];
+      // The real stylesheet, fetched once and inlined into every frame below. A <link> would
+      // leave the measurement racing a subresource the frame's `load` event does not wait for
+      // (task 288): a frame measured before style.css applies shows all ten controls and a
+      // 21px unstyled button, which reads as a regression in the narrow-chrome rules. Inlined,
+      // the document `load` announces is already styled and there is nothing left to race.
+      const cssSrc191 = await (await fetch('./css/style.css')).text();
+      ok('task191: the measured frames carry the real narrow-chrome stylesheet inline',
+         /@media \(max-width: 600px\)/.test(cssSrc191) && /\.icon-btn\.in-menu \{ display: none; \}/.test(cssSrc191),
+         `css bytes=${cssSrc191.length}`);
       // Build the strip in an iframe of the given CSS width and report what the real
       // stylesheet does with it. `legacy` strips the .in-menu markers to reproduce the
       // pre-fix ten-control header, so the overflow metric is shown to detect the bug.
@@ -1626,7 +1635,7 @@ export async function run(ctx) {
         frame.setAttribute('scrolling', 'no');
         frame.style.cssText = `position:absolute;left:-20000px;top:0;border:0;width:${width}px;height:400px;`;
         frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">'
-          + '<link rel="stylesheet" href="css/style.css"></head><body>'
+          + '<style>' + cssSrc191 + '</style></head><body>'
           + '<div id="app" class="screen-game"><header class="game-header">'
           + btn(shown[0]) + '<div class="header-title">Fabled Lands</div>'
           + '<div class="header-actions">' + shown.slice(1).map(btn).join('') + '</div>'
