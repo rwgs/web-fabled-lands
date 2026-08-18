@@ -965,6 +965,12 @@ export function isFightHeld(view, node) {
 //   { mode:'apply', showWords, setVarName, rollOwned, rerunnable } — the plain effect;
 //     rollOwned freezes a <set> whose var a roll owns (task 61), rerunnable re-evaluates
 //     an absolute <set value=…> every render.
+
+// The bare `stamina` keyword inside a <set value=> expression — evalExpression reads it as
+// the CURRENT score (with no modifier=), the one quantity a section moves under its own
+// feet. Word-bounded so `prestamina`/`staminaMax` are not mistaken for it. (task 289)
+const CURRENT_STAMINA_RE = /(^|[^A-Za-z0-9_])stamina([^A-Za-z0-9_]|$)/i;
+
 export function classifyPassive(node, view) {
   const tag = node.tagName.toLowerCase();
   const hidden = boolAttr(node.getAttribute('hidden'));
@@ -1090,7 +1096,15 @@ export function classifyPassive(node, view) {
   // An absolute <set value="…"> is a pure function of current state, so it is
   // re-evaluated on every render — this keeps variables derived from a roll
   // result correct after that roll resolves (rather than frozen at first render).
-  const rerunnable = tag === 'set' && node.hasAttribute('value') && !node.hasAttribute('modifier') && !rollOwned;
+  // EXCEPT when it reads the CURRENT Stamina, which is not an input the section
+  // holds still: a fight rerenders on every round, so re-evaluating would overwrite
+  // the author's pre-fight SNAPSHOT with the wounded score. book1/297 saves
+  // `prestamina` above a padded bout and restores it on both exits; book3/104 saves
+  // `curr` to decide `wounded` before a <rest> heals it. Both are frozen at their
+  // first application, which is what "the score before" means. (task 289)
+  const readsLiveStamina = tag === 'set' && CURRENT_STAMINA_RE.test(node.getAttribute('value') || '');
+  const rerunnable = tag === 'set' && node.hasAttribute('value') && !node.hasAttribute('modifier')
+    && !rollOwned && !readsLiveStamina;
   return { mode: 'apply', showWords: !hidden, setVarName, rollOwned, rerunnable };
 }
 

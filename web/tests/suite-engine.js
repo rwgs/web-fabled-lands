@@ -107,6 +107,84 @@ export async function run(ctx) {
     eng.applyEffect(parse('<lose staminato="1"/>'), gs, {});
     ok('lose staminato="1" beats you down to 1 Stamina', gs.data.stamina === 1, `stam=${gs.data.stamina}`);
 
+    // task 289: staminato SETS the score, so it restores as well as wounds ("This may
+    // actually restore stamina, if it is currently lower than the value given").
+    { // block-scoped
+      const gsr = GameState.create({ name:'T289', gender:'m', profession:'Warrior', book:1, adv });
+      gsr.data.staminaMax = 12; gsr.data.stamina = 3;
+      eng.applyEffect(parse('<lose staminato="12"/>'), gsr, {});
+      ok('task289: staminato above the current score restores up to it', gsr.data.stamina === 12, `stam=${gsr.data.stamina}`);
+      gsr.data.stamina = 0;
+      eng.applyEffect(parse('<lose staminato="12"/>'), gsr, {});
+      ok('task289: staminato restores from 0 (the padded tournament loser)', gsr.data.stamina === 12 && !gsr.isDead(), `stam=${gsr.data.stamina} dead=${gsr.isDead()}`);
+      eng.applyEffect(parse('<lose staminato="12"/>'), gsr, {});
+      ok('task289: staminato equal to the current score is a no-op', gsr.data.stamina === 12, `stam=${gsr.data.stamina}`);
+      eng.applyEffect(parse('<lose staminato="4"/>'), gsr, {});
+      ok('task289: staminato below the current score still beats it down', gsr.data.stamina === 4, `stam=${gsr.data.stamina}`);
+      gsr.data.stamina = 2;
+      eng.applyEffect(parse('<lose staminato="99"/>'), gsr, {});
+      ok('task289: a staminato restore clamps at the Stamina ceiling, not the target',
+         gsr.data.stamina === gsr.effectiveStaminaMax(), `stam=${gsr.data.stamina} cap=${gsr.effectiveStaminaMax()}`);
+      // the var form is what book1/297 uses
+      gsr.data.stamina = 5; gsr.setVar('prestamina', 11);
+      eng.applyEffect(parse('<lose staminato="prestamina"/>'), gsr, {});
+      ok('task289: staminato="<var>" restores to the saved score', gsr.data.stamina === 11, `stam=${gsr.data.stamina}`);
+    }
+
+    // task 289 end to end: §1.297's padded tournament promises "any Stamina you lose is
+    // not permanent", and §1.370 opens "back to your Stamina score before the fight" —
+    // a wound left in place there is a spurious death on a shipped page.
+    { // block-scoped
+      const g297 = GameState.create({ name:'T297', gender:'m', profession:'Warrior', book:1, adv });
+      g297.data.staminaMax = 12; g297.data.stamina = 12;
+      const c297 = document.createElement('div');
+      const st297 = new Story(c297, g297, { navigate(){}, onDeath(){}, notify(){} });
+      st297.begin(await data.getSection(1, '297'), 1, '297');
+      ok('task289: §1.297 saves the pre-fight Stamina in `prestamina`', g297.getVar('prestamina') === 12, `var=${g297.getVar('prestamina')}`);
+      g297.data.stamina = 3; // the padded fight wounds you
+      // Every fight round rerenders the section (render-combat), and `prestamina` is a
+      // SNAPSHOT: it must survive that or the restore below resolves to the wound itself.
+      st297.rerender();
+      ok('task289: §1.297 keeps `prestamina` across the fight\'s rerenders',
+         g297.getVar('prestamina') === 12, `var=${g297.getVar('prestamina')}`);
+      const win297 = Array.from(c297.querySelectorAll('.group-action'))
+        .filter((b) => !b.closest('.cond-inactive') && !b.disabled)
+        .find((b) => b.textContent.includes('19'));
+      ok('task289: §1.297 offers the "turn to 19" win group', !!win297,
+         Array.from(c297.querySelectorAll('.group-action')).map((b) => b.textContent).join(' | '));
+      if (win297) win297.click();
+      ok('task289: §1.297 winning gives the padded wound back', g297.data.stamina === 12, `stam=${g297.data.stamina}`);
+
+      const s370 = await data.getSection(1, '370');
+      let deathsOk = 0;
+      const gOk = GameState.create({ name:'T370', gender:'m', profession:'Warrior', book:1, adv });
+      gOk.data.staminaMax = 12; gOk.data.stamina = 12;
+      new Story(document.createElement('div'), gOk, { navigate(){}, onDeath(){ deathsOk++; }, notify(){} }).begin(s370, 1, '370');
+      ok('task289: §1.370 entered on the restored score is not a death', deathsOk === 0, `deaths=${deathsOk}`);
+      // control — the deferral machinery is untouched: still at 0 on arrival really does end it
+      let deaths0 = 0;
+      const g0 = GameState.create({ name:'T370z', gender:'m', profession:'Warrior', book:1, adv });
+      g0.data.staminaMax = 12; g0.data.stamina = 0;
+      new Story(document.createElement('div'), g0, { navigate(){}, onDeath(){ deaths0++; }, notify(){} }).begin(s370, 1, '370');
+      ok('task289: §1.370 entered still at 0 Stamina fires onDeath (control)', deaths0 === 1, `deaths=${deaths0}`);
+
+      // The other <set> the freeze reaches: §3.104 snapshots `curr` to decide `wounded`,
+      // then <rest>s you to full. Re-evaluating `curr` after that heal flipped `wounded`
+      // to 0 and opened the "if you were NOT wounded" permanent +1d Stamina the section
+      // gates on exactly that.
+      const g104 = GameState.create({ name:'T104', gender:'m', profession:'Warrior', book:3, adv });
+      g104.data.staminaMax = 12; g104.data.stamina = 5;
+      const c104 = document.createElement('div');
+      const st104 = new Story(c104, g104, { navigate(){}, onDeath(){}, notify(){} });
+      st104.begin(await data.getSection(3, '104'), 3, '104');
+      ok('task289: §3.104 snapshots the wounded score and flags `wounded`',
+         g104.getVar('curr') === 5 && g104.getVar('wounded') === 1, `curr=${g104.getVar('curr')} wounded=${g104.getVar('wounded')} stam=${g104.data.stamina}`);
+      g104.data.stamina = 12; // the section's <rest> is taken: back to the normal score
+      st104.rerender();
+      ok('task289: §3.104 keeps `wounded` set once its <rest> has healed you',
+         g104.getVar('curr') === 5 && g104.getVar('wounded') === 1, `curr=${g104.getVar('curr')} wounded=${g104.getVar('wounded')} stam=${g104.data.stamina}`);
+    }
+
     // --- ability effects: rank/stamina/*/?/fatal/effect= (task 15) ---
     const ga = GameState.create({ name:'A', gender:'m', profession:'Warrior', book:1, adv });
     ga.data.section = '999';

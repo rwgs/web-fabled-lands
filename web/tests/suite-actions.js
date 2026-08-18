@@ -3432,6 +3432,27 @@ export async function run(ctx) {
       const ownedCtx = visit.newCtx(); ownedCtx.rolledVars.add('y');
       ok('task119: classifyPassive a roll-owned set is frozen (task 61)',
          (() => { const v = classify(setSec, 'set', { ctx: ownedCtx }); return v.mode === 'apply' && v.rollOwned === true && v.rerunnable === false; })());
+
+      // task 289: a <set value=> reading the CURRENT Stamina is a snapshot, and a fight
+      // rerenders every round — re-evaluating it would hand back the wound, not the score
+      // before it (book1/297's `prestamina`, book3/104's `curr`).
+      const snapSec = parse('<section><set var="prestamina" value="stamina"/></section>');
+      ok('task289: classifyPassive a set reading current Stamina is frozen',
+         (() => { const v = classify(snapSec, 'set'); return v.mode === 'apply' && v.rerunnable === false; })());
+      const snapExpr = parse('<section><set var="half" value="stamina/2"/></section>');
+      ok('task289: the freeze reaches an expression that reads Stamina, not just the bare word',
+         classify(snapExpr, 'set').rerunnable === false);
+      // modifier= already reads the unwounded max, and a var merely NAMED for stamina is
+      // an ordinary variable — neither is the volatile read, so neither changes.
+      const snapMax = parse('<section><set var="max" value="stamina" modifier="affected"/></section>');
+      ok('task289: a modifier= Stamina read was never rerunnable and still is not',
+         classify(snapMax, 'set').rerunnable === false);
+      const snapVar = parse('<section><set var="z" value="prestamina"/></section>');
+      ok('task289: a var merely named for stamina stays rerunnable (word-bounded)',
+         classify(snapVar, 'set').rerunnable === true);
+      const snapOther = parse('<section><set var="s" value="sanctity"/></section>');
+      ok('task289: an ability read stays rerunnable (task 61 unchanged)',
+         classify(snapOther, 'set').rerunnable === true);
     }
 
     // --- task 119 (phase 3): choiceGate — the <choice> eligibility + payment verdict ---

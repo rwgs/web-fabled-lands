@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-288 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **289 is open**. File new
+289 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **no task is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,7 +16,7 @@ there once the buckets below are clear.
 
 **HIGH**
 
-- [ ] 289. `<lose staminato="N">` can only ever lower Stamina, so book1/297's padded tournament never heals its winner and kills its loser at book1/370
+- [x] 289. `<lose staminato="N">` can only ever lower Stamina, so book1/297's padded tournament never heals its winner and kills its loser at book1/370
 
 **MEDIUM**
 
@@ -24,7 +24,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [x] 288. Task 191's narrow-header block measures an iframe whose stylesheet may not have applied, and fails intermittently
+*(none open)*
 
 **Done**
 
@@ -320,6 +320,7 @@ this order.*
 - [x] 285. A `<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes whichever blessing was acquired first *(a fifth player-choice verdict; 20 assertions, and a census pinning the three shipped sections)*
 - [x] 286. A `<group>` never asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page states *(one control, one question — an ability arm and a fixed-count forfeit arm; both census-pinned at 0 for the shipped corpus)*
 - [x] 287. The Rules dialog opens scrolled to its last line, and a dialog long enough to scroll has no exit in view *(`preventScroll` on the initial focus, plus a sticky `.modal-head` carrying a ✕ on every dismissable dialog)*
+- [x] 288. Task 191's narrow-header block measures an iframe whose stylesheet may not have applied, and fails intermittently *(the fetched `style.css` inlined into each `srcdoc`, so the frame's `load` is an exact barrier and no subresource is left to race)*
 
 ---
 
@@ -1321,6 +1322,43 @@ carries besides `stamina=`.)*
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-18 (implementation pass, task 289): closed **289** — `<lose staminato="N">` now moves
+the score in **both** directions, and the `<set>` that feeds book1/297's restore survives the fight
+that would otherwise erase it. The suite moves `RESULT ALL PASS pass=2800 fail=0` → `pass=2819
+fail=0`; `web/` only, so the change is a stamp and no data rebuild. 288's checklist line also moves
+into **Done**, which its own commit left in the LOW bucket. Nothing new filed.
+
+**The filed fix was half the bug, and the half it named could not be seen from the engine.** Making
+`staminato` heal is four lines, and every unit assertion for it passed immediately — restore up,
+restore from 0, no-op at the target, clamp at `effectiveStaminaMax()`, the `var` form. §1.297 still
+kept the wound. `<set var="prestamina" value="stamina"/>` is classified `rerunnable`
+(`render-rules.js`, task 61: an absolute `<set value=>` re-evaluates every render so a var derived
+from a roll updates when the roll resolves), and `render-combat.js` rerenders on **every round** —
+so the padded bout overwrote the pre-fight snapshot with the wound as it was being inflicted, and
+`staminato="prestamina"` then correctly restored the player to exactly where they already were. Two
+independent mechanisms, each defensible alone, composing into one silent death.
+
+**`stamina` is the input a section moves under its own feet, which is what makes it the exception.**
+The freeze is narrow on purpose: a `<set value=>` whose expression reads the bare `stamina` keyword
+(word-bounded, so `prestamina` is untouched; `modifier=` forms read the unwounded max and were never
+rerunnable) applies once per visit. That is 2 of the corpus's 3 stamina-reading `<set>` nodes and
+0 of everything else, so task 61's rule is otherwise exactly as it was.
+
+**The second node the freeze reaches was a free permanent stat gain, and only the negative control
+found it.** book3/104 snapshots `curr` before a `<rest>` heals you, compares it to `max` to set
+`wounded`, and gates "if you were **not** wounded you can permanently increase your Stamina by 1-6"
+on the answer. Re-evaluating `curr` after the heal flipped `wounded` to 0 and opened that branch —
+measured with the fix disabled: enter §3.104 at 5/12, take the rest, and the sheet reads **17**.
+Nobody filed it; it fell out of asking what else the one-line rule change touched.
+
+**The control run is the method, not a formality — my first §3.104 assertions passed without the
+fix.** They asserted `curr`/`wounded` across a rerender, but the section's `<rest>` is a control the
+player takes, not an on-entry heal, so with the score unmoved the re-evaluation was a no-op and the
+block proved nothing. Task 288's log says to look for an assertion that *fails* in the broken state;
+the cheapest way to actually know is to break it and watch. Both §1.297 assertions and both
+classifier assertions failed as expected — §3.104's did not, and that is the only reason the real
+one exists.
 
 Worked 2026-08-17 (implementation pass, task 288): closed **288** — task 191's seven header frames
 inline the stylesheet fetched once at the top of the block instead of `<link>`ing it, so the frame's

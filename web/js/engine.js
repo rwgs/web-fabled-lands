@@ -585,15 +585,21 @@ function applyLose(el, state, opts) {
   if (get('stamina') != null || get('staminato') != null) {
     let n;
     const s = get('stamina');
-    // staminato="N" is "beaten down TO N Stamina" (§570 "wake up on 1 Stamina") —
-    // it carries no stamina= attribute, so it must gate the block on its own (task
-    // 71); the damage is however far above N you currently are.
-    if (get('staminato') != null) { const target = resolveValue(state, get('staminato')); n = Math.max(0, state.data.stamina - target); }
+    // staminato="N" SETS the score to N, so its delta is SIGNED: usually "beaten
+    // down TO N Stamina" (§570 "wake up on 1 Stamina"), but the tag is documented to
+    // "actually restore stamina, if it is currently lower than the value given" —
+    // book1/297's padded tournament restores the pre-fight score on both of its exits,
+    // and a wound left in place there kills the loser at §370 (task 289). It carries no
+    // stamina= attribute, so it must gate the block on its own (task 71).
+    if (get('staminato') != null) n = state.data.stamina - resolveValue(state, get('staminato'));
     // <adjust> children reduce (or raise) the wound: "subtract your armour from
     // the roll" (book4/679, book6/306/527/696/742) or "−1 if you worship the
     // Three Fortunes" (book4/556). childAdjustment is 0 when there are none.
     else n = Math.max(0, resolveValue(state, s) + childAdjustment(el, state));
-    state.damageStamina(n); notes.push(`−${n} Stamina`);
+    // A restore clamps at effectiveStaminaMax(), the right ceiling while an aura or a
+    // Stamina-cutting affliction is in play; the note has to say which way it moved.
+    if (n < 0) { state.healStamina(-n); notes.push(`+${-n} Stamina`); }
+    else { state.damageStamina(n); notes.push(`−${n} Stamina`); }
   }
   if (get('ability') != null) {
     const note = applyAbilityChange(el, state, -1, opts);
