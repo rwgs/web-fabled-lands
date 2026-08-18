@@ -9,7 +9,18 @@ combat, markets, ships, live adventure sheet). Plain HTML/CSS/ES modules —
 
 ## Repository map — what is source, what is generated
 - **`books/book<N>/*.xml`** — section text + rules markup. **SOURCE OF TRUTH**
-  (~4,400 sections). Edit these. Superseded working copies live in
+  (~4,400 sections). Edit these — but **only ever to ADD rules markup, never to reword the
+  book.** The port re-creates the printed gamebook as-is, so the section text is the author's,
+  not ours: a tag WRAPS the printed instruction (`<tick>place a tick in it now</tick>`,
+  `<gain shards="20">gain 20 Shards</gain>`) and never replaces, rewrites, abridges or
+  re-splits it. A bare self-closing tag where the book printed words makes the renderer
+  substitute generic filler (a bare `<tick/>` prints "tick the box"), which silently loses the
+  wording — so pass the words through. Watch the sentence boundary too: write `</if> <else>`,
+  not `</if><else>`, or two printed sentences run together. **Check before committing** by
+  stripping tags from the old and new file and diffing the remaining prose — it should be
+  byte-identical apart from the markup you added. This holds for every book, including
+  in-progress conversions.
+  Superseded working copies live in
   **`books/book<N>/temp/`**, which nothing walks — keep them out of the book folder itself,
   where a file declaring a `<section name=>` that is not its own filename now fails the
   build gate, because such a file reads as a second copy of a live section to any by-hand
