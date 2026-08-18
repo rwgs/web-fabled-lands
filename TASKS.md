@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 288 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **no task is open**. File new
+misdiagnosis (see the Review log); **289 is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -13,6 +13,10 @@ records each audit pass and is where new work is filed.
 This file is for **defects**. New features are scoped in
 [`ROADMAP.md`](ROADMAP.md) instead, as ordered phases — pick up a phase from
 there once the buckets below are clear.
+
+**HIGH**
+
+- [ ] 289. `<lose staminato="N">` can only ever lower Stamina, so book1/297's padded tournament never heals its winner and kills its loser at book1/370
 
 **MEDIUM**
 
@@ -1247,6 +1251,68 @@ named a suite the change could not have touched.
 
 *(Filed 2026-08-17 during conversion work on an unpublished book, from a run whose only change was
 section XML. Closed 2026-08-17.)*
+
+---
+
+## 289. `<lose staminato="N">` can only ever lower Stamina, so book1/297's padded tournament never heals its winner and kills its loser at book1/370
+
+`applyEffect`'s `staminato` branch computes the wound as `Math.max(0, state.data.stamina - target)`
+and hands it to `damageStamina` (`engine.js:591`, `:596`), so a target **above** the current score
+resolves to a wound of 0 and the score does not move. `JaFL-XML-Tags.md:416` documents the attribute
+as "The value to **set** the current stamina to. This may be a number or a variable name. **This may
+actually restore stamina, if it is currently lower than the value given.**" The restoring half has
+never been implemented, and the comment above the branch shows why nobody noticed — it describes the
+attribute as "beaten down TO N Stamina", which is what 15 of the corpus's 17 nodes do.
+
+**The other two are book1/297, and they are the whole point of the page.** The Dragon Knights'
+tournament sets `<set var="prestamina" value="stamina"/>` above the fight, prints "Because it is not
+a duel to the death, your weapons are padded, so any Stamina you lose is not permanent - it is
+recovered after the fight", and then puts `<lose staminato="prestamina"/>` inside **each** of the two
+`<group>`s that leave the page — the `<if dead="f">` win group to 19 and the `<else>` group to 370.
+Those are the only `staminato` nodes in the corpus whose target can exceed the current score (the
+other 15 are `staminato="1"` ×14 and `staminato="3"` ×1), so this is the one shipped page the missing
+direction reaches, and it reaches it on both of its exits.
+
+Measured against a real `GameState` (a scratch page under `web/`, deleted after):
+
+* wounded to 3 of 12 with `prestamina` = 12, `<lose staminato="prestamina"/>` leaves **3**;
+* at **0** Stamina it leaves 0, and `isDead()` reads true;
+* controls, so the finding is this branch's arithmetic and nothing else: `staminato="1"` from 9 beats
+  the score down to **1** correctly, and `healStamina(9)` from 3 reaches **12**;
+* end to end on §1.297 — the page saves `prestamina` correctly, the win group renders, and clicking
+  it leaves the wound in place.
+
+**The loser's case is a spurious character death, and the engine's own machinery for avoiding one is
+what makes it reachable.** §1.297's `<else>` prints "If you are reduced to 0 Stamina, you pass out,
+turn to **370**", which is exactly the non-death "if you lose…" branch `hasLosePath` exists for
+(`render.js:914`), so the death is deferred correctly and the player really does get the →370 button.
+§1.370 then opens "You come round, back to your Stamina score before the fight started" — and
+because the restore was a no-op the sheet still reads 0, so `render.js:916` fires `onDeath` on
+arrival. Measured: entering §1.370 on 0 Stamina fires `onDeath` exactly once while that sentence is
+on the page; the control at a restored score fires none. So a tournament the book says is not to the
+death ends the character, or spends a resurrection deal, at the very section that says it does not —
+and the win branch quietly keeps a wound the same paragraph promises is temporary.
+
+**Fix:** honour the documented semantics. `staminato` *sets* the score, so the branch has to move it
+in either direction — compute the signed delta against the target and heal when it is positive
+(`healStamina` already clamps at `effectiveStaminaMax()`, which is the right ceiling for a restore
+that may be read while an aura or a Stamina-cutting affliction is in play). Keep the lowering path
+byte-identical for the 15 nodes that use it, and keep the note text honest in both directions rather
+than always printing `−N Stamina`.
+
+**Tests:** both directions of the tag as unit assertions in `suite-engine.js` beside the existing
+task-71 one (`staminato` down from a healthy score, up from a wound, up from 0, and a no-op when the
+score already equals the target), plus one over the real §1.297/§1.370 pair — wound, take the win
+group, assert the score is back; and enter §1.370 on the restored score and assert no death. The
+second is what makes the regression un-writable again: the unit assertion alone passed for a year
+because it only ever tested the direction the corpus mostly uses.
+
+**Priority: HIGH — a silent, unavoidable character death on a shipped page**, with no diagnostic
+of any kind: the player reads "you pass out" and "You come round", and the app kills them. The
+winner's case is milder but is the same one line.
+
+*(Filed 2026-08-18 during conversion work on an unpublished book, from a census of what `<lose>`
+carries besides `stamina=`.)*
 
 ---
 
