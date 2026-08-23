@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 289 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **no task is open**. File new
+misdiagnosis (see the Review log); **290 is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,6 +16,7 @@ there once the buckets below are clear.
 
 **HIGH**
 
+- [ ] 290. book5/315's `<if var="exp">` reads a variable no node in the section ever writes, so the training courtyard's crippling injury can never fire — task 278's twin from the reader's side
 - [x] 289. `<lose staminato="N">` can only ever lower Stamina, so book1/297's padded tournament never heals its winner and kills its loser at book1/370
 
 **MEDIUM**
@@ -1317,11 +1318,111 @@ carries besides `stamina=`.)*
 
 ---
 
+## 290. book5/315's `<if var="exp">` reads a variable no node in the section ever writes, so the training courtyard's crippling injury can never fire — task 278's twin from the reader's side
+
+**Priority: HIGH — the player escapes a printed penalty entirely, which is the line task 278 drew
+between HIGH and MEDIUM.** It is one section and the stake is 2 maximum Stamina, so a reader
+weighting blast radius could argue MEDIUM; the rubric weights correctness.
+
+*(Filed 2026-08-23 during conversion work on an unpublished book, from a census of every `var=`
+reference against the writers in its own section.)*
+
+`books/book5/315.xml` in full:
+
+```xml
+<p>
+    <training ability="combat">Roll two dice</training>.
+    If the roll exceeds your current COMBAT score, increase it by 1.
+    <if var="exp" lessthan="0">
+        If the roll is less than your current COMBAT, however, then you take a
+        <lose ability="stamina" amount="2">crippling injury</lose>
+        that permanently reduces your Stamina by 2 points.</if>
+</p>
+```
+
+Nothing in the section writes `exp`. The `<training>` carries no `var=` at all, so
+`renderTraining`'s `writeRollVar` (task 278's fix) has no attribute to write, and
+`evaluateCondition` resolves the guard through `state.getVar('exp')` → `0`. `0 < 0` is false, so
+the branch is suppressed on every render: the printed sentence never appears and the 2-point
+maximum-Stamina loss never applies. Same failure mode as 278 — silent, no warning, no throw.
+
+**Two things are wrong, not one, and fixing only the obvious half leaves the branch just as
+dead.** Adding `var="exp"` to the `<training>` makes the var live, but `rollTraining` writes
+`res.total` — the raw 2-dice sum, as 278's filing says in as many words ("do not copy the margin
+line") — which is never negative, so `lessthan="0"` still never matches. The comparator has to
+name the score the page names.
+
+**`lessthan="combat"` is not it either, and the reason is the one asymmetry the format has here.**
+`resolveValue` is *variable-first* (`engine.js:105`), so a bare `combat` in a comparator reads the
+variable `combat` and gets 0; only the `<set value=>` side is keyword-first (`evalExpression`).
+So the score has to be snapshotted into a var first:
+
+```xml
+<set var="pre" value="combat" modifier="natural" hidden="t"/>
+<training ability="combat" var="exp">Roll two dice</training>.
+…
+<if var="exp" lessthan="pre">
+```
+
+`modifier="natural"` because `rollTraining` already judges success against the *natural* score
+(`engine.js:1719`'s own comment), so the penalty must be judged against the same one or the two
+halves of the printed sentence disagree for anyone wearing a COMBAT-boosting item.
+
+**The re-render hazard that bit task 289 is present here and is harmless, which is worth writing
+down so the implementer does not design around it.** An absolute `<set value=>` is `rerunnable`
+(task 61), so after a successful roll `pre` re-reads a COMBAT that the training just raised. That
+cannot produce a false positive: a success means `exp > pre_old`, i.e. `exp >= pre_old + 1 = pre_new`,
+so `exp < pre_new` is false either way. On a failure the score is unchanged and the test is exactly
+the printed one. Assert both directions rather than reasoning about it a second time.
+
+**Why the task-278 pass could not see this.** That census asked the writer-side question — "how
+many `<training>` nodes carry a `var=`" — and answered 1 of 62. The reader-side question is a
+different set, and it is the one that finds a var with no writer at all. Over the shipped corpus
+it returns exactly one file:
+
+```python
+import re, glob
+R = re.compile(r'<(random|difficulty|rankcheck|training|set)\b[^>]*\bvar="([^"]+)"')
+T = re.compile(r'<(if|elseif|while|outcomes|outcome|success|failure)\b[^>]*\bvar="([^"]+)"')
+for f in sorted(glob.glob('books/book[1-6]/[0-9]*.xml')):
+    s = open(f, encoding='utf-8').read()
+    w = {m.group(2) for m in R.finditer(s)}
+    for m in T.finditer(s):
+        if m.group(2) not in w:
+            print(f, m.group(2))
+```
+
+`books/book5/315.xml exp`, and nothing else. Vars are section-local — `Story.begin` calls
+`clearVars()` (`render.js`) — so "written in this section" is the whole of the question and the
+predicate needs no cross-file pass.
+
+Assertions: a unit case in `suite-render.js` driving §5.315 with a forced seed — a roll under the
+natural COMBAT applies the 2-point maximum-Stamina loss and prints its words, a roll over it
+raises COMBAT and applies neither — and a corpus census in `suite-corpus.js` pinning the predicate
+above at **0** files, so a future section cannot reintroduce a read of a var nothing writes. The
+census is the part that generalises, and one caveat comes with widening it: a version that also
+scans the *expression* attributes (`value=`, `amount=`, `bonus=`, `level=`, `equals=`, …) for bare
+identifiers must exclude `modifier=`, whose keyword values (`natural`/`affected`/`noweapon`) are
+not variables — they account for **38** hits across books 2, 3, 5 and 6, and read as the whole
+finding if they are not filtered out.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-23 (census pass, no code changed): **290** — a `var=` census run in the direction
+task 278's could not go. 278 asked which `<training>` nodes carry a `var=` (1 of 62, and it fixed
+the writer); this asks which `var=` *readers* name a variable their own section never writes, which
+is a set the writer-side count cannot produce. One hit across the shipped corpus, and it is the same
+`<training>` family — book5/315, whose crippling-injury branch is guarded by an unwritten `exp` and
+so has never rendered. **A fix's own census is scoped to the shape the fix touched**, and the twin
+of a defect can sit one predicate away from the pass that closed it. The reader-side predicate is
+cheap, section-local (vars are cleared on entry) and belongs in `suite-corpus.js` as a pinned zero;
+nothing else was filed and nothing else in the corpus reads an unwritten var.
 
 Worked 2026-08-18 (implementation pass, task 289): closed **289** — `<lose staminato="N">` now moves
 the score in **both** directions, and the `<set>` that feeds book1/297's restore survives the fight
