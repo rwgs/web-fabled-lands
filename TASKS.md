@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-289 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **290 is open**. File new
+290 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **291 is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,8 +16,8 @@ there once the buckets below are clear.
 
 **HIGH**
 
-- [ ] 290. book5/315's `<if var="exp">` reads a variable no node in the section ever writes, so the training courtyard's crippling injury can never fire — task 278's twin from the reader's side
-- [x] 289. `<lose staminato="N">` can only ever lower Stamina, so book1/297's padded tournament never heals its winner and kills its loser at book1/370
+- [ ] 291. A branch guarded on `lessthan=` over a roll var not yet filled matches at 0, so four shipped sections open before their roll — book2/270 and book2/362 hand out the god Nagil for nothing
+- [x] 290. book5/315's `<if var="exp">` reads a variable no node in the section ever writes, so the training courtyard's crippling injury can never fire — task 278's twin from the reader's side
 
 **MEDIUM**
 
@@ -322,6 +322,7 @@ this order.*
 - [x] 286. A `<group>` never asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page states *(one control, one question — an ability arm and a fixed-count forfeit arm; both census-pinned at 0 for the shipped corpus)*
 - [x] 287. The Rules dialog opens scrolled to its last line, and a dialog long enough to scroll has no exit in view *(`preventScroll` on the initial focus, plus a sticky `.modal-head` carrying a ✕ on every dismissable dialog)*
 - [x] 288. Task 191's narrow-header block measures an iframe whose stylesheet may not have applied, and fails intermittently *(the fetched `style.css` inlined into each `srcdoc`, so the frame's `load` is an exact barrier and no subresource is left to race)*
+- [x] 289. `<lose staminato="N">` can only ever lower Stamina, so book1/297's padded tournament never heals its winner and kills its loser at book1/370 *(a signed delta, plus a narrow freeze on the `<set value=>` nodes that read the live Stamina a fight moves under them)*
 
 ---
 
@@ -1408,11 +1409,102 @@ finding if they are not filtered out.
 
 ---
 
+## 291. A branch guarded on `lessthan=` over a roll var not yet filled matches at 0, so four shipped sections open before their roll — book2/270 and book2/362 hand out the god Nagil for nothing
+
+**Priority: HIGH — two sections award a god with no roll at all, and a third puts a live exit on
+the page before either of its two rolls is made.** Nothing is silent here in the sense task 290
+was: the effects *fire*, they just fire unearned, and one of them is a permanent religious
+allegiance the rest of both books branches on.
+
+*(Filed 2026-08-23 while implementing task 290, from the census that fix's own pre-roll assertion
+forced into existence.)*
+
+`render-rules.js`'s `effectPendingVars` comment states the design in as many words:
+
+> A *condition* deliberately does NOT consult the unfilled set — an unwritten var reads as 0 and
+> its branch simply doesn't match, which is the long-standing behaviour — whereas an effect that
+> applies against 0 memoises its own award away. (task 181)
+
+"An unwritten var reads as 0 and its branch simply doesn't match" is true of `equals=` (§2.554's
+`equals="2"`) and of a bare `var=` (which tests `!= 0`). It is **false of `lessthan=`**, where 0 is
+the smallest value there is and matches every positive bar. So a `<random|difficulty|rankcheck|
+training var="V">` with an `<if var="V" lessthan="N">` beneath it has that branch **open on entry**,
+effects and exits included.
+
+The census — roll writers, readers whose comparator matches at `V == 0`, minus the sections that
+carry a `<set var="V">` sentinel — returns **4 files over the shipped 4,369**, and each was driven
+in a real `Story` to see what the open branch actually does:
+
+| section | guard | on entry, before any roll |
+|---|---|---|
+| book2/270 | `<if var="x" lessthan="rank">` | `gods=["Nagil"]` — the `<tick god="Nagil">` inside has already applied |
+| book2/362 | `<if var="x" lessthan="rank">` | `gods=["Nagil"]` — the same trial, the same free god |
+| book4/257 | `<elseif var="m" lessthan="1">` / `<if var="s" lessthan="1">` | the "both rolls failed" exit **→374 is live and clickable**, while the correct →216 and →413 are gated off |
+| book3/40 | `<if var="x" lessthan="5">` | an editorial note shows and its `<reroll>` control is armed, before the roll it would reroll |
+
+`pendingRollVar` cannot help: it inspects only the effect's own **magnitude** attributes
+(`EFFECT_MAGNITUDE_ATTRS`), and `<tick god="Nagil">` names no var at all — the guard's verdict is
+the whole of what admits it. §4.257's →374 is not gated either, because `applyRollGate` holds the
+`<choices>` block and an inline `<goto>` inside a matching `<if>` is not one.
+
+**Two candidate fixes, and they are not equivalent.** (a) Markup: give each of the four a
+not-yet-rolled sentinel, which is what §6.628 already does (`<set var="y" value="7"/>` above its
+`<random var="y">`, out of range of the `lessthan="6"` beneath) and what task 290 did for §5.315
+(`<set var="exp" value="pre"/>`, a bar that is not a literal). Four files, no engine change, and it
+leaves the fifth such section a future book adds just as broken. (b) Engine: let a condition
+consult `unsettledVars` after all, so a `<if var="V" …>` over an unfilled roll var in the same
+section defers like an effect. That is a deliberate task-181 decision being reversed and needs its
+own census of the **other** direction — every `<if var=>` over a roll var that today *relies* on
+reading 0 before its roll, which the corpus may well contain. Read that census before choosing;
+(a) is the smaller change and (b) is the one that generalises.
+
+Assertions either way: the four sections driven on entry — no god, no live exit, no armed reroll —
+and the census above pinned in `suite-corpus.js` at whatever the chosen fix makes it (0 files for
+(a); for (b) the predicate moves to the engine and the corpus scan becomes redundant). Task 290's
+§5.315 block is the shape to copy: it asserts the pre-roll state *and* both post-roll directions,
+and the pre-roll one is the assertion that found this.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-23 (implementation pass, task 290): closed **290** — §5.315's crippling injury now
+fires when the printed sentence says it does. The suite moves `RESULT ALL PASS pass=2819 fail=0` →
+`pass=2828 fail=0`; `books/` changed, so this is a data rebuild. 289's checklist line also moves
+into **Done**, which its own commit left in the HIGH bucket. Filed **291**.
+
+**The filing named two defects and there were three; the third is the one that mattered, and only
+the negative-control habit found it.** Adding `var="exp"` and `lessthan="pre"` made the guard
+readable and made it match — *on entry*, before the roll, because `exp` reads 0 and 0 is less than
+any COMBAT. The intermediate run reported `max=18` on a page nobody had rolled on: the fix had
+turned a penalty that could never fire into a penalty that always fired, for 2 maximum Stamina the
+player never earned. That is strictly worse than the bug, and it passed every assertion the filing
+asked for. The answer was already in the corpus — §6.628 puts `<set var="y" value="7"/>` above its
+`<random var="y">` precisely so the `lessthan="6"` beneath cannot match an unrolled 0 — so §5.315
+gets `<set var="exp" value="pre"/>`, the same move on a bar that is not a literal. `rollOwned`
+(task 61) freezes it the moment the roll takes the var, which is what makes the idiom safe.
+
+**The filing's re-render analysis was wrong in its premise and right in its conclusion, which is
+worth separating.** It reasoned that `pre` would be `rerunnable` and then proved the drift harmless.
+`rerunnable` excludes any `<set>` carrying `modifier=` (`render-rules.js`), so a
+`modifier="natural"` snapshot never re-runs at all — it is frozen after its first application. The
+assertion the filing asked for (assert both directions rather than reason twice) is what settles it
+either way, and it is why the premise being wrong cost nothing.
+
+**One of the four new assertions passed in the broken state, and it is the one the block is for.**
+"Before the roll the guard is grayed and costs nothing" passes vacuously against the original
+markup — a guard that can never match is also a guard that does not match yet — so on its own it
+proves nothing. Pinning the sentinel's *value* (`exp === 7 && pre === 7`, not `exp === pre`) is what
+makes it fail there: `0 === 0` is true in exactly the state the assertion exists to reject, and
+strengthening it moved the control from 6 of 9 failing to **7 of 9**. The control run is the only
+way that shows up, and knowing *which* assertions survive the broken state is the whole value of
+running it. The two that legitimately still pass are the guard-is-grayed one (vacuous there, and it
+is the assertion that caught the mid-fix regression above) and "the injury prints the words the book
+printed for it" — an untaken `<if>` prints its words grayed, so that text is in the DOM either way.
 
 Filed 2026-08-23 (census pass, no code changed): **290** — a `var=` census run in the direction
 task 278's could not go. 278 asked which `<training>` nodes carry a `var=` (1 of 62, and it fixed

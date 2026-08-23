@@ -392,6 +392,77 @@ export async function run(ctx) {
         eng.seedRng(null);                // revert to Math.random for later tests
       }
 
+      // …and §5.315, the reader-side twin (task 290): the courtyard training's crippling injury
+      // was guarded on `<if var="exp" lessthan="0">` over a var no node in the section wrote, so
+      // it could never fire. The fix needs FOUR things, and three of them are invisible from the
+      // filing: a writer (`<training var="exp">`); a comparator naming the score the page names;
+      // a SNAPSHOT to name it through, because resolveValue is variable-first and a bare
+      // `lessthan="combat"` would read the var `combat` (0), not the sheet; and a NOT-YET-ROLLED
+      // sentinel, because a condition deliberately does not consult the unfilled-roll-var set
+      // (render-rules, task 181: "an unwritten var reads as 0 and its branch simply doesn't
+      // match") — true of §2.554's `equals="2"`, false of a `lessthan=`, where 0 matches and the
+      // injury applied ON ENTRY for 2 maximum Stamina the player never rolled for. §6.628's
+      // `<set var="y" value="7"/>` above its `<random var="y" >` is the corpus's own answer to
+      // exactly that, and `exp = pre` is the same move on a bar that is not a literal.
+      // Seed 7 forces [1,1] (under COMBAT 7) and seed 5 forces [5,5] (over it).
+      {
+        const sec315 = await data.getSection(5, '315');
+        const mk315 = async (weapon) => {
+          const g = GameState.create({ name:'T290', gender:'m', profession:'Warrior', book:5, adv });
+          g.ephemeral = true; g.data.abilities.combat = 7;
+          g.data.stamina = 20; g.data.staminaMax = 20;
+          if (weapon) g.addItem(makeItem('weapon', 'sunsword', 3)); // affected COMBAT 10, natural 7
+          const c = document.createElement('div');
+          const st = new Story(c, g, { navigate(){}, onDeath(){}, notify(){} });
+          g.setVisitProvider(() => st.serializeVisit());
+          st.begin(sec315, 5, '315');
+          return { g, c, st };
+        };
+        // As at §2.554: an untaken <if> still prints its words grayed, so read whether it FIRED
+        // off .cond-inactive and the sheet, never off the text.
+        const injuryOff = (c) => Array.from(c.querySelectorAll('.cond-inactive')).some((s) => /crippling injury/i.test(s.textContent));
+        const before = await mk315(false);
+        ok('§5.315 before the roll the crippling-injury guard is grayed and costs nothing',
+           injuryOff(before.c) && before.g.data.staminaMax === 20,
+           `off=${injuryOff(before.c)} max=${before.g.data.staminaMax}`);
+        // …at the bar, not merely equal to it: a 0 === 0 read passes in the BROKEN state too, and
+        // that is the whole of what the guard-is-grayed assertion above proves there. (task 288)
+        ok('§5.315 the sentinel holds the unrolled roll at the bar, not below it',
+           before.g.getVar('exp') === 7 && before.g.getVar('pre') === 7,
+           `exp=${before.g.getVar('exp')} pre=${before.g.getVar('pre')}`);
+        // The snapshot is the NATURAL score, because rollTraining judges success against the
+        // natural one — a COMBAT-boosting weapon must not move the bar the penalty is judged on,
+        // or the two halves of the printed sentence disagree.
+        ok('§5.315 the snapshot reads the natural COMBAT, not the weapon-boosted score',
+           before.g.getVar('pre') === 7 && (await mk315(true)).g.getVar('pre') === 7);
+        // Under the score: no gain, and the 2-point PERMANENT (maximum) Stamina loss applies.
+        const lo = await mk315(false);
+        eng.seedRng(7); rollBtn(lo.c).click(); await settle172();
+        ok('§5.315 a roll under natural COMBAT fires the injury — 2 maximum Stamina, no gain',
+           lo.g.getVar('exp') === 2 && !injuryOff(lo.c)
+           && lo.g.data.abilities.combat === 7 && lo.g.data.staminaMax === 18,
+           `exp=${lo.g.getVar('exp')} combat=${lo.g.data.abilities.combat} max=${lo.g.data.staminaMax}`);
+        ok('§5.315 the injury prints the words the book printed for it',
+           /crippling injury/.test(lo.c.textContent) && /permanently reduces your Stamina by 2/.test(lo.c.textContent));
+        // Over it: +1 COMBAT and no injury. This is also the re-render direction — the snapshot
+        // carries modifier=, so it is not rerunnable (render-rules) and `pre` cannot drift up to
+        // the score the training just raised; either way a success can never satisfy exp < pre.
+        const hi = await mk315(false);
+        eng.seedRng(5); rollBtn(hi.c).click(); await settle172();
+        ok('§5.315 a roll over natural COMBAT trains +1 and leaves the injury grayed',
+           hi.g.getVar('exp') === 10 && injuryOff(hi.c)
+           && hi.g.data.abilities.combat === 8 && hi.g.data.staminaMax === 20,
+           `exp=${hi.g.getVar('exp')} combat=${hi.g.data.abilities.combat} max=${hi.g.data.staminaMax}`);
+        ok('§5.315 the raised score does not drag the snapshot up with it',
+           hi.g.getVar('pre') === 7, `pre=${hi.g.getVar('pre')}`);
+        // …and the sentinel does not claw the die result back on the rerender that follows it:
+        // the roll owns `exp` now (ctx.rolledVars), which is what freezes the <set> (task 61).
+        hi.st.rerender();
+        ok('§5.315 the sentinel is frozen once the roll owns its var',
+           hi.g.getVar('exp') === 10 && hi.st.ctx.rolledVars.has('exp'), `exp=${hi.g.getVar('exp')}`);
+        eng.seedRng(null);
+      }
+
       window.__FL_INSTANT_DICE__ = false;
     }
 

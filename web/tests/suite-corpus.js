@@ -87,4 +87,30 @@ export async function run(ctx) {
     ok('task273: 26 such guards in all, the other 16 of them over prose in 11 further sections',
        guards273 === 26 && proseOnly273.length === 16 && prose273.length === 11,
        `guards=${guards273} prose=${proseOnly273.length} in ${prose273.length}: ${prose273.join(' ')}`);
+
+    // --- task 290: no branch may read a var= its own section never writes -----------------------
+    // Task 278's census asked the WRITER-side question ("how many <training> nodes carry a var=":
+    // 1 of 62) and fixed the writer. This is the reader side, which is a different set and the one
+    // that finds a var with no writer at all — a guard that silently never matches, printing
+    // nothing and throwing nothing. Its single hit was §5.315, whose crippling injury was gated on
+    // an unwritten `exp`; pinned at ZERO so a future section cannot reintroduce the shape.
+    // Vars are section-local — Story.begin calls clearVars() — so "written in this section" is the
+    // whole of the question and no cross-file pass is needed.
+    // Widening this to the EXPRESSION attributes (value=/amount=/bonus=/level=/equals=/…) must
+    // exclude modifier=, whose keyword values (natural/affected/noweapon) are not variables: they
+    // are 38 hits across books 2, 3, 5 and 6 and would read as the whole finding. (task 290)
+    const W290 = /<(?:random|difficulty|rankcheck|training|set)\b[^>]*\bvar="([^"]+)"/g;
+    const R290 = /<(?:if|elseif|while|outcomes|outcome|success|failure)\b[^>]*\bvar="([^"]+)"/g;
+    const unwritten290 = [];
+    for (const b of books) {
+      const raw = await data.loadBook(b);
+      for (const key of Object.keys(raw)) {
+        const xml = raw[key];
+        const written = new Set(); let m;
+        W290.lastIndex = 0; while ((m = W290.exec(xml))) written.add(m[1]);
+        R290.lastIndex = 0; while ((m = R290.exec(xml))) if (!written.has(m[1])) unwritten290.push(b + '/' + key + ' ' + m[1]);
+      }
+    }
+    ok('task290: no branch in the corpus reads a var= no node in its own section writes',
+       unwritten290.length === 0, unwritten290.join(', '));
 }
