@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 290 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **291 is open**. File new
+misdiagnosis (see the Review log); **291, 292 and 293 are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,7 +16,8 @@ there once the buckets below are clear.
 
 **HIGH**
 
-- [ ] 291. A branch guarded on `lessthan=` over a roll var not yet filled matches at 0, so four shipped sections open before their roll — book2/270 and book2/362 hand out the god Nagil for nothing
+- [ ] 291. book2/270 and book2/362 hand out the god Nagil on entry, because a `lessthan=` guard over a roll var not yet filled matches at 0
+- [ ] 292. book4/257 puts its "both rolls failed" exit on the page before either roll is made, because no roll-gate seed reads a condition
 - [x] 290. book5/315's `<if var="exp">` reads a variable no node in the section ever writes, so the training courtyard's crippling injury can never fire — task 278's twin from the reader's side
 
 **MEDIUM**
@@ -25,7 +26,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-*(none open)*
+- [ ] 293. book3/40 shows its editorial reroll note before the roll it describes, and the obvious sentinel would open a live exit
 
 **Done**
 
@@ -1409,15 +1410,14 @@ finding if they are not filtered out.
 
 ---
 
-## 291. A branch guarded on `lessthan=` over a roll var not yet filled matches at 0, so four shipped sections open before their roll — book2/270 and book2/362 hand out the god Nagil for nothing
+## 291. book2/270 and book2/362 hand out the god Nagil on entry, because a `lessthan=` guard over a roll var not yet filled matches at 0
 
-**Priority: HIGH — two sections award a god with no roll at all, and a third puts a live exit on
-the page before either of its two rolls is made.** Nothing is silent here in the sense task 290
-was: the effects *fire*, they just fire unearned, and one of them is a permanent religious
-allegiance the rest of both books branches on.
+**Priority: HIGH — a permanent religious allegiance, awarded with no roll at all**, on two pages
+whose whole point is a trial you can fail. Both books branch on the God box afterwards.
 
 *(Filed 2026-08-23 while implementing task 290, from the census that fix's own pre-roll assertion
-forced into existence.)*
+forced into existence. Split from a wider filing — see 292 and 293 — once each of the four hits
+turned out to want a different answer.)*
 
 `render-rules.js`'s `effectPendingVars` comment states the design in as many words:
 
@@ -1428,41 +1428,120 @@ forced into existence.)*
 "An unwritten var reads as 0 and its branch simply doesn't match" is true of `equals=` (§2.554's
 `equals="2"`) and of a bare `var=` (which tests `!= 0`). It is **false of `lessthan=`**, where 0 is
 the smallest value there is and matches every positive bar. So a `<random|difficulty|rankcheck|
-training var="V">` with an `<if var="V" lessthan="N">` beneath it has that branch **open on entry**,
-effects and exits included.
+training var="V">` with an `<if var="V" lessthan="N">` beneath it has that branch open on entry,
+effects and exits included. Task 290's §5.315 was one; the census over the shipped 4,369 — roll
+writers, readers whose comparator matches at `V == 0`, minus the sections carrying a `<set var="V">`
+sentinel — returns four more, each driven in a real `Story` to see what the open branch does.
 
-The census — roll writers, readers whose comparator matches at `V == 0`, minus the sections that
-carry a `<set var="V">` sentinel — returns **4 files over the shipped 4,369**, and each was driven
-in a real `Story` to see what the open branch actually does:
+**These two.** §2.270 and §2.362 are the same Nagil trial, `<random dice="1" var="x">roll under your
+Rank on one die</random>` under `<if var="x" lessthan="rank">`, and the branch holds
+`<tick god="Nagil">`. Driven on entry, before the roll: `gods=["Nagil"]`. `pendingRollVar` cannot
+help — it inspects only the effect's own **magnitude** attributes (`EFFECT_MAGNITUDE_ATTRS`), and
+`<tick god="Nagil">` names no var at all, so the guard's verdict is the whole of what admits it.
 
-| section | guard | on entry, before any roll |
-|---|---|---|
-| book2/270 | `<if var="x" lessthan="rank">` | `gods=["Nagil"]` — the `<tick god="Nagil">` inside has already applied |
-| book2/362 | `<if var="x" lessthan="rank">` | `gods=["Nagil"]` — the same trial, the same free god |
-| book4/257 | `<elseif var="m" lessthan="1">` / `<if var="s" lessthan="1">` | the "both rolls failed" exit **→374 is live and clickable**, while the correct →216 and →413 are gated off |
-| book3/40 | `<if var="x" lessthan="5">` | an editorial note shows and its `<reroll>` control is armed, before the roll it would reroll |
+**The fix is the corpus's own idiom, and the engine alternative was measured and rejected.**
+§6.628 puts `<set var="y" value="7"/>` above its `<random var="y">`, out of range of the
+`lessthan="6"` beneath, precisely so an unrolled 0 cannot match; task 290 did the same for §5.315
+with `<set var="exp" value="pre"/>`. Here it is `<set var="x" value="rank" modifier="natural"/>` —
+`x == rank` pre-roll, so `x < rank` is false by construction for any Rank, and `rollOwned`
+(task 61) freezes it the moment the roll takes the var. The engine alternative — let a condition
+consult `unsettledVars` so an `<if var="V">` over an unfilled roll var defers like an effect —
+was censused rather than argued:
 
-`pendingRollVar` cannot help: it inspects only the effect's own **magnitude** attributes
-(`EFFECT_MAGNITUDE_ATTRS`), and `<tick god="Nagil">` names no var at all — the guard's verdict is
-the whole of what admits it. §4.257's →374 is not gated either, because `applyRollGate` holds the
-`<choices>` block and an inline `<goto>` inside a matching `<if>` is not one.
+- **138** readers over a roll var across **112** sections would change how they resolve pre-roll.
+- **8** of those sit in an if/else chain with an `else`/`elseif`, whose `<else>` activates pre-roll
+  today and would be held instead (a pending condition holds the WHOLE chain, `render.js`).
+- **21** readers have every writer of their var inside a conditional they are outside of, so a
+  branch never taken would leave them pending **forever**. All but one are `<success>`/`<failure>`
+  or `<outcome>`, which already gate on the var being written this visit (`branchResolved`); the
+  exception is book3/149's `<if x>`.
 
-**Two candidate fixes, and they are not equivalent.** (a) Markup: give each of the four a
-not-yet-rolled sentinel, which is what §6.628 already does (`<set var="y" value="7"/>` above its
-`<random var="y">`, out of range of the `lessthan="6"` beneath) and what task 290 did for §5.315
-(`<set var="exp" value="pre"/>`, a bar that is not a literal). Four files, no engine change, and it
-leaves the fifth such section a future book adds just as broken. (b) Engine: let a condition
-consult `unsettledVars` after all, so a `<if var="V" …>` over an unfilled roll var in the same
-section defers like an effect. That is a deliberate task-181 decision being reversed and needs its
-own census of the **other** direction — every `<if var=>` over a roll var that today *relies* on
-reading 0 before its roll, which the corpus may well contain. Read that census before choosing;
-(a) is the smaller change and (b) is the one that generalises.
+That is a deliberate task-181 decision reversed for a wide blast radius, against a two-line markup
+change for the two sections that actually lose something. Take the markup.
 
-Assertions either way: the four sections driven on entry — no god, no live exit, no armed reroll —
-and the census above pinned in `suite-corpus.js` at whatever the chosen fix makes it (0 files for
-(a); for (b) the predicate moves to the engine and the corpus scan becomes redundant). Task 290's
-§5.315 block is the shape to copy: it asserts the pre-roll state *and* both post-roll directions,
-and the pre-roll one is the assertion that found this.
+Assertions: both sections driven on entry (no god, and the guard grayed) and in both roll directions
+with a forced seed (a die under Rank writes Nagil, a die at or above it does not), plus the census
+above pinned in `suite-corpus.js` at exactly the sections 292 and 293 own, so it moves when either
+bucket does and a fifth such section lands here. Task 290's §5.315 block is the shape to copy: it
+asserts the pre-roll state *and* both post-roll directions, and the pre-roll one is what found this.
+
+---
+
+## 292. book4/257 puts its "both rolls failed" exit on the page before either roll is made, because no roll-gate seed reads a condition
+
+**Priority: HIGH — a live, clickable route past two mandatory checks**, and it is the route that
+costs the player nothing to take.
+
+*(Filed 2026-08-23, split out of 291's census: the same `lessthan=`-matches-0 trigger, but the only
+one of the four where no sentinel can fix it.)*
+
+§4.257 makes two Difficulty-14 rolls (`var="s"`, `var="m"`) and routes on the pair:
+
+```xml
+<if var="m" greaterthan="0"><if var="s" greaterthan="0">If both rolls were successful, <goto section="216"/>.</if></if>
+<elseif var="m" lessthan="1"><if var="s" lessthan="1">If both rolls failed, <goto section="374"/>.</if></elseif>
+<else>If one roll was successful, <goto section="413"/>.</else>
+```
+
+Driven on entry: `216[OFF] 374[ON] 413[OFF]`. Both margins read 0, so `greaterthan="0"` is false and
+`lessthan="1"` is true — the both-failed arm matches and its →374 is live. The other two are off
+only because they sit in unmatched branches, not because anything gates them.
+
+**A sentinel cannot fix this one, which is what separates it from 291.** A `<difficulty>` var holds
+the margin, where 0 *means* failure — there is no out-of-range "not yet rolled" value. And whatever
+the sentinel makes true, some arm of an if/elseif/else chain always matches, so some exit is always
+live. (A pair chosen to exploit the chain — `m=1`, `s=0`, so the outer `if` matches and its inner
+one does not, closing all three — works, and is an incantation no reviewer could read.)
+
+**The real gap is in the roll gate, and it is the next member of a family already twice extended.**
+`computeRollGate` (`render-gates.js`) seeds from three questions about what a mandatory roll's
+result FEEDS: an outcome table (`tableRoll`), a sheet effect's magnitude (`owedRoll`, task 247, 36
+sections), or a `<success>`/`<failure>` branch (`branchedRoll`, task 249). §4.257 has no table, no
+effect at all, and uses `<if var=>` rather than `<success>` — so all three miss and **none** of its
+gotos is gated. The missing seed is the mandatory roll whose result a **condition** reads: the same
+`provisionalVarClosure` trace the other two use, applied to `if`/`elseif`/`while` `var=` and the
+comparator attributes.
+
+Measure the blast radius the way task 247 did (it reported "36 shipped sections gain the gate,
+measured") before committing: 138 readers over a roll var across 112 sections is the outer bound,
+but most of those sections are already gated by one of the three existing seeds, and a seed that
+holds navigation the player currently reaches is a regression in the other direction.
+
+Assertions: §4.257 driven on entry — all three exits gated — then each pair of roll outcomes routed
+to the right one; the count of sections that gain the gate, pinned; and 291's census, which this
+takes one hit closer to zero.
+
+---
+
+## 293. book3/40 shows its editorial reroll note before the roll it describes, and the obvious sentinel would open a live exit
+
+**Priority: LOW — prose and an inert button**, on the only one of 291's four hits that costs the
+player nothing. It is filed because the fix that works for the other three is *actively unsafe*
+here, and that is worth writing down before someone applies it.
+
+*(Filed 2026-08-23, split out of 291's census.)*
+
+§3/40's `<random type="travel" var="x"/>` feeds an `<outcomes>` table, and above it sits
+`<if var="x" lessthan="5">` wrapping an editor's note — "[*If you roll 2-4 and lack book 9,*
+`<reroll>`*roll again*`</reroll>` *--Ed*]". Pre-roll `x` reads 0, so the note shows and its button is
+armed before the roll it would reroll. The button is inert (`blessingSpendForReroll` finds no storm
+blessing to charge, and there is no stored roll to delete) and the table's own exits are gated by
+`tableRoll`, so nothing is lost — it is a sentence in the wrong place.
+
+**The sentinel that fixes 291 breaks this section, and it was measured, not assumed.** An applied
+`<set>` adds its var to `ctx.wroteVars` (`render-rewards.js`), and `branchResolved`
+(`render-rules.js`) reveals an `<outcome>` row as soon as its var is written this visit. So
+`<set var="x" value="5"/>` above the roll marks `x` written, the `range="5-8"` row resolves, and the
+section renders **`Continue → 59[ON]`** — "A peaceful voyage", live and clickable, before the dice.
+Verified by driving it: the sentinel grays the reroll button (`roll again[OFF]`) and opens a route,
+trading a cosmetic defect for a real one. **Any sentinel on a var an `<outcomes>` table reads does
+this**, which is the general rule to carry out of here; §5.315 and §6.628 are safe only because
+neither has a table.
+
+So this one needs a different answer, and the choice is the task: gate the reroll control on its
+roll having happened, drop the `lessthan="5"` and let the note stand unconditionally (its own words
+already say "if you roll 2-4", so it reads correctly either way), or leave it and pin it as known.
+Whichever, 291's census must stop naming it.
 
 ---
 
@@ -1505,6 +1584,30 @@ way that shows up, and knowing *which* assertions survive the broken state is th
 running it. The two that legitimately still pass are the guard-is-grayed one (vacuous there, and it
 is the assertion that caught the mid-fix regression above) and "the injury prints the words the book
 printed for it" — an untaken `<if>` prints its words grayed, so that text is in the DOM either way.
+
+Split 2026-08-23 (same pass, before any of it was worked): **291** as filed named four sections and
+one fix. Driving each of the four in a real `Story` — rather than trusting the shared trigger —
+turned up **three different correct answers**, so it is now 291 (the two Nagil sections, a
+two-line sentinel), **292** (book4/257, where no sentinel can work and the roll gate needs a fourth
+seed) and **293** (book3/40, LOW, where the sentinel that fixes the others *opens a live exit*).
+
+**A shared trigger is not a shared fix, and the filing had already assumed it was.** All four hit
+the same predicate — a `lessthan=` guard reading a roll var at 0 — and the filing offered exactly
+two options for all four, markup or engine. §4.257 admits neither: a `<difficulty>` margin has no
+out-of-range "not yet rolled" value, and some arm of an if/elseif/else chain always matches, so a
+sentinel can only move which exit is wrongly live. §3/40 is worse than that — the sentinel *works*
+and is still wrong, because an applied `<set>` marks its var written and `branchResolved` then
+reveals the `<outcomes>` row it feeds: driving the "fix" put **`Continue → 59[ON]`** on the page
+before the dice. The general rule that falls out is worth more than either fix: **a sentinel is
+only safe on a var no `<outcomes>` table reads.** §6.628 and §5.315 satisfy that; §3/40 does not.
+
+**The engine alternative was censused rather than argued, and the numbers are why it was declined:**
+138 readers over a roll var across 112 sections change how they resolve pre-roll; 8 sit in a chain
+whose `<else>` activates pre-roll today and would be held; 21 have every writer of their var inside
+a conditional they sit outside, so a branch never taken would hold them pending forever (all but
+book3/149's `<if x>` already gate on the write through `branchResolved`). Two lines of markup
+against that is not a close call — but the seed §4.257 needs (task 292) is an engine change either
+way, so the census is recorded there rather than thrown away.
 
 Filed 2026-08-23 (census pass, no code changed): **290** — a `var=` census run in the direction
 task 278's could not go. 278 asked which `<training>` nodes carry a `var=` (1 of 62, and it fixed
