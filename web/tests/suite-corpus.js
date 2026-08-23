@@ -113,4 +113,52 @@ export async function run(ctx) {
     }
     ok('task290: no branch in the corpus reads a var= no node in its own section writes',
        unwritten290.length === 0, unwritten290.join(', '));
+
+    // --- task 291: a guard over a roll var that MATCHES at 0, with no not-yet-rolled sentinel ----
+    // The other half of 290's shape, and the sharper one. A condition deliberately does not consult
+    // the unfilled-roll-var set (render-rules, task 181: "an unwritten var reads as 0 and its branch
+    // simply doesn't match"), which is true of `equals=` and of a bare `var=` but FALSE of
+    // `lessthan=`, where 0 is the smallest value there is. So such a branch is open on entry —
+    // §2.270 and §2.362 wrote the god Nagil before the die was rolled. The corpus's own answer is a
+    // sentinel (§6.628's `<set var="y" value="7"/>` above its `<random var="y">`), so a section
+    // carrying a `<set>` for the var is not a hit.
+    // Pinned by NAME at the two sections tasks 292 and 293 own, both of which need a different fix:
+    // §4.257's margins have no out-of-range value to hold (292 wants a fourth roll-gate seed), and
+    // §3/40's var feeds an <outcomes> table, where a sentinel marks the var written and reveals a
+    // row — it would put a live "Continue → 59" on the page before the dice (293). The general rule
+    // that falls out: **a sentinel is only safe on a var no <outcomes> table reads.**
+    const RW291 = /<(?:random|difficulty|rankcheck|training)\b[^>]*\bvar="([^"]+)"/g;
+    const SET291 = /<set\b[^>]*\bvar="([^"]+)"/g;
+    const RD291 = /<(?:if|elseif|while|outcomes|outcome|success|failure)\b([^>]*?)\/?>/g;
+    const num291 = (s) => (/^-?\d+$/.test(String(s).trim()) ? parseInt(s, 10) : null);
+    const open291 = [];
+    for (const b of books) {
+      const raw = await data.loadBook(b);
+      for (const key of Object.keys(raw)) {
+        const xml = raw[key];
+        const rolled = new Set(), sentinelled = new Set(); let m;
+        RW291.lastIndex = 0; while ((m = RW291.exec(xml))) rolled.add(m[1]);
+        if (!rolled.size) continue;
+        SET291.lastIndex = 0; while ((m = SET291.exec(xml))) sentinelled.add(m[1]);
+        RD291.lastIndex = 0;
+        while ((m = RD291.exec(xml))) {
+          const attrs = m[1];
+          const v = /\bvar="([^"]*)"/.exec(attrs);
+          if (!v || !rolled.has(v[1]) || sentinelled.has(v[1])) continue;
+          const lt = /\blessthan="([^"]*)"/.exec(attrs), gt = /\bgreaterthan="([^"]*)"/.exec(attrs);
+          const eq = /\bequals="([^"]*)"/.exec(attrs);
+          if (!lt && !gt && !eq) continue;             // a bare var= tests != 0, so 0 never matches
+          let hits0 = false;
+          // A non-numeric bar is another var (§2.270's `lessthan="rank"`) — unknown here, so flag it
+          // rather than assume it exceeds 0, which is the assumption that hid these in the first place.
+          if (lt) hits0 = hits0 || num291(lt[1]) === null || 0 < num291(lt[1]);
+          if (gt) hits0 = hits0 || (num291(gt[1]) !== null && 0 > num291(gt[1]));
+          if (eq) hits0 = hits0 || num291(eq[1]) === 0;
+          if (hits0) open291.push(b + '/' + key + ' ' + v[1]);
+        }
+      }
+    }
+    ok('task291: the only guards matching an unrolled 0 are the two sections tasks 292/293 own',
+       [...new Set(open291)].sort().join(' ') === '3/40 x 4/257 m 4/257 s',
+       [...new Set(open291)].sort().join(' '));
 }

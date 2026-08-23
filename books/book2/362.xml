@@ -11,6 +11,7 @@
 	<p>
 		<if safeAddGod="Nagil">
 			To pass the test you must
+			<set var="x" value="rank" modifier="natural" hidden="t"/>
 			<random dice="1" var="x">
 				roll under your Rank on one die
 			</random>.

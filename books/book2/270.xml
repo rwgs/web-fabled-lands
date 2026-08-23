@@ -5,6 +5,7 @@
 	</if>
 	<else>
 		You are made to undergo various trials to test your worthiness. In the last test, you are sealed in a casket below the ground and made to confront your own fears. To pass the test you must
+		<set var="x" value="rank" modifier="natural" hidden="t"/>
 		<random dice="1" var="x">
 			roll under your Rank on one die
 		</random>.

@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-290 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **291, 292 and 293 are open**. File new
+291 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **292 and 293 are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,9 +16,8 @@ there once the buckets below are clear.
 
 **HIGH**
 
-- [ ] 291. book2/270 and book2/362 hand out the god Nagil on entry, because a `lessthan=` guard over a roll var not yet filled matches at 0
 - [ ] 292. book4/257 puts its "both rolls failed" exit on the page before either roll is made, because no roll-gate seed reads a condition
-- [x] 290. book5/315's `<if var="exp">` reads a variable no node in the section ever writes, so the training courtyard's crippling injury can never fire — task 278's twin from the reader's side
+- [x] 291. book2/270 and book2/362 hand out the god Nagil on entry, because a `lessthan=` guard over a roll var not yet filled matches at 0
 
 **MEDIUM**
 
@@ -324,6 +323,7 @@ this order.*
 - [x] 287. The Rules dialog opens scrolled to its last line, and a dialog long enough to scroll has no exit in view *(`preventScroll` on the initial focus, plus a sticky `.modal-head` carrying a ✕ on every dismissable dialog)*
 - [x] 288. Task 191's narrow-header block measures an iframe whose stylesheet may not have applied, and fails intermittently *(the fetched `style.css` inlined into each `srcdoc`, so the frame's `load` is an exact barrier and no subresource is left to race)*
 - [x] 289. `<lose staminato="N">` can only ever lower Stamina, so book1/297's padded tournament never heals its winner and kills its loser at book1/370 *(a signed delta, plus a narrow freeze on the `<set value=>` nodes that read the live Stamina a fight moves under them)*
+- [x] 290. book5/315's `<if var="exp">` reads a variable no node in the section ever writes, so the training courtyard's crippling injury can never fire *(a writer, a natural-score snapshot to compare against, and a not-yet-rolled sentinel — the third of which the filing could not see)*
 
 ---
 
@@ -1584,6 +1584,27 @@ way that shows up, and knowing *which* assertions survive the broken state is th
 running it. The two that legitimately still pass are the guard-is-grayed one (vacuous there, and it
 is the assertion that caught the mid-fix regression above) and "the injury prints the words the book
 printed for it" — an untaken `<if>` prints its words grayed, so that text is in the DOM either way.
+
+Worked 2026-08-23 (implementation pass, task 291): closed **291** — the Nagil trial no longer writes
+the god before the die is rolled. Two lines of markup, thirteen assertions, and nine of them fail
+against the unsentinelled files. The suite moves `RESULT ALL PASS pass=2828 fail=0` → `pass=2841
+fail=0`; `books/` changed, so this is a data rebuild. 290's checklist line also moves into **Done**,
+which its own commit left in the HIGH bucket. Nothing new filed — 292 and 293 came out of the split
+above, before this was worked.
+
+**The broken state contradicted itself on the next render, and that is what the assertion caught.**
+The expectation was that a pre-roll award would simply be an early award. What actually happens is
+worse: §2.270 opens with `<if not="t" safeAddGod="Nagil">` ("not possible if you are already an
+initiate") over an `<else>` holding the trial, so writing Nagil on entry makes that first branch
+TRUE on the following render — the trial and its result go grayed and the page tells the player they
+cannot become an initiate of the god it just gave them. The assertion reads the branch's own
+`.cond-inactive` state rather than the God box alone, which is why it fails for that reason instead
+of passing on a technically-present god.
+
+**The seed pair was chosen from the PRNG rather than guessed, and it is pinned.** One die and Rank 3
+needs a roll strictly under and strictly over 3; seeds 9 and 2 give 2 and 5. Both are asserted
+before the branch is driven, so a change to `seedRng`/`rollDice` fails as "seed 9 no longer rolls a
+2" and not as a mystery in the Nagil branch three assertions later — the habit task 278's block set.
 
 Split 2026-08-23 (same pass, before any of it was worked): **291** as filed named four sections and
 one fix. Driving each of the four in a real `Story` — rather than trusting the shared trigger —

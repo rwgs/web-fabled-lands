@@ -463,6 +463,59 @@ export async function run(ctx) {
         eng.seedRng(null);
       }
 
+      // --- task 291: the Nagil trial does not award the god before you roll for it ---------------
+      // The same shape as §5.315 above, on a `<tick god=>` instead of a Stamina loss and found by
+      // the same census: `<random dice="1" var="x">` under `<if var="x" lessthan="rank">`, so an
+      // unrolled x read 0, 0 < any Rank, and the branch handed out a permanent religious
+      // allegiance on entry. `pendingRollVar` cannot see it — that predicate inspects the effect's
+      // own MAGNITUDE attributes, and `<tick god="Nagil">` names no var at all — so the sentinel is
+      // the fix, `x = rank` making `x < rank` false by construction for any Rank.
+      // Rank 3 on one die: assert the seeds first so a PRNG change fails loudly here rather than
+      // as a mystery in the branch.
+      {
+        eng.seedRng(9); ok('task291: forcing seed 9 rolls a 2 on one die', eng.rollDice(1).total === 2);
+        eng.seedRng(2); ok('task291: forcing seed 2 rolls a 5 on one die', eng.rollDice(1).total === 5);
+        const mkNagil = async (bk, key) => {
+          const sec = await data.getSection(bk, key);
+          const g = GameState.create({ name:'T291', gender:'m', profession:'Warrior', book:bk, adv });
+          g.ephemeral = true; g.data.rank = 3;
+          const c = document.createElement('div');
+          const st = new Story(c, g, { navigate(){}, onDeath(){}, notify(){} });
+          g.setVisitProvider(() => st.serializeVisit());
+          st.begin(sec, bk, key);
+          return { g, c, st };
+        };
+        const godOff = (c) => Array.from(c.querySelectorAll('.cond-inactive')).some((s) => /Nagil in the God box/i.test(s.textContent));
+        for (const [bk, key] of [[2, '270'], [2, '362']]) {
+          const pre = await mkNagil(bk, key);
+          ok(`§${bk}.${key} the trial awards no god before the roll, and its branch is grayed`,
+             pre.g.data.gods.length === 0 && godOff(pre.c),
+             `gods=${JSON.stringify(pre.g.data.gods)} off=${godOff(pre.c)}`);
+          // The sentinel's VALUE, not just "x is set": an `x === pre.getVar('rank')` read would be
+          // 0 === 0 in the unsentinelled state, which is exactly the state this rejects. (task 290)
+          ok(`§${bk}.${key} the sentinel holds the unrolled die at Rank, not below it`,
+             pre.g.getVar('x') === 3, `x=${pre.g.getVar('x')}`);
+          const lo = await mkNagil(bk, key);
+          eng.seedRng(9); rollBtn(lo.c).click(); await settle172();
+          ok(`§${bk}.${key} a die under Rank 3 passes the trial and writes Nagil`,
+             lo.g.getVar('x') < 3 && !godOff(lo.c) && lo.g.hasGod('Nagil'),
+             `x=${lo.g.getVar('x')} gods=${JSON.stringify(lo.g.data.gods)}`);
+          const hi = await mkNagil(bk, key);
+          eng.seedRng(2); rollBtn(hi.c).click(); await settle172();
+          ok(`§${bk}.${key} a die over Rank 3 fails the trial and writes no god`,
+             hi.g.getVar('x') > 3 && godOff(hi.c) && hi.g.data.gods.length === 0,
+             `x=${hi.g.getVar('x')} gods=${JSON.stringify(hi.g.data.gods)}`);
+          // …and the sentinel does not claw the die back on the rerender that follows: the roll
+          // owns `x` now, which is what freezes the <set> (task 61). Without that the next render
+          // would overwrite the die with Rank and the branch would flip.
+          const rolled = hi.g.getVar('x');
+          hi.st.rerender();
+          ok(`§${bk}.${key} the sentinel is frozen once the roll owns its var`,
+             hi.g.getVar('x') === rolled && hi.st.ctx.rolledVars.has('x'), `x=${hi.g.getVar('x')}`);
+        }
+        eng.seedRng(null);
+      }
+
       window.__FL_INSTANT_DICE__ = false;
     }
 
