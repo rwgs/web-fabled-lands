@@ -1889,13 +1889,19 @@ export class Story {
     const held = Array.from(flow.querySelectorAll(
       '[data-rollnav], [data-rollfight] .btn-roll, [data-rollfight] .blessing-combat'));
     if (!held.length) return;
-    const roll = gate.rollPath != null ? this.ctx.rolls.get('roll@' + gate.rollPath) : null;
+    // EVERY roll the gate awaits must have resolved (task 292): §4.257 routes on the pair of
+    // Difficulty-14 checks it makes, so a hold lifted by whichever one the player rolled first
+    // hands out the exit the OTHER roll decides. Seeds 1-3 await exactly one roll, so this is
+    // the same test they always made.
     // A rolled gate whose result is still a pending blessing-reroll decision (task 175) is not
     // final: keep the onward navigation locked exactly as an unrolled gate, so the player
     // cannot walk past the decision before keeping or rerolling it.
-    const pendingRoll = gate.rollPath != null && this.rerollPendingRolls.has(gate.rollPath);
+    const unresolved = [...gate.rollNodes].some((n) => {
+      const path = gate.rollPaths.get(n);
+      return path == null || !this.ctx.rolls.get('roll@' + path) || this.rerollPendingRolls.has(path);
+    });
     let disable, title;
-    if (!roll || pendingRoll) {
+    if (unresolved) {
       disable = true; title = 'Resolve the roll above first.';
     } else {
       const oc = gate.matchedOutcome;

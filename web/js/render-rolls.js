@@ -112,9 +112,10 @@ function offerReroll(story, widget, path, stored, reroll) {
 // where the roll gate's node→path binding is recorded, so applyRollGate can read whether the
 // gating roll has been made: it lives in this ONE shared place because the gate now seeds from
 // a <rankcheck>/<difficulty> as readily as a <random>, and a roll kind that gated the exits
-// without reporting its path would hold them for ever (task 247).
+// without reporting its path would hold them for ever (task 247). A gate may await more than
+// one roll (§4.257's pair of Difficulty-14 checks, task 292), so the binding is per node.
 function makeRollWidget(story, container, node, path) {
-  if (story.rollGate && node === story.rollGate.rollNode) story.rollGate.rollPath = path;
+  if (story.rollGate && story.rollGate.rollNodes.has(node)) story.rollGate.rollPaths.set(node, path);
   story.noteOutcomeRoll(node, path); // a revealed table row's own stake holds the row's exit (task 257)
   const widget = document.createElement('div');
   widget.className = 'roll';

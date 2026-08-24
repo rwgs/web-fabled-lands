@@ -3150,6 +3150,52 @@ export async function run(ctx) {
       ok('task249: an optional (force="f") table roll gates nothing either',
          gates.computeRollGate(parse('<section name="t440"><p>If you want to read a book, <random dice="2" force="f"/>:</p><outcomes><outcome range="2-5" section="529"/><outcome range="6-12" section="579"/></outcomes><p>When you are ready to leave, <goto section="314"/>.</p></section>')) === null);
 
+      // task 249's three seeds all ask what a roll's result FEEDS, and none of the three is a
+      // CONDITION: §4.257 makes two Difficulty-14 rolls and routes on the pair with `<if var=>`,
+      // so it had no table, no effect and no <success>/<failure> — nothing gated its three exits,
+      // and both margins reading 0 made `lessthan="1"` true, putting a live "if both rolls failed"
+      // <goto> on the page before either roll. No sentinel can close that (a margin has no
+      // out-of-range "not yet rolled" value, and some arm of an if/elseif/else chain always
+      // matches), so the fix is the fourth seed. (task 292)
+      const cond292 = rg247('<difficulty ability="scouting" level="14" var="s"/><if var="s" lessthan="1">If the roll failed, <goto section="374"/>.</if><else>Otherwise <goto section="216"/>.</else>');
+      ok('task292: a check read only by an <if var=> gates the exits',
+         !!cond292 && cond292.navNodes.size === 2 && cond292.seed === 'condition',
+         cond292 ? 'nav=' + cond292.navNodes.size + ' seed=' + cond292.seed : 'null');
+      ok('task292: an <elseif> reads it too',
+         !!rg247('<random dice="2" var="roll"/><if var="roll" greaterthan="9">Good.</if><elseif var="roll" equals="2">Bad.</elseif><goto section="9"/>'));
+      ok('task292: so does a <while>',
+         !!rg247('<random dice="1" var="x"/><while var="x" lessthan="3">Again.</while><goto section="9"/>'));
+      // The comparison BAR is read as well as the var= under test — §5.315's `lessthan="pre"`
+      // shape, where the roll is the bar rather than the subject.
+      ok('task292: a condition whose BAR is the roll var gates the exits',
+         !!rg247('<difficulty ability="combat" level="9" var="m"/><if ability="rank" lessthan="m">Impressive.</if><goto section="9"/>'));
+      // A condition over a var no roll fills owes nothing, exactly as seed 2 reads it.
+      ok('task292: a condition reading a var no roll writes gates nothing',
+         rg247('<random dice="1" var="x"/><if var="y" lessthan="3">Elsewhere.</if><goto section="9"/>') === null);
+      ok('task292: a codeword/item condition beside a roll gates nothing',
+         rg247('<random dice="1" var="x"/><if codeword="K">You know the way.</if><goto section="9"/>') === null);
+      // The same "is this the section's own step" question the other three seeds ask.
+      ok('task292: an optional (force="f") check read by a condition gates nothing',
+         rg247('<difficulty ability="charisma" level="8" force="f" var="c"/><if var="c" greaterthan="0">You talk your way out.</if><goto section="9"/>') === null);
+      ok('task292: a pay-to-spin roll read by a condition gates nothing',
+         rg247('<random dice="1" var="x" flag="k"/><lose shards="10" price="k"/><if var="x" lessthan="3">Unlucky.</if><goto section="9"/>') === null);
+      ok('task292: a roll inside a <group> read by a condition gates nothing',
+         rg247('<group><random dice="1" var="x"/></group><if var="x" lessthan="3">Unlucky.</if><goto section="9"/>') === null);
+      // §4.257's own shape: the gate awaits BOTH rolls, because an exit released by whichever the
+      // player rolled first is decided by a var the other roll has not written yet.
+      const pair292 = rg247('<difficulty ability="scouting" level="14" var="s"/><difficulty ability="magic" level="14" var="m"/>'
+        + '<if var="m" greaterthan="0"><if var="s" greaterthan="0">Both, <goto section="216"/>.</if></if>'
+        + '<elseif var="m" lessthan="1"><if var="s" lessthan="1">Neither, <goto section="374"/>.</if></elseif>'
+        + '<else>One, <goto section="413"/>.</else>');
+      ok('task292: a condition reading two rolls awaits both of them',
+         !!pair292 && pair292.rollNodes.size === 2 && pair292.navNodes.size === 3
+         && pair292.rollNode === pair292.rollNodes.values().next().value,
+         pair292 ? 'rolls=' + pair292.rollNodes.size + ' nav=' + pair292.navNodes.size : 'null');
+      // The earlier seeds are unchanged by that generalisation: each still names exactly one roll.
+      ok('task292: the table, effect and branch seeds each still await exactly one roll',
+         gates.computeRollGate(parse('<section name="tr2"><random/><outcomes><outcome range="1-6" section="5"/></outcomes><choices><choice section="8">Leave</choice></choices></section>')).rollNodes.size === 1
+         && owed247.rollNodes.size === 1 && branch249.rollNodes.size === 1);
+
       // task 257: the outcome-row gate — the die a REVEALED row makes, holding that row's exit.
       // All three seeds above refuse a roll under `outcome`, and for the other six members of
       // ROLLGATE_OPTIONAL_WRAP that is right; an <outcome> is not a branch the player chooses but

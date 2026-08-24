@@ -9,6 +9,7 @@
 import * as data from '../js/data.js';
 import { GameState } from '../js/state.js';
 import { Story } from '../js/render.js';
+import * as gates from '../js/render-gates.js';
 
 export async function run(ctx) {
   const { ok, parse } = ctx;
@@ -161,4 +162,35 @@ export async function run(ctx) {
     ok('task291: the only guards matching an unrolled 0 are the two sections tasks 292/293 own',
        [...new Set(open291)].sort().join(' ') === '3/40 x 4/257 m 4/257 s',
        [...new Set(open291)].sort().join(' '));
+
+    // --- task 292: what the roll gate's CONDITION seed holds, measured -------------------------
+    // The blast radius task 292 wanted measured before the seed was committed, kept as the pin.
+    // These 28 sections had NO roll gate at all before it: seeds 1-3 ask what a roll's result
+    // feeds (an outcome table, an effect's magnitude, a <success>/<failure>), and a section that
+    // routes or rewards through `<if var=>` has none of the three. Twenty of them are the "roll
+    // higher than your Rank" pages, where the exit was live before the die that decides the Rank;
+    // §4.257, §5.343 and §5.432 are the sharper kind, where an `<if>` arm's own <goto> was live
+    // and reachable on entry. A section LEAVING this list has had its gate taken over by an
+    // earlier seed (or lost it); a section joining it is a page that gained one.
+    const gained292 = [], multi292 = [];
+    for (const b of books) {
+      const raw = await data.loadBook(b);
+      for (const key of Object.keys(raw)) {
+        const g = gates.computeRollGate(await data.getSection(b, key));
+        if (!g) continue;
+        if (g.seed === 'condition') gained292.push(b + '/' + key);
+        else if (g.rollNodes.size !== 1) multi292.push(b + '/' + key + ' seed=' + g.seed);
+      }
+    }
+    ok('task292: the condition seed holds 28 sections, and only these',
+       gained292.join(' ') === '1/313 2/345 2/378 2/389 2/529 2/536 2/563 2/584 2/614 2/637 2/654 2/683 2/752 '
+         + '3/267 3/379 3/412 3/455 3/492 3/559 3/583 4/257 5/245 5/343 5/432 6/17 6/344 6/402 6/738',
+       gained292.length + ': ' + gained292.join(' '));
+    // §4.257 is the whole reason the gate awaits a SET of rolls: it is the only shipped section
+    // whose gate has more than one, and the other three seeds must keep naming exactly one each,
+    // since a table matches one row, an effect owes one magnitude and a branch belongs to one check.
+    const g257 = gates.computeRollGate(await data.getSection(4, '257'));
+    ok('task292: only §4.257 awaits two rolls, and no other seed awaits more than one',
+       multi292.length === 0 && !!g257 && g257.rollNodes.size === 2,
+       (g257 ? 'rolls=' + g257.rollNodes.size : 'no gate on 4/257') + '; ' + multi292.join(', '));
 }

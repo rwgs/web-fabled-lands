@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-291 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **292 and 293 are open**. File new
+292 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **293 and 294 are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,8 +16,8 @@ there once the buckets below are clear.
 
 **HIGH**
 
-- [ ] 292. book4/257 puts its "both rolls failed" exit on the page before either roll is made, because no roll-gate seed reads a condition
-- [x] 291. book2/270 and book2/362 hand out the god Nagil on entry, because a `lessthan=` guard over a roll var not yet filled matches at 0
+- [ ] 294. book4/257 leaves a mixed pair of rolls with no exit at all, so succeeding one check and failing the other ends the adventure
+- [x] 292. book4/257 puts its "both rolls failed" exit on the page before either roll is made, because no roll-gate seed reads a condition
 
 **MEDIUM**
 
@@ -324,6 +324,7 @@ this order.*
 - [x] 288. Task 191's narrow-header block measures an iframe whose stylesheet may not have applied, and fails intermittently *(the fetched `style.css` inlined into each `srcdoc`, so the frame's `load` is an exact barrier and no subresource is left to race)*
 - [x] 289. `<lose staminato="N">` can only ever lower Stamina, so book1/297's padded tournament never heals its winner and kills its loser at book1/370 *(a signed delta, plus a narrow freeze on the `<set value=>` nodes that read the live Stamina a fight moves under them)*
 - [x] 290. book5/315's `<if var="exp">` reads a variable no node in the section ever writes, so the training courtyard's crippling injury can never fire *(a writer, a natural-score snapshot to compare against, and a not-yet-rolled sentinel — the third of which the filing could not see)*
+- [x] 291. book2/270 and book2/362 hand out the god Nagil on entry, because a `lessthan=` guard over a roll var not yet filled matches at 0 *(a two-line sentinel, `x = rank`, on both sections — nine of thirteen assertions fail without it)*
 
 ---
 
@@ -1545,6 +1546,62 @@ Whichever, 291's census must stop naming it.
 
 ---
 
+## 294. book4/257 leaves a mixed pair of rolls with no exit at all, so succeeding one check and failing the other ends the adventure
+
+**Priority: HIGH — the page offers nothing and the renderer draws "Your tale ends here"**, on two
+of the four outcomes of a mandatory pair of rolls.
+
+*(Filed 2026-08-23 while implementing task 292, from driving all four pairs of that section's roll
+outcomes rather than only the two the filing named.)*
+
+The chain §4.257 routes on branches its OUTER arms on `m` alone:
+
+```xml
+<if var="m" greaterthan="0"><if var="s" greaterthan="0">If both rolls were successful, <goto section="216"/>.</if></if>
+<elseif var="m" lessthan="1"><if var="s" lessthan="1">If both rolls failed, <goto section="374"/>.</if></elseif>
+<else>If one roll was successful, <goto section="413"/>.</else>
+```
+
+`m > 0` and `m < 1` between them cover every value, so the `<else>` is **unreachable** and §413 —
+the destination the section's own comment says it was written for ("last paragraph is my own
+invention, to handle outcomes of two difficulty rolls") — can never be reached. A mixed pair lands
+in whichever outer arm `m` selects and then fails that arm's inner `<if>`, so the paragraph prints
+nothing: measured, with SCOUTING passing and MAGIC failing, the page renders
+`216[OFF] 374[OFF] 413[OFF]` and the renderer's no-way-forward fallback appears
+(`FATE[ON]` — "Your tale ends here — accept your fate"). Both mixed directions do this; the two
+matched pairs route correctly. Task 292's gate is what makes this visible rather than harmless: the
+exits are now held until both dice are thrown, so a player who reaches the mixed case has nothing
+left to click, where before they could have taken the wrongly-live →374.
+
+The fix is a chain whose arms are mutually exclusive *and* exhaustive, without re-splitting or
+duplicating the three printed sentences — each belongs to exactly one arm, and markup wraps the
+author's text rather than rewriting it (AGENTS.md). **What is available was checked, and it rules
+out the two obvious answers:**
+
+* A conjunction cannot be written on one tag. `evaluateCondition` (engine.js) OR-accumulates every
+  recognised attribute (`result = result || cond()`), and there is one `var=` per tag, so
+  `<if var="s" greaterthan="0" …>` can never mean "and `m` too".
+* Nesting the pair the other way round (`s` outside, `m` inside, an `<else>` in each arm) is
+  exhaustive, but it puts the "if one roll was successful" sentence in **both** arms — the printed
+  text twice, which the markup rule forbids.
+
+That leaves a derived flag per roll, tested by a chain over one var, and the arithmetic is
+narrower than it looks: `evalExpression` is `+ - * /` with parens and *truncating* integer division
+(no `min`/`max`, no comparison operators), so "did this margin succeed" has to be expressed as
+something like `(s+999)/1000` — 1 for a margin of 1 or more, 0 for 0 or less. That reads as an
+incantation, which is the objection task 291's notes raised against exactly this kind of trick, so
+weigh it against the alternative: give the engine a readable way to say it (a `<set>` that captures
+a roll's own success, which `rollDifficulty` already computes as `res.success` and throws away).
+Whichever, the three sentences must each stay in one place, and §413 must become reachable.
+
+Assertions: the two mixed pairs route to §413, both matched pairs still route where task 292 pinned
+them (that block's last two assertions invert from "reaches no exit" to `413[ON]`), and a census of
+the corpus for the same shape — an if/elseif chain whose outer comparators are exhaustive over one
+var with an inner `<if>` inside each arm — so a second section written this way is found rather than
+waited for.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
@@ -1605,6 +1662,58 @@ of passing on a technically-present god.
 needs a roll strictly under and strictly over 3; seeds 9 and 2 give 2 and 5. Both are asserted
 before the branch is driven, so a change to `seedRng`/`rollDice` fails as "seed 9 no longer rolls a
 2" and not as a mystery in the Nagil branch three assertions later — the habit task 278's block set.
+
+Worked 2026-08-23 (implementation pass, task 292): closed **292** — the roll gate has a fourth
+seed, the mandatory roll whose result a CONDITION reads, and §4.257's three exits are held until
+both its Difficulty-14 rolls are thrown. **28 shipped sections gain the gate, measured before the
+seed was committed and pinned in `suite-corpus.js`** — twenty of them the "roll higher than your
+Rank" pages, whose exit was live beside the undecided die, and §4.257/§5.343/§5.432 the sharper kind,
+where an `<if>` arm's own `<goto>` was clickable on entry. `books/` is untouched, so this is a stamp,
+not a data rebuild. The suite moves `RESULT ALL PASS pass=2841 fail=0` → `pass=2862 fail=0`. 291's
+checklist line also moves into **Done**, which its own commit left in the HIGH bucket. Filed **294**.
+
+**One seed, but the first that awaits more than one roll — and the single-roll version passed every
+assertion the filing asked for.** `computeRollGate` named ONE `rollNode` and read ONE `rollPath`, so
+the gate lifted when *whichever* of §4.257's two rolls the player made first resolved. Entry was
+then correct and the intermediate state was not: fail the SCOUTING roll, leave MAGIC unrolled at 0,
+and the "if both rolls failed" arm matches again — the original defect, one click later. The filing's
+assertion list ("driven on entry … then each pair of roll outcomes") does not reach that state; a
+per-pair drive that clicks one button and looks does. So the gate now carries `rollNodes`/`rollPaths`
+and holds until every awaited roll has resolved, and the census pins that §4.257 is the only shipped
+section with two of them — a table matches one row, an effect owes one magnitude and a branch belongs
+to one check, so seeds 1-3 each still name exactly one and their behaviour is unchanged.
+
+**Driving all four pairs is what found task 294, and only the fourth pair shows it.** Both-succeed
+routes to §216 and both-fail to §374, exactly as printed. A MIXED pair reaches **no exit at all**: the
+chain's outer arms test `m` alone and `m > 0`/`m < 1` are exhaustive, so the `<else>` holding "if one
+roll was successful" is unreachable and §413 can never be reached — the page renders
+`216[OFF] 374[OFF] 413[OFF]` and the renderer draws its "Your tale ends here" fallback. That is a
+worse outcome than the defect 292 fixed, on the same section, and it is filed rather than folded in
+(294): 292 owns *when* an exit may open, 294 owns *which*. The two mixed pairs are pinned here as
+they behave today, with the assertion naming 294 so that task inverts them rather than discovering
+them.
+
+**The control run failed 10 of the 21 new assertions, and the ones that survived are worth naming.**
+The corpus census, every synthetic seed assertion with a positive expectation, and the three §4.257
+state assertions (gate shape, entry, one-roll-made) fail with the seed disabled — including
+`374[ON]` on entry, the defect reproduced. The eleven that pass are the whole negative half of the
+seed block (a roll no condition reads, a `force="f"` check, a pay-to-spin die, a `<group>`-wrapped
+roll, a codeword guard: `null` either way, so they only ever guard against the seed *widening*), the
+two both-matched routing assertions (the destination was always right, only its timing was wrong),
+the two task-294 pins (independent of the gate), "both margins read 0 on entry" (the broken state's
+own fact, kept because it is the premise the whole defect rests on) and "each earlier seed still
+awaits exactly one roll" (an invariant of the generalisation, true before it). Knowing which is which
+is the point of running it — and the control earned one fix of its own: the census's second assertion
+dereferenced the gate it had just failed to find, so a *missing* gate reported `FATAL [corpus]` and
+took the rest of the suite's corpus assertions with it. Made null-safe, it now says
+`no gate on 4/257`.
+
+**`conditionPending` and the new seed now read the same list.** "This condition reads a roll's
+result" is asked in two places — by the refusal that holds an undecided branch (render-rules.js) and
+by the gate that holds the exits until the roll is made — so the attribute list and the var
+extraction live once in `render-gates.js` (`CONDITION_VALUE_ATTRS`, `conditionVars`) and are imported
+back, the arrangement `EFFECT_MAGNITUDE_ATTRS` already uses for seed 2. The bar is traced as well as
+the subject, which is what catches §5.315's `lessthan="pre"` shape where the roll is the bar.
 
 Split 2026-08-23 (same pass, before any of it was worked): **291** as filed named four sections and
 one fix. Driving each of the four in a real `Story` — rather than trusting the shared trigger —

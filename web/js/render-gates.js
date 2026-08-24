@@ -49,6 +49,15 @@ const FIGHT_EFFECT_TAGS = new Set(['lose', 'gain', ...ITEM_FAMILY_TAGS]);
 // gate and the deferral can never disagree about what counts as reading a roll's result.
 export const EFFECT_MAGNITUDE_ATTRS = ['multiple', 'shards', 'stamina', 'staminato', 'amount', 'count', 'itemAt', 'quantity'];
 
+// The attributes a CONDITION reads its comparison bar from, beside the `var=` naming the value
+// under test. The same arrangement as the list above, for the same reason: render-rules.js's
+// conditionPending (which holds an undecided branch) imports it from here, and the roll gate's
+// condition seed (which holds the exits until the roll that branch reads is made) reads it too,
+// so the two can never disagree about what counts as a condition reading a roll's result.
+// A bar may itself be a variable (§2.270's `lessthan="rank"`, §5.315's `lessthan="pre"`), which
+// is why the values are traced through expressionVars and not merely compared as numbers. (task 292)
+export const CONDITION_VALUE_ATTRS = ['equals', 'greaterthan', 'lessthan', 'shards', 'ticks'];
+
 // Wrapper tag sets used only by these gate computations.
 const ROLLGATE_OPTIONAL_WRAP = new Set(['if', 'elseif', 'else', 'success', 'failure', 'outcome', 'group']);
 // A roll inside one of these is not the section's own step but the FIGHT's: a <flee> branch's
@@ -362,18 +371,79 @@ function branchedRoll(sectionEl) {
   }) || null;
 }
 
+// The vars a CONDITION reads: the `var=` naming the value under test, plus every identifier in
+// its comparison bars. Shared with render-rules.js's conditionPending (task 292) — see
+// CONDITION_VALUE_ATTRS above for why the two must read the same attributes.
+export function conditionVars(node) {
+  const out = new Set();
+  if (!node) return out;
+  const v = node.getAttribute('var');
+  if (v != null && String(v).trim() !== '') out.add(String(v).trim());
+  for (const a of CONDITION_VALUE_ATTRS) {
+    const raw = node.getAttribute(a);
+    if (raw != null) expressionVars(raw).forEach((id) => out.add(id));
+  }
+  return out;
+}
+
+// Seed 4 (task 292) — the mandatory roll whose result a CONDITION reads. Seeds 1-3 ask what the
+// result feeds: an outcome table, an effect's magnitude, a <success>/<failure> branch. A section
+// that routes on `<if var=>` instead has none of the three, so §4.257's two Difficulty-14 rolls
+// gated nothing at all and its "if both rolls failed" <goto> was live on entry — both margins read
+// 0, so `lessthan="1"` matched before either roll was made. No sentinel can close that one: a
+// <difficulty> margin has no out-of-range "not yet rolled" value (0 MEANS failure), and whatever
+// value a sentinel wrote, some arm of an if/elseif/else chain always matches — so the fix has to
+// be the gate.
+//
+// Position-blind on the read, like seed 2 and the trace itself: §3.40's editorial note sits ABOVE
+// the roll it describes and still reads its var. The roll's own position still bounds which
+// navigation is held, and a condition reading a var no roll fills seeds nothing.
+//
+// EVERY such roll, not the first: §4.257 routes on the PAIR, and a gate released by whichever of
+// the two the player rolled first still hands out the wrong exit — fail the SCOUTING roll and
+// `m` is 0, so the "if both rolls failed" arm matches with the MAGIC roll unmade. This is the
+// one seed whose condition can read more than one roll (a table matches one row, an effect owes
+// one magnitude, a branch belongs to one check), so it is the one that returns a list.
+function conditionRolls(sectionEl) {
+  const conds = Array.from(sectionEl.querySelectorAll('if, elseif, while'));
+  if (!conds.length) return [];
+  const read = new Set();
+  conds.forEach((c) => conditionVars(c).forEach((id) => read.add(id)));
+  if (!read.size) return [];
+  return Array.from(sectionEl.querySelectorAll('random[var], rankcheck[var], difficulty[var]')).filter((r) => {
+    const v = (r.getAttribute('var') || '').trim();
+    if (!v || !isMandatoryRoll(sectionEl, r)) return false;
+    return [...provisionalVarClosure(sectionEl, [v])].some((id) => read.has(id));
+  });
+}
+
 // A mandatory roll must be made before the section's onward navigation unlocks, and (table
 // seed) a "get lost" outcome carrying its own <goto> suppresses those choices. `outcomesNode`
-// is the table this gate's roll feeds, or null when the gate came from the effect or branch
-// seed — there is no outcome to match then, so applyRollGate releases on the roll (and, for a
-// branch seed, the <success>/<failure> the roll reveals) RESOLVING. Returns
-// { rollNode, outcomesNode, navNodes:Set, fightNodes:Set, rollPath, matchedOutcome } or null.
+// is the table this gate's roll feeds, or null when the gate came from the effect, branch or
+// condition seed — there is no outcome to match then, so applyRollGate releases on the roll (and,
+// for a branch seed, the <success>/<failure> the roll reveals) RESOLVING. Returns
+// { rollNode, rollNodes:Set, seed, outcomesNode, navNodes:Set, fightNodes:Set, rollPaths:Map,
+// matchedOutcome } or null.
 export function computeRollGate(sectionEl) {
   if (!sectionEl) return null;
   const outcomesNode = sectionEl.querySelector('outcomes');
   const tabled = outcomesNode ? tableRoll(sectionEl, outcomesNode) : null;
-  const rollNode = tabled || owedRoll(sectionEl) || branchedRoll(sectionEl);
-  if (!rollNode) return null;
+  // The seeds are tried in order and `seed` names the one that fired, so a census can ask which
+  // sections a newly added seed is holding — the measurement task 292 wanted before committing it.
+  let seed = 'table', rolls = tabled ? [tabled] : [];
+  const trySeed = (name, find) => {
+    if (rolls.length) return;                 // lazy, so a table-seeded gate still scans nothing else
+    const found = find();
+    if (found.length) { rolls = found; seed = name; }
+  };
+  trySeed('effect', () => [owedRoll(sectionEl)].filter(Boolean));
+  trySeed('branch', () => [branchedRoll(sectionEl)].filter(Boolean));
+  trySeed('condition', () => conditionRolls(sectionEl));
+  if (!rolls.length) return null;
+  // The FIRST of them fixes the gate's position (so everything below the earliest awaited roll is
+  // held) and, for the table seed, is the roll whose outcome row is matched; `rollNodes` is what
+  // must all have resolved before the hold lifts, and the view fills `rollPaths` as each renders.
+  const rollNode = rolls[0];
   const navNodes = new Set();
   sectionEl.querySelectorAll('choice, goto, return').forEach((n) => {
     if (!(rollNode.compareDocumentPosition(n) & DOCUMENT_POSITION_FOLLOWING)) return;
@@ -394,7 +464,8 @@ export function computeRollGate(sectionEl) {
     fightNodes.add(f);
   });
   if (!navNodes.size && !fightNodes.size) return null; // pure roll-to-goto travel — nothing to gate
-  return { rollNode, outcomesNode: tabled ? outcomesNode : null, navNodes, fightNodes, rollPath: null, matchedOutcome: null };
+  return { rollNode, rollNodes: new Set(rolls), seed, outcomesNode: tabled ? outcomesNode : null,
+           navNodes, fightNodes, rollPaths: new Map(), matchedOutcome: null };
 }
 
 // The outcome-row roll gate (task 257) — the roll a REVEALED table row makes, holding that

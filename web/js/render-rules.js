@@ -13,7 +13,7 @@ import { bookAvailable } from './edition.js'; // the DOM-free registry, never da
 import { blessingLabel } from './render-util.js'; // pure label formatting, no DOM (task 218)
 import {
   isRollGate, isDeferredEscapeClear, isDeferredTagCleanup, aggregateFightOutcome, ITEM_FAMILY_TAGS,
-  hasAncestorTag, expressionVars, provisionalVarClosure, EFFECT_MAGNITUDE_ATTRS,
+  hasAncestorTag, expressionVars, provisionalVarClosure, EFFECT_MAGNITUDE_ATTRS, conditionVars,
 } from './render-gates.js';
 
 // isRollGate moved to render-gates.js (one-way dependency: classifyPassive below composes
@@ -538,14 +538,12 @@ export function pendingRerollBlessings(state, node, stored) {
 // §2.389's `<if var="x" equals="3"><tick shards="150"/>` must neither award the 150 Shards nor
 // expose a Take control while x is a pending reroll result. The renderer holds the WHOLE
 // if/elseif/else chain when any branch is undecided, so no later <else> slips active instead.
+// The vars it reads are conditionVars (render-gates.js) — shared with the roll gate's condition
+// seed, so "this branch reads a roll's result" means the same thing to the gate that holds the
+// exits until the roll is made and to the refusal that holds the branch itself (task 292).
 export function conditionPending(node, pendingVars) {
   if (!pendingVars || !pendingVars.size) return false;
-  const v = node.getAttribute('var');
-  if (v != null && pendingVars.has(String(v).trim())) return true;
-  for (const a of ['equals', 'greaterthan', 'lessthan', 'shards', 'ticks']) {
-    const raw = node.getAttribute(a);
-    if (raw != null && expressionVars(raw).some((id) => pendingVars.has(id))) return true;
-  }
+  for (const id of conditionVars(node)) if (pendingVars.has(id)) return true;
   return false;
 }
 

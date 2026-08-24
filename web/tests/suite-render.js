@@ -516,6 +516,83 @@ export async function run(ctx) {
         eng.seedRng(null);
       }
 
+      // --- task 292: §4.257's two Difficulty-14 rolls hold all three of its exits ---------------
+      // The section routes on the PAIR with `<if var=>`, so it has no outcome table, no effect
+      // reading a margin and no <success>/<failure>: all three of the roll gate's seeds missed it
+      // and NOTHING held its exits. Both margins reading 0 made `lessthan="1"` true, so "if both
+      // rolls failed, turn to 374" was live and clickable on entry — the cheapest of the three
+      // routes, taken before a die was thrown. A sentinel cannot fix it (a margin has no
+      // out-of-range "not yet rolled" value, and some arm of an if/elseif/else chain always
+      // matches), so the fix is the gate's fourth seed: the mandatory roll a CONDITION reads.
+      //
+      // Fixed dice (4s) and a clamped ability (ABILITY_MAX is 12, so a 12 is not a guaranteed
+      // success on a 2-die roll — snake-eyes ties the Difficulty and margin 0 is a FAILURE) make
+      // both margins exact; they are asserted first so a change to rollDifficulty fails here
+      // rather than as a mystery three assertions later. (the habit task 278's block set)
+      {
+        const settle292 = () => new Promise((r) => setTimeout(r, 20));
+        const rnd292 = Math.random;
+        const rollBtn292 = (c) => c.querySelector('.roll .btn-roll');
+        const mk257 = async (sPass, mPass) => {
+          const g = GameState.create({ name:'T292', gender:'m', profession:'Warrior', book:4, adv });
+          g.ephemeral = true;
+          g.data.abilities.scouting = sPass ? 12 : 1;
+          g.data.abilities.magic = mPass ? 12 : 1;
+          const c = document.createElement('div');
+          const st = new Story(c, g, { navigate(){}, onDeath(){}, notify(){} });
+          g.setVisitProvider(() => st.serializeVisit());
+          st.begin(await data.getSection(4, '257'), 4, '257');
+          return { g, c, st };
+        };
+        // Every exit the page draws, in document order, ON only if it is really clickable: a
+        // <goto> in an untaken branch is drawn grayed and disabled, and so is a gated one, which
+        // is why this reads the button's own state rather than counting nodes. FATE is the
+        // renderer's "your tale ends here" button, which appears only when a page offers nothing.
+        const exits292 = (c) => Array.from(c.querySelectorAll('.goto')).map((b) =>
+          (b.classList.contains('end-fate') ? 'FATE' : b.textContent.replace(/\D+/g, ''))
+          + (b.disabled || b.closest('.cond-inactive') ? '[OFF]' : '[ON]')).join(' ');
+        Math.random = () => 0.5; // both dice read 4, so a 2-die roll totals 8
+        const ff = await mk257(false, false);
+        ok('§4.257 the gate awaits BOTH rolls, not whichever is rolled first',
+           !!ff.st.rollGate && ff.st.rollGate.rollNodes.size === 2 && ff.st.rollGate.seed === 'condition',
+           ff.st.rollGate ? `rolls=${ff.st.rollGate.rollNodes.size} seed=${ff.st.rollGate.seed}` : 'null');
+        ok('§4.257 no exit is live before either roll — the both-failed route included',
+           exits292(ff.c) === '216[OFF] 374[OFF] 413[OFF]', exits292(ff.c));
+        ok('§4.257 both margins read 0 on entry, which is what made lessthan="1" match',
+           ff.g.getVar('s') === 0 && ff.g.getVar('m') === 0,
+           `s=${ff.g.getVar('s')} m=${ff.g.getVar('m')}`);
+        // The half a one-roll gate would have leaked: SCOUTING failed, MAGIC unrolled and reading
+        // 0, so the "both rolls failed" arm matches on a page with a die still to throw.
+        rollBtn292(ff.c).click(); await settle292();
+        ok('§4.257 one roll made and failed does not release the both-failed exit',
+           ff.g.getVar('s') === -5 && ff.g.getVar('m') === 0 && exits292(ff.c) === '216[OFF] 374[OFF] 413[OFF]',
+           `s=${ff.g.getVar('s')} m=${ff.g.getVar('m')} ${exits292(ff.c)}`);
+        rollBtn292(ff.c).click(); await settle292();
+        ok('§4.257 both rolls failed routes to 374, and only there',
+           ff.g.getVar('s') === -5 && ff.g.getVar('m') === -5 && exits292(ff.c) === '216[OFF] 374[ON] 413[OFF]',
+           `s=${ff.g.getVar('s')} m=${ff.g.getVar('m')} ${exits292(ff.c)}`);
+        const pp = await mk257(true, true);
+        rollBtn292(pp.c).click(); await settle292(); rollBtn292(pp.c).click(); await settle292();
+        ok('§4.257 both rolls successful routes to 216, and only there',
+           pp.g.getVar('s') === 6 && pp.g.getVar('m') === 6 && exits292(pp.c) === '216[ON] 374[OFF] 413[OFF]',
+           `s=${pp.g.getVar('s')} m=${pp.g.getVar('m')} ${exits292(pp.c)}`);
+        // The MIXED pair reaches no exit at all, in either direction — a second defect in this
+        // section, filed as task 294 and pinned here rather than fixed under this one. The outer
+        // chain branches on `m` alone, so a mixed pair matches an arm whose inner <if> is false
+        // and the <else> holding "if one roll was successful" is never evaluated: the page offers
+        // nothing and the renderer draws its "your tale ends here" button. Task 292 owns the gate,
+        // and the gate is right — no exit may open before the dice; which exit the markup then
+        // opens is 294's. When 294 lands, both of these become 413[ON].
+        for (const [sPass, mPass] of [[true, false], [false, true]]) {
+          const mx = await mk257(sPass, mPass);
+          rollBtn292(mx.c).click(); await settle292(); rollBtn292(mx.c).click(); await settle292();
+          ok(`§4.257 (task294) one roll of the pair successful (s=${sPass?'pass':'fail'}) reaches no exit`,
+             exits292(mx.c) === '216[OFF] 374[OFF] 413[OFF] FATE[ON]',
+             `s=${mx.g.getVar('s')} m=${mx.g.getVar('m')} ${exits292(mx.c)}`);
+        }
+        Math.random = rnd292;
+      }
+
       window.__FL_INSTANT_DICE__ = false;
     }
 
