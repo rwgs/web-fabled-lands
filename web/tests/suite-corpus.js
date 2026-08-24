@@ -123,50 +123,80 @@ export async function run(ctx) {
     // §2.270 and §2.362 wrote the god Nagil before the die was rolled. The corpus's own answer is a
     // sentinel (§6.628's `<set var="y" value="7"/>` above its `<random var="y">`), so a section
     // carrying a `<set>` for the var is not a hit.
-    // Pinned by NAME at the two sections tasks 292 and 293 own, both of which need a different fix:
-    // §4.257's margins have no out-of-range value to hold (292 wants a fourth roll-gate seed), and
-    // §3/40's var feeds an <outcomes> table, where a sentinel marks the var written and reveals a
-    // row — it would put a live "Continue → 59" on the page before the dice (293). The general rule
-    // that falls out: **a sentinel is only safe on a var no <outcomes> table reads.**
+    // Pinned at ZERO, having named all three of its hits in turn. §4.257's two left when task 294
+    // rewrote its chain to route on one derived count (the guards now read `passed`, which no roll
+    // writes, so the shape is gone from that page; what holds it pre-roll is still task 292's
+    // gate, asserted below). §3/40's left when task 293 nested its guard — a sentinel could never
+    // have worked there, because its var feeds an <outcomes> table, where a `<set>` marks the var
+    // written and reveals a row: it would have put a live "Continue → 59" on the page before the
+    // dice. The general rule that falls out: **a sentinel is only safe on a var no <outcomes>
+    // table reads**, and where one does, nesting the guard is the answer.
+    //
+    // Nesting is AND, so a guard that CANNOT match at 0 shuts every guard on the same var beneath
+    // it: §3/40's inner `lessthan="5"` is unreachable pre-roll under the `greaterthan="1"` task 293
+    // wrapped it in. That needs a tag STACK — the technique task 273's census above uses — because
+    // matching each opening tag alone reports a guard no unrolled visit can reach. Only
+    // `if`/`elseif`/`while` shut their children, which is narrower than the truth and deliberately
+    // so: see the fixture assertion below for what that leaves reported and why.
     const RW291 = /<(?:random|difficulty|rankcheck|training)\b[^>]*\bvar="([^"]+)"/g;
     const SET291 = /<set\b[^>]*\bvar="([^"]+)"/g;
-    const RD291 = /<(?:if|elseif|while|outcomes|outcome|success|failure)\b([^>]*?)\/?>/g;
+    const TAG291 = /<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g;
+    const RD291 = /^(?:if|elseif|while|outcomes|outcome|success|failure)$/;
+    const BAR291 = /^(?:if|elseif|while)$/;
     const num291 = (s) => (/^-?\d+$/.test(String(s).trim()) ? parseInt(s, 10) : null);
+    // Does this guard's comparison match while its var still reads the unrolled 0? A tag with no
+    // comparator at all does not — a bare var= tests != 0 — which also makes it a barrier below.
+    const at0291 = (attrs) => {
+      const lt = /\blessthan="([^"]*)"/.exec(attrs), gt = /\bgreaterthan="([^"]*)"/.exec(attrs);
+      const eq = /\bequals="([^"]*)"/.exec(attrs);
+      if (!lt && !gt && !eq) return false;
+      let hits0 = false;
+      // A non-numeric bar is another var (§2.270's `lessthan="rank"`) — unknown here, so flag it
+      // rather than assume it exceeds 0, which is the assumption that hid these in the first place.
+      if (lt) hits0 = hits0 || num291(lt[1]) === null || 0 < num291(lt[1]);
+      if (gt) hits0 = hits0 || (num291(gt[1]) !== null && 0 > num291(gt[1]));
+      if (eq) hits0 = hits0 || num291(eq[1]) === 0;
+      return hits0;
+    };
+    const scan291 = (xml) => {
+      const hits = [];
+      const rolled = new Set(), sentinelled = new Set(); let m;
+      RW291.lastIndex = 0; while ((m = RW291.exec(xml))) rolled.add(m[1]);
+      if (!rolled.size) return hits;
+      SET291.lastIndex = 0; while ((m = SET291.exec(xml))) sentinelled.add(m[1]);
+      const stack = [];
+      TAG291.lastIndex = 0;
+      while ((m = TAG291.exec(xml))) {
+        const [, close, tag, attrs, selfClose] = m;
+        const t = tag.toLowerCase();
+        if (close) { if (stack.length && stack[stack.length - 1].tag === t) stack.pop(); continue; }
+        const v = RD291.test(t) ? /\bvar="([^"]*)"/.exec(attrs) : null;
+        const name = v && rolled.has(v[1]) && !sentinelled.has(v[1]) ? v[1] : null;
+        const open = name ? at0291(attrs) : false;
+        if (name && open && !stack.some((fr) => fr.shut === name)) hits.push(name);
+        if (!selfClose) stack.push({ tag: t, shut: name && !open && BAR291.test(t) ? name : null });
+      }
+      return hits;
+    };
     const open291 = [];
     for (const b of books) {
       const raw = await data.loadBook(b);
-      for (const key of Object.keys(raw)) {
-        const xml = raw[key];
-        const rolled = new Set(), sentinelled = new Set(); let m;
-        RW291.lastIndex = 0; while ((m = RW291.exec(xml))) rolled.add(m[1]);
-        if (!rolled.size) continue;
-        SET291.lastIndex = 0; while ((m = SET291.exec(xml))) sentinelled.add(m[1]);
-        RD291.lastIndex = 0;
-        while ((m = RD291.exec(xml))) {
-          const attrs = m[1];
-          const v = /\bvar="([^"]*)"/.exec(attrs);
-          if (!v || !rolled.has(v[1]) || sentinelled.has(v[1])) continue;
-          const lt = /\blessthan="([^"]*)"/.exec(attrs), gt = /\bgreaterthan="([^"]*)"/.exec(attrs);
-          const eq = /\bequals="([^"]*)"/.exec(attrs);
-          if (!lt && !gt && !eq) continue;             // a bare var= tests != 0, so 0 never matches
-          let hits0 = false;
-          // A non-numeric bar is another var (§2.270's `lessthan="rank"`) — unknown here, so flag it
-          // rather than assume it exceeds 0, which is the assumption that hid these in the first place.
-          if (lt) hits0 = hits0 || num291(lt[1]) === null || 0 < num291(lt[1]);
-          if (gt) hits0 = hits0 || (num291(gt[1]) !== null && 0 > num291(gt[1]));
-          if (eq) hits0 = hits0 || num291(eq[1]) === 0;
-          if (hits0) open291.push(b + '/' + key + ' ' + v[1]);
-        }
-      }
+      for (const key of Object.keys(raw)) scan291(raw[key]).forEach((v) => open291.push(b + '/' + key + ' ' + v));
     }
-    // §4.257's two entries left this list when task 294 rewrote its chain to route on one derived
-    // count: the guards now read `passed`, which no roll writes, so the shape the census looks for
-    // is gone from that page. What holds the section pre-roll is still task 292's gate — the
-    // `equals="0"` arm is revealed on entry exactly as the `lessthan="1"` one was — and that is
-    // asserted where the gate is, below. §3/40 is the one hit left, and it is task 293's.
-    ok('task291: the only guard matching an unrolled 0 is the section task 293 owns',
-       [...new Set(open291)].sort().join(' ') === '3/40 x',
+    ok('task291: no guard in the corpus can match a roll var still reading its unrolled 0',
+       [...new Set(open291)].sort().join(' ') === '',
        [...new Set(open291)].sort().join(' '));
+    // The zero has to be shown to come from the corpus and not from a census that stopped matching,
+    // so both halves are driven over §3/40's guard as it was and as task 293 nested it. The third
+    // case pins how NARROW the barrier rule is on purpose: a guard inside a var-keyed <outcome> row
+    // is not reachable pre-roll either (task 50's branchResolved waits for the write), but no
+    // shipped section is written that way, so it stays reported. Over-reporting sends a human to
+    // look; under-reporting hides a live branch, which is the failure this census exists to catch.
+    ok('task293: the census still finds the shape, and the nesting is what clears it',
+       scan291('<p><random var="x"/><if var="x" lessthan="5">Note.</if></p>').join(' ') === 'x'
+       && scan291('<p><random var="x"/><if var="x" greaterthan="1"><if var="x" lessthan="5">Note.</if></if></p>').length === 0
+       && scan291('<p><random var="x"/><outcomes var="x"><outcome var="x" range="2-4">'
+                  + '<if var="x" lessthan="5">Note.</if></outcome></outcomes></p>').join(' ') === 'x');
 
     // --- task 294: a chain over one var whose <else> can never be reached ----------------------
     // §4.257's outer arms were `m > 0` and `m < 1`, which between them cover every value, so the

@@ -2,9 +2,11 @@
 <section name="40">
 	<p>
 		The wind freshens and veers to blow from the north-east. You must be careful, or your ship could be blown onto the reefs fringing the Innis archipelago. <random type="travel" var="x"/>.
-		<if var="x" lessthan="5">
-			<if book="9" not="t">
-				[<i>If you roll 2-4 and lack book 9, <reroll>roll again</reroll> --Ed</i>]
+		<if var="x" greaterthan="1">
+			<if var="x" lessthan="5">
+				<if book="9" not="t">
+					[<i>If you roll 2-4 and lack book 9, <reroll>roll again</reroll> --Ed</i>]
+				</if>
 			</if>
 		</if>
 	</p>

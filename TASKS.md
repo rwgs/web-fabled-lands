@@ -4,7 +4,8 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 294 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **293 is the only one open**. File new
+misdiagnosis (see the Review log) — **every bucket is clear**, so the next work
+comes from [`ROADMAP.md`](ROADMAP.md). File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -26,7 +27,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 293. book3/40 shows its editorial reroll note before the roll it describes, and the obvious sentinel would open a live exit
+- [x] 293. book3/40 shows its editorial reroll note before the roll it describes, and the obvious sentinel would open a live exit
 
 **Done**
 
@@ -1664,6 +1665,47 @@ of passing on a technically-present god.
 needs a roll strictly under and strictly over 3; seeds 9 and 2 give 2 and 5. Both are asserted
 before the branch is driven, so a change to `seedRng`/`rollDice` fails as "seed 9 no longer rolls a
 2" and not as a mystery in the Nagil branch three assertions later — the habit task 278's block set.
+
+Worked 2026-08-23 (implementation pass, task 293): closed **293**, and with it **every open
+bucket** — the next work comes from [`ROADMAP.md`](ROADMAP.md). §3.40's editorial reroll note is no
+longer offered before the roll it describes, and a `<reroll>` control anywhere in the corpus is
+disabled until there is a roll for it to throw away. The suite moves
+`RESULT ALL PASS pass=2875 fail=0` → `pass=2883 fail=0`.
+
+**The filing offered three answers; reading the code deleted one of them and suggested a fourth.**
+"Drop the `lessthan="5"` and let the note stand unconditionally" is not safe: `renderReroll` deletes
+the stored roll and rerenders, and `blessingSpendForReroll` finds no `<lose blessing hidden>` in
+§3.40, so nothing is charged. That guard is the only thing confining the free reroll to a 2-4
+result — without it the note also shows after a 5-8 or 9-12 roll, with a live button that rerolls a
+peaceful voyage as often as the player likes. The fourth answer is that **nesting is AND**: one tag
+ORs its recognised attributes, but a nested pair conjoins, which is the shape task 294 had just
+finished removing from §4.257 and the shape this section needed *adding*. `<if var="x"
+greaterthan="1">` around the existing `<if var="x" lessthan="5">` reads as the printed range 2-4, is
+false at an unrolled 0, and needs no engine change at all.
+
+**Both halves were kept, and the control run shows they cover different sections.** Reverting only
+the markup leaves the note rendering `live+disabled` before the dice — live prose, which is the
+filing's headline defect, with the button held by the engine alone. Reverting only the engine gate
+leaves §4.287 and §5.19 armed: both print "if you haven't got the book listed, roll again" as loose
+prose *under* their outcome table, with no guard at all, so the walk reaches it on entry. Six of the
+nine `<reroll>` sections were already safe — inside an `<outcome>` row, or under an
+`equals=`/`greaterthan=` guard that cannot match an unrolled 0 — and none of them changes.
+
+**291's census needed a tag stack to tell the truth, because nesting is exactly what it could not
+see.** Matching each opening tag alone, it still reported §3.40's inner `lessthan="5"` — a guard no
+unrolled visit can now reach. It now walks with an enclosing-frame stack (task 273's census in the
+same file does the same) and skips a guard whose ancestor on the same var cannot match at 0. Only
+`if`/`elseif`/`while` shut their children: a var-keyed `<outcome>` row is unreachable pre-roll too
+(task 50's `branchResolved` waits for the write), but no shipped section is written that way, so it
+stays reported — over-reporting sends a human to look, where under-reporting hides a live branch,
+which is the failure the census exists to catch. Both halves are driven over fixtures beside the
+pin, so its **zero** cannot come from a census that quietly stopped matching.
+
+**One thing checked and left alone.** A 2-4 roll reveals a live `Continue → 84` into book 9, which
+is unpublished. That is deliberate and already documented: a branch's `book=` asks the shared
+edition gate on the CLICK rather than at render (task 244, `revealBranch`). It is pinned in the
+assertion so the note's premise — that the reroll beside it is the way forward — reads as a fact
+about the page and not an oversight.
 
 Worked 2026-08-23 (implementation pass, task 294): closed **294** — §4.257's chain routes on ONE
 derived count, `<set var="passed" success="s|m">`, whose three values are mutually exclusive *and*

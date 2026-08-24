@@ -604,6 +604,73 @@ export async function run(ctx) {
         Math.random = rnd292;
       }
 
+      // --- task 293: §3.40's editorial reroll note waits for the roll it describes --------------
+      // The note sits ABOVE the travel roll it is about — "[If you roll 2-4 and lack book 9, roll
+      // again --Ed]" under `<if var="x" lessthan="5">` — and an unrolled x reads 0, which is less
+      // than 5, so it printed on entry with its button armed, describing a roll nobody had made.
+      // The sentinel that fixes task 291's other three sections is ACTIVELY unsafe here: x feeds an
+      // <outcomes> table, a `<set>` marks the var written, `branchResolved` reveals the range="5-8"
+      // row, and the page gains a live "Continue → 59" before the dice. Nesting is AND, so
+      // `greaterthan="1"` wrapped around the existing guard reads as the printed range 2-4 and is
+      // false at 0 — no engine change, and the reroll stays confined to a 2-4 result, which is what
+      // dropping `lessthan="5"` would have lost (renderReroll deletes the stored roll and charges
+      // nothing in this section, so an unguarded note is a free reroll of any travel result).
+      {
+        const settle293 = () => new Promise((r) => setTimeout(r, 20));
+        const rnd293 = Math.random;
+        // The <reroll> control is the only .btn-secondary these sections draw. An untaken branch is
+        // GRAYED rather than dropped (renderConditionalBranch — JaFL's model: its words show, its
+        // controls are disabled), so "the note is not offered" is `.cond-inactive`, not absence.
+        const reroll293 = (c) => c.querySelector('button.btn-secondary');
+        const note293 = (c) => { const b = reroll293(c); return !b ? 'absent'
+          : (b.closest('.cond-inactive') ? 'grayed' : 'live') + (b.disabled ? '+disabled' : '+enabled'); };
+        const exits293 = (c) => Array.from(c.querySelectorAll('.goto')).map((b) =>
+          b.textContent.replace(/\D+/g, '') + (b.disabled || b.closest('.cond-inactive') ? '[OFF]' : '[ON]')).join(' ');
+        const mk293 = async (book, key) => {
+          const g = GameState.create({ name:'T293', gender:'m', profession:'Warrior', book, adv });
+          g.ephemeral = true;
+          const c = document.createElement('div');
+          const st = new Story(c, g, { navigate(){}, onDeath(){}, notify(){} });
+          g.setVisitProvider(() => st.serializeVisit());
+          st.begin(await data.getSection(book, key), book, key);
+          return { g, c, st };
+        };
+        Math.random = () => 0; // every die reads 1, so the travel roll totals 2 — inside the 2-4 row
+        const low = await mk293(3, '40');
+        ok('§3.40 (task293) the reroll note is not offered before the roll it describes',
+           note293(low.c) === 'grayed+disabled' && exits293(low.c) === '',
+           `note=${note293(low.c)} exits=${exits293(low.c)}`);
+        low.c.querySelector('.roll .btn-roll').click(); await settle293();
+        // A 2-4 roll is the case the note exists for. Its own outcome row reveals a live
+        // "Continue → 84" into book 9 — deliberately: a branch's book= asks the edition gate on the
+        // CLICK, not at render (task 244) — so the reroll beside it is the note's whole point.
+        ok('§3.40 (task293) a 2-4 roll makes the note live and its reroll clickable',
+           low.g.getVar('x') === 2 && note293(low.c) === 'live+enabled' && exits293(low.c) === '84[ON]',
+           `x=${low.g.getVar('x')} note=${note293(low.c)} exits=${exits293(low.c)}`);
+        Math.random = () => 0.5; // both dice read 4, so the roll totals 8 — the "peaceful voyage" row
+        const high = await mk293(3, '40');
+        high.c.querySelector('.roll .btn-roll').click(); await settle293();
+        // …and the guard still confines the reroll to 2-4, which is what dropping `lessthan="5"`
+        // would have thrown away: a live button here rerolls a peaceful voyage for nothing.
+        ok('§3.40 (task293) a 5-8 roll leaves the note grayed and opens its own exit',
+           high.g.getVar('x') === 8 && note293(high.c) === 'grayed+disabled' && exits293(high.c) === '59[ON]',
+           `x=${high.g.getVar('x')} note=${note293(high.c)} exits=${exits293(high.c)}`);
+        // §4.287 and §5.19 print the same instruction as loose prose under their outcome table,
+        // with no guard at all, so the walk reaches it on entry — the control, not the markup, is
+        // what has to refuse. Its click deletes the stored roll, and pre-roll there is none.
+        for (const [b, key] of [[4, '287'], [5, '19']]) {
+          const bare = await mk293(b, key);
+          const btn = reroll293(bare.c);
+          ok(`§${b}.${key} (task293) an unguarded "roll again" is offered but disabled before the roll`,
+             !!btn && btn.disabled === true, btn ? 'enabled' : 'no reroll button drawn');
+          bare.c.querySelector('.roll .btn-roll').click(); await settle293();
+          ok(`§${b}.${key} (task293) …and enabled once there is a roll to throw away`,
+             !!reroll293(bare.c) && reroll293(bare.c).disabled === false,
+             reroll293(bare.c) ? 'still disabled' : 'no reroll button drawn');
+        }
+        Math.random = rnd293;
+      }
+
       window.__FL_INSTANT_DICE__ = false;
     }
 

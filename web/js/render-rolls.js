@@ -206,6 +206,15 @@ export function renderReroll(story, container, node, path) {
   story.appendChildren(inner, node, path);
   btn.textContent = inner.textContent.trim() || 'Roll again';
   const roll = story.activeRoll;
+  // "Roll again" needs a roll to throw away: with none stored the click deletes nothing and only
+  // rerenders, so the button is offered and inert. Three sections armed one before the dice —
+  // §3.40's editorial note sits ABOVE the travel roll it describes, and §4.287/§5.19 print
+  // "if you haven't got the book listed, roll again" as loose prose under their outcome table,
+  // reached by the walk on entry. Disabled until the roll it would replace exists. The other six
+  // are already guarded by their own result (an <outcome> row, or an `equals=`/`greaterthan=`
+  // guard that cannot match an unrolled 0), so none of them changes. (task 293)
+  const stored = roll ? story.ctx.rolls.get('roll@' + roll.path) : null;
+  if (!stored) { btn.disabled = true; btn.title = 'Make the roll first.'; }
   btn.addEventListener('click', () => {
     // §232/502/716 storm form: the reroll IS the "lose the blessing and roll again"
     // spend. The intended hidden <lose blessing> never fires (its keepblessing guard
