@@ -4,8 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 295 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log) — **every bucket is clear**, so the next work
-comes from [`ROADMAP.md`](ROADMAP.md). File new
+misdiagnosis (see the Review log); **296 is open in MEDIUM**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -23,7 +22,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-*(none open)*
+- [ ] 296. `rewardWasteReason` refuses a new resurrection deal to anyone already holding one, where `addResurrection` implements the replacement the books print — so book1/597's third reward is dead to a deal-holder
 
 **LOW**
 
@@ -1710,6 +1709,71 @@ empties the stash and leaves the purse alone; §6.512's existing max-cap asserti
 corpus census pinning **0** word-carrying `<lose shards= cache=X>` nodes whose cache has no deposit
 route, so the next section written this way is found rather than waited for.
 
+## 296. `rewardWasteReason` refuses a new resurrection deal to anyone already holding one, where `addResurrection` implements the replacement the books print — so book1/597's third reward is dead to a deal-holder
+
+**Priority: MEDIUM — a reward the printed page offers, silently withdrawn.** Nothing is lost or
+double-charged; an option the book puts on the page simply cannot be taken.
+
+*(Filed 2026-08-24 from a probe of the two paths that offer a resurrection deal, run because they
+answer the same printed rule differently. Found during conversion work on an unpublished book.)*
+
+`rewardWasteReason` exists so a payment is never taken for a reward the player then cannot pick up
+(task 223), and its first clause is `if (tag === 'resurrection' && state.hasResurrection()) return
+'You already have a resurrection deal.'` (`render-rules.js:237`). **That is the one refusal in the
+list the corpus's own rule contradicts.** A blessing you already hold really is a wasted grant and
+an affliction you do not suffer really cannot be lifted — but a deal is *replaceable*, and this
+engine already implements the replacement: `addResurrection` drops any standard deal when a new
+standard one arrives, "you can only have one resurrection arranged at a time; a new deal cancels the
+old" (task 98, `state.js:981`). **11 of the corpus's 15 offer pages print that rule in so many
+words** ("If you arrange another resurrection elsewhere the original one is cancelled — cross it off
+your Adventure Sheet"), and the deals land in different places, so swapping one for another is a
+real choice and not a no-op. book1/597 — the one page this defect actually reaches — is not one of
+the 11, which is part of why the mismatch has stayed invisible: its own text says nothing, so only
+the sheet rule applies, and the sheet rule is the one `addResurrection` implements.
+
+**Two paths, one rule, opposite answers — which is what makes this a defect rather than a policy.**
+An ordinary `<resurrection section=>` draws its own Arrange button with no waste check at all, so a
+deal-holder arranges freely and the old deal is cancelled exactly as printed. Only the *flag-linked*
+paths consult `rewardWasteReason`: `renderChoosableReward` for the pick, and `menuWasteReason` for
+the cost. Measured on a real `GameState` (a Warrior holding the book1/350 Temple of Nagil deal):
+
+```
+plain offer, no deal held:      Arrange resurrection [dis=false] -> deals=["2.339"]
+plain offer, another deal held: Arrange resurrection [dis=false] -> deals=["2.339"]   (replaced)
+book1/597, no deal held:            picks = Amber Wand [dis=false] | 500 Shards [dis=false] | resurrection deal [dis=false]
+book1/597, another deal held:       picks = Amber Wand [dis=false] | 500 Shards [dis=false] | resurrection deal [dis=true "You already have a resurrection deal."]
+book1/597, supplemental boon only:  picks = Amber Wand [dis=false] | 500 Shards [dis=false] | resurrection deal [dis=true "You already have a resurrection deal."]
+lone priced deal (task 221), no deal held:      Pay 30 Shards [dis=false]  menuWasteReason=null
+lone priced deal (task 221), another deal held: Pay 30 Shards [dis=true "You already have a resurrection deal."]  menuWasteReason="You already have a resurrection deal."
+addResurrection over a held deal -> ["2.339"]              (the swap the guard forbids)
+addResurrection over a boon      -> ["1.350*","2.339"]     (the coexistence the guard forbids)
+```
+
+**The supplemental case has no defence at all.** `rewardWasteReason` asks `state.hasResurrection()`,
+which is true for a player holding only a supplemental boon (§6.355) — and `addResurrection` never
+lets a supplemental displace a standard deal, so the two would simply coexist, as the last line
+above measures. A player carrying a boon and no standard deal is refused a deal they could plainly
+have, and no payment could ever change the answer.
+
+**Reach.** 15 sections across books 1–6 offer a deal and exactly **one** is flag-linked —
+book1/597, where the cost is a hidden `<tick price="x" hidden="t"/>`, so the menu stays live and
+only its third pick dies. That is the whole cost today, and it is why this has gone unnoticed: the
+14 plain offers all behave correctly. The lone-priced shape (task 221) has no instance in books 1–6
+yet, so its refusal of the payment itself is latent rather than live — recorded because it is the
+same clause and fails harder, refusing the page rather than one option on it.
+
+**Suggested fix.** Refuse only what a payment truly cannot change. A new standard deal always
+changes something (the landing site), and it is never wasted on a supplemental-only holder, so the
+clause should either go or narrow to "the deal already held is this same book+section". Whichever is
+chosen, the plain Arrange path is the reference behaviour: the two paths must agree, and today only
+one of them reads the rule `addResurrection` implements.
+
+Assertions: book1/597's deal pick is live for a player already holding the book1/350 deal, and
+taking it leaves exactly one deal, at the new site; a supplemental-only holder is offered the
+standard deal and ends holding both; a lone priced deal's payment is live for a deal-holder; and the
+plain unflagged Arrange path is unmoved, since it is the behaviour the other two are being brought
+into line with.
+
 ---
 
 ## Review log
@@ -1717,6 +1781,16 @@ route, so the next section written this way is found rather than waited for.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-24 (**296**): the resurrection family's two offer paths answer the same printed rule
+differently. `rewardWasteReason` refuses a new deal to anyone already holding one, so book1/597's
+third reward is dead to a deal-holder — and to a player holding only §6.355's supplemental boon,
+whom `addResurrection` would let hold both. The plain unflagged Arrange button, which is 14 of the
+15 offer pages, has no such check and replaces the old deal exactly as the books print it. Measured
+on a scratch page (both paths, three holdings, plus `addResurrection`'s own behaviour in each). No
+code changed; the probe was deleted. Found during conversion work on an unpublished book, which is
+what put a lone flag-linked deal in front of the guard for the first time — books 1–6 have no
+instance of that shape, so the payment-side half of the clause is latent there.
 
 Worked 2026-08-24 (implementation pass, task 295): closed **295** — an `<itemcache>` with no `max=`
 now stores Shards, so the town houses' printed offer works, their break-in rolls have something to
