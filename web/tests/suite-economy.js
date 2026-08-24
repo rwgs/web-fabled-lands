@@ -3611,4 +3611,47 @@ export async function run(ctx) {
          && eng.evaluateCondition(parse('<if resurrection="t"/>'), gGuard) === true);
     }
 
+    // --- task 298: the silent hidden="t" registration reads the exclusion too ---
+    { // block-scoped
+      // Task 297 taught the flag-linked pick and the plain Arrange button to read unique="t".
+      // The third path arranges a deal with no button at all — hidden="t" registers it on entry
+      // (§3.351's Island of Rebirth re-arms it each visit) — and asked nothing, so a page written
+      // as a hidden registration PRINTING an exclusion would have replaced a deal its own text
+      // protects. The check is now asked once, above all three paths.
+      const boon298 = (g) => eng.buyResurrectionDeal(g, { book:6, section:'710', text:'Lords of the Rising Sun 710', supplemental:true });
+      const deal298 = (g) => eng.buyResurrectionDeal(g, { book:1, section:'350', text:'Temple of Nagil' });
+      const fresh298 = (name, book) => { const g = GameState.create({ name, gender:'m', profession:'Warrior', book, adv }); g.data.resurrections = []; return g; };
+      const enter298 = (g, xml, book, id) => { const c = document.createElement('div'); new Story(c, g, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xml), book, id); return c; };
+      const xmlHid = '<section name="h298"><p>If you have no resurrection arrangements, write'
+        + ' <resurrection text="Shrine of the Lame God" book="3" section="404" unique="t" hidden="t"/>'
+        + ' in the Resurrection box.</p></section>';
+
+      const gHeld = fresh298('Held298', 3); deal298(gHeld);
+      enter298(gHeld, xmlHid, 3, 'h298');
+      ok('task298: a hidden unique="t" registration leaves a deal-holder\'s own deal alone',
+         gHeld.data.resurrections.length === 1 && String(gHeld.data.resurrections[0].section) === '350',
+         JSON.stringify(gHeld.data.resurrections));
+
+      const gNone = fresh298('None298', 3);
+      enter298(gNone, xmlHid, 3, 'h298');
+      ok('task298: the same node registers normally for a player holding nothing',
+         gNone.data.resurrections.length === 1 && String(gNone.data.resurrections[0].section) === '404',
+         JSON.stringify(gNone.data.resurrections));
+
+      const gBoon = fresh298('Boon298', 3); boon298(gBoon);
+      enter298(gBoon, xmlHid, 3, 'h298');
+      ok('task298: and for a holder of nothing but §6.355\'s boon, which is no deal — both stand',
+         gBoon.data.resurrections.length === 2 && gBoon.data.resurrections.filter((r) => !r.supplemental).length === 1,
+         JSON.stringify(gBoon.data.resurrections));
+
+      // The control: §3.351's own hidden registration prints no exclusion, so the sheet's
+      // replacement rule stands there exactly as it always has.
+      const g351 = fresh298('Isle298', 3); deal298(g351);
+      const c351 = document.createElement('div');
+      new Story(c351, g351, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(3, '351'), 3, '351');
+      ok('task298: §3.351 (no unique=) still re-arms over a held deal, leaving one at the Island',
+         g351.data.resurrections.length === 1 && String(g351.data.resurrections[0].section) === '351',
+         JSON.stringify(g351.data.resurrections));
+    }
+
 }

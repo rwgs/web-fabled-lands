@@ -28,7 +28,7 @@ there once the buckets below are clear.
 
 - [x] 297. the resurrection waste guard is a blanket engine rule that only book1/597's printed wording justifies, so the first flag-linked offer on a page printing the replacement rule will be refused an option its own text grants
 
-- [ ] 298. `renderResurrection`'s `hidden="t"` auto-register path ignores `unique="t"`, so the exclusion task 297 gave the markup is honoured on two of the three paths that arrange a deal
+- [x] 298. `renderResurrection`'s `hidden="t"` auto-register path ignores `unique="t"`, so the exclusion task 297 gave the markup is honoured on two of the three paths that arrange a deal
 
 - [x] 293. book3/40 shows its editorial reroll note before the roll it describes, and the obvious sentinel would open a live exit
 
@@ -1873,6 +1873,13 @@ adds nothing; the same node registers normally for a player holding no deal, and
 only §6.355's supplemental boon; §3.351's hidden re-arming (no `unique=`) is unmoved for a
 deal-holder, since it is the behaviour the corpus actually depends on.
 
+**Closed (2026-08-24).** The exclusion is asked once, above every branch that arranges: one
+`excluded` const in `renderResurrection`, read by the silent `hidden="t"` registration and by the
+plain Arrange button that task 297 had taught separately. An excluded registration writes nothing
+and memoises nothing, so a page that loses the held deal before re-rendering may still arrange
+this one — which is what its own printed condition says. §3.351, the hidden path's only corpus
+user, prints no exclusion and is unmoved.
+
 ---
 
 ## Review log
@@ -1880,6 +1887,32 @@ deal-holder, since it is the behaviour the corpus actually depends on.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-24 (implementation pass, task 298): closed **298** — the `hidden="t"` registration
+reads the exclusion too, so `unique="t"` now means the same thing on all three paths that arrange a
+deal. The check is hoisted above the branch rather than repeated in it: one `excluded` const, asked
+once, used by the silent registration and the plain button alike. Four assertions. The suite moves
+`RESULT ALL PASS pass=2913 fail=0` → `pass=2917 fail=0`; `web/` only, so this is a stamp and not a
+data rebuild. Nothing new filed.
+
+**Hoisting the check was the whole fix, and it is smaller than the version 297 shipped.** Task 297
+put the condition inside the plain-button branch, which is where it was needed and nowhere else that
+day; 298 needed it one branch earlier, so the two call sites became one expression above both. That
+is the tell for this shape of change: an attribute the view asks about in more than one place wants
+asking once, at the point where every path can see the answer.
+
+**An excluded registration memoises nothing, which is deliberate.** The `applied` memo exists to
+stop a hidden node re-arming on every re-render within a visit; a registration that never happened
+has nothing to remember, and a page that loses the held deal before re-rendering may then arrange
+this one — which is what its own printed condition says. Marking it applied would have made the
+exclusion permanent for the visit, and no page asks for that.
+
+**One of the four assertions fails against the unfixed path, and the three survivors are the
+controls.** The negative control reads 1 of 4: only the deal-holder's deal being replaced. The
+others — the same node registering for a player holding nothing, registering beside §6.355's boon
+(no deal, so no exclusion), and §3.351's own `unique=`-less re-arming still replacing a held deal —
+pin the behaviour the fix must not move, and §3.351 is the one the corpus actually depends on. The
+silent path throws nothing in either state, so all four were measured.
 
 Worked 2026-08-24 (implementation pass, task 297): closed **297** — the resurrection exclusion is
 now a property of the page, not of the engine. `books/book1/597.xml` carries `unique="t"` (markup

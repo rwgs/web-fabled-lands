@@ -870,14 +870,23 @@ export function renderResurrection(story, container, node, path) {
     cost: shards ? resolveValue(story.state, shards) : 0, supplemental,
   });
   const memo = 'res@' + path;
+  // unique="t" carries a page's PRINTED exclusion of a deal-holder (§1.597's free deal, "if
+  // you do not have one already"). Without it the sheet's replacement rule stands, which is
+  // what the other 14 offer pages print and what addResurrection does: arranging again
+  // cancels the old deal. Asked once here for EVERY path that arranges a deal, so the
+  // attribute cannot mean a refusal behind a flag= key and nothing at all on the plain
+  // button or the silent registration. (tasks 297, 298)
+  const excluded = boolAttr(node.getAttribute('unique')) && story.state.hasStandardResurrection();
   // A resurrection with book+section ARRANGES/registers a deal; one with no section
   // is a "use your deal" trigger that lives inside a death-revival <group>
   // (renderGroup) — here it is just narrative prose. (task 98)
   if (section && hidden) {
     // hidden="t" registers the deal automatically on entry, exactly once (§3.351's
     // Island of Rebirth re-arms the deal each visit while its boxes remain) — no
-    // manual button, no repeated registration.
-    if (!story.inactive && !story.ctx.applied.has(memo)) { story.ctx.applied.add(memo); arrange(); }
+    // manual button, no repeated registration. An excluded registration writes nothing AND
+    // memoises nothing: a page that loses the held deal before re-rendering may then arrange
+    // this one, which is what its own printed condition says. (task 298)
+    if (!story.inactive && !excluded && !story.ctx.applied.has(memo)) { story.ctx.applied.add(memo); arrange(); }
     return null;
   }
   const span = document.createElement('span');
@@ -890,12 +899,6 @@ export function renderResurrection(story, container, node, path) {
     const btn = document.createElement('button');
     btn.className = 'btn-secondary' + (done ? ' done' : '');
     btn.textContent = done ? '☑ Resurrection arranged' : (cost ? `Buy resurrection deal (${cost} Shards)` : 'Arrange resurrection');
-    // unique="t" carries a page's PRINTED exclusion of a deal-holder (§1.597's free deal, "if
-    // you do not have one already"). Without it the sheet's replacement rule stands, which is
-    // what the other 14 offer pages print and what addResurrection does: arranging again
-    // cancels the old deal. Honoured on this path too, so the attribute cannot mean one thing
-    // behind a flag= key and nothing at all on a plain Arrange button. (task 297)
-    const excluded = boolAttr(node.getAttribute('unique')) && story.state.hasStandardResurrection();
     btn.disabled = done || excluded || (cost > 0 && story.state.data.shards < cost);
     if (excluded && !done) btn.title = 'You already have a resurrection deal.';
     if (!done) btn.addEventListener('click', () => {
