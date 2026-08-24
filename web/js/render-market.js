@@ -595,9 +595,15 @@ export function renderItemCache(story, container, node, path) {
   if (!name) return null;
   const text = node.getAttribute('text') || 'Stored here';
   const limit = node.getAttribute('itemlimit') ? parseInt(node.getAttribute('itemlimit'), 10) : 0;
-  // An <itemcache max="N"> also stores Shards up to N (§6.512's cabinet: "store up to
-  // 5000 Shards and six possessions"). Absent max= ⇒ item-only (the town-house caches);
-  // a positive max= caps the cached Shards. Reuses the shared cache purse keyed by name. (task 131)
+  // An <itemcache> stores Shards as well as possessions (JaFL CacheNode renders a Shards
+  // field on an item cache; its no-limit default is −1). max="0" bars money, a positive
+  // max= caps the stash (§6.512's cabinet: "store up to 5000 Shards and six possessions"),
+  // and ABSENT max= is unlimited — which is the town houses, whose own paragraph offers
+  // the storage ("You can leave possessions and money here") and whose break-in rolls
+  // <lose shards="*" cache=> the money they hold. Reading absent as item-only left those
+  // sixteen printed sentences unable to fire and stranded §4.586's confiscated purse, which
+  // §4.528 gives back through this widget and nothing else. Same parse as renderMoneyCache,
+  // and now the same gate. (tasks 131, 295)
   const moneyMax = node.hasAttribute('max') ? (parseInt(node.getAttribute('max'), 10) || 0) : -1;
   const stored = story.state.cacheItems(name);
 
@@ -637,9 +643,9 @@ export function renderItemCache(story, container, node, path) {
   });
   box.appendChild(list);
 
-  // Shards storage (only when max= opts the cache into money): a balance line plus
-  // Deposit/Withdraw capped at max=, mirroring the money cache. (task 131)
-  if (moneyMax > 0) {
+  // Shards storage (every cache but a max="0" one): a balance line plus Deposit/Withdraw
+  // capped at a positive max=, mirroring the money cache. (tasks 131, 295)
+  if (moneyMax !== 0) {
     const bal = document.createElement('div');
     bal.className = 'cache-balance';
     bal.innerHTML = `<span class="cache-label">Shards stored</span><span class="cache-sum">${story.state.cacheMoney(name)} Shards</span>`;
@@ -657,7 +663,9 @@ export function renderItemCache(story, container, node, path) {
     dep.textContent = 'Deposit';
     dep.addEventListener('click', () => {
       let amt = Math.max(0, Math.floor(Number(input.value) || 0));
-      amt = Math.min(amt, moneyMax - story.state.cacheMoney(name)); // cap the stash total at max
+      // Only a positive max= is a ceiling: at −1 this subtraction is negative and would bar
+      // every deposit, which is renderMoneyCache's `if (max >= 0)` guard. (task 295)
+      if (moneyMax > 0) amt = Math.min(amt, moneyMax - story.state.cacheMoney(name));
       amt = Math.min(amt, story.state.data.shards);
       if (amt > 0) { // books the deposit at this node, as the money cache does (task 263)
         const mark = story.spendMark();
@@ -673,6 +681,12 @@ export function renderItemCache(story, container, node, path) {
       const amt = Math.max(0, Math.floor(Number(input.value) || 0));
       if (amt > 0 && story.state.cacheMoney(name) > 0) { story.state.withdrawCacheMoney(name, amt, 0); story.rerender(); }
     });
+    // Sealed with the Take/Store buttons, not left loose like a bank's: task 38's "a plain
+    // stash lock leaves a bank editable" is about a <moneycache>, and no confiscation uses
+    // one. §4.586 seals cache 4.586 and prints no unlock, so an unsealed Withdraw would hand
+    // the confiscated purse straight back — task 256's hole on the money side. (task 295)
+    dep.dataset.cachelock = name;
+    wd.dataset.cachelock = name;
     mc.appendChild(dep); mc.appendChild(wd);
     box.appendChild(mc);
   }

@@ -3330,4 +3330,99 @@ export async function run(ctx) {
          `locked=${g464b.isCacheLocked('6.464')} title=${takes(c464b)[0] && takes(c464b)[0].title}`);
     }
 
+    // --- task 295: an <itemcache> with no max= stores Shards, and its money is sealed too ------
+    { // block-scoped
+      // renderItemCache parsed max= as −1 ("no limit") and then gated its money controls on
+      // `> 0`, so every cache without a max= was item-only. That is the town houses, whose own
+      // paragraph offers the storage and whose break-in rolls <lose shards="*" cache=> the money
+      // they hold — sixteen printed sentences in books 1–6 that could never apply — and it is
+      // §4.586, which transfers the PURSE as well as the gear into a cache §4.528 then opened
+      // for items only. The 500 Shards were on no sheet and in no reachable box.
+      const money295 = (root) => Array.from(root.querySelectorAll('.item-cache button')).filter((b) => /Deposit|Withdraw/.test(b.textContent));
+      const sealed295 = (b) => b.disabled && /sealed/i.test(b.title || '');
+      // Null-safe on purpose: run against the unfixed renderer these widgets do not exist, and a
+      // block that throws on the first missing input reports one verdict where nine are wanted.
+      // The negative control is only readable if every assertion in it gets to fail on its own.
+      const pay295 = (root, label, v) => {
+        const input = root.querySelector('.item-cache .cache-amount');
+        const btn = money295(root).find((b) => b.textContent.indexOf(label) >= 0);
+        if (!input || !btn) return false;
+        input.value = String(v);
+        btn.click();
+        return true;
+      };
+
+      // §1.177's town house: the printed offer works, and the 10–11 break-in takes what it holds.
+      const g177 = GameState.create({ name:'T177', gender:'f', profession:'Warrior', book:1, adv });
+      g177.data.shards = 400;
+      const c177 = document.createElement('div');
+      new Story(c177, g177, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(1, '177'), 1, '177');
+      ok('task295: §1.177 offers Deposit and Withdraw on its bare <itemcache>',
+         money295(c177).length === 2, `n=${money295(c177).length}`);
+      pay295(c177, 'Deposit', 400);
+      ok('task295: §1.177 banking 400 Shards moves them off the sheet',
+         g177.cacheMoney('1.177') === 400 && g177.data.shards === 0,
+         `stash=${g177.cacheMoney('1.177')} purse=${g177.data.shards}`);
+      // The break-in the book prints — "Any money left here has gone" — takes the stash, not the
+      // purse. Pinned as 400 → 0 rather than as "0 afterwards": the second form passes vacuously
+      // against a renderer that could never bank anything, which is the state this block is for.
+      g177.data.shards = 25;
+      const banked177 = g177.cacheMoney('1.177');
+      eng.applyEffect(parse('<section name="x"><p><lose shards="*" cache="1.177">Any money left here has gone</lose></p></section>').querySelector('lose'), g177);
+      ok('task295: the break-in empties the banked 400 and leaves the purse alone',
+         banked177 === 400 && g177.cacheMoney('1.177') === 0 && g177.data.shards === 25,
+         `banked=${banked177} stash=${g177.cacheMoney('1.177')} purse=${g177.data.shards}`);
+
+      // §4.586 → §4.528: the confiscated purse is sealed where the gear is, and comes back where
+      // the gear comes back. An unsealed Withdraw at §586 would undo the transfer on one click.
+      const g586m = GameState.create({ name:'C586', gender:'m', profession:'Warrior', book:4, adv });
+      g586m.data.items = [makeItem('item', 'pyramid key')];
+      g586m.addItem(makeItem('weapon', 'sword'));
+      g586m.data.shards = 500;
+      const c586m = document.createElement('div');
+      new Story(c586m, g586m, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(4, '586'), 4, '586');
+      const x586 = Array.from(c586m.querySelectorAll('.pay-action')).find((b) => /transfer them/i.test(b.textContent));
+      if (x586) x586.click();
+      ok('task295: §4.586 takes the purse into the sealed cache',
+         g586m.data.shards === 0 && g586m.cacheMoney('4.586') === 500,
+         `purse=${g586m.data.shards} stash=${g586m.cacheMoney('4.586')}`);
+      ok('task295: §4.586 draws the money controls and seals them with the Takes',
+         money295(c586m).length === 2 && money295(c586m).every(sealed295),
+         `n=${money295(c586m).length} states=${money295(c586m).map((b) => b.disabled).join(',')}`);
+
+      const g528m = GameState.create({ name:'C528', gender:'m', profession:'Warrior', book:4, adv });
+      g528m.data.items = [makeItem('item', 'pyramid key')];
+      g528m.data.shards = 500;
+      g528m.depositCacheMoney('4.586', 500);   // draws from the PURSE, so seed it and then bank it
+      g528m.lockCache('4.586');
+      const c528m = document.createElement('div');
+      new Story(c528m, g528m, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(4, '528'), 4, '528');
+      ok('task295: §4.528 draws a live Withdraw over the confiscated purse',
+         money295(c528m).length === 2 && money295(c528m).every((b) => !b.disabled),
+         `n=${money295(c528m).length} states=${money295(c528m).map((b) => b.disabled).join(',')}`);
+      pay295(c528m, 'Withdraw', 500);
+      ok('task295: §4.528 reclaims the confiscated 500 Shards in full',
+         g528m.data.shards === 500 && g528m.cacheMoney('4.586') === 0,
+         `purse=${g528m.data.shards} stash=${g528m.cacheMoney('4.586')}`);
+
+      // §6.512's cabinet is the control: absent and max="5000" must not become the same thing.
+      const g512c = GameState.create({ name:'B512c', gender:'m', profession:'Warrior', book:6, adv });
+      g512c.data.items = []; g512c.data.shards = 6000;
+      const c512c = document.createElement('div');
+      new Story(c512c, g512c, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(6, '512'), 6, '512');
+      pay295(c512c, 'Deposit', 6000);
+      ok('task295: §6.512 still caps its stash at max="5000"',
+         g512c.cacheMoney('6.512') === 5000 && g512c.data.shards === 1000,
+         `stash=${g512c.cacheMoney('6.512')} purse=${g512c.data.shards}`);
+
+      // A max="0" item cache bars money outright — the vocabulary that says "no money here".
+      const g0 = GameState.create({ name:'Bar0', gender:'f', profession:'Warrior', book:1, adv });
+      g0.data.shards = 300;
+      const c0 = document.createElement('div');
+      new Story(c0, g0, { navigate(){}, onDeath(){}, notify(){} })
+        .begin(parse('<section name="bar"><p>A shelf.</p><itemcache name="bar.0" text="Shelf" max="0"/></section>'), 1, 'bar');
+      ok('task295: an <itemcache max="0"> draws no money controls at all',
+         money295(c0).length === 0 && g0.cacheMoney('bar.0') === 0, `n=${money295(c0).length}`);
+    }
+
 }

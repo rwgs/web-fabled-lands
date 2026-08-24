@@ -89,6 +89,61 @@ export async function run(ctx) {
        guards273 === 26 && proseOnly273.length === 16 && prose273.length === 11,
        `guards=${guards273} prose=${proseOnly273.length} in ${prose273.length}: ${prose273.join(' ')}`);
 
+    // --- task 295: a cache the book empties of money that nobody can pay money into ------------
+    // The cache family run in the direction its name does not suggest: for every printed
+    // <lose shards=… cache=X>, can anything in the corpus put money INTO X? Five things can — a
+    // <moneycache name="X"> or an <itemcache name="X"> (either one, unless max="0" bars money), a
+    // <transfer to="X"> carrying shards=, an <adjustmoney name="X">, or a <tick|gain shards=
+    // cache="X">. Sixteen nodes named a cache with none of them while renderItemCache withheld its
+    // money controls from every cache without a max=: sixteen printed sentences that could not
+    // apply, and §4.586's confiscated purse stranded in a box §4.528 opens only for items.
+    // Pinned at ZERO over the bundled corpus, and cross-file by construction — the loss and the
+    // widget are routinely in different sections (§1.273 empties §1.300's box, §2.665 empties
+    // §2.617's), which is why this cannot be a per-file census.
+    const strand295 = (xmls) => {
+      const routes = new Set(), losses = [];
+      const W = /<(moneycache|itemcache|transfer|adjustmoney|tick|gain)\b([^>]*)>/g;
+      const L = /<lose\b([^>]*)>/g;
+      const A = /([a-zA-Z][\w-]*)="([^"]*)"/g;
+      const at = (a, k) => { const o = {}; let x; A.lastIndex = 0; while ((x = A.exec(a))) o[x[1].toLowerCase()] = x[2]; return k in o ? o[k] : null; };
+      xmls.forEach(([, xml]) => {
+        let m; W.lastIndex = 0;
+        while ((m = W.exec(xml))) {
+          const tag = m[1].toLowerCase(), a = m[2];
+          if ((tag === 'moneycache' || tag === 'itemcache') && at(a, 'name') && at(a, 'max') !== '0') routes.add(at(a, 'name'));
+          else if (tag === 'transfer' && at(a, 'to') && at(a, 'shards') != null) routes.add(at(a, 'to'));
+          else if (tag === 'adjustmoney' && at(a, 'name')) routes.add(at(a, 'name'));
+          else if ((tag === 'tick' || tag === 'gain') && at(a, 'cache') && at(a, 'shards') != null) routes.add(at(a, 'cache'));
+        }
+      });
+      xmls.forEach(([id, xml]) => {
+        let m; L.lastIndex = 0;
+        while ((m = L.exec(xml))) {
+          const a = m[1];
+          if (!/\bshards=/.test(a) || !/\bcache="/.test(a)) continue;
+          losses.push([id, /\bcache="([^"]*)"/.exec(a)[1]]);
+        }
+      });
+      return { losses, stranded: losses.filter(([, c]) => !routes.has(c)).map(([id, c]) => id + ' ' + c) };
+    };
+    // The control the nil-result rule asks for: the census must still SEE the shape, and the only
+    // thing that makes a cache unpayable now is an explicit max="0". Both fixtures carry the loss;
+    // only the barred one is a hit.
+    const ctl295bare = strand295([['f/1', '<section name="1"><p><lose shards="*" cache="c">gone</lose></p><itemcache name="c" text="Box"/></section>']]);
+    const ctl295bar = strand295([['f/2', '<section name="2"><p><lose shards="*" cache="c">gone</lose></p><itemcache name="c" text="Box" max="0"/></section>']]);
+    ok('task295: the census discriminates a payable cache from a barred one',
+       ctl295bare.stranded.length === 0 && ctl295bar.stranded.join(' ') === 'f/2 c',
+       `bare=${ctl295bare.stranded.length} barred=${ctl295bar.stranded.join(' ')}`);
+    const xmls295 = [];
+    for (const b of books) {
+      const raw = await data.loadBook(b);
+      for (const key of Object.keys(raw)) xmls295.push([b + '/' + key, raw[key]]);
+    }
+    const res295 = strand295(xmls295);
+    ok('task295: every cache the corpus empties of money can be paid money into',
+       res295.stranded.length === 0,
+       `${res295.losses.length} cache money losses; stranded: ${res295.stranded.join(', ')}`);
+
     // --- task 290: no branch may read a var= its own section never writes -----------------------
     // Task 278's census asked the WRITER-side question ("how many <training> nodes carry a var=":
     // 1 of 62) and fixed the writer. This is the reader side, which is a different set and the one

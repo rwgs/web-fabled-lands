@@ -3,8 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-294 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **295 is open under HIGH**. File new
+295 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log) — **every bucket is clear**, so the next work
+comes from [`ROADMAP.md`](ROADMAP.md). File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,7 +17,7 @@ there once the buckets below are clear.
 
 **HIGH**
 
-- [ ] 295. `renderItemCache` draws no money controls without `max=`, so book4/586 confiscates the player's whole purse and book4/528 can never give it back
+- [x] 295. `renderItemCache` draws no money controls without `max=`, so book4/586 confiscates the player's whole purse and book4/528 can never give it back
 
 - [x] 294. book4/257 leaves a mixed pair of rolls with no exit at all, so succeeding one check and failing the other ends the adventure
 
@@ -1716,6 +1717,42 @@ route, so the next section written this way is found rather than waited for.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-24 (implementation pass, task 295): closed **295** — an `<itemcache>` with no `max=`
+now stores Shards, so the town houses' printed offer works, their break-in rolls have something to
+take, and §4.586's confiscated purse comes back at §4.528. Two lines of renderer, one seal, eleven
+assertions. The suite moves `RESULT ALL PASS pass=2883 fail=0` → `pass=2894 fail=0`; `web/` only, so
+this is a stamp and not a data rebuild. Nothing new filed.
+
+**Six of the eleven fail against the unfixed renderer, and the control is what set the count.** The
+first run of the block threw on the first missing widget (`Cannot set properties of null`), which the
+harness reports as one `FATAL [economy]` — so eight assertions written to be measured were never
+measured, in the run whose whole purpose is measuring them. Made null-safe, the control reads
+6 of 11. **A negative control needs every assertion in it to survive the broken state long enough to
+fail**, which means no `find(…).click()` and no `querySelector(…).value` on a widget the defect
+removes.
+
+**One of the five survivors was vacuous and is now the sixth failure.** "The break-in empties the
+stash and leaves the purse alone" passed against a renderer that could never bank anything —
+`cacheMoney === 0` is true before the deposit and after the theft. Pinning the transition
+(`banked === 400 && stash === 0`) is what makes it fail there. The four that legitimately still pass
+are the ones that were always true: the §4.586 transfer itself, §6.512's `max="5000"` cap (the
+control that says absent and 5000 must not become the same thing), and `max="0"` drawing nothing.
+
+**The corpus census passes in both states, deliberately, and that is worth saying out loud.** It pins
+the MARKUP — no section names a cache nothing can pay into — and its route table counts a bare
+`<itemcache>` as payable, which is only true after this fix. So it cannot detect the renderer bug and
+was never meant to; the eleven behavioural assertions do that. What the census catches is the next
+section written with a loss over a cache no widget serves, and its own control (a `max="0"` fixture
+against a bare one) is what shows it still discriminates.
+
+**The obvious fix reopened task 256, exactly as the filing said, and the seal is the interesting
+half.** Task 38's rule — a plain stash lock leaves a bank editable — is about a `<moneycache>`, and
+every corpus lock over one is a bet bundled with a roll. No confiscation uses a money cache: §4.586
+seals an ITEM cache holding the purse it just took. So the money buttons now carry
+`data-cachelock` like the Takes, which over books 1–6 seals money at the same four boxes as items and
+leaves every town house editable, because their unlock is unconditional. **A rule about one tag does
+not transfer to another tag that happens to render the same control.**
 
 Worked 2026-08-24 (filed from a census, no code change): filed **295** (HIGH) — a bare
 `<itemcache>` renders no money controls, so §4.586 takes the player's whole purse and §4.528 can

@@ -2031,9 +2031,14 @@ export class Story {
   // confiscation, book3/74's and book6/284's stashes in the branch where fire has just emptied
   // them, and book6/464's letter branch (which sends the player to §28 "at once").
   //
-  // An <itemcache max=>'s Shard controls are deliberately left alone: renderMoneyCache gates
-  // only a lock bundled with a roll, which is task 38's rule that a plain stash lock leaves a
-  // bank editable, and that bank is the same thing.
+  // An <itemcache>'s Shard controls are sealed with its Takes (task 295). Task 38's rule — a
+  // plain stash lock leaves a bank editable — is about a <moneycache>, and every corpus lock
+  // over one is a bet bundled with a roll (§1.91, §2.134, §2.594, §4.127), which
+  // renderMoneyCache still gates on its own. No confiscation uses a money cache: §4.586 seals
+  // an ITEM cache holding the purse it just took, so leaving that Withdraw live would undo the
+  // transfer on a click. Over books 1–6 this seals money at the same four boxes as items —
+  // §4.586, book3/74's and book6/284's burnt-out stashes, book6/464's letter branch — and
+  // leaves every town house editable, because their unlock is unconditional.
   //
   // Runs before the dead-end fallback's control census, which filters out disabled controls:
   // a locked Take is not a way forward, exactly as an unaffordable Pay button isn't.
