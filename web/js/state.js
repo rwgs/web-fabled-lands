@@ -974,6 +974,12 @@ export class GameState {
 
   // ---- resurrections ---------------------------------------------------
   hasResurrection() { return this.data.resurrections.length > 0; }
+  // Does the player hold a resurrection DEAL — the one-at-a-time arrangement the temples
+  // sell? A supplemental boon (§6.355) is not one: the deity grants it "even if you have
+  // another resurrection deal arranged", and addResurrection lets the two coexist rather
+  // than letting a boon displace a deal. So a boon-only holder has no deal, and an offer of
+  // one is neither wasted on them nor a replacement. (task 296)
+  hasStandardResurrection() { return this.data.resurrections.some((r) => !r.supplemental); }
   // A standard arrangement replaces any existing standard one (JaFL Adventurer
   // .addResurrection: "you can only have one resurrection arranged at a time; a new
   // deal cancels the old"); a supplemental boon (§6.355) is added on top and never

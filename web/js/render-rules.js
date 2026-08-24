@@ -234,7 +234,11 @@ export function hasVisiblePay(sectionEl, key) {
 // or a curse/disease/poison "lift" you aren't suffering. Returns the reason or null.
 export function rewardWasteReason(state, node) {
   const tag = node.tagName.toLowerCase();
-  if (tag === 'resurrection' && state.hasResurrection()) return 'You already have a resurrection deal.';
+  // A DEAL already held is the refusal (§1.597 offers its free deal "if you do not have one
+  // already"); a supplemental boon is not a deal — §6.355's deity grants it on top of one,
+  // and addResurrection lets the two coexist — so a boon-only holder is offered the deal
+  // they could plainly take, which no payment could ever have unlocked. (task 296)
+  if (tag === 'resurrection' && state.hasStandardResurrection()) return 'You already have a resurrection deal.';
   if (ITEM_FAMILY_TAGS.has(tag)) {
     const rawName = node.getAttribute('name') || tag;
     const isCurrency = tag === 'item' && currencyAward(rawName) != null;

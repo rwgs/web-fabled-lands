@@ -3425,4 +3425,84 @@ export async function run(ctx) {
          money295(c0).length === 0 && g0.cacheMoney('bar.0') === 0, `n=${money295(c0).length}`);
     }
 
+    // --- task 296: a supplemental boon is not a resurrection DEAL to the waste guard ------
+    { // block-scoped
+      // rewardWasteReason asked hasResurrection(), which counts §6.355's supplemental boon —
+      // a boon addResurrection never lets a standard deal displace, so the two simply coexist.
+      // A boon-only holder was refused a deal they could plainly take, and no payment could
+      // ever change the answer. It now asks hasStandardResurrection(). The DEAL-holder refusal
+      // stays: §1.597 prints its offer as free "if you do not have one already".
+      const boon = (g) => eng.buyResurrectionDeal(g, { book:6, section:'710', text:'Lords of the Rising Sun 710', supplemental:true });
+      const deal = (g) => eng.buyResurrectionDeal(g, { book:1, section:'350', text:'Temple of Nagil' });
+
+      // The state question itself: a boon alone is no deal, and a deal beside one is.
+      const gS = GameState.create({ name:'Boon', gender:'f', profession:'Warrior', book:1, adv });
+      gS.data.resurrections = []; boon(gS);
+      ok('task296: a boon-only holder has an arrangement but no DEAL',
+         gS.hasResurrection() === true && gS.hasStandardResurrection() === false,
+         JSON.stringify(gS.data.resurrections));
+      deal(gS);
+      ok('task296: a standard deal arranged beside the boon leaves both, and now names a deal',
+         gS.data.resurrections.length === 2 && gS.hasStandardResurrection() === true,
+         JSON.stringify(gS.data.resurrections));
+
+      // §1.597's third pick, the corpus's only flag-linked offer: live for a boon-only holder.
+      const g597 = GameState.create({ name:'Ghoul296', gender:'m', profession:'Warrior', book:1, adv });
+      g597.data.resurrections = []; boon(g597);
+      const c597 = document.createElement('div');
+      new Story(c597, g597, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(1, '597'), 1, '597');
+      const resPick = (c) => Array.from(c.querySelectorAll('.reward-pick')).find((b) => /resurrection/i.test(b.textContent));
+      ok('task296: §1.597 offers its deal to a holder of nothing but the boon',
+         !!resPick(c597) && resPick(c597).disabled === false,
+         resPick(c597) ? `dis=${resPick(c597).disabled} title=${resPick(c597).title}` : 'no deal pick');
+      if (resPick(c597) && !resPick(c597).disabled) resPick(c597).click();
+      const std296 = g597.data.resurrections.filter((r) => !r.supplemental);
+      ok('task296: taking it leaves the boon standing beside the new deal (both held)',
+         g597.data.resurrections.length === 2 && std296.length === 1 && String(std296[0].section) === '350'
+         && g597.data.resurrections.some((r) => r.supplemental),
+         JSON.stringify(g597.data.resurrections));
+
+      // The control that must NOT move: §1.597's own text conditions the free deal on not
+      // having one, so a standard-deal holder is still refused, boon or no boon.
+      const g597b = GameState.create({ name:'Ghoul296b', gender:'m', profession:'Warrior', book:1, adv });
+      g597b.data.resurrections = []; deal(g597b);
+      const c597b = document.createElement('div');
+      new Story(c597b, g597b, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(1, '597'), 1, '597');
+      ok('task296: §1.597 still refuses its free deal to a standard-deal holder ("if you do not have one already")',
+         !!resPick(c597b) && resPick(c597b).disabled === true && resPick(c597b).title === 'You already have a resurrection deal.',
+         resPick(c597b) ? `dis=${resPick(c597b).disabled} title=${resPick(c597b).title}` : 'no deal pick');
+      ok('task296: §1.597 leaves the other two picks live for that holder',
+         Array.from(c597b.querySelectorAll('.reward-pick')).filter((b) => !b.disabled).length === 2,
+         `live=${Array.from(c597b.querySelectorAll('.reward-pick')).filter((b) => !b.disabled).length}`);
+
+      // The cost side reads the same clause (menuWasteReason), so a lone priced deal
+      // (task 221's shape) must be payable by a boon-only holder too.
+      const xmlPact296 = '<section><p><lose shards="30" price="pact">Pay 30 Shards</lose> to <resurrection book="2" section="60" flag="pact">arrange a pact</resurrection>.</p></section>';
+      const gPay = GameState.create({ name:'Pact296', gender:'f', profession:'Warrior', book:2, adv });
+      gPay.data.resurrections = []; gPay.data.shards = 100; boon(gPay);
+      const cPay = document.createElement('div');
+      new Story(cPay, gPay, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlPact296), 2, 'x296');
+      const payPact = () => cPay.querySelector('.pay-action');
+      ok('task296: a boon-only holder may pay for a lone priced deal',
+         !!payPact() && payPact().disabled === false, payPact() ? `title=${payPact().title}` : 'no pay button');
+      ok('task296: rewardWasteReason itself clears a boon-only holder and refuses a deal-holder',
+         rewardWasteReason(gPay, parse('<section><resurrection book="2" section="60" flag="p"/></section>').querySelector('resurrection')) === null
+         && rewardWasteReason(g597b, parse('<section><resurrection book="2" section="60" flag="p"/></section>').querySelector('resurrection')) === 'You already have a resurrection deal.');
+
+      // Unmoved: the plain unflagged Arrange path never consulted the guard, and a
+      // deal-holder replaces the old deal there exactly as §1.478 prints it.
+      const gPlain = GameState.create({ name:'Plain296', gender:'m', profession:'Warrior', book:2, adv });
+      gPlain.data.resurrections = []; gPlain.data.shards = 2000; deal(gPlain);
+      const cPlain = document.createElement('div');
+      new Story(cPlain, gPlain, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(2, '316'), 2, '316');
+      const arrange296 = () => Array.from(cPlain.querySelectorAll('.btn-secondary')).find((b) => /resurrection|arrange|temple of nagil/i.test(b.textContent));
+      ok('task296: the plain §2.316 Arrange button is live for a deal-holder (no waste check)',
+         !!arrange296() && arrange296().disabled === false,
+         arrange296() ? `dis=${arrange296().disabled} title=${arrange296().title}` : 'no arrange button');
+      arrange296().click();
+      ok('task296: and arranging there replaces the old deal, leaving exactly one, at the new site',
+         gPlain.data.resurrections.length === 1 && String(gPlain.data.resurrections[0].section) === '339',
+         JSON.stringify(gPlain.data.resurrections));
+    }
+
 }

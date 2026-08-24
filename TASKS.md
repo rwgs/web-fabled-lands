@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-295 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **296 is open in MEDIUM**. File new
+296 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **297 is open in LOW**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -22,9 +22,11 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 296. `rewardWasteReason` refuses a new resurrection deal to anyone already holding one, where `addResurrection` implements the replacement the books print — so book1/597's third reward is dead to a deal-holder
+- [x] 296. `rewardWasteReason` refuses a new resurrection deal to anyone already holding one, where `addResurrection` implements the replacement the books print — so book1/597's third reward is dead to a deal-holder
 
 **LOW**
+
+- [ ] 297. the resurrection waste guard is a blanket engine rule that only book1/597's printed wording justifies, so the first flag-linked offer on a page printing the replacement rule will be refused an option its own text grants
 
 - [x] 293. book3/40 shows its editorial reroll note before the roll it describes, and the obvious sentinel would open a live exit
 
@@ -1774,6 +1776,57 @@ standard deal and ends holding both; a lone priced deal's payment is live for a 
 plain unflagged Arrange path is unmoved, since it is the behaviour the other two are being brought
 into line with.
 
+**Closed in part (2026-08-24), and the part left undone is filed as 297.** The filing's premise
+about book1/597 — "its own text says nothing, so only the sheet rule applies" — is contradicted by
+the file: §1.597 offers "a free `<resurrection …>resurrection deal</resurrection>`, **if you do not
+have one already**". That clause is authorial (`597.xml` has one commit, the original books import),
+and it is the printed source for exactly the refusal the guard implements. So the first assertion —
+a deal-holder gets the pick, and taking it lands the deal at the new site — was **not** implemented:
+it would make the engine grant an option the page conditions away. What was implemented is the
+supplemental half, which stands under §1.597's wording too, since a boon is not a deal.
+
+---
+
+## 297. The resurrection waste guard is a blanket engine rule that only book1/597's printed wording justifies, so the first flag-linked offer on a page printing the replacement rule will be refused an option its own text grants
+
+**Priority: LOW — latent: no corpus instance, and the one live instance is right by accident.**
+Nothing in books 1–6 misbehaves. This is a trap laid for the next conversion.
+
+*(Filed 2026-08-24 while closing 296, from reading all 15 offer pages rather than the guard.)*
+
+`rewardWasteReason`'s first clause refuses a `<resurrection>` reward to a standard-deal holder
+(`render-rules.js:241`), and `menuWasteReason` refuses the payment for one. **The corpus does not
+speak with one voice about whether that is right, and the guard cannot hear the difference.** Of the
+15 sections offering a deal, 11 print the *replacement* rule ("If you arrange another resurrection
+later at a different temple, the original one is cancelled — cross it off your Adventure Sheet. You
+do not get a refund") — under which a deal-holder may always arrange another, and `addResurrection`
+implements exactly that. book1/597 prints the opposite: its deal is free "if you do not have one
+already", a printed *exclusion*.
+
+**Only the flag-linked and lone-priced shapes consult the guard**, and book1/597 is the corpus's
+only instance of either — so today the blanket rule is right on the one page it reaches, and the 14
+plain `<resurrection>` offers draw their own Arrange button with no waste check and replace as
+printed. The two paths disagree, and in books 1–6 that disagreement is **authorial**, not a defect:
+two pages, two printed rules, two behaviours.
+
+**What breaks.** The first book-7+ section that puts a `<resurrection>` behind a `flag=`/`price=`
+key while printing the replacement rule gets the wrong answer, and the lone-priced shape (task 221)
+fails harder than book1/597 would: `menuWasteReason` refuses the *payment*, so the whole page is
+dead to a deal-holder rather than one option on it. Nothing is lost or double-charged either way.
+
+**Suggested fix.** The exclusion is a printed condition on one offer, so it belongs on the node, not
+in a blanket engine rule — something the markup states (an attribute on `<resurrection>`, or the
+existing `<if resurrection>` gate the vocabulary already allows) with the engine defaulting to the
+sheet rule `addResurrection` implements. Whatever is chosen, `<if resurrection>` is worth checking in
+the same pass: it also reads `hasResurrection()` (`engine.js:259`), so it counts §6.355's
+supplemental boon as an arrangement — which is arguably right for a gate asking "is anything written
+in the box" and arguably not, and no corpus section pins it either way.
+
+Assertions: a flag-linked offer whose page prints the replacement rule is live for a deal-holder and
+replaces the old deal; a lone priced deal on such a page keeps its payment live; §1.597's exclusion
+still refuses its deal-holder (it is the page the default must not break); and whichever way
+`<if resurrection>` is settled, a boon-only holder gets a pinned answer from it.
+
 ---
 
 ## Review log
@@ -1781,6 +1834,38 @@ into line with.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-24 (implementation pass, task 296): closed **296 in part** — a supplemental boon no
+longer reads as a resurrection deal to the waste guard, so §1.597's third reward and a lone priced
+deal's payment are both live for a player holding nothing but §6.355's boon. One accessor
+(`hasStandardResurrection`), one call site, ten assertions. The suite moves
+`RESULT ALL PASS pass=2894 fail=0` → `pass=2904 fail=0`; `web/` only, so this is a stamp and not a
+data rebuild. Filed **297** for what was left.
+
+**The filing's central premise was wrong, and reading the section was all it took to see it.** 296
+said book1/597's "own text says nothing, so only the sheet rule applies". The page actually offers
+"a free resurrection deal, **if you do not have one already**" — an authorial clause (`597.xml`
+carries a single commit, the original books import) that is the printed source for the very refusal
+the task called a defect. So the headline assertion, that a deal-holder should get the pick, was not
+implemented: it would have made the engine grant an option the page conditions away, in the name of
+a sheet rule that page does not invoke. **A filing that quotes what a section does not say is worth
+opening the section over** — the probe that produced 296 measured the engine on scratch fixtures and
+never read the one page it names.
+
+**What survived the correction is the half that holds under either reading.** §6.355's boon is
+explicitly not a deal — the deity grants it "even if you have another resurrection deal arranged",
+and `addResurrection` lets the two coexist — so a boon-only holder has no deal under the sheet rule
+*and* none under §1.597's wording. That is the case with no defence, and it is the one that changed.
+
+**Six of the ten assertions pass in both states, and that is the point of them.** The negative
+control reads 4 of 10: the two §1.597 boon assertions, the boon-only payment, and
+`rewardWasteReason` read directly. The six controls — `hasResurrection`/`hasStandardResurrection`
+disagreeing on a boon, §1.597 still refusing a deal-holder with its other two picks live, and
+§2.316's plain Arrange replacing a held deal — are what pin the behaviour the fix must NOT move, and
+§1.597's refusal is now pinned *with its printed reason in the assertion text*, so the next pass to
+read task 296 finds the correction before it acts on it. Every assertion survives the broken state
+long enough to fail or pass (task 295's lesson): the defect only disables a button, and a click on a
+disabled button is a silent no-op, so nothing throws.
 
 Filed 2026-08-24 (**296**): the resurrection family's two offer paths answer the same printed rule
 differently. `rewardWasteReason` refuses a new deal to anyone already holding one, so book1/597's
