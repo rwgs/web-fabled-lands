@@ -28,6 +28,8 @@ there once the buckets below are clear.
 
 - [x] 297. the resurrection waste guard is a blanket engine rule that only book1/597's printed wording justifies, so the first flag-linked offer on a page printing the replacement rule will be refused an option its own text grants
 
+- [ ] 298. `renderResurrection`'s `hidden="t"` auto-register path ignores `unique="t"`, so the exclusion task 297 gave the markup is honoured on two of the three paths that arrange a deal
+
 - [x] 293. book3/40 shows its editorial reroll note before the roll it describes, and the obvious sentinel would open a live exit
 
 **Done**
@@ -1837,6 +1839,42 @@ why: all eight corpus gates are death-revival gates, and §6.355's boon does rev
 
 ---
 
+## 298. `renderResurrection`'s `hidden="t"` auto-register path ignores `unique="t"`, so the exclusion task 297 gave the markup is honoured on two of the three paths that arrange a deal
+
+**Priority: LOW — latent: no corpus instance, and the attribute exists on one section that is
+neither hidden nor plain.** Nothing in books 1–6 misbehaves.
+
+*(Filed 2026-08-24 while closing 297, from the path that closing it did not touch.)*
+
+Task 297 moved the "if you do not have one already" exclusion out of `rewardWasteReason` and onto
+the node as `unique="t"`, and taught two paths to read it: the flag-linked pick (via
+`rewardWasteReason`, which `menuWasteReason` composes for the cost side) and the plain Arrange
+button (`render-market.js:898`). `renderResurrection` has a **third** path — `section && hidden`,
+which registers the deal automatically on entry with no button at all (§3.351's Island of Rebirth
+re-arms it each visit) — and that path calls `arrange()` without asking anything about what the
+player already holds.
+
+**What breaks.** A book-7+ section written as a hidden registration *and* printing an exclusion
+("if you have no resurrection arrangements, write X in the box") would silently replace a held deal
+instead of leaving it. Nothing is lost that the sheet rule would not also lose, and no corpus
+section has the combination — `unique="t"` appears once (book1/597, a visible flag-linked pick) and
+the hidden path's one user (§3.351) prints no exclusion — so this is a trap laid for the next
+conversion, of exactly the species 297 closed on the other two paths.
+
+**Suggested fix.** One condition in the `section && hidden` branch: skip the automatic
+registration when `unique="t"` and `state.hasStandardResurrection()`. Consider at the same time
+whether the gate belongs above `arrange()` for all three paths rather than in each of them — a
+single `resurrectionExcluded(state, node)` helper in a DOM-free module would let the view ask once,
+and would be the natural home for the printed-condition question if a second such attribute ever
+arrives.
+
+Assertions: a hidden `unique="t"` registration leaves a deal-holder's existing deal untouched and
+adds nothing; the same node registers normally for a player holding no deal, and for one holding
+only §6.355's supplemental boon; §3.351's hidden re-arming (no `unique=`) is unmoved for a
+deal-holder, since it is the behaviour the corpus actually depends on.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
@@ -1849,7 +1887,7 @@ only; the printed sentence is untouched, and a tag-stripped diff of the file is 
 allowlist gained the attribute and the bool-value list gained its name, and `rewardWasteReason`
 consults the node instead of the state alone. One attribute, three call sites, nine assertions. The
 suite moves `RESULT ALL PASS pass=2904 fail=0` → `pass=2913 fail=0`; `books/` changed, so this is a
-data rebuild and not a stamp. Nothing new filed.
+data rebuild and not a stamp. Filed **298** for the third path.
 
 **The fix is one line of markup and one condition, because the disagreement was never in the code.**
 14 of the 15 offer pages print the replacement rule and one prints an exclusion, so no single
@@ -1889,6 +1927,13 @@ eight corpus gates are death-revival gates ("unless you have a resurrection deal
 marked for it"), and §6.355's boon does revive you — at §6.710 — so a boon-only holder must pass one.
 It stays `hasResurrection()`; the comment at `engine.js` now says it is deliberately not
 `hasStandardResurrection()`, which answers the different question the offer pages ask.
+
+Filed 2026-08-24 (**298**): the `hidden="t"` auto-register path arranges a deal with no button and
+no question, so it ignores the `unique="t"` exclusion the other two paths now read. Latent: the
+attribute exists on one section, which is neither hidden nor plain, and the hidden path's only
+corpus user (§3.351) prints no exclusion. Left undone deliberately rather than written blind - the
+same reasoning that put the attribute on the node says the third path should read it, but a
+condition with no page to answer to is a guess about wording nobody has written yet.
 
 Worked 2026-08-24 (implementation pass, task 296): closed **296 in part** — a supplemental boon no
 longer reads as a resurrection deal to the waste guard, so §1.597's third reward and a lone priced
