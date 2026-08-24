@@ -4,8 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 294 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log) — **every bucket is clear**, so the next work
-comes from [`ROADMAP.md`](ROADMAP.md). File new
+misdiagnosis (see the Review log); **295 is open under HIGH**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -17,7 +16,7 @@ there once the buckets below are clear.
 
 **HIGH**
 
-*(none open)*
+- [ ] 295. `renderItemCache` draws no money controls without `max=`, so book4/586 confiscates the player's whole purse and book4/528 can never give it back
 
 - [x] 294. book4/257 leaves a mixed pair of rolls with no exit at all, so succeeding one check and failing the other ends the adventure
 
@@ -1605,11 +1604,147 @@ waited for.
 
 ---
 
+## 295. `renderItemCache` draws no money controls without `max=`, so book4/586 confiscates the player's whole purse and book4/528 can never give it back
+
+**Priority: HIGH — an unrecoverable loss of every Shard the player is carrying**, on a section
+whose own next page says "You can reclaim your gear."
+
+*(Filed 2026-08-24 from a census of the cache family run in one direction nothing had run it in:
+every printed money loss *from* a cache against every route by which money can *reach* one.)*
+
+`renderItemCache` parses `max=` exactly as the spec asks — absent is −1, "no limit"
+(`render-market.js:598`) — and then gates the widget on `if (moneyMax > 0)`, so a bare
+`<itemcache>` renders no Shards balance, no Deposit and no Withdraw. `renderMoneyCache` gates the
+same value with `if (max >= 0)` and therefore honours the −1. **The parse is right in both
+widgets and only one of them acts on it.**
+
+Task 131 asked for the other reading in as many words — "parse `max` with 0 = barred / absent =
+unlimited **in both cache widgets**" — quoting JaFL `CacheNode`, which "uses −1 as its no-limit
+default and renders a Shards field on item caches". The code comment records the deviation as a
+decision ("Absent `max=` ⇒ item-only (the town-house caches)"), which is why it has survived: it
+reads as settled rather than as unfinished.
+
+**What it costs, measured.** §4.586 is the confiscation task 256 was filed for. Its
+`<transfer to="4.586" item="*" xitem="*key*" shards="*">` moves the purse as well as the gear, and
+§4.528 — the matching unlock, reusing the same cache key — hands back only what the item widget
+can reach. Driven on a real `GameState` (Warrior, 500 Shards, a sword and a pyramid key):
+
+```
+§4.586 moves the whole purse into cache 4.586 :: purse=0 cache=500
+§4.586 renders NO money control on the sealed box (bare <itemcache>) :: n=0
+§4.528 unlocks cache 4.586, and holds the confiscated 500 Shards
+§4.528 renders NO money control either :: n=0
+§4.528 after clicking every live control the purse is still empty :: purse=0 cache=500
+control: §6.512 (max="5000") DOES draw Deposit/Withdraw :: n=2
+```
+
+The control matters: the money half of the widget works, it is simply withheld. So the 500 Shards
+are on no sheet and in no reachable box — they leave the game.
+
+**And the same gate makes 16 printed sentences unable to fire.** A cache's money can only be
+non-zero if something puts it there: a `<moneycache>` of the same name, an `<itemcache max="N">`, a
+`<transfer to=>` carrying `shards=`, an `<adjustmoney name=>`, or a `<tick|gain shards= cache=>`.
+Censused over the `^\d+[a-z]?$` sections of books 1–6, **16 word-carrying
+`<lose shards=… cache=X>` nodes name a cache with none of those**:
+
+| section | cache | printed words that can never apply |
+| --- | --- | --- |
+| book1/177 | 1.177 | "Any money left here has gone" |
+| book1/273, book1/300 | 1.300 | "cross off anything you had stored there", "has gone" |
+| book1/434 (×2) | 1.434 | "All the money you left here has gone", "Lose all possessions you left here" |
+| book2/171 | 2.171 | "gone" |
+| book2/211 | 2.211 | "all the money you left here has gone" |
+| book2/278 | 2.278 | "gone" |
+| book2/348 | 2.348 | "all the money" |
+| book2/641, book2/665 | 2.617 | "Cross them off", "The money has gone" |
+| book3/74 | 3.74 | "taken any money" |
+| book4/509 | 4.509 | "Lose everything you left here" |
+| book6/284 | 6.284 | "all the money" |
+| book6/414 | 6.414 | "all the money" |
+| book6/576 | 6.576 | "cross off any money and possessions" |
+
+Every one of them is a break-in roll on a town house whose own paragraph offers the storage, and
+the family is wider than the losses: **28 of the 30 sections in books 1–6 that carry a bare
+`<itemcache>` mention money or Shards** — book1/177, book1/300, book1/327, book1/434, book2/171,
+book2/211, book2/278, book2/348, book2/617, book2/661, book2/665, book3/74, book3/335, book3/607,
+book4/450, book4/468, book4/509, book4/586, book5/245, book5/560, book5/586, book5/624, book6/238,
+book6/284, book6/414, book6/453, book6/464, book6/576 — against **2 that mention neither**
+(book4/528, book6/276). So the printed offer — "You can leave possessions and money here to save
+having to carry them around with you" — is half implemented in 28 places, and the *risk* the book
+attaches to using it never arrives. Measured on three of them: §1.177, §2.211 and §6.414 each draw
+no way to store money and hold a stash of 0 with 400 Shards in the purse.
+
+**The obvious fix reopens task 256 on the money side, and that was measured too.** `applyCacheLock`
+disables `[data-cachelock]` elements (`render.js:2040`), which is what `renderItemCache` stamps on
+its Take and Store buttons and *not* on its money buttons — deliberately, per the comment above it
+("an `<itemcache max=>`'s Shard controls are deliberately left alone … that bank is the same
+thing"), which is sound for §6.512's cabinet and not for a confiscation. Driven on a fixture section
+that locks a cache and gives it `max=`:
+
+```
+seal probe: the Take/Store buttons ARE sealed :: n=3
+seal probe: the money Withdraw is NOT sealed :: disabled=false
+seal probe: a click on it empties the sealed stash into the purse :: purse=500 stash=0
+```
+
+So today's `moneyMax > 0` is the only thing keeping §4.586 from being undone by a Withdraw the
+moment the controls appear.
+
+The fix is therefore two changes and a decision:
+
+* Gate the controls on `moneyMax !== 0` and apply the deposit cap only when `moneyMax > 0`
+  (`amt = Math.min(amt, moneyMax - cacheMoney)` computes a negative ceiling at −1 and would bar
+  every deposit — copy `renderMoneyCache`'s `if (max >= 0)`).
+* Extend the seal to an item cache's money controls, or §4.586's confiscation is clickable straight
+  back. Task 38's "a plain stash lock leaves a bank editable" is about a `<moneycache>`, which no
+  confiscation uses; an `<itemcache>` whose items are sealed has no case for leaving its money loose.
+* Decide whether the two sections that mention no money (book4/528, book6/276) should carry an
+  explicit `max="0"`. Both are retrieval/storage pages where a Shards field is merely odd, so this
+  is taste, not correctness — but `max="0"` is the vocabulary that says so.
+
+Assertions: §4.586 seals the money controls as it seals the Takes; §4.528 draws a live Withdraw and
+returns the confiscated purse in full; §1.177 stores 400 Shards, and its 10–11 break-in outcome
+empties the stash and leaves the purse alone; §6.512's existing max-cap assertions are unmoved
+(absent and `5000` must not become the same thing); §4.263's `max="0"` still bars deposits; and a
+corpus census pinning **0** word-carrying `<lose shards= cache=X>` nodes whose cache has no deposit
+route, so the next section written this way is found rather than waited for.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-24 (filed from a census, no code change): filed **295** (HIGH) — a bare
+`<itemcache>` renders no money controls, so §4.586 takes the player's whole purse and §4.528 can
+never hand it back. Nothing closed; the buckets were clear and are not now.
+
+**The census that found it runs a family in the direction the family's own name does not suggest.**
+Every previous cache pass asked what a widget *offers*; this one asked, for each printed money loss
+*from* a cache, whether anything in the corpus can ever put money *into* that cache — a
+`<moneycache>` of the same name, an `<itemcache max="N">`, a `<transfer to=>` with `shards=`, an
+`<adjustmoney name=>`, or a `<tick|gain shards= cache=>`. Sixteen nodes in books 1–6 name a cache
+with none of the five. A widget census cannot ask that question, because the widget is fine: the
+money half of `renderItemCache` works and is measurably live at §6.512. What is broken is the gate
+in front of it, and only pairing the losses against the deposits shows a gate at all.
+
+**Task 131's own acceptance text is the evidence, and it had been read as satisfied for a month.**
+It says "parse `max` with 0 = barred / absent = unlimited **in both cache widgets**", quoting JaFL
+`CacheNode`'s −1 default. `renderItemCache` does the parse and then gates on `moneyMax > 0`,
+throwing the −1 away one line later; `renderMoneyCache` gates the same value on `max >= 0` and
+honours it. A task whose title names one section (§6.512) closes when that section works, and the
+half of its own fix statement that was general went with it. **Read a closed task's fix text, not
+its title, when auditing what it left behind.**
+
+**The obvious fix reopens task 256, and the negative control is what says so.** Turning the controls
+on for a bare `<itemcache>` gives §4.586's sealed confiscation a live Withdraw — `applyCacheLock`
+stamps `data-cachelock` on Takes and Stores and not on money buttons, deliberately, on reasoning
+that is right for a bank and wrong for a confiscation. Measured on a locked fixture cache with
+`max=`: three Take/Store buttons sealed, the Withdraw `disabled=false`, and one click moving the
+sealed 500 Shards into the purse. So the filing carries the second half of the fix rather than
+leaving it to be discovered by the run that closes the first.
 
 Worked 2026-08-23 (implementation pass, task 290): closed **290** — §5.315's crippling injury now
 fires when the printed sentence says it does. The suite moves `RESULT ALL PASS pass=2819 fail=0` →
