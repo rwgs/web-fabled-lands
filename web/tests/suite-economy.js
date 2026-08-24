@@ -2826,9 +2826,12 @@ export async function run(ctx) {
          gRoom.data.shards === 150 && gRoom.findItems('silver charm').length === 1,
          `sh=${gRoom.data.shards} charm=${gRoom.findItems('silver charm').length}`);
 
-      // A held deal is the refusal no payment can clear: buying a second one would only
-      // REPLACE it (task 98), so the temple must not take the money for a disabled pick.
-      const xmlPact223 = '<section><p><lose shards="30" price="pact">Pay 30 Shards</lose> to <resurrection book="2" section="60" flag="pact">arrange a pact</resurrection>.</p></section>';
+      // A held deal is the refusal no payment can clear WHERE THE PAGE EXCLUDES ONE, so the
+      // temple must not take the money for a disabled pick. The exclusion is a printed
+      // condition (§1.597's "if you do not have one already"), which unique="t" carries here:
+      // without it the sheet's replacement rule applies and the second deal is takeable, so
+      // this shape had nothing left to test. (tasks 223, 297)
+      const xmlPact223 = '<section><p><lose shards="30" price="pact">Pay 30 Shards</lose> to <resurrection book="2" section="60" flag="pact" unique="t">arrange a pact</resurrection>.</p></section>';
       const gDeal = GameState.create({ name:'Deal', gender:'f', profession:'Warrior', book:2, adv });
       gDeal.data.shards = 100; gDeal.data.resurrections = [];
       eng.buyResurrectionDeal(gDeal, { book:1, section:'350', text:'Nagil' });
@@ -2841,7 +2844,7 @@ export async function run(ctx) {
       ok('task223: and the Shards stay in the purse', gDeal.data.shards === 100, `sh=${gDeal.data.shards}`);
 
       // "Every, never some": the same held deal beside a takeable item keeps the cost live.
-      const xmlMixed = '<section><p><lose shards="30" price="mix">Pay 30 Shards</lose> for either <resurrection book="2" section="60" flag="mix">a pact</resurrection> or a <item name="silver charm" flag="mix"/>.</p></section>';
+      const xmlMixed = '<section><p><lose shards="30" price="mix">Pay 30 Shards</lose> for either <resurrection book="2" section="60" flag="mix" unique="t">a pact</resurrection> or a <item name="silver charm" flag="mix"/>.</p></section>';
       const cMixed = document.createElement('div');
       new Story(cMixed, gDeal, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlMixed), 2, 'x223d');
       const payMixed = cMixed.querySelector('.pay-action');
@@ -3485,9 +3488,11 @@ export async function run(ctx) {
       const payPact = () => cPay.querySelector('.pay-action');
       ok('task296: a boon-only holder may pay for a lone priced deal',
          !!payPact() && payPact().disabled === false, payPact() ? `title=${payPact().title}` : 'no pay button');
+      // The deal-holder half needs the page's printed exclusion on the node now (task 297):
+      // the refusal was never the sheet rule, only §1.597's own "if you do not have one already".
       ok('task296: rewardWasteReason itself clears a boon-only holder and refuses a deal-holder',
-         rewardWasteReason(gPay, parse('<section><resurrection book="2" section="60" flag="p"/></section>').querySelector('resurrection')) === null
-         && rewardWasteReason(g597b, parse('<section><resurrection book="2" section="60" flag="p"/></section>').querySelector('resurrection')) === 'You already have a resurrection deal.');
+         rewardWasteReason(gPay, parse('<section><resurrection book="2" section="60" flag="p" unique="t"/></section>').querySelector('resurrection')) === null
+         && rewardWasteReason(g597b, parse('<section><resurrection book="2" section="60" flag="p" unique="t"/></section>').querySelector('resurrection')) === 'You already have a resurrection deal.');
 
       // Unmoved: the plain unflagged Arrange path never consulted the guard, and a
       // deal-holder replaces the old deal there exactly as §1.478 prints it.
@@ -3503,6 +3508,107 @@ export async function run(ctx) {
       ok('task296: and arranging there replaces the old deal, leaving exactly one, at the new site',
          gPlain.data.resurrections.length === 1 && String(gPlain.data.resurrections[0].section) === '339',
          JSON.stringify(gPlain.data.resurrections));
+    }
+
+    // --- task 297: the resurrection exclusion is printed on the page, not baked into the engine ---
+    { // block-scoped
+      // rewardWasteReason refused EVERY <resurrection> reward to a deal-holder, but the corpus
+      // does not speak with one voice: 14 of the 15 offer pages print the replacement rule ("the
+      // original one is cancelled - you do not get a refund"), which is what addResurrection does
+      // and what the plain Arrange button has always done. Only §1.597 prints an exclusion ("if
+      // you do not have one already"), so that page now carries unique="t" and the engine defaults
+      // to the sheet rule. The guard could not hear the difference; the markup states it.
+      const boon297 = (g) => eng.buyResurrectionDeal(g, { book:6, section:'710', text:'Lords of the Rising Sun 710', supplemental:true });
+      const deal297 = (g) => eng.buyResurrectionDeal(g, { book:1, section:'350', text:'Temple of Nagil' });
+      const holder297 = (name, book) => { const g = GameState.create({ name, gender:'f', profession:'Warrior', book, adv }); g.data.resurrections = []; deal297(g); return g; };
+      const pick297 = (c) => Array.from(c.querySelectorAll('.reward-pick')).find((b) => /resurrection|rock|pact/i.test(b.textContent));
+
+      // A flag-linked offer on a page printing the REPLACEMENT rule: the shape §1.597 is the
+      // corpus's only instance of, on the wording the other 14 pages print.
+      const xmlRepl = '<section name="x297"><p><tick price="k" hidden="t"/>Take <tick shards="200" flag="k"/>'
+        + ' or arrange a <resurrection text="Temple of the Rock" book="3" section="404" flag="k">resurrection deal</resurrection>.'
+        + ' If you arrange another resurrection later at a different temple, the original one is cancelled.</p></section>';
+      const gRepl = holder297('Repl297', 3);
+      const cRepl = document.createElement('div');
+      new Story(cRepl, gRepl, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlRepl), 3, 'x297');
+      ok('task297: a flag-linked deal on a replacement-rule page is offered to a deal-holder',
+         !!pick297(cRepl) && pick297(cRepl).disabled === false,
+         pick297(cRepl) ? `dis=${pick297(cRepl).disabled} title=${pick297(cRepl).title}` : 'no deal pick');
+      if (pick297(cRepl) && !pick297(cRepl).disabled) pick297(cRepl).click();
+      ok('task297: taking it cancels the old deal and leaves exactly one, at the new temple',
+         gRepl.data.resurrections.length === 1 && String(gRepl.data.resurrections[0].section) === '404',
+         JSON.stringify(gRepl.data.resurrections));
+
+      // The lone priced shape (task 221) failed harder: menuWasteReason refused the PAYMENT, so
+      // the whole page went dead to a deal-holder rather than one option on it.
+      const xmlPriced = '<section name="y297"><p><lose shards="40" price="pact">Pay 40 Shards</lose> to'
+        + ' <resurrection text="Temple of the Rock" book="3" section="404" flag="pact">arrange a pact</resurrection>.'
+        + ' If you arrange another resurrection later, the original one is cancelled.</p></section>';
+      const gPriced = holder297('Priced297', 3); gPriced.data.shards = 200;
+      const cPriced = document.createElement('div');
+      new Story(cPriced, gPriced, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlPriced), 3, 'y297');
+      const payPriced = () => cPriced.querySelector('.pay-action');
+      ok('task297: a lone priced deal on such a page keeps its payment live for a deal-holder',
+         !!payPriced() && payPriced().disabled === false,
+         payPriced() ? `dis=${payPriced().disabled} title=${payPriced().title}` : 'no pay button');
+      if (payPriced() && !payPriced().disabled) payPriced().click();
+      if (pick297(cPriced) && !pick297(cPriced).disabled) pick297(cPriced).click();
+      ok('task297: paying then taking it charges once and replaces the deal',
+         gPriced.data.shards === 160 && gPriced.data.resurrections.length === 1
+         && String(gPriced.data.resurrections[0].section) === '404',
+         `shards=${gPriced.data.shards} ${JSON.stringify(gPriced.data.resurrections)}`);
+
+      // The plain Arrange path reads the attribute too, so unique="t" cannot mean one thing
+      // behind a flag= key and nothing at all on the button 14 pages draw.
+      const xmlPlainU = '<section name="z297"><p>A free <resurrection text="Temple of Nagil" book="1" section="350" unique="t">resurrection deal</resurrection>, if you do not have one already.</p></section>';
+      const gPlainU = holder297('PlainU297', 1);
+      const cPlainU = document.createElement('div');
+      new Story(cPlainU, gPlainU, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlPlainU), 1, 'z297');
+      const arrange297 = (c) => Array.from(c.querySelectorAll('.btn-secondary')).find((b) => /resurrection|arrange/i.test(b.textContent));
+      ok('task297: a plain Arrange button carrying unique="t" is refused to a deal-holder',
+         !!arrange297(cPlainU) && arrange297(cPlainU).disabled === true
+         && arrange297(cPlainU).title === 'You already have a resurrection deal.',
+         arrange297(cPlainU) ? `dis=${arrange297(cPlainU).disabled} title=${arrange297(cPlainU).title}` : 'no arrange button');
+      const gPlainB = GameState.create({ name:'PlainB297', gender:'m', profession:'Warrior', book:1, adv });
+      gPlainB.data.resurrections = []; boon297(gPlainB);
+      const cPlainB = document.createElement('div');
+      new Story(cPlainB, gPlainB, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(xmlPlainU), 1, 'z297');
+      ok('task297: the same button is live for a holder of nothing but §6.355\'s boon',
+         !!arrange297(cPlainB) && arrange297(cPlainB).disabled === false,
+         arrange297(cPlainB) ? `dis=${arrange297(cPlainB).disabled} title=${arrange297(cPlainB).title}` : 'no arrange button');
+
+      // The guard read directly: the attribute is the whole difference for a deal-holder, and a
+      // boon is not a deal even where the page excludes one.
+      const nodeOf297 = (xml) => parse(`<section>${xml}</section>`).querySelector('resurrection');
+      const gGuard = holder297('Guard297', 1);
+      const gBoonOnly = GameState.create({ name:'Boon297', gender:'f', profession:'Warrior', book:1, adv });
+      gBoonOnly.data.resurrections = []; boon297(gBoonOnly);
+      ok('task297: rewardWasteReason refuses a deal-holder only where the page prints the exclusion',
+         rewardWasteReason(gGuard, nodeOf297('<resurrection book="3" section="404" flag="k"/>')) === null
+         && rewardWasteReason(gGuard, nodeOf297('<resurrection book="3" section="404" flag="k" unique="t"/>')) === 'You already have a resurrection deal.'
+         && rewardWasteReason(gBoonOnly, nodeOf297('<resurrection book="3" section="404" flag="k" unique="t"/>')) === null);
+
+      // Controls that must NOT move. §1.597 is the page the new default must not break: its own
+      // text conditions the free deal on not having one, and now says so in markup.
+      const g597c = holder297('Ghoul297', 1);
+      const c597c = document.createElement('div');
+      new Story(c597c, g597c, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(1, '597'), 1, '597');
+      const pick597 = Array.from(c597c.querySelectorAll('.reward-pick')).find((b) => /resurrection/i.test(b.textContent));
+      ok('task297: §1.597 still refuses its free deal to a deal-holder, from its own unique="t"',
+         !!pick597 && pick597.disabled === true && pick597.title === 'You already have a resurrection deal.'
+         && Array.from(c597c.querySelectorAll('.reward-pick')).filter((b) => !b.disabled).length === 2,
+         pick597 ? `dis=${pick597.disabled} title=${pick597.title}` : 'no deal pick');
+
+      // <if resurrection> is the OTHER question, and it keeps the other answer: all eight corpus
+      // gates are death-revival gates, and §6.355's boon does revive you (at §6.710), so a
+      // boon-only holder passes one where hasStandardResurrection() would fail them.
+      const gNone297 = GameState.create({ name:'None297', gender:'m', profession:'Warrior', book:1, adv });
+      gNone297.data.resurrections = [];
+      ok('task297: <if resurrection> counts a supplemental boon (a death gate asks "can you come back")',
+         eng.evaluateCondition(parse('<if resurrection="t"/>'), gBoonOnly) === true
+         && gBoonOnly.hasStandardResurrection() === false
+         && eng.evaluateCondition(parse('<if resurrection="t"/>'), gNone297) === false
+         && eng.evaluateCondition(parse('<if resurrection="t"/>'), gGuard) === true);
     }
 
 }

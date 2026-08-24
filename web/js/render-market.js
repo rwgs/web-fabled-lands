@@ -890,7 +890,14 @@ export function renderResurrection(story, container, node, path) {
     const btn = document.createElement('button');
     btn.className = 'btn-secondary' + (done ? ' done' : '');
     btn.textContent = done ? '☑ Resurrection arranged' : (cost ? `Buy resurrection deal (${cost} Shards)` : 'Arrange resurrection');
-    btn.disabled = done || (cost > 0 && story.state.data.shards < cost);
+    // unique="t" carries a page's PRINTED exclusion of a deal-holder (§1.597's free deal, "if
+    // you do not have one already"). Without it the sheet's replacement rule stands, which is
+    // what the other 14 offer pages print and what addResurrection does: arranging again
+    // cancels the old deal. Honoured on this path too, so the attribute cannot mean one thing
+    // behind a flag= key and nothing at all on a plain Arrange button. (task 297)
+    const excluded = boolAttr(node.getAttribute('unique')) && story.state.hasStandardResurrection();
+    btn.disabled = done || excluded || (cost > 0 && story.state.data.shards < cost);
+    if (excluded && !done) btn.title = 'You already have a resurrection deal.';
     if (!done) btn.addEventListener('click', () => {
       arrange();
       story.ctx.applied.add(memo);

@@ -256,6 +256,12 @@ export function evaluateCondition(el, state, opts = {}) {
   add(get('title'), () => get('title').split(/[|,]/).some((t) => state.hasTitle(t.trim())));
   add(get('profession'), () => normalize(state.data.profession) === normalize(get('profession')));
   add(get('gender'), () => (state.data.gender === 'm') === get('gender').toLowerCase().startsWith('m'));
+  // ANY arrangement written in the Resurrection box answers this, boon included: all eight
+  // corpus <if resurrection> gates are death-revival gates ("unless you have a resurrection
+  // deal", "turn to the entry marked for it"), and §6.355's supplemental boon does revive
+  // you — at §6.710 — so a boon-only holder must pass. This is deliberately NOT
+  // hasStandardResurrection(), which asks the different question the offer pages ask:
+  // "is a DEAL held, so does a new one replace it". (tasks 296, 297)
   add(get('resurrection'), () => state.hasResurrection());
   add(get('dead'), () => state.isDead() === boolAttr(get('dead')));
   add(get('book'), () => bookAvailable(get('book')));

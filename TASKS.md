@@ -26,7 +26,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 297. the resurrection waste guard is a blanket engine rule that only book1/597's printed wording justifies, so the first flag-linked offer on a page printing the replacement rule will be refused an option its own text grants
+- [x] 297. the resurrection waste guard is a blanket engine rule that only book1/597's printed wording justifies, so the first flag-linked offer on a page printing the replacement rule will be refused an option its own text grants
 
 - [x] 293. book3/40 shows its editorial reroll note before the roll it describes, and the obvious sentinel would open a live exit
 
@@ -1827,6 +1827,14 @@ replaces the old deal; a lone priced deal on such a page keeps its payment live;
 still refuses its deal-holder (it is the page the default must not break); and whichever way
 `<if resurrection>` is settled, a boon-only holder gets a pinned answer from it.
 
+**Closed (2026-08-24).** The exclusion is now stated by the markup: `<resurrection unique="t">`,
+which book1/597 carries and no other section does, and the engine defaults to the sheet's
+replacement rule everywhere else. `rewardWasteReason` reads the attribute instead of asking the
+state alone, so `menuWasteReason` follows on the cost side for free, and the plain Arrange path
+reads it too — the attribute cannot mean one thing behind a `flag=` key and nothing at all on the
+button 14 pages draw. `<if resurrection>` keeps `hasResurrection()`, boon included, and now says
+why: all eight corpus gates are death-revival gates, and §6.355's boon does revive you.
+
 ---
 
 ## Review log
@@ -1834,6 +1842,53 @@ still refuses its deal-holder (it is the page the default must not break); and w
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-24 (implementation pass, task 297): closed **297** — the resurrection exclusion is
+now a property of the page, not of the engine. `books/book1/597.xml` carries `unique="t"` (markup
+only; the printed sentence is untouched, and a tag-stripped diff of the file is byte-identical), the
+allowlist gained the attribute and the bool-value list gained its name, and `rewardWasteReason`
+consults the node instead of the state alone. One attribute, three call sites, nine assertions. The
+suite moves `RESULT ALL PASS pass=2904 fail=0` → `pass=2913 fail=0`; `books/` changed, so this is a
+data rebuild and not a stamp. Nothing new filed.
+
+**The fix is one line of markup and one condition, because the disagreement was never in the code.**
+14 of the 15 offer pages print the replacement rule and one prints an exclusion, so no single
+engine-wide answer could be right for both; a blanket refusal made §1.597's wording the rule for
+pages that print its opposite. Putting the exception on the node leaves the default where
+`addResurrection` and the plain Arrange button already were, and `menuWasteReason` needed no edit at
+all — it composes `rewardWasteReason` per linked reward, so the cost side followed for free. That is
+the shape to prefer when the corpus disagrees with itself: the pages differ, so let the markup differ.
+
+**The plain Arrange path reads the attribute too, and that is not scope creep but the point of a
+closed allowlist.** Had it been left alone, `unique="t"` would mean a refusal behind a `flag=` key
+and a silent no-op on the button 14 pages draw — the exact "a typo cannot ship as a silent no-op"
+failure `validate-source.ps1` exists to prevent, except worse, because the attribute would be spelled
+correctly. Four lines, inert on every section shipping today.
+
+**Two older assertions pinned the blanket rule, and both were fixtures rather than corpus.** Task
+223's "a deal-holder cannot pay for a second deal they cannot pick up" and its "one takeable option
+keeps the cost live" twin both used a scratch `<resurrection>` with no printed exclusion; under the
+new default the second deal is takeable, so the first would fail and the second would pass
+vacuously. Giving both fixtures `unique="t"` keeps what they were written to test — that
+`menuWasteReason` blocks a payment for a reason no payment can clear, and that one live option keeps
+the cost open — and now says on the page why the reason is unclearable. Task 296's direct
+`rewardWasteReason` read needed the same attribute for the same reason.
+
+**Six of the nine new assertions fail against the unfixed guard, and the three that pass in both
+states are the ones that had to.** The negative control (blanket refusal restored, plain path
+ignoring the attribute) reads 6 of 9: both halves of the flag-linked replacement page, both halves of
+the lone priced page, the plain button's refusal, and the guard read directly. The three survivors
+are §1.597's own refusal — the page the new default must not break, now pinned to its markup rather
+than to the engine — the plain button staying live for a boon-only holder, and `<if resurrection>`
+answering yes to a boon. Every assertion survived the broken state long enough to be measured: the
+defect only disables a button, and clicks are guarded by `!disabled`, so nothing threw and none of
+the nine went unreported.
+
+**`<if resurrection>` is settled as "any arrangement in the box", with the reason written down.** All
+eight corpus gates are death-revival gates ("unless you have a resurrection deal", "turn to the entry
+marked for it"), and §6.355's boon does revive you — at §6.710 — so a boon-only holder must pass one.
+It stays `hasResurrection()`; the comment at `engine.js` now says it is deliberately not
+`hasStandardResurrection()`, which answers the different question the offer pages ask.
 
 Worked 2026-08-24 (implementation pass, task 296): closed **296 in part** — a supplemental boon no
 longer reads as a resurrection deal to the waste guard, so §1.597's third reward and a lone priced

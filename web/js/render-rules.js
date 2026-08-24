@@ -234,11 +234,17 @@ export function hasVisiblePay(sectionEl, key) {
 // or a curse/disease/poison "lift" you aren't suffering. Returns the reason or null.
 export function rewardWasteReason(state, node) {
   const tag = node.tagName.toLowerCase();
-  // A DEAL already held is the refusal (§1.597 offers its free deal "if you do not have one
-  // already"); a supplemental boon is not a deal — §6.355's deity grants it on top of one,
-  // and addResurrection lets the two coexist — so a boon-only holder is offered the deal
-  // they could plainly take, which no payment could ever have unlocked. (task 296)
-  if (tag === 'resurrection' && state.hasStandardResurrection()) return 'You already have a resurrection deal.';
+  // A resurrection offer is refused only where the PAGE excludes a deal-holder, which the
+  // markup states (unique="t") and the corpus prints exactly once: §1.597's deal is free "if
+  // you do not have one already". The other 14 offers print the replacement rule ("if you
+  // arrange another resurrection later at a different temple, the original one is cancelled"),
+  // which is what addResurrection implements and what the plain Arrange path has always done —
+  // so a blanket refusal here denied a deal-holder an option those pages grant. A supplemental
+  // boon is not a deal either way (§6.355's deity grants it on top of one), so a boon-only
+  // holder is never refused. (tasks 296, 297)
+  if (tag === 'resurrection' && boolAttr(node.getAttribute('unique')) && state.hasStandardResurrection()) {
+    return 'You already have a resurrection deal.';
+  }
   if (ITEM_FAMILY_TAGS.has(tag)) {
     const rawName = node.getAttribute('name') || tag;
     const isCurrency = tag === 'item' && currencyAward(rawName) != null;

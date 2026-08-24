@@ -76,7 +76,11 @@ $script:FL_TAG_ATTRS = @{
     'adjustmoney' = 'cache force multiply name'
     'transfer' = 'armour bonus force from hidden item limit price shards to weapon xarmour xgroup xitem'
     'rest' = 'hidden shards stamina'
-    'resurrection' = 'book flag god hidden section shards supplemental text'
+    # unique='t' is the port's name for a PRINTED exclusion on one offer: section 1.597's free
+    # deal is offered "if you do not have one already". The engine's default is the sheet's
+    # replacement rule (a new deal cancels the old), so only a page printing the exclusion
+    # carries this - never the 14 offers that print the replacement rule. (task 297)
+    'resurrection' = 'book flag god hidden section shards supplemental text unique'
     'curse' = 'cumulative lift name'
     'disease' = 'name'
     'poison' = 'name'
@@ -110,7 +114,7 @@ $script:FL_TAG_ATTRS = @{
 
 # Attributes whose value is a JaFL truth flag. The books write both letters and words.
 $script:FL_BOOL_ATTRS = @('force', 'hidden', 'dead', 'not', 'using', 'sail', 'start', 'revisit',
-                          'cumulative', 'permanent', 'supplemental', 'visit', 'playerFirst', 'fatal')
+                          'cumulative', 'permanent', 'supplemental', 'unique', 'visit', 'playerFirst', 'fatal')
 $script:FL_BOOL_VALUES = @('t', 'f', 'true', 'false')
 
 # Closed value sets, mirroring the engine's own canonical lists (web/js/rules.js ABILITIES /
