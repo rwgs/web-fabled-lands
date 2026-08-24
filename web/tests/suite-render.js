@@ -576,20 +576,31 @@ export async function run(ctx) {
         ok('§4.257 both rolls successful routes to 216, and only there',
            pp.g.getVar('s') === 6 && pp.g.getVar('m') === 6 && exits292(pp.c) === '216[ON] 374[OFF] 413[OFF]',
            `s=${pp.g.getVar('s')} m=${pp.g.getVar('m')} ${exits292(pp.c)}`);
-        // The MIXED pair reaches no exit at all, in either direction — a second defect in this
-        // section, filed as task 294 and pinned here rather than fixed under this one. The outer
-        // chain branches on `m` alone, so a mixed pair matches an arm whose inner <if> is false
-        // and the <else> holding "if one roll was successful" is never evaluated: the page offers
-        // nothing and the renderer draws its "your tale ends here" button. Task 292 owns the gate,
-        // and the gate is right — no exit may open before the dice; which exit the markup then
-        // opens is 294's. When 294 lands, both of these become 413[ON].
+        // The MIXED pair, in both directions — task 294. It reached NO exit at all: the outer
+        // chain branched on `m` alone, and `m > 0` / `m < 1` between them cover every value, so
+        // the <else> holding "if one roll was successful" was unreachable and §413 could never be
+        // reached. A mixed pair matched whichever outer arm `m` selected and then failed that
+        // arm's inner <if>, printing nothing — the page offered nothing and the renderer drew its
+        // "your tale ends here" button. The chain now routes on ONE var, `<set var="passed"
+        // success="s|m">`, whose three values are mutually exclusive AND exhaustive, so each of
+        // the section's three printed sentences stays in exactly one arm.
         for (const [sPass, mPass] of [[true, false], [false, true]]) {
           const mx = await mk257(sPass, mPass);
           rollBtn292(mx.c).click(); await settle292(); rollBtn292(mx.c).click(); await settle292();
-          ok(`§4.257 (task294) one roll of the pair successful (s=${sPass?'pass':'fail'}) reaches no exit`,
-             exits292(mx.c) === '216[OFF] 374[OFF] 413[OFF] FATE[ON]',
-             `s=${mx.g.getVar('s')} m=${mx.g.getVar('m')} ${exits292(mx.c)}`);
+          ok(`§4.257 (task294) one roll of the pair successful (s=${sPass?'pass':'fail'}) routes to 413`,
+             mx.g.getVar('passed') === 1 && exits292(mx.c) === '216[OFF] 374[OFF] 413[ON]',
+             `s=${mx.g.getVar('s')} m=${mx.g.getVar('m')} passed=${mx.g.getVar('passed')} ${exits292(mx.c)}`);
         }
+        // …and the derived count itself, pinned in all three states: 2 both, 0 neither, 1 mixed
+        // (asserted above). A count that read 0 on entry would put the both-failed exit back on
+        // the page, which is why the <set> must stay held until both dice are thrown.
+        ok('§4.257 (task294) the success count is written only once both rolls have settled',
+           ff.g.getVar('passed') === 0 && pp.g.getVar('passed') === 2,
+           `bothFailed=${ff.g.getVar('passed')} bothPassed=${pp.g.getVar('passed')}`);
+        const un = await mk257(true, true);
+        ok('§4.257 (task294) before the dice the count is unwritten, so no arm commits',
+           !un.g.hasVar('passed') && exits292(un.c) === '216[OFF] 374[OFF] 413[OFF]',
+           `hasVar=${un.g.hasVar('passed')} ${exits292(un.c)}`);
         Math.random = rnd292;
       }
 

@@ -13,7 +13,7 @@ import { bookAvailable } from './edition.js'; // the DOM-free registry, never da
 import { blessingLabel } from './render-util.js'; // pure label formatting, no DOM (task 218)
 import {
   isRollGate, isDeferredEscapeClear, isDeferredTagCleanup, aggregateFightOutcome, ITEM_FAMILY_TAGS,
-  hasAncestorTag, expressionVars, provisionalVarClosure, EFFECT_MAGNITUDE_ATTRS, conditionVars,
+  hasAncestorTag, provisionalVarClosure, EFFECT_MAGNITUDE_ATTRS, conditionVars, setReadVars,
 } from './render-gates.js';
 
 // isRollGate moved to render-gates.js (one-way dependency: classifyPassive below composes
@@ -555,7 +555,8 @@ export function conditionPending(node, pendingVars) {
 // reads the SHEET at the walk's position instead of memoising the guard's verdict (Story.sheetAt,
 // render.js), which needs no view of how the condition is phrased.
 
-// Is this <set> itself unsettled — does its expression READ a var that is not settled yet
+// Is this <set> itself unsettled — do the vars it READS (setReadVars: its value= expression, or
+// the roll results a success= counts) include one that is not settled yet
 // (task 181)? Such a set must not write: §2.698's `<set var="cash" value="roll*100">` would
 // otherwise bank a rejected roll's Shard value through the `<tick shards="cash">` beneath it,
 // and §2.684's `result` would resolve its <outcomes> branch. Rendered inert, it applies on the
@@ -566,7 +567,7 @@ export function conditionPending(node, pendingVars) {
 export function setPending(node, pendingVars) {
   if (!pendingVars || !pendingVars.size) return false;
   if (node.tagName.toLowerCase() !== 'set') return false;
-  return expressionVars(node.getAttribute('value')).some((id) => pendingVars.has(id));
+  return setReadVars(node).some((id) => pendingVars.has(id));
 }
 
 // The vars a roll in this section is going to fill but has NOT yet (task 181): every
@@ -1101,8 +1102,10 @@ export function classifyPassive(node, view) {
   // `curr` to decide `wounded` before a <rest> heals it. Both are frozen at their
   // first application, which is what "the score before" means. (task 289)
   const readsLiveStamina = tag === 'set' && CURRENT_STAMINA_RE.test(node.getAttribute('value') || '');
-  const rerunnable = tag === 'set' && node.hasAttribute('value') && !node.hasAttribute('modifier')
-    && !rollOwned && !readsLiveStamina;
+  // A success= set counts the sign of two roll vars, so it is absolute in exactly the same
+  // sense and re-evaluates for exactly the same reason. (task 294)
+  const rerunnable = tag === 'set' && (node.hasAttribute('value') || node.hasAttribute('success'))
+    && !node.hasAttribute('modifier') && !rollOwned && !readsLiveStamina;
   return { mode: 'apply', showWords: !hidden, setVarName, rollOwned, rerunnable };
 }
 

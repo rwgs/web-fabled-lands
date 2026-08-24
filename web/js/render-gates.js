@@ -246,22 +246,31 @@ export function expressionVars(str) {
   return s.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
 }
 
+// The variables a `<set>` READS: its value= expression, plus the roll-result vars a success=
+// counts (task 294). `<set var="passed" success="s|m">` depends on both rolls exactly as
+// `value="s+m"` would, so both the trace below and setPending (render-rules.js — the refusal
+// that stops the same set writing before those rolls land) must follow it, or §4.257's gate
+// would stop seeing the very rolls its chain routes on.
+export function setReadVars(node) {
+  return [...expressionVars(node.getAttribute('value')), ...expressionVars(node.getAttribute('success'))];
+}
+
 // Every variable whose value is still PROVISIONAL this render (task 181): `seed` (the vars a
-// pending reroll decision's roll wrote) grown through the section's <set var="V" value="expr">
-// nodes, transitively — a value derived from a provisional var is itself provisional
+// pending reroll decision's roll wrote) grown through the section's deriving <set> nodes
+// (setReadVars above), transitively — a value derived from a provisional var is itself provisional
 // (§2.698's `roll*100` → cash, §2.684's `(rank+1)-roll` → result). The scan is deliberately
 // position- and branch-blind: an over-wide set only DEFERS work until the decision settles,
 // whereas a missed dependency would commit a rejected result.
 export function provisionalVarClosure(sectionEl, seed) {
   const out = new Set(seed || []);
   if (!sectionEl || !out.size) return out;
-  const sets = Array.from(sectionEl.querySelectorAll('set[var][value]'));
+  const sets = Array.from(sectionEl.querySelectorAll('set[var][value], set[var][success]'));
   for (let pass = 0; pass <= sets.length; pass++) {
     let grew = false;
     for (const s of sets) {
       const v = s.getAttribute('var');
       if (!v || out.has(v)) continue;
-      if (expressionVars(s.getAttribute('value')).some((id) => out.has(id))) { out.add(v); grew = true; }
+      if (setReadVars(s).some((id) => out.has(id))) { out.add(v); grew = true; }
     }
     if (!grew) break;
   }

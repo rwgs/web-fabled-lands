@@ -159,9 +159,58 @@ export async function run(ctx) {
         }
       }
     }
-    ok('task291: the only guards matching an unrolled 0 are the two sections tasks 292/293 own',
-       [...new Set(open291)].sort().join(' ') === '3/40 x 4/257 m 4/257 s',
+    // §4.257's two entries left this list when task 294 rewrote its chain to route on one derived
+    // count: the guards now read `passed`, which no roll writes, so the shape the census looks for
+    // is gone from that page. What holds the section pre-roll is still task 292's gate — the
+    // `equals="0"` arm is revealed on entry exactly as the `lessthan="1"` one was — and that is
+    // asserted where the gate is, below. §3/40 is the one hit left, and it is task 293's.
+    ok('task291: the only guard matching an unrolled 0 is the section task 293 owns',
+       [...new Set(open291)].sort().join(' ') === '3/40 x',
        [...new Set(open291)].sort().join(' '));
+
+    // --- task 294: a chain over one var whose <else> can never be reached ----------------------
+    // §4.257's outer arms were `m > 0` and `m < 1`, which between them cover every value, so the
+    // <else> holding "if one roll was successful" was dead code and §413 unreachable: a mixed pair
+    // of rolls matched whichever arm `m` selected, failed that arm's inner <if>, and the page
+    // printed nothing at all. Censused over the PARSED corpus rather than the XML text — the shape
+    // is about sibling arms and their nested children, which a regex cannot see — and pinned at
+    // zero, so a second section written this way is found rather than waited for. Only numeric bars
+    // are decidable here; a bar that is itself a variable (§2.270's `lessthan="rank"`) is left
+    // alone rather than guessed at, which is the same caution task 291's census took.
+    const deadElse294 = (el) => {
+      const out = [];
+      el.querySelectorAll('if').forEach((head) => {
+        const prev = head.previousElementSibling;
+        if (prev && /^(if|elseif)$/.test(prev.tagName.toLowerCase())) return; // mid-chain, not its head
+        const arms = [head];
+        for (let n = head.nextElementSibling; n; n = n.nextElementSibling) {
+          const t = n.tagName.toLowerCase();
+          if (t !== 'elseif' && t !== 'else') break;
+          arms.push(n);
+        }
+        if (!arms.some((a) => a.tagName.toLowerCase() === 'else')) return; // no <else> to be dead
+        const conds = arms.filter((a) => a.tagName.toLowerCase() !== 'else');
+        const vars = new Set(conds.map((a) => a.getAttribute('var')));
+        if (vars.size !== 1 || vars.has(null)) return; // not one chain over one var
+        const bars = conds.map((a) => ['greaterthan', 'lessthan', 'equals'].map((k) => a.getAttribute(k)));
+        if (!bars.every((t) => t.some((v) => v != null) && t.every((v) => v == null || /^-?\d+$/.test(v)))) return;
+        const hit = (t, x) => (t[2] != null && x === +t[2]) || (t[0] != null && x > +t[0]) || (t[1] != null && x < +t[1]);
+        for (let x = -200; x <= 200; x++) if (!bars.some((t) => hit(t, x))) return; // some value falls through
+        out.push([...vars][0]);
+      });
+      return out;
+    };
+    // The census is pinned at zero, so it has to be shown to still SEE the shape: §4.257 as it was
+    // written, against §4.257 as task 294 rewrote it. Without this pair the zero below would also
+    // be reported by a census that had quietly stopped matching anything.
+    ok('task294: the census still finds the shape it was written for, and clears the repair',
+       deadElse294(parse('<section name="old"><p><if var="m" greaterthan="0"><if var="s" greaterthan="0">Both, <goto section="216"/>.</if></if>'
+         + '<elseif var="m" lessthan="1"><if var="s" lessthan="1">Neither, <goto section="374"/>.</if></elseif>'
+         + '<else>One, <goto section="413"/>.</else></p></section>')).join(' ') === 'm'
+       && deadElse294(parse('<section name="new"><p><set var="passed" success="s|m" hidden="t"/>'
+         + '<if var="passed" equals="2">Both, <goto section="216"/>.</if>'
+         + '<elseif var="passed" equals="0">Neither, <goto section="374"/>.</elseif>'
+         + '<else>One, <goto section="413"/>.</else></p></section>')).length === 0);
 
     // --- task 292: what the roll gate's CONDITION seed holds, measured -------------------------
     // The blast radius task 292 wanted measured before the seed was committed, kept as the pin.
@@ -172,16 +221,22 @@ export async function run(ctx) {
     // §4.257, §5.343 and §5.432 are the sharper kind, where an `<if>` arm's own <goto> was live
     // and reachable on entry. A section LEAVING this list has had its gate taken over by an
     // earlier seed (or lost it); a section joining it is a page that gained one.
-    const gained292 = [], multi292 = [];
+    // Task 294's census rides along in this pass rather than opening a third one over all 4,369
+    // sections: both need the parsed element, and each await here spends virtual-time budget.
+    const gained292 = [], multi292 = [], dead294 = [];
     for (const b of books) {
       const raw = await data.loadBook(b);
       for (const key of Object.keys(raw)) {
-        const g = gates.computeRollGate(await data.getSection(b, key));
+        const el = await data.getSection(b, key);
+        deadElse294(el).forEach((v) => dead294.push(b + '/' + key + ' ' + v));
+        const g = gates.computeRollGate(el);
         if (!g) continue;
         if (g.seed === 'condition') gained292.push(b + '/' + key);
         else if (g.rollNodes.size !== 1) multi292.push(b + '/' + key + ' seed=' + g.seed);
       }
     }
+    ok('task294: no shipped chain over one var leaves its <else> unreachable',
+       dead294.length === 0, dead294.join(', '));
     ok('task292: the condition seed holds 28 sections, and only these',
        gained292.join(' ') === '1/313 2/345 2/378 2/389 2/529 2/536 2/563 2/584 2/614 2/637 2/654 2/683 2/752 '
          + '3/267 3/379 3/412 3/455 3/492 3/559 3/583 4/257 5/245 5/343 5/432 6/17 6/344 6/402 6/738',

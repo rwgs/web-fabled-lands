@@ -3191,6 +3191,18 @@ export async function run(ctx) {
          !!pair292 && pair292.rollNodes.size === 2 && pair292.navNodes.size === 3
          && pair292.rollNode === pair292.rollNodes.values().next().value,
          pair292 ? 'rolls=' + pair292.rollNodes.size + ' nav=' + pair292.navNodes.size : 'null');
+      // Task 294 rewrote that chain to route on ONE derived count, and the gate has to survive
+      // the rewrite: the condition now names `passed`, which reaches the two rolls only through
+      // the `<set success="s|m">` the trace follows. If it stopped following it, this section
+      // would lose its gate altogether and 292's defect would be back.
+      const pair294g = rg247('<difficulty ability="scouting" level="14" var="s"/><difficulty ability="magic" level="14" var="m"/>'
+        + '<set var="passed" success="s|m" hidden="t"/>'
+        + '<if var="passed" equals="2">Both, <goto section="216"/>.</if>'
+        + '<elseif var="passed" equals="0">Neither, <goto section="374"/>.</elseif>'
+        + '<else>One, <goto section="413"/>.</else>');
+      ok('task294: a chain over a success= count still awaits both of the rolls it counts',
+         !!pair294g && pair294g.rollNodes.size === 2 && pair294g.navNodes.size === 3 && pair294g.seed === 'condition',
+         pair294g ? 'rolls=' + pair294g.rollNodes.size + ' nav=' + pair294g.navNodes.size + ' seed=' + pair294g.seed : 'null');
       // The earlier seeds are unchanged by that generalisation: each still names exactly one roll.
       ok('task292: the table, effect and branch seeds each still await exactly one roll',
          gates.computeRollGate(parse('<section name="tr2"><random/><outcomes><outcome range="1-6" section="5"/></outcomes><choices><choice section="8">Leave</choice></choices></section>')).rollNodes.size === 1
@@ -3672,6 +3684,55 @@ export async function run(ctx) {
          rules.setPending(parse('<set var="x" value="7"/>'), pv) === false);
       ok('task181: setPending — a non-set node is never a pending set',
          rules.setPending(parse('<tick shards="x"/>'), pv) === false);
+
+      // --- task 294: <set success="V|W"> — the readable way to route on a PAIR of checks -------
+      // §4.257's chain branched on `m` alone (`m > 0` / `m < 1` are exhaustive between them), so
+      // its <else> was unreachable and a mixed pair reached no exit at all. The three printed
+      // sentences each belong to exactly one arm, and neither obvious repair is available: one tag
+      // can never mean "and" (evaluateCondition ORs its recognised attributes), and nesting the
+      // pair the other way round puts the "one roll was successful" sentence in BOTH arms. So the
+      // chain routes on one derived count, and "did this margin succeed" is spelled the way the
+      // rest of the engine already spells it — a value greater than 0, as <difficulty>/<rankcheck>
+      // store their margin and as branchSuccess reads a `<success var=>` branch.
+      {
+        const g294 = GameState.create({ name: 'S294', gender: 'm', profession: 'Warrior', book: 4, adv });
+        const count294 = (spec) => { eng.applyEffect(parse(`<set var="n" success="${spec}"/>`), g294, {}); return g294.getVar('n'); };
+        g294.setVar('s', 6); g294.setVar('m', -5);
+        ok('task294: a single roll var reads 1 on success and 0 on failure',
+           count294('s') === 1 && count294('m') === 0, `s=${count294('s')} m=${count294('m')}`);
+        ok('task294: a pair counts them, which is what makes an exhaustive chain writable',
+           count294('s|m') === 1, `mixed=${count294('s|m')}`);
+        g294.setVar('m', 6);
+        ok('task294: both successful counts 2', count294('s|m') === 2, `both=${count294('s|m')}`);
+        g294.setVar('s', -5); g294.setVar('m', 0);
+        // A margin of 0 is a FAILURE (the roll must BEAT the Difficulty), and an unwritten var
+        // reads 0 too — which is exactly why the count must stay held until the dice are thrown.
+        ok('task294: a margin of 0 is a failure, and so is an unwritten var',
+           count294('s|m') === 0 && count294('never') === 0, `pair=${count294('s|m')} unset=${count294('never')}`);
+        ok('task294: value= still wins over success= on the same node',
+           (() => { eng.applyEffect(parse('<set var="w" value="9" success="s|m"/>'), g294, {}); return g294.getVar('w') === 9; })());
+      }
+      // The trace must follow success= exactly as it follows value=, or §4.257's roll gate would
+      // stop seeing the two rolls its chain routes on — and the same set would write its count
+      // before either die was thrown.
+      const pair294 = parse('<section><difficulty ability="scouting" level="14" var="s"/><difficulty ability="magic" level="14" var="m"/>'
+        + '<set var="passed" success="s|m" hidden="t"/><set var="twice" value="passed*2"/><set var="flat" value="7"/></section>');
+      const clos294 = rules.provisionalVarClosure(pair294, new Set(['m']));
+      ok('task294: provisionalVarClosure traces a success= <set>, and on through its derivations',
+         clos294.has('passed') && clos294.has('twice') && !clos294.has('flat') && !clos294.has('s'),
+         JSON.stringify([...clos294]));
+      ok('task294: setPending holds a success= <set> whose roll has not settled',
+         rules.setPending(parse('<set var="passed" success="s|x"/>'), pv) === true
+         && rules.setPending(parse('<set var="passed" success="s|m"/>'), pv) === false);
+      ok('task294: unsettledRollVars marks the count unsettled until BOTH rolls land',
+         (() => {
+           const g = GameState.create({ name: 'U294', gender: 'm', profession: 'Warrior', book: 4, adv });
+           const before = rules.unsettledRollVars(pair294, g);
+           g.setVar('s', 6);
+           const half = rules.unsettledRollVars(pair294, g);
+           g.setVar('m', -5);
+           return before.has('passed') && half.has('passed') && rules.unsettledRollVars(pair294, g).size === 0;
+         })());
 
       // effectPendingVars unions the decision boundary with the unfilled-roll-var set; a
       // condition deliberately consults only the former (viewPendingVars).

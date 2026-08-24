@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-292 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **293 and 294 are open**. File new
+294 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **293 is the only one open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,8 +16,9 @@ there once the buckets below are clear.
 
 **HIGH**
 
-- [ ] 294. book4/257 leaves a mixed pair of rolls with no exit at all, so succeeding one check and failing the other ends the adventure
-- [x] 292. book4/257 puts its "both rolls failed" exit on the page before either roll is made, because no roll-gate seed reads a condition
+*(none open)*
+
+- [x] 294. book4/257 leaves a mixed pair of rolls with no exit at all, so succeeding one check and failing the other ends the adventure
 
 **MEDIUM**
 
@@ -325,6 +326,7 @@ this order.*
 - [x] 289. `<lose staminato="N">` can only ever lower Stamina, so book1/297's padded tournament never heals its winner and kills its loser at book1/370 *(a signed delta, plus a narrow freeze on the `<set value=>` nodes that read the live Stamina a fight moves under them)*
 - [x] 290. book5/315's `<if var="exp">` reads a variable no node in the section ever writes, so the training courtyard's crippling injury can never fire *(a writer, a natural-score snapshot to compare against, and a not-yet-rolled sentinel — the third of which the filing could not see)*
 - [x] 291. book2/270 and book2/362 hand out the god Nagil on entry, because a `lessthan=` guard over a roll var not yet filled matches at 0 *(a two-line sentinel, `x = rank`, on both sections — nine of thirteen assertions fail without it)*
+- [x] 292. book4/257 puts its "both rolls failed" exit on the page before either roll is made, because no roll-gate seed reads a condition *(a fourth roll-gate seed — the mandatory roll a CONDITION reads — and the first that awaits a SET of rolls; 28 shipped sections gain the gate)*
 
 ---
 
@@ -1662,6 +1664,48 @@ of passing on a technically-present god.
 needs a roll strictly under and strictly over 3; seeds 9 and 2 give 2 and 5. Both are asserted
 before the branch is driven, so a change to `seedRng`/`rollDice` fails as "seed 9 no longer rolls a
 2" and not as a mystery in the Nagil branch three assertions later — the habit task 278's block set.
+
+Worked 2026-08-23 (implementation pass, task 294): closed **294** — §4.257's chain routes on ONE
+derived count, `<set var="passed" success="s|m">`, whose three values are mutually exclusive *and*
+exhaustive, so §413 is reachable and each of the section's three printed sentences stays in exactly
+one arm. The two mixed pairs now route there instead of reaching nothing; the two matched pairs go
+where 292 pinned them. `books/` changed, so this is a data rebuild. The suite moves
+`RESULT ALL PASS pass=2862 fail=0` → `pass=2875 fail=0`. 292's checklist line moves into **Done**,
+and the HIGH bucket is empty for the first time since 289.
+
+**The filing offered two answers and both were tried; the arithmetic one is worse than it reads.**
+`(s+999)/1000` does work — `evalExpression`'s truncating integer division makes it 1 for a margin of
+1 or more and 0 for 0 or less — and it needs no engine change at all, because `provisionalVarClosure`
+already follows `set[var][value]`, so §4.257's gate would have kept working untouched. That is a real
+advantage and it was still declined: the expression's correctness rests on a bound nothing states
+(no margin reaches ±1000), and a reviewer cannot read it. So the engine gained the readable
+spelling instead — `<set var="D" success="V|W">`, the number of the named roll-result vars holding a
+success, where "success" is `> 0`: the rule `<difficulty>`/`<rankcheck>` already store their margin
+by, and the one `branchSuccess` already reads for a `<success var=>` branch. One attribute, one
+new function, no new grammar.
+
+**A pipe list rather than a boolean, because the section needs a COUNT and the boolean form needs
+three `<set>`s to build one.** `success="s"` reads 1 or 0, so the list form is a strict
+generalisation of the single-var one and the corpus's own `a|b` idiom; spelling it that way turns
+three hidden nodes and three invented var names into one of each. Only a count makes the chain
+writable at all: a decision tree over the two margins has four leaves and the "if one roll was
+successful" sentence sits at two of them, which is the printed text twice.
+
+**The trace change is the load-bearing half, and the control run proves it.** `success=` is a var
+READ exactly as `value=` is, so `provisionalVarClosure` and `setPending` both consult it through one
+new helper (`setReadVars`). With that helper narrowed back to `value=` alone, ten assertions fail
+and the first of them is `374[ON]` on entry — §4.257 loses its gate outright and **292's defect is
+back**, because the condition now names `passed` and reaches the two rolls only through the `<set>`.
+The same helper is what holds the count unwritten until both dice are thrown; a count that read 0
+early would put the both-failed exit back on the page. Reverting only the markup fails five
+assertions, including the corpus census, which reports `4/257 m`.
+
+**The census found the shape once in 4,369 sections, so no wider repair is warranted.** An if/elseif
+chain whose outer comparators are exhaustive over one var — leaving a dead `<else>` — occurs in
+§4.257 and nowhere else, measured over the parsed corpus rather than the XML text, since the shape is
+about sibling arms and nested children. It is pinned at **zero**, with a two-fixture assertion beside
+it (§4.257 as written, §4.257 as repaired) so the zero cannot come from a census that quietly stopped
+matching. 291's own census loses both its §4.257 hits and now names only §3/40, task 293's.
 
 Worked 2026-08-23 (implementation pass, task 292): closed **292** — the roll gate has a fourth
 seed, the mandatory roll whose result a CONDITION reads, and §4.257's three exits are held until

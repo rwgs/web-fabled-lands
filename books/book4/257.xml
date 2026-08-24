@@ -14,15 +14,12 @@
 		</difficulty>, both at a Difficulty of 14.
 	</p>
 	<p>
-		<if var="m" greaterthan="0">
-			<if var="s" greaterthan="0">
-				If both rolls were successful, <goto section="216"/>.
-			</if>
+		<set var="passed" success="s|m" hidden="t"/>
+		<if var="passed" equals="2">
+			If both rolls were successful, <goto section="216"/>.
 		</if>
-		<elseif var="m" lessthan="1">
-			<if var="s" lessthan="1">
-				If both rolls failed, <goto section="374"/>.
-			</if>
+		<elseif var="passed" equals="0">
+			If both rolls failed, <goto section="374"/>.
 		</elseif>
 		<else>
 			If one roll was successful, <goto section="413"/>.

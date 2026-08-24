@@ -1370,6 +1370,18 @@ function setSelectorBonus(state, sel, kind) {
   return 0;
 }
 
+/** How many of the roll-result vars named by `<set var="D" success="V|W">` hold a SUCCESS
+ *  (task 294). "Success" is a value greater than 0 — the rule <difficulty>/<rankcheck> store
+ *  their margin by, and the one branchSuccess already reads for a `<success var=>` branch — so
+ *  a single var reads 1 on success and 0 on failure, and a list counts them. That count is how
+ *  a section routing on a PAIR of checks gets ONE variable to write a mutually exclusive,
+ *  exhaustive chain over: nesting the pair instead has to print its "if one roll was
+ *  successful" sentence in both arms, and one tag can never mean "and", because
+ *  evaluateCondition ORs every recognised attribute. §4.257 is the corpus's only such page. */
+function successCount(state, spec) {
+  return String(spec).split(/[|,]/).reduce((n, v) => n + (state.getVar(v.trim()) > 0 ? 1 : 0), 0);
+}
+
 function applySet(el, state) {
   const get = (a) => el.getAttribute(a);
   const name = get('var');
@@ -1381,6 +1393,7 @@ function applySet(el, state) {
   let val;
   if (get('value') != null) val = evalExpression(get('value'), state, mode, setSelector(el));
   else if (get('codeword') != null) val = state.codewordValue(get('codeword'));
+  else if (get('success') != null) val = successCount(state, get('success'));
   else val = 0;
   state.setVar(name, val);
   return '';
