@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 299 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **301 is open in LOW**. File new
+misdiagnosis (see the Review log); **302 is open in LOW**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -28,7 +28,9 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 301. closing `modifier=`'s value set also closed the numeric/var addend `renderDifficulty` implements, so a shape the view supports is now a build error — deliberate, and recorded here because nothing else would say so
+- [ ] 302. the port acts on neither `modifier="noarmour"` nor `modifier="current"` off `<adjust>`, though the JaFL spec defines both — so two spec-legal spellings are build errors this port cannot honour
+
+- [x] 301. closing `modifier=`'s value set also closed the numeric/var addend `renderDifficulty` implements, so a shape the view supports is now a build error — deliberate, and recorded here because nothing else would say so
 
 - [x] 300. nothing validates a `modifier=`/`modifiers=` value, so one misspelling silently reverts a check to the very score the page says not to use — across 42 shipped sites, and it is task 46's defect from the source side
 
@@ -2035,11 +2037,11 @@ missed.
 
 ## 301. Closing `modifier=`'s value set also closed the numeric/var addend `renderDifficulty` implements, so a shape the view supports is now a build error
 
-**Priority: LOW — a deliberate narrowing, filed so it is not rediscovered as a bug.** Nothing is
-broken today: the shape has **zero** uses anywhere under `books/`, published or not, `temp/`
-included. What is filed is the disagreement it leaves behind.
+**Priority: LOW — filed as a deliberate narrowing, closed as a non-issue.** Nothing is broken
+today: the shape has **zero** uses anywhere under `books/`, published or not, `temp/` included —
+and, it turns out, no standing in the format either.
 
-*(Filed 2026-08-25 while implementing task 300.)*
+*(Filed 2026-08-25 while implementing task 300; resolved the same day against `rules/`.)*
 
 **The fifth reader task 300 did not count.** That task listed four readers of `modifier=` and
 concluded the legal set is four mode words. `web/js/render-rolls.js` `renderDifficulty` is a fifth,
@@ -2049,30 +2051,81 @@ many words). So before task 300, `<difficulty ability="combat" level="10" modifi
 `<difficulty … modifier="myvar">` were both live markup. After it, `FL_ENUMS['modifier']` rejects
 both at build time.
 
-**Why it was closed anyway rather than given an integer escape** (as `crew=` has one). The gate's
-whole purpose here is that a value it does not recognise must not pass. A var-name addend is
-character-for-character indistinguishable from a misspelled mode word — `modifier="naturel"` is a
-perfectly good var name — so admitting one admits the other, and task 300's guard would catch
-nothing on `<difficulty>`, the tag where four of the shipped `natural` sites sit. An integer escape
-alone would be narrower and safe, but it is handling for a case the corpus does not contain: **the
-count across every XML file under `books/` is zero**, so it was left out under the smallest-change
-rule rather than because it is wrong.
+**RESOLVED the same day, by reading the spec this filing had not.** `rules/JaFL-XML-Tags.md`
+declares `modifier` as `"S"` on every tag that carries it and closes its value list to
+`noweapon | noarmour | notool | natural`, plus `current` for `ability="stamina"`. **There is no
+numeric or var addend in the format at all.** `renderDifficulty`'s addend path is this port's own,
+and task 53's comment calling it "the historical numeric-modifier behaviour" is the tell that was
+there to be read. So nothing spec-legal was closed off, and there is no escape to add: the premise
+above — "a shape the view supports" — is true of the view and false of the format.
 
-**What to do if a book needs one.** The idiomatic route already exists and is already validated:
-`<difficulty …><adjust value="3"/></difficulty>`, one of `FL_ADJUST_READERS`' five readers, which
-`childAdjustment` sums into exactly the same number. Prefer that. If a page genuinely wants the
-attribute form, the change is one line — add an `'^[+-]?\d+$'` escape to `Test-AttrValue`'s
-`modifier` branch beside the `crew` one — and it should be **restricted to `<difficulty>`**, since
-on `<set>`, `<if>` and `<adjust>` an integer means nothing at all and would only be another silent
-fall-through.
+**The reasoning against an escape stands on its own anyway**, and is worth keeping for the next
+attribute. A var-name addend is character-for-character indistinguishable from a misspelled mode
+word — `modifier="naturel"` is a perfectly good var name — so admitting one admits the other, and
+task 300's guard would catch nothing on `<difficulty>`, the tag where all four shipped
+`<difficulty modifier=>` sites sit. Where a page really wants a number, the idiomatic route exists
+and is already validated: `<difficulty …><adjust value="3"/></difficulty>`, one of
+`FL_ADJUST_READERS`' five readers, which `childAdjustment` sums into exactly the same total.
 
-**The failure mode is loud, which is the point.** A rejected value stops `build-data.ps1` with the
-file and the reason named, before anything is written. That is the opposite of the silence task 300
-was filed about, and it is why the narrowing is acceptable to ship.
+**What reading the spec did turn up is filed as 302** — two spellings the format defines and this
+port does not act on. That is the real divergence, and it points the other way: not markup the gate
+wrongly rejects, but markup it must **keep** rejecting until the engine catches up.
 
-**Assertions.** None yet — there is nothing to assert about a shape no file uses. If the escape is
-added, `build/validate-selftest.ps1` should gain a case each way: `<difficulty … modifier="3">`
-accepted, `<set … modifier="3">` still rejected.
+**Assertions.** None — there is nothing to assert about a shape the format does not have. The two
+cases the spec did earn are in 302.
+
+---
+
+## 302. The port acts on neither `modifier="noarmour"` nor `modifier="current"` off `<adjust>`, though the JaFL spec defines both — so two spec-legal spellings are build errors this port cannot honour
+
+**Priority: LOW — a capability gap, not a live defect.** No shipped section uses either spelling,
+and the source gate now rejects both **loudly**, which is the safe half of the trade. What is filed
+is that the rejection is a workaround for a missing engine branch, so that a later reader does not
+"fix" the gate by widening its table and quietly reopen task 300's defect.
+
+*(Filed 2026-08-25 while implementing task 300, from `rules/JaFL-XML-Tags.md`.)*
+
+**What the spec says.** `modifier` is declared `"S"` on `<if>`, `<difficulty>`, `<set>`, `<adjust>`
+(and `<training>`), and its value list is closed:
+
+> This may be 'noweapon', 'noarmour', 'notool' or 'natural'; these exclude (respectively) the
+> ability bonuses of a weapon, armour, a tool, or any of these things. The default is to include
+> these bonuses.
+
+with, on `<difficulty>` and `<training>`, a fifth: *"A final value, 'current', can be used with
+`ability="stamina"` to make a roll against the current Stamina value."*
+
+**The two gaps.**
+
+- **`noarmour` has no branch anywhere.** `state.js abilityForMode` handles `natural` and
+  `noweapon`/`notool` (both routed to `abilityNoWeapon`) and returns the full `ability()` for
+  everything else. There is no `abilityNoArmour`. A page reading "roll against DEFENCE, not
+  counting your armour" would therefore resolve *with* the armour bonus — task 300's fall-through
+  exactly, and toward the easier check as always.
+- **`current` is read in one place only** — `engine.js adjustAmount`, for `ability="stamina"`.
+  `renderDifficulty`'s keyword list is `natural|noweapon|notool|affected`, so `current` misses it,
+  falls to the numeric-addend path, resolves as a var name, reads **0**, and the mode is lost with
+  no trace. (`<difficulty ability="stamina">` does not work in this port regardless: `rollDifficulty`
+  goes through `firstAbility`, which knows only the six core abilities and returns `null` → an
+  ability score of 0. No corpus section rolls it, so this has never mattered.)
+
+**What the gate does about it now (task 300).** `FL_ENUMS['modifier']` omits `noarmour` outright,
+and `Test-AttrValue` rejects `current` on any tag but `<adjust>`. Both carry a comment saying the
+omission is deliberate and pointing here. `affected` — which this port added as the explicit
+spelling of the default, and which one corpus section uses — is likewise **not** in the spec; that
+direction is harmless, since the engine does act on it.
+
+**The fix, if a book ever needs it.** `noarmour` wants an `abilityNoArmour(ability)` beside
+`abilityNoWeapon` (the armour's Defence bonus is already separable — `combat.js` subtracts it for
+the Water Drake's `modifiers="noarmour"`, so the arithmetic exists), a branch in `abilityForMode`,
+and the word added to `FL_ENUMS`. `current` wants adding to `renderDifficulty`'s keyword list and
+routing to `state.data.stamina`, and its tag guard relaxed — and that is only worth doing alongside
+making `<difficulty ability="stamina">` resolve at all.
+
+**Assertions.** The gate rejects `modifier="noarmour"` on `<difficulty>` and `modifier="current"`
+on any tag but `<adjust>`, both driven by `build/validate-selftest.ps1`; `<adjust ability="stamina"
+modifier="current">` stays accepted. Whichever gap is closed, its case here inverts from a
+rejection to an acceptance, and the engine gains the assertion that the mode changes the score.
 
 ---
 
@@ -2081,6 +2134,47 @@ accepted, `<set … modifier="3">` still rejected.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-25 (implementation pass, task 301): closed **301** as a non-issue and filed **302**
+in its place. The whole pass is one lesson: **301 was filed without reading `rules/`, and reading
+`rules/` dissolved it.** The spec declares `modifier` as `"S"` with a closed keyword list and has
+**no numeric or var addend at all**, so the "shape the view supports" 301 was written to protect
+does not exist in the format — it is a port-local path, and task 53's own comment calling it "the
+historical numeric-modifier behaviour" was the tell sitting there the whole time. Nothing was
+implemented for 301; the two `validate-selftest.ps1` cases added this pass belong to 302.
+
+**Reading the spec cost one command and moved three separate conclusions**, which is the reusable
+part. `AGENTS.md` says `rules/` is reference material to read "when a task points at it" — and
+neither 300 nor 301 pointed at it, because both were reasoning from the READERS in `web/js` and the
+values in `books/`. Those two sources answer "what is implemented" and "what is used". Only the
+spec answers **"what is legal"**, and a validation table is a claim about exactly that. So: **when
+a change closes a value set, read the format's own definition of that set before writing the table
+down.** Three things it turned up that no amount of grepping the port would have:
+- `noarmour` is spec-legal `modifier=` on all four tags, and `state.js abilityForMode` has no
+  branch for it — it falls through to the full affected score, armour bonus included. Task 300's
+  defect, still live, for a value the format defines.
+- `current` is spec-legal on `<difficulty ability="stamina">`, not only `<adjust>` as task 300's
+  own comment (and my first draft of the `FL_ENUMS` row) claimed.
+- `affected`, which the corpus uses once and all the port's readers handle, is **not in the spec**
+  — this port's own explicit spelling of the default. Harmless, but the table now says so.
+
+**The gate change that came out of it is small and points the other way from 301.** `noarmour`
+stays OUT of `FL_ENUMS['modifier']` and `current` is now rejected on any tag but `<adjust>`, both
+with comments saying the omission is deliberate and citing 302. That is the correct trade and worth
+stating plainly: **where the engine has no branch for a spec-legal value, the gate must reject it,
+not admit it.** Admitting it produces markup that looks right, validates clean and silently
+resolves to the affected score; rejecting it produces a build error naming the file and the value.
+Loud-and-wrong beats quiet-and-wrong, and 302 exists so the next reader widens the engine rather
+than the table. Seven fixture cases became nine (36 → 38 gate assertions); the browser suite is
+unchanged at `RESULT ALL PASS pass=2935 fail=0`, and `web/tests/` is outside the stamp digest, so
+this pass moves neither `version.js` nor `sw.js`.
+
+**One hole this closed was one the previous commit had opened.** Task 300 made `current` legal on
+all four tags where the port reads it on one, turning "unvalidated" into "validated wrong" for
+three of them — a 1-in-4 silent fall-through introduced by the very change that existed to stop
+them. It survived a green suite because the corpus has zero `current` sites, which is precisely the
+condition under which a census reads clean and proves nothing. The corpus assertion is word-level
+by design and does not see tags; the gate owns that dimension, and both now say so in comments.
 
 Worked 2026-08-25 (implementation pass, task 300): closed **300** — a `modifier=`/`modifiers=` value
 is now checked against the words the engine acts on, in the gate and again over the corpus.

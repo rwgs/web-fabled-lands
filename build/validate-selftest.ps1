@@ -170,6 +170,19 @@ $CASES = @(
        text  = '<section name="2"><fight name="Water Drake" combat="9" defence="15" stamina="12" modifiers="noarmour nosheild"/></section>'
        want  = 'modifiers="nosheild" is not a known fight modifier' }
 
+    # task 302: the two spellings the SPEC allows and this port does not act on. Both must be
+    # rejected, or a conversion author writes working-looking markup that silently resolves to
+    # the affected score - the exact fall-through task 300 was filed about.
+    @{ label = 'a spec-legal modifier="noarmour" the engine has no branch for (task 302)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><difficulty ability="combat" level="10" modifier="noarmour"/></section>'
+       want  = 'modifier="noarmour" is not a known modifier' }
+
+    @{ label = 'modifier="current" on a tag that does not read it (task 302)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><difficulty ability="stamina" level="10" modifier="current"/></section>'
+       want  = 'modifier="current" is only read on <adjust>' }
+
     @{ label = 'a bad per-tag type value'
        file  = 'books/book1/2.xml'
        text  = '<section name="2"><item name="potion"><effect type="quaff" verb="Drink"/></item></section>'
