@@ -170,18 +170,17 @@ $CASES = @(
        text  = '<section name="2"><fight name="Water Drake" combat="9" defence="15" stamina="12" modifiers="noarmour nosheild"/></section>'
        want  = 'modifiers="nosheild" is not a known fight modifier' }
 
-    # task 302: the two spellings the SPEC allows and this port does not act on. Both must be
-    # rejected, or a conversion author writes working-looking markup that silently resolves to
-    # the affected score - the exact fall-through task 300 was filed about.
-    @{ label = 'a spec-legal modifier="noarmour" the engine has no branch for (task 302)'
+    # task 302: `current` is the one value whose legality depends on its TAG - only <adjust> and
+    # <difficulty> read it, so on <set>/<if> it would fall through to the default in silence.
+    @{ label = 'modifier="current" on <set>, which does not read it (task 302)'
        file  = 'books/book1/2.xml'
-       text  = '<section name="2"><difficulty ability="combat" level="10" modifier="noarmour"/></section>'
-       want  = 'modifier="noarmour" is not a known modifier' }
+       text  = '<section name="2"><set var="s" value="stamina" modifier="current"/></section>'
+       want  = 'modifier="current" is only read on <adjust> and <difficulty>' }
 
-    @{ label = 'modifier="current" on a tag that does not read it (task 302)'
+    @{ label = 'modifier="current" on <if>, which does not read it (task 302)'
        file  = 'books/book1/2.xml'
-       text  = '<section name="2"><difficulty ability="stamina" level="10" modifier="current"/></section>'
-       want  = 'modifier="current" is only read on <adjust>' }
+       text  = '<section name="2"><if ability="stamina" greaterthan="5" modifier="current"><p>Hale.</p></if></section>'
+       want  = 'modifier="current" is only read on <adjust> and <difficulty>' }
 
     @{ label = 'a bad per-tag type value'
        file  = 'books/book1/2.xml'
@@ -257,16 +256,20 @@ Assert 'a prose-named <section> loose in a book folder is left alone' ($ok4.Erro
 # The other half of tasks 268 + 269's check: the shapes the corpus really writes must stay
 # legal - all five readers, and the non-crew conditions the widened check now also sees.
 # The other half of task 300's check: every spelling the ENGINE acts on must stay legal, or the
-# gate rejects working markup. Five modes, not four - `current` is read by <adjust ability=
-# "stamina"> (engine.js adjustAmount) and the other four by state.js abilityForMode - plus the
-# one fight mode combat.js parses. A tag not listed here carries no modifier= in the allowlist.
+# gate rejects working markup. SIX modes since task 302 brought the table level with the spec -
+# `noarmour` (state.js defenceForMode) and `current` (adjustAmount / rollDifficulty, tag-restricted
+# to <adjust> and <difficulty>) joined the four state.js abilityForMode already read - plus the one
+# fight mode combat.js parses. A tag not listed here carries no modifier= in the allowlist.
 $ok300 = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2">' +
     '<set var="a" value="combat" modifier="natural"/><set var="b" value="combat" modifier="affected"/>' +
     '<set var="c" value="combat" modifier="noweapon"/><set var="d" value="combat" modifier="notool"/>' +
     '<difficulty ability="combat" level="10" modifier="noweapon"><adjust ability="stamina" modifier="current"/></difficulty>' +
+    '<difficulty ability="stamina" level="10" modifier="current"/>' +
+    '<difficulty ability="defence" level="14" modifier="noarmour"/>' +
+    '<if ability="defence" greaterthan="13" modifier="noarmour"><p>Unarmoured.</p></if>' +
     '<if ability="combat" greaterthan="5" modifier="natural"><p>Strong.</p></if>' +
     '<fight name="Water Drake" combat="9" defence="15" stamina="12" modifiers="noarmour"/></section>' }
-Assert 'every resolution mode the engine acts on, and the one fight mode, are accepted (task 300)' ($ok300.Errors.Count -eq 0) ($ok300.Errors -join ' | ')
+Assert 'every resolution mode the engine acts on, and the one fight mode, are accepted (tasks 300, 302)' ($ok300.Errors.Count -eq 0) ($ok300.Errors -join ' | ')
 $ok5 = Build-Fixture @{ 'books/book2/1.xml' = '<section name="1"><random dice="2"><adjust crew="good" amount="1"/><adjust codeword="Eldritch" value="3"/></random><difficulty ability="scouting" level="9"><adjust crew="poor" value="-1"/><adjust title="Nightstalker" value="1"/></difficulty><rankcheck dice="1"><adjust titleVal="bokh" default="-1"/></rankcheck><gain ability="stamina" amount="2"><adjust name="CharismaBonus"/></gain><lose stamina="4"><adjust crew="excellent" amount="-1"/></lose></section>' }
 Assert 'an <adjust> under each of the five readers is left alone' ($ok5.Errors.Count -eq 0) ($ok5.Errors -join ' | ')
 

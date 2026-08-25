@@ -72,6 +72,64 @@ export async function run(ctx) {
     ok('task303: control — task 68\'s rank arm still routes',
        eng.evaluateCondition(parse('<if ability="rank" greaterthan="2"/>'), gdef) === true);
 
+    // --- task 302: the two spec mode words this port had no branch for --------------------------
+    // `noarmour` and `current` are in rules/JaFL-XML-Tags.md's closed list for modifier=. Both
+    // used to fall to renderDifficulty's numeric-addend path, resolve as a var name and read 0,
+    // so the mode vanished with no trace. The gate's FL_ENUMS['modifier'] and renderDifficulty's
+    // keyword list must move together with these.
+    const g302 = GameState.create({ name:'Mod', gender:'m', profession:'Warrior', book:1, adv });
+    g302.data.items = [];
+    g302.addItem(makeItem('weapon', 'iron sword', 2));
+    g302.addItem(makeItem('armour', 'plate', 3));
+    const armour302 = g302.armourBonus(), full302 = g302.defence();
+    ok('task302: fixture — a worn armour (+'+armour302+') inside a Defence of '+full302,
+       armour302 === 3 && full302 === g302.ability('combat') + g302.rankValue() + 3);
+    ok('task302: modifier="noarmour" takes the worn armour off Defence, and only that',
+       g302.abilityForMode('defence', 'noarmour') === full302 - armour302,
+       'got ' + g302.abilityForMode('defence', 'noarmour') + ' want ' + (full302 - armour302));
+    ok('task302: no modifier still reads the full Defence',
+       g302.abilityForMode('defence', null) === full302);
+    ok('task302: modifier="noweapon" takes the WEAPON off Defence\'s COMBAT term, not the armour',
+       g302.abilityForMode('defence', 'noweapon') === full302 - 2);
+    ok('task302: modifier="natural" strips armour and weapon both (the spec\'s "any of these")',
+       g302.abilityForMode('defence', 'natural') === g302.abilityNatural('combat') + g302.rankValue());
+    // The one that says noarmour is not silently doing something else: on a core ability the
+    // armour contributes nothing in this port, so the mode must leave the score alone.
+    ok('task302: noarmour is a no-op on a core ability, which is what "armour reaches nothing else" means',
+       g302.abilityForMode('combat', 'noarmour') === g302.ability('combat'));
+    // End to end through the condition path task 303 opened.
+    ok('task302: <if ability="defence" modifier="noarmour"> honours the mode',
+       eng.evaluateCondition(parse('<if ability="defence" modifier="noarmour" greaterthan="'+(full302 - armour302 - 1)+'"/>'), g302) === true
+       && eng.evaluateCondition(parse('<if ability="defence" modifier="noarmour" greaterthan="'+(full302 - 1)+'"/>'), g302) === false);
+
+    // A <difficulty> may now NAME a derived stat: before task 302 firstAbility() returned null
+    // for all three and the roll scored 0, which is why `current` had nowhere to be read.
+    g302.data.staminaMax = 12; g302.data.stamina = 5;
+    const rollStam = eng.rollDifficulty(g302, 'stamina', 10, 0, null);
+    const rollCur = eng.rollDifficulty(g302, 'stamina', 10, 0, 'current');
+    const rollNat = eng.rollDifficulty(g302, 'stamina', 10, 0, 'natural');
+    ok('task302: <difficulty ability="stamina"> scores the unwounded max by default, not 0',
+       rollStam.abilityScore === g302.effectiveStaminaMax() && rollStam.abilityScore > 0,
+       'score=' + rollStam.abilityScore);
+    ok('task302: modifier="current" rolls against the WOUNDED Stamina instead',
+       rollCur.abilityScore === 5, 'score=' + rollCur.abilityScore);
+    ok('task302: modifier="natural" rolls against the written maximum',
+       rollNat.abilityScore === 12, 'score=' + rollNat.abilityScore);
+    ok('task302: the roll reports the stat it rolled, so the widget label is not null',
+       rollCur.ability === 'stamina', String(rollCur.ability));
+    const rollDef = eng.rollDifficulty(g302, 'defence', 10, 0, 'noarmour');
+    ok('task302: <difficulty ability="defence" modifier="noarmour"> scores Defence less the armour',
+       rollDef.abilityScore === full302 - armour302 && rollDef.ability === 'defence',
+       'score=' + rollDef.abilityScore);
+    ok('task302: <difficulty ability="rank"> scores the Rank, the third derived stat',
+       eng.rollDifficulty(g302, 'rank', 5, 0, null).abilityScore === g302.rankValue());
+    ok('task302: <set value="defence" modifier="noarmour"> cannot hand back the armoured score',
+       eng.evalExpression('defence', g302, 'noarmour') === full302 - armour302
+       && eng.evalExpression('defence', g302, null) === full302,
+       'noarmour=' + eng.evalExpression('defence', g302, 'noarmour') + ' plain=' + eng.evalExpression('defence', g302, null));
+    ok('task302: control — a core ability still resolves the way it always did',
+       eng.rollDifficulty(g302, 'combat', 10, 0, null).abilityScore === g302.ability('combat'));
+
     // multi-attribute <if>: recognized attributes combine as OR (JaFL
     // IfNode.meetsConditions), then not="t" negates the whole result. (task 3)
     const gcond = GameState.create({ name:'C', gender:'m', profession:'Mage', book:1, adv });

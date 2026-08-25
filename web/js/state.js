@@ -425,18 +425,41 @@ export class GameState {
   /** Ability score for a roll under a `<difficulty|rankcheck modifier=>` keyword:
    *   - natural            → the written score, no item/effect bonuses (MODIFIER_NATURAL)
    *   - noweapon / notool  → the affected score *minus* the weapon/tool bonus (MODIFIER_NOTOOL)
+   *   - noarmour           → the affected score *minus* the worn armour's bonus
    *   - affected / (none)  → the full affected score, item bonuses included
    *  The cursed/fixed check-flags (and the CHARISMA mask exception) apply first,
-   *  exactly as for abilityForCheck. (tasks 46, 53) */
+   *  exactly as for abilityForCheck. (tasks 46, 53, 302) */
   abilityForMode(ability, mode) {
     const fx = this.data.abilityFlags && this.data.abilityFlags[ability];
     if (fx && (fx.cursed || fx.fixed) && !(ability === 'charisma' && this.hasMask())) {
       return fx.cursed ? CURSED_ABILITY : 1;
     }
     const m = String(mode || '').toLowerCase();
+    // `defence` is a DERIVED stat, not a key in data.abilities, so it is composed here rather
+    // than looked up — and it is the only score a mode word can take armour off, because in
+    // this port armour reaches nothing else: itemBonus() covers tools and the wielded weapon,
+    // and armourBonus() feeds defence() alone. That is why noarmour is a defence-only branch
+    // and falls through to the full score everywhere else, which is not a fudge — excluding a
+    // bonus armour never granted leaves the score unchanged. (task 302)
+    if (ability === 'defence') return this.defenceForMode(m);
     if (m === 'natural') return this.abilityNatural(ability);
     if (m === 'noweapon' || m === 'notool') return this.abilityNoWeapon(ability);
     return this.ability(ability);
+  }
+
+  /** defence() under a `modifier=` keyword. `natural` strips every bonus the written scores
+   *  did not carry (armour included, per the spec's "or any of these things"); `noarmour`
+   *  strips the worn armour alone; `noweapon`/`notool` strip the weapon/tool bonus from the
+   *  COMBAT term it is built on. A `type="wielded"` aura on armour naming some OTHER ability
+   *  is not stripped — no corpus item has one, and auraBonus() cannot separate it. (task 302) */
+  defenceForMode(mode) {
+    const m = String(mode || '').toLowerCase();
+    const combat = (m === 'natural') ? this.abilityNatural('combat')
+      : (m === 'noweapon' || m === 'notool') ? this.abilityNoWeapon('combat')
+      : this.ability('combat');
+    const armour = (m === 'natural' || m === 'noarmour') ? 0 : this.armourBonus();
+    const aura = (m === 'natural') ? 0 : this.auraBonus('defence');
+    return combat + this.rankValue() + armour + aura;
   }
 
   /** Ability score for a <set value=> arithmetic read (JaFL SetVarNode.resolveIdentifier):

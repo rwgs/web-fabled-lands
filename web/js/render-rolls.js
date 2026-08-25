@@ -239,8 +239,12 @@ export function renderDifficulty(story, container, node, path) {
   // (natural/noweapon/affected — book3/235/271/290, book5/516 unarmed COMBAT) or a
   // numeric/var addend. Keywords route into the ability lookup (mode); anything
   // else keeps the historical numeric-modifier behaviour. (task 53)
+  // `noarmour` and `current` joined the list in task 302 — both are spec words this port had
+  // no branch for, so each fell to the addend path, resolved as a var name and read 0, losing
+  // the mode with no trace. The source gate rejects a word that is not on this list, so the
+  // two must move together: build/validate-source.ps1's FL_ENUMS['modifier'].
   const modRaw = (node.getAttribute('modifier') || '').trim().toLowerCase();
-  const mode = ['natural', 'noweapon', 'notool', 'affected'].includes(modRaw) ? modRaw : null;
+  const mode = ['natural', 'noweapon', 'notool', 'noarmour', 'affected', 'current'].includes(modRaw) ? modRaw : null;
   const modifier = (node.getAttribute('modifier') != null && !mode) ? resolveValue(story.state, node.getAttribute('modifier')) : 0;
 
   appendRollDescription(story, container, node, path); // its own descriptive text

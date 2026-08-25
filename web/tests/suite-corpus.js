@@ -47,9 +47,9 @@ export async function run(ctx) {
     // FL_FIGHT_MODIFIERS reject it at build time now; this census is the runtime half, and the
     // two word lists must stay in step. The site count rides in the condition so a corpus that
     // stopped carrying the attribute cannot report a vacuous zero.
-    // Word-level only: `current` is legal on <adjust> and nowhere else, and the gate owns that
-    // tag dimension (task 302) rather than it being re-derived from raw XML here.
-    const MODES300 = ['affected', 'current', 'natural', 'notool', 'noweapon'];
+    // Word-level only: `current` is legal on <adjust> and <difficulty> and nowhere else, and the
+    // gate owns that tag dimension (task 302) rather than it being re-derived from raw XML here.
+    const MODES300 = ['affected', 'current', 'natural', 'noarmour', 'notool', 'noweapon'];
     const FIGHTMODES300 = ['noarmour'];
     const bad300 = [];
     let sites300 = 0;

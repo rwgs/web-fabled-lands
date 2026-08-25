@@ -147,19 +147,15 @@ $script:FL_ENUMS = @{
     # (see the note above engine.js setValueMode). The attribute NAME was allowlisted from the
     # start; only the value set was missing, which is how it went unnoticed. (task 300)
     #
-    # This row is the set THIS PORT ACTS ON, which is deliberately not the set the JaFL spec
-    # defines (rules/JaFL-XML-Tags.md, under <if>/<difficulty>/<set>/<adjust>). Two differences,
-    # both load-bearing - do not "correct" either without changing the engine first (task 302):
-    #   - `noarmour` is spec-legal on all four tags and is NOT listed here, because
-    #     state.js abilityForMode has no branch for it: it would fall through to the full
-    #     affected score, armour bonus included, which is exactly the silent fall-through this
-    #     row exists to stop. A loud build error is the better half of that trade.
-    #   - `affected` is NOT in the spec - it is this port's explicit spelling of the default,
-    #     and the corpus uses it once.
-    # `current` is listed but tag-restricted below: engine.js adjustAmount reads it (the wounded
-    # value, against natural's written score) and nothing else does. The other four modes are
-    # read by state.js abilityForMode.
-    'modifier'       = 'affected current natural notool noweapon'
+    # This row is the set THIS PORT ACTS ON. Task 302 brought it level with the JaFL spec
+    # (rules/JaFL-XML-Tags.md, under <if>/<difficulty>/<set>/<adjust>): `noarmour` now has an
+    # engine branch - state.js defenceForMode drops the worn armour, the only score in this port
+    # armour reaches - and `current` is read on <difficulty> as well as <adjust>. One difference
+    # remains, and it is harmless: `affected` is NOT in the spec, it is this port's explicit
+    # spelling of the default, and the corpus uses it once.
+    # `current` stays tag-restricted below, because it means "the wounded Stamina" and only the
+    # two tags that roll or read a stat have somewhere to put it.
+    'modifier'       = 'affected current natural noarmour notool noweapon'
     'profession'     = 'mage priest rogue troubadour warrior wayfarer'
     'ship'           = 'barque brigantine galleon brig gall galley t'  # 't' = "any ship"
     'special'        = 'armourlock attack defence difficultyCurse difficultyRestore godless lock unlock weaponlock'
@@ -267,13 +263,13 @@ function Test-AttrValue([string]$tag, [string]$attr, [string]$value) {
             if (($script:FL_ENUMS[$attr] -split ' ') -notcontains $p) {
                 return "$attr=`"$part`" is not a known $attr ($($script:FL_ENUMS[$attr]))"
             }
-            # The one value in FL_ENUMS whose legality depends on its TAG. The spec allows
-            # `current` on <difficulty ability="stamina"> too, but renderDifficulty has no
-            # branch for it: it falls to the numeric-addend path, resolves as a var name, reads
-            # 0, and the mode is silently lost - task 300's own failure shape. Rejected off
-            # <adjust> until the engine implements it. (task 302)
-            if ($attr -eq 'modifier' -and $p -eq 'current' -and $tag -ne 'adjust') {
-                return "modifier=`"$part`" is only read on <adjust> (engine.js adjustAmount), not on <$tag>"
+            # The one value in FL_ENUMS whose legality depends on its TAG. `current` means "the
+            # WOUNDED Stamina, not the unwounded maximum", so it is only meaningful where a stat
+            # is rolled or read: engine.js adjustAmount and engine.js rollDifficulty, i.e.
+            # <adjust> and <difficulty>. On <set>/<if> nothing reads it and it would fall
+            # through to the default silently - task 300's failure shape. (task 302)
+            if ($attr -eq 'modifier' -and $p -eq 'current' -and $tag -notin @('adjust', 'difficulty')) {
+                return "modifier=`"$part`" is only read on <adjust> and <difficulty>, not on <$tag>"
             }
         }
     }

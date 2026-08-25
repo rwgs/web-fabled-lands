@@ -286,7 +286,7 @@ export function evaluateCondition(el, state, opts = {}) {
     const natural = normalize(get('modifier') || '') === 'natural';
     let v;
     if (spec === 'rank') v = state.rankValue();
-    else if (spec === 'defence') v = state.defence();
+    else if (spec === 'defence') v = state.abilityForMode('defence', get('modifier'));
     else if (spec === 'stamina') v = get('modifier') ? state.effectiveStaminaMax() : state.data.stamina;
     else { const ab = firstAbility(get('ability')); v = ab ? state.abilityForCheck(ab, natural) : 0; }
     const cmp = compare(v);
@@ -1579,7 +1579,10 @@ export function evalExpression(expr, state, mode = null, sel = null) {
     // ultimate power's +2 aura. §2.270 sets `var rank = rank modifier="natural"` and then
     // compares against it, so a ring-holder must be judged by natural Rank. (task 136.4)
     if (w === 'rank') return mode === 'natural' ? state.data.rank : state.rankValue();
-    if (w === 'defence') return state.defence();
+    // defenceForMode(null) IS defence(), so an unmodified read is unchanged; what this
+    // buys is that `<set value="defence" modifier="noarmour">` cannot validate clean
+    // and then hand back the armoured score. (task 302)
+    if (w === 'defence') return state.defenceForMode(mode);
     if (w === 'armour') return state.armourBonus();
     if (w === 'weapon') return state.wieldedWeapon()?.bonus || 0;
     if (w === 'crew') return CREW_LEVELS.indexOf(state.currentShip()?.crew) + 1 || 0;
@@ -1750,9 +1753,25 @@ export function rollDifficulty(state, ability, level, modifier = 0, mode = null)
   // The Three Fortunes' difficultyCurse (book3/91) restricts ability rolls to a
   // single die until lifted at their temple (book2/102 difficultyRestore). (task 36)
   const r = rollDice(state.data.oneDieRolls ? 1 : 2);
-  const abilityScore = ab ? state.abilityForMode(ab, mode) : 0;
+  // `rank`/`defence`/`stamina` are derived stats, so firstAbility() returns null for them and
+  // the roll scored 0 — the same hole task 68 closed on the condition path and task 303 on its
+  // third stat. Routed here so a <difficulty> may name one, which is what makes the spec's
+  // `modifier="current"` (roll against the WOUNDED Stamina) reachable at all. `key` replaces
+  // the null in the returned `ability`, which the widget prints as the roll's label. (task 302)
+  const key = String(ability || '').split('|')[0].trim().toLowerCase();
+  const m = String(mode || '').toLowerCase();
+  let abilityScore, rolled = ab;
+  if (ab) abilityScore = state.abilityForMode(ab, mode);
+  else if (key === 'rank') { abilityScore = state.rankValue(); rolled = key; }
+  else if (key === 'defence') { abilityScore = state.abilityForMode('defence', mode); rolled = key; }
+  else if (key === 'stamina') {
+    abilityScore = (m === 'current') ? state.data.stamina
+      : (m === 'natural') ? state.data.staminaMax
+      : state.effectiveStaminaMax();
+    rolled = key;
+  } else abilityScore = 0;
   const total = r.total + abilityScore + modifier;
-  return { dice: r.dice, rollTotal: r.total, abilityScore, ability: ab, total, level, margin: total - level, success: total > level };
+  return { dice: r.dice, rollTotal: r.total, abilityScore, ability: rolled, total, level, margin: total - level, success: total > level };
 }
 
 // rank check: success iff (dice + add + adjust) <= current Rank. `margin` (>0 on

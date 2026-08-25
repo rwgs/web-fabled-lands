@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 299 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **302 is open in LOW, 304 in MEDIUM**. File new
+misdiagnosis (see the Review log); **304 is open in MEDIUM**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -32,7 +32,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 302. the port acts on neither `modifier="noarmour"` nor `modifier="current"` off `<adjust>`, though the JaFL spec defines both — so two spec-legal spellings are build errors this port cannot honour
+- [x] 302. the port acts on neither `modifier="noarmour"` nor `modifier="current"` off `<adjust>`, though the JaFL spec defines both — so two spec-legal spellings are build errors this port cannot honour
 
 - [x] 301. closing `modifier=`'s value set also closed the numeric/var addend `renderDifficulty` implements, so a shape the view supports is now a build error — deliberate, and recorded here because nothing else would say so
 
@@ -2238,6 +2238,53 @@ fight against a cursed player reads the reduced Defence.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-25 (implementation pass, task 302): closed **302** — `modifier="noarmour"` and
+`modifier="current"` are now words the engine acts on rather than words the gate has to refuse.
+`state.js` gains `defenceForMode`, `abilityForMode` routes `defence` into it, `engine.js
+rollDifficulty` routes all three derived stats so a `<difficulty>` may name one, `evalExpression`'s
+`defence` read honours the mode, and `renderDifficulty`'s keyword list and `FL_ENUMS['modifier']`
+both gain the two words. Fifteen assertions; the two gate cases invert from rejections to
+acceptances and two new ones keep `current` off the tags that still cannot read it. The suite moves
+`RESULT ALL PASS pass=2943 fail=0` → `pass=2958 fail=0`; `web/` and `build/` only, so a stamp and
+not a data rebuild — `web/data` byte-identical.
+
+**`noarmour` is a Defence-only mode, and saying so out loud is most of the design.** In this port
+armour reaches exactly one score: `itemBonus()` covers tools and the wielded weapon, and
+`armourBonus()` feeds `defence()` alone. So a mode word that means "without the armour" has one
+place to bite, and `abilityForMode` sends `defence` to a new `defenceForMode` while every core
+ability falls through unchanged. **That fall-through is correct, not a shortcut** — excluding a
+bonus the armour never granted leaves the score where it was — and there is an assertion whose only
+job is to say so, because a reviewer's first instinct is that a no-op branch is an unfinished one.
+
+**It could not be built until `defence` resolved at all, which is why 303 came first.** Defence
+never reached `abilityForMode`: the condition path compared 0 (303's live defect) and
+`rollDifficulty` scored 0. Shipping `noarmour` on top of that would have added a branch nothing
+could reach and a gate word that still silently meant "the full score" — precisely the fall-through
+300 and 302 exist to close. **A capability task that depends on a defect task is worth spotting
+before writing code, not after:** the tell here was that the census found zero sites for the
+feature *and* zero working reads of the thing it modifies.
+
+**The change re-opened one hole while closing another, and the gate is what surfaced it.** Adding
+`noarmour` to `FL_ENUMS` makes it legal on `<set>` too — and `evalExpression`'s `defence` branch
+read `state.defence()` flat, ignoring the mode. So `<set var="d" value="defence"
+modifier="noarmour"/>` would have validated clean and handed back the armoured score: a *new*
+silent fall-through, created by the fix for silent fall-throughs. `defenceForMode(null)` is
+`defence()` by construction, so the one-line correction changes nothing that exists today. **The
+rule this leaves behind: widening a value table is not a table edit — it is a promise that every
+reader of that attribute honours the new word, and the readers have to be enumerated again.**
+
+**What stayed rejected, and why that is not a compromise.** `current` means "the wounded Stamina",
+so it is only meaningful where a stat is rolled or read: `adjustAmount` and `rollDifficulty`, i.e.
+`<adjust>` and `<difficulty>`. On `<set>`/`<if>` nothing reads it, so the tag guard keeps refusing
+it there and two fixtures pin both directions. `affected` remains the one word in the table the
+spec does not define — this port's explicit spelling of the default, used once in the corpus.
+
+**Scope kept honest.** No shipped section uses either word, so this is capability rather than
+repair; it was implemented because it was asked for after being described that way. One boundary is
+recorded in the code rather than papered over: a `type="wielded"` aura on armour naming some *other*
+ability is not stripped by `noarmour`, because `auraBonus()` cannot separate it and no corpus item
+has one.
 
 Worked 2026-08-25 (implementation pass, task 303): closed **303** — `<if ability="defence">` routes
 through `state.defence()` instead of falling to `firstAbility`, which knows the six core abilities
