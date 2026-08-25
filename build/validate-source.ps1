@@ -140,6 +140,15 @@ $script:FL_ENUMS = @{
     'blessing'       = 'charisma combat magic sanctity scouting thievery defence disease poison injury luck storm storms travel wrath'
     'crew'           = 'poor average good excellent'   # or an integer delta - see below
     'gender'         = 'm f male female'
+    # modifier= is an ability-resolution MODE, and every reader of it treats an unknown value
+    # as "no modifier at all" - which falls through to the affected score, the very one a
+    # `natural` site exists to exclude. A misspelling therefore makes the check EASIER than the
+    # page prints it, silently, and that is task 46's defect arriving from the source side
+    # (see the note above engine.js setValueMode). The attribute NAME was allowlisted from the
+    # start; only the value set was missing, which is how it went unnoticed. `current` is read
+    # by <adjust ability="stamina"> alone (the wounded value, against natural's written score
+    # - engine.js adjustAmount); the other four are read by state.js abilityForMode. (task 300)
+    'modifier'       = 'affected current natural notool noweapon'
     'profession'     = 'mage priest rogue troubadour warrior wayfarer'
     'ship'           = 'barque brigantine galleon brig gall galley t'  # 't' = "any ship"
     'special'        = 'armourlock attack defence difficultyCurse difficultyRestore godless lock unlock weaponlock'
@@ -147,6 +156,10 @@ $script:FL_ENUMS = @{
 # The eight tradable commodities. Ports abbreviate them ("grai", "meta", "timb"), which
 # canonCargo folds by prefix, so a prefix of exactly one commodity is legal here too.
 $script:FL_CARGO = @('grain', 'furs', 'metals', 'minerals', 'spices', 'textiles', 'timber', 'slaves')
+# The fight modes a <fight modifiers=> may name. Unlike modifier= above this is a token LIST,
+# not an enum, so it gets its own check in Test-AttrValue rather than an FL_ENUMS row. Keep it
+# in step with combat.js makeFight, which parses the same tokens. (task 300)
+$script:FL_FIGHT_MODIFIERS = @('noarmour')
 # The tags that READ an <adjust> child: the three roll nodes (engine.js childAdjustment, via
 # walkEffectBody and the roll widgets) plus <gain>/<lose>, whose amount= and stamina= take the
 # same conditional modifiers ("subtract your armour from the wound"). Used by the structural
@@ -213,6 +226,18 @@ function Test-AttrValue([string]$tag, [string]$attr, [string]$value) {
         $allowed = $script:FL_TYPE_VALUES[$tag] -split ' '
         if ($allowed -notcontains $value.Trim().ToLowerInvariant()) {
             return "type=`"$value`" is not a <$tag> type ($($script:FL_TYPE_VALUES[$tag]))"
+        }
+        return $null
+    }
+    # modifiers= is a whitespace/comma-separated token list of fight modes, so it splits on
+    # neither '|' nor nothing: every word must be one combat.js acts on. (task 300)
+    if ($attr -eq 'modifiers') {
+        foreach ($word in ($value -split '[\s,]+')) {
+            $w = $word.Trim().ToLowerInvariant()
+            if ($w -eq '') { continue }
+            if ($script:FL_FIGHT_MODIFIERS -notcontains $w) {
+                return "modifiers=`"$word`" is not a known fight modifier ($($script:FL_FIGHT_MODIFIERS -join ' '))"
+            }
         }
         return $null
     }

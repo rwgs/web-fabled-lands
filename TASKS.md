@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 299 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **300 is open in LOW**. File new
+misdiagnosis (see the Review log); **301 is open in LOW**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -28,7 +28,9 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 300. nothing validates a `modifier=`/`modifiers=` value, so one misspelling silently reverts a check to the very score the page says not to use — across 42 shipped sites, and it is task 46's defect from the source side
+- [ ] 301. closing `modifier=`'s value set also closed the numeric/var addend `renderDifficulty` implements, so a shape the view supports is now a build error — deliberate, and recorded here because nothing else would say so
+
+- [x] 300. nothing validates a `modifier=`/`modifiers=` value, so one misspelling silently reverts a check to the very score the page says not to use — across 42 shipped sites, and it is task 46's defect from the source side
 
 - [x] 297. the resurrection waste guard is a blanket engine rule that only book1/597's printed wording justifies, so the first flag-linked offer on a page printing the replacement rule will be refused an option its own text grants
 
@@ -2031,11 +2033,92 @@ missed.
 
 ---
 
+## 301. Closing `modifier=`'s value set also closed the numeric/var addend `renderDifficulty` implements, so a shape the view supports is now a build error
+
+**Priority: LOW — a deliberate narrowing, filed so it is not rediscovered as a bug.** Nothing is
+broken today: the shape has **zero** uses anywhere under `books/`, published or not, `temp/`
+included. What is filed is the disagreement it leaves behind.
+
+*(Filed 2026-08-25 while implementing task 300.)*
+
+**The fifth reader task 300 did not count.** That task listed four readers of `modifier=` and
+concluded the legal set is four mode words. `web/js/render-rolls.js` `renderDifficulty` is a fifth,
+and it reads the attribute differently: a keyword routes into the ability lookup, and **anything
+else is a numeric or var ADDEND** resolved through `resolveValue` (task 53's comment says so in as
+many words). So before task 300, `<difficulty ability="combat" level="10" modifier="3">` and
+`<difficulty … modifier="myvar">` were both live markup. After it, `FL_ENUMS['modifier']` rejects
+both at build time.
+
+**Why it was closed anyway rather than given an integer escape** (as `crew=` has one). The gate's
+whole purpose here is that a value it does not recognise must not pass. A var-name addend is
+character-for-character indistinguishable from a misspelled mode word — `modifier="naturel"` is a
+perfectly good var name — so admitting one admits the other, and task 300's guard would catch
+nothing on `<difficulty>`, the tag where four of the shipped `natural` sites sit. An integer escape
+alone would be narrower and safe, but it is handling for a case the corpus does not contain: **the
+count across every XML file under `books/` is zero**, so it was left out under the smallest-change
+rule rather than because it is wrong.
+
+**What to do if a book needs one.** The idiomatic route already exists and is already validated:
+`<difficulty …><adjust value="3"/></difficulty>`, one of `FL_ADJUST_READERS`' five readers, which
+`childAdjustment` sums into exactly the same number. Prefer that. If a page genuinely wants the
+attribute form, the change is one line — add an `'^[+-]?\d+$'` escape to `Test-AttrValue`'s
+`modifier` branch beside the `crew` one — and it should be **restricted to `<difficulty>`**, since
+on `<set>`, `<if>` and `<adjust>` an integer means nothing at all and would only be another silent
+fall-through.
+
+**The failure mode is loud, which is the point.** A rejected value stops `build-data.ps1` with the
+file and the reason named, before anything is written. That is the opposite of the silence task 300
+was filed about, and it is why the narrowing is acceptable to ship.
+
+**Assertions.** None yet — there is nothing to assert about a shape no file uses. If the escape is
+added, `build/validate-selftest.ps1` should gain a case each way: `<difficulty … modifier="3">`
+accepted, `<set … modifier="3">` still rejected.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-25 (implementation pass, task 300): closed **300** — a `modifier=`/`modifiers=` value
+is now checked against the words the engine acts on, in the gate and again over the corpus.
+`FL_ENUMS` gains a `modifier` row, `modifiers=` gets its own token check beside it
+(`FL_FIGHT_MODIFIERS`), and `combat.js makeFight` parses the same tokens instead of asking
+`includes('noarmour')` of the raw string. Seven fixture cases in `validate-selftest.ps1` (29 → 36)
+and one corpus census; the census reads **42 sites, zero unknown**. The suite moves
+`RESULT ALL PASS pass=2934 fail=0` → `pass=2935 fail=0`; `web/` and `build/` only, so this is a
+stamp and not a data rebuild — `web/data` is byte-identical. **301** filed.
+
+**The suggested word set was one short, and the reason is worth keeping.** Task 300 named four
+modes; the shipped set is **five**. `<adjust ability="stamina" modifier="current">` reads the
+*wounded* value against `natural`'s written score — `engine.js adjustAmount` documents it in a
+comment two lines long and nothing else mentions it. Shipping the four would have made the gate
+reject markup the engine implements, which is the same class of error in the other direction. The
+lesson is the cheap one: **when closing a value set, enumerate it from the READERS, not from the
+corpus** — the corpus tells you what is used, and only the readers tell you what is legal.
+
+**And there was a fifth reader.** `render-rolls.js renderDifficulty` treats a non-keyword
+`modifier=` as a numeric/var addend (task 53). Closing the enum closes that too, deliberately —
+a var name and a misspelled mode word are the same string, so no guard can admit one and catch the
+other. Zero files under `books/` use it and the idiomatic `<adjust value=>` already does the job,
+so it was narrowed rather than escaped, and **301** records the one-line reopening if a book ever
+needs it.
+
+**`modifiers=` is a list, so it could not be an enum row.** `FL_ENUMS` splits on `|`; the fight
+attribute is whitespace/comma separated, and `combat.js` was matching it as a **substring**, which
+failed open both ways — `noarmor` matched nothing and any string containing `noarmour` matched. The
+gate and the engine now split the same way, so the two agree on what a mode is; §5.689's Water
+Drake is the one shipped site and it re-verifies. The fixture that earns its place is the mixed
+list: `modifiers="noarmour nosheild"`, legal first word and bad second, which the old substring read
+accepted outright.
+
+**The census guards itself against reading zero for the wrong reason.** Its site count rides inside
+the assertion (`sites300 > 0 && bad300.length === 0`), so a corpus that stopped carrying the
+attribute — or a regex that stopped matching it — fails instead of reporting a clean zero. It is
+pinned to the word set and not to a section list, so a seventh book is checked on arrival rather
+than re-pinning the assertion.
 
 Filed 2026-08-25 (single finding, no implementation): **300** in LOW — nothing validates a
 `modifier=`/`modifiers=` value. Found during conversion work on an unpublished book, which needed a

@@ -17,7 +17,12 @@ export function makeFight(node, state = null) {
   // N Stamina or fewer (e.g. §570 "reduce the tree to 5 or less"), not to 0. It is
   // distinct from a `<flee>` CHILD element, which is the player's Flee button.
   const flee = node.getAttribute('flee');
-  const modifiers = (node.getAttribute('modifiers') || '').toLowerCase();
+  // modifiers= is a token list of fight modes. Parsed as WORDS, not matched as a substring:
+  // `includes('noarmour')` failed open in both directions — a typo (`noarmor`) matched nothing
+  // and any string merely containing the word matched — so the engine and the source gate
+  // disagreed about what a mode is. build/validate-source.ps1's FL_FIGHT_MODIFIERS is the
+  // same list. (task 300)
+  const modifiers = (node.getAttribute('modifiers') || '').toLowerCase().split(/[\s,]+/).filter(Boolean);
   const fight = {
     name: node.getAttribute('name') || 'Enemy',
     combat: parseInt(node.getAttribute('combat') || '0', 10),
@@ -29,7 +34,7 @@ export function makeFight(node, state = null) {
     // --- task 26 attributes ---
     attackDice: parseInt(node.getAttribute('attackDice') || '2', 10) || 2, // dice the player rolls to attack (default 2)
     attacks: parseInt(node.getAttribute('attacks') || '1', 10) || 1,       // enemy attacks per round (Tripling = 3)
-    noArmour: modifiers.includes('noarmour'),                              // the player's armour does not count
+    noArmour: modifiers.includes('noarmour'),                              // the player's armour does not count (an exact token)
     playerDefence: node.getAttribute('playerDefence'),                    // a value/var replacing the player's Defence
     abilityDamaged: node.getAttribute('abilityDamaged') || null,          // wound this ability/stamina instead of Stamina
     staminaLost: node.getAttribute('staminaLost') || null,                // codeword that accumulates damage dealt

@@ -136,6 +136,40 @@ $CASES = @(
        text  = '<section name="1"><if crew="exellent"><p>Fine crew.</p></if></section>'
        want  = 'crew="exellent"' }
 
+    # task 300: one case per tag that carries modifier=, because the gate keys the check on the
+    # ATTRIBUTE and a tag that stopped reaching Test-AttrValue would fail here and nowhere else.
+    @{ label = 'a misspelled <set modifier=> resolution mode (task 300)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><set var="r" value="rank" modifier="naturel"/></section>'
+       want  = 'modifier="naturel" is not a known modifier' }
+
+    @{ label = 'a misspelled <difficulty modifier=> resolution mode (task 300)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><difficulty ability="combat" level="10" modifier="naturel"/></section>'
+       want  = 'modifier="naturel" is not a known modifier' }
+
+    @{ label = 'a misspelled <if modifier=> resolution mode (task 300)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><if ability="combat" greaterthan="5" modifier="naturel"><p>Strong.</p></if></section>'
+       want  = 'modifier="naturel" is not a known modifier' }
+
+    @{ label = 'a misspelled <adjust modifier=> resolution mode (task 300)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><difficulty ability="combat" level="10"><adjust ability="stamina" modifier="naturel"/></difficulty></section>'
+       want  = 'modifier="naturel" is not a known modifier' }
+
+    @{ label = 'a misspelled <fight modifiers=> fight mode (task 300)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><fight name="Water Drake" combat="9" defence="15" stamina="12" modifiers="noarmor"/></section>'
+       want  = 'modifiers="noarmor" is not a known fight modifier' }
+
+    # The token split is the point of giving modifiers= its own check: a list whose FIRST word is
+    # legal must still be rejected on the second, which the old substring read accepted.
+    @{ label = 'a <fight modifiers=> list with one good word and one bad (task 300)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><fight name="Water Drake" combat="9" defence="15" stamina="12" modifiers="noarmour nosheild"/></section>'
+       want  = 'modifiers="nosheild" is not a known fight modifier' }
+
     @{ label = 'a bad per-tag type value'
        file  = 'books/book1/2.xml'
        text  = '<section name="2"><item name="potion"><effect type="quaff" verb="Drink"/></item></section>'
@@ -209,6 +243,17 @@ $ok4 = Build-Fixture @{ 'books/book1/1temp.xml' = '<section name="The War-Torn K
 Assert 'a prose-named <section> loose in a book folder is left alone' ($ok4.Errors.Count -eq 0) ($ok4.Errors -join ' | ')
 # The other half of tasks 268 + 269's check: the shapes the corpus really writes must stay
 # legal - all five readers, and the non-crew conditions the widened check now also sees.
+# The other half of task 300's check: every spelling the ENGINE acts on must stay legal, or the
+# gate rejects working markup. Five modes, not four - `current` is read by <adjust ability=
+# "stamina"> (engine.js adjustAmount) and the other four by state.js abilityForMode - plus the
+# one fight mode combat.js parses. A tag not listed here carries no modifier= in the allowlist.
+$ok300 = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2">' +
+    '<set var="a" value="combat" modifier="natural"/><set var="b" value="combat" modifier="affected"/>' +
+    '<set var="c" value="combat" modifier="noweapon"/><set var="d" value="combat" modifier="notool"/>' +
+    '<difficulty ability="combat" level="10" modifier="noweapon"><adjust ability="stamina" modifier="current"/></difficulty>' +
+    '<if ability="combat" greaterthan="5" modifier="natural"><p>Strong.</p></if>' +
+    '<fight name="Water Drake" combat="9" defence="15" stamina="12" modifiers="noarmour"/></section>' }
+Assert 'every resolution mode the engine acts on, and the one fight mode, are accepted (task 300)' ($ok300.Errors.Count -eq 0) ($ok300.Errors -join ' | ')
 $ok5 = Build-Fixture @{ 'books/book2/1.xml' = '<section name="1"><random dice="2"><adjust crew="good" amount="1"/><adjust codeword="Eldritch" value="3"/></random><difficulty ability="scouting" level="9"><adjust crew="poor" value="-1"/><adjust title="Nightstalker" value="1"/></difficulty><rankcheck dice="1"><adjust titleVal="bokh" default="-1"/></rankcheck><gain ability="stamina" amount="2"><adjust name="CharismaBonus"/></gain><lose stamina="4"><adjust crew="excellent" amount="-1"/></lose></section>' }
 Assert 'an <adjust> under each of the five readers is left alone' ($ok5.Errors.Count -eq 0) ($ok5.Errors -join ' | ')
 

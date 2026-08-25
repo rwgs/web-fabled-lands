@@ -36,6 +36,37 @@ export async function run(ctx) {
     ok('every published book has bundled section data', empty.length === 0, 'no sections for book(s) '+empty.join(','));
     ok('all sections render w/o throw ('+total+')', renderErrors===0, renderErrors+' errors; first='+firstErr);
 
+    // --- task 300: every modifier=/modifiers= value is one the engine acts on -----------------
+    // Pinned to the WORD SET, not to a section list, so a book joining the edition is checked
+    // rather than re-pinning the assertion. modifier= is the ability-resolution mode read by
+    // state.js abilityForMode (`current` by engine.js adjustAmount alone, for stamina); modifiers=
+    // is the fight-mode token list combat.js parses. Every one of those readers treats an unknown
+    // value as "no modifier at all" — which falls through to the AFFECTED score, the very one a
+    // `natural` site exists to exclude — so a misspelling makes the check easier than the page
+    // prints it and nothing anywhere says so. build/validate-source.ps1's FL_ENUMS/
+    // FL_FIGHT_MODIFIERS reject it at build time now; this census is the runtime half, and the
+    // two word lists must stay in step. The site count rides in the condition so a corpus that
+    // stopped carrying the attribute cannot report a vacuous zero.
+    const MODES300 = ['affected', 'current', 'natural', 'notool', 'noweapon'];
+    const FIGHTMODES300 = ['noarmour'];
+    const bad300 = [];
+    let sites300 = 0;
+    for (const b of books) {
+      const raw = await data.loadBook(b);
+      for (const key of Object.keys(raw)) {
+        for (const m of raw[key].matchAll(/\bmodifiers?="([^"]*)"/g)) {
+          sites300++;
+          const plural = m[0].startsWith('modifiers');
+          const words = m[1].toLowerCase().split(plural ? /[\s,]+/ : /\|/).filter(Boolean);
+          const known = plural ? FIGHTMODES300 : MODES300;
+          words.filter((w) => !known.includes(w.trim()))
+               .forEach((w) => bad300.push(b + '/' + key + ' ' + m[0] + ' -> "' + w + '"'));
+        }
+      }
+    }
+    ok('task300: every modifier=/modifiers= value in the corpus is one the engine acts on ('+sites300+' sites)',
+       sites300 > 0 && bad300.length === 0, bad300.join(', ') || 'no modifier= sites found at all');
+
     // --- task 273: the sections that gate on a codeword and delete it inside the guard ---------
     // The ones enclosing a <goto> are the ones that LOSE a destination when the guard is re-derived
     // live (§2.143 deletes Bounty and grays the →601 it deleted it for), so they are pinned by name
