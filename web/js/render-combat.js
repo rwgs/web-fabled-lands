@@ -6,7 +6,7 @@
 // helpers. The combat RULES live in combat.js; this only builds the widget and wires the
 // clicks.
 
-import { makeFight, fightRound, groupFightRound, isDefeated, useWrathBlessing, useDefenceBlessing, rerollAttack } from './combat.js';
+import { makeFight, fightRound, groupFightRound, isDefeated, useWrathBlessing, useDefenceBlessing, rerollAttack, playerFightDefence } from './combat.js';
 import { applyEffectBody } from './engine.js';
 import { aggregateFightOutcome } from './render-gates.js';
 import { animateDice } from './ui.js';
@@ -131,12 +131,16 @@ function statsRow(className, cells) {
   return row;
 }
 
-// The player's stats line. defenceBonus is the per-fight Defence-through-Faith raise (stored on
-// the single fight, or shared on every group member — task 91), folded in with the transient
-// special="attack"/"defence" bonuses so the shown values match what resolution uses. (tasks 49, 87)
-function playerStatsRow(story, defenceBonus = 0) {
+// The player's stats line. The Defence comes from combat.js playerFightDefence — the function the
+// RESOLVER uses — rather than being re-derived here, so the number shown is the number the enemy
+// rolls against whatever the fight does to it: the per-fight Defence-through-Faith raise (stored on
+// the single fight, or shared on every group member — task 91), the transient
+// special="attack"/"defence" bonuses, a modifiers="noarmour" fight's dropped armour, and a
+// playerDefence= override. This row used to compute its own and was wrong on the last two: on
+// book5/689 it read "Your Defence 12" while the drake rolled against 7. (tasks 49, 87, 306)
+function playerStatsRow(story, fight = null) {
   const shownCombat = story.state.ability('combat') + story.state.fightAttackBonus();
-  const shownDef = story.state.defence() + story.state.fightDefenceBonus() + (defenceBonus || 0);
+  const shownDef = playerFightDefence(story.state, fight);
   return statsRow('fight-stats you', [
     [`Your Combat ${shownCombat}`],
     [`Your Defence ${shownDef}`],
@@ -229,7 +233,7 @@ function drawGroupFight(story, box, fights, dmgNode, group, fleeNode = null) {
     ]));
   });
 
-  box.appendChild(playerStatsRow(story, fights[0] ? fights[0].defenceBonus : 0)); // shared group Defence mark
+  box.appendChild(playerStatsRow(story, fights[0] || null)); // shared group Defence mark
   box.appendChild(logRow(fights.flatMap((f) => f.log)));
 
   if (groupResolved()) {
@@ -341,7 +345,7 @@ function drawFight(story, box, fight, node, dmgNode, fleeNode, key, locked = fal
     [`Stamina ${fight.stamina}/${fight.maxStamina}`, 'en-stam'],
   ]));
 
-  box.appendChild(playerStatsRow(story, fight.defenceBonus)); // fight.defenceBonus = this fight's Defence-through-Faith raise
+  box.appendChild(playerStatsRow(story, fight)); // the fight carries its own Defence-through-Faith raise
   box.appendChild(logRow(fight.log));
 
   if (fight.outcome === 'win') {

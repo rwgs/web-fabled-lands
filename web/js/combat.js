@@ -135,6 +135,19 @@ function startFight(fight, node, state) {
 /** The player's effective Defence for this fight: a playerDefence= override (a
  *  value/variable — §Chimerical Beast "s", §Talanexor "d") wins; otherwise the
  *  sheet Defence, minus the armour bonus when modifiers="noarmour" (Water Drake). */
+/** The Defence an enemy in `fight` actually rolls against — the single source for both the
+ *  resolver and the widget's "Your Defence" row (task 306). It was private, and the row
+ *  re-derived the number from `state.defence()` alone: a `modifiers="noarmour"` fight
+ *  (book5/689's Water Drake) showed the armoured score while the drake rolled against the
+ *  unarmoured one, and a `playerDefence=` fight (book6/473, book6/718) showed the sheet score
+ *  while the enemy rolled against the override. A row that re-computes what a resolver computes
+ *  is a lie waiting for the resolver to gain a branch, which is what happened twice here.
+ *  `fight` may be null (a group whose members are all defeated), in which case there is no
+ *  fight-local term and the sheet Defence plus any section-wide boon is the honest answer. */
+export function playerFightDefence(state, fight) {
+  return playerDefenceFor(state, fight || {});
+}
+
 function playerDefenceFor(state, fight) {
   // A <tick special="defence"> bonus raises Defence for the section's fight (§4.434
   // ring of defence, §6.183 Thunder Beast). It applies even over a playerDefence=

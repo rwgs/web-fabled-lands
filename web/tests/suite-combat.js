@@ -573,6 +573,50 @@ export async function run(ctx) {
     defBtn80().click();
     ok('§80 using Defence through Faith: button gone, blessing consumed, no global leak', gdom80.fightDefenceBonus() === 0 && !defBtn80() && !gdom80.hasBlessing('defence'));
     ok('§80 the widget shows the boosted Defence', new RegExp('Your Defence ' + (gdom80.defence() + 3) + '(?!\\d)').test(cdom80.querySelector('.you').textContent), cdom80.querySelector('.you').textContent);
+    // task 306: the row shows the Defence the ENEMY rolls against, not a re-derivation of the
+    // sheet score. It used to compute its own, so the two fight-local terms were invisible: a
+    // modifiers="noarmour" fight showed the armoured score, and a playerDefence= override showed
+    // the sheet score. Both are read here off the widget and off the fight log in the same run,
+    // because the log prints "vs your Def N" from the resolver and is the independent witness.
+    {
+      // The Attack click resolves behind the animated-dice guard, so the log line the second half
+      // of each pair reads only exists after a settle — reading it in the same tick returns null.
+      window.__FL_INSTANT_DICE__ = true;
+      const settle306 = () => new Promise((r) => setTimeout(r, 30));
+      const mk306 = (xml, armour) => {
+        const g = GameState.create({ name:'D306', gender:'m', profession:'Warrior', book:5, adv });
+        g.data.items = g.data.items.filter((it) => it.kind !== 'armour');
+        if (armour) g.addItem(makeItem('armour', armour, 5));
+        g.data.stamina = 300; g.data.staminaMax = 300;
+        const c = document.createElement('div');
+        new Story(c, g, { navigate(){}, onDeath(){}, notify(){} }).begin(parse(`<section name="D306"><p>${xml}</p></section>`), 5, 'D306');
+        return { g, c };
+      };
+      const shown306 = (c) => { const m = /Your Defence (\d+)/.exec(c.querySelector('.you').textContent); return m ? +m[1] : null; };
+      const fought306 = (c) => { const m = /vs your Def (\d+)/.exec(c.textContent); return m ? +m[1] : null; };
+      const atk306 = (c) => Array.from(c.querySelectorAll('button')).find((b) => /Attack/i.test(b.textContent) && !b.disabled);
+
+      const na = mk306('<fight name="Water Drake" combat="9" defence="99" stamina="99" modifiers="noarmour"/>', 'plate');
+      ok('task306: a noarmour fight SHOWS the unarmoured Defence',
+         shown306(na.c) === na.g.defence() - 5 && na.g.armourBonus() === 5,
+         `shown=${shown306(na.c)} sheet=${na.g.defence()} armour=${na.g.armourBonus()}`);
+      atk306(na.c).click(); await settle306();
+      ok('task306: …and it is the number the drake rolls against', shown306(na.c) === fought306(na.c),
+         `shown=${shown306(na.c)} fought=${fought306(na.c)}`);
+
+      const pd = mk306('<fight name="Beast" combat="9" defence="99" stamina="99" playerDefence="7"/>', 'plate');
+      ok('task306: a playerDefence= fight SHOWS the override, not the sheet score',
+         shown306(pd.c) === 7 && pd.g.defence() !== 7, `shown=${shown306(pd.c)} sheet=${pd.g.defence()}`);
+      atk306(pd.c).click(); await settle306();
+      ok('task306: …and that is the number the enemy rolls against', shown306(pd.c) === fought306(pd.c),
+         `shown=${shown306(pd.c)} fought=${fought306(pd.c)}`);
+
+      const plain = mk306('<fight name="Troll" combat="1" defence="99" stamina="99"/>', 'plate');
+      ok('task306: an ordinary fight is unchanged — the sheet Defence, armour included',
+         shown306(plain.c) === plain.g.defence(), `shown=${shown306(plain.c)} sheet=${plain.g.defence()}`);
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
     const rndDom80 = Math.random; Math.random = () => 0.5; // 1d → 4; 16−4 = 12
     wrathBtn80().click();
     Math.random = rndDom80;

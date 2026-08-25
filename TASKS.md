@@ -32,6 +32,8 @@ there once the buckets below are clear.
 
 **LOW**
 
+- [x] 306. the fight widget's "Your Defence" row re-derives the score instead of asking the resolver, so a `modifiers="noarmour"` fight shows the armoured number the enemy is not rolling against — book5/689 reads 12 while the drake rolls against 7
+
 - [x] 305. a `<tick god=>` shares `readEffects` with the afflictions, so it accepts `ability="defence"` (task 304) and `ability="stamina"` (task 185) — and `data.effects` is read only by the core-ability paths, so both parse, store and move nothing
 
 - [x] 302. the port acts on neither `modifier="noarmour"` nor `modifier="current"` off `<adjust>`, though the JaFL spec defines both — so two spec-legal spellings are build errors this port cannot honour
@@ -2235,6 +2237,46 @@ fight against a cursed player reads the reduced Defence.
 
 ---
 
+## 306. The fight widget's "Your Defence" row re-derives the score instead of asking the resolver, so a `modifiers="noarmour"` fight shows the armoured number the enemy is not rolling against
+
+**Priority: LOW — display only, and the resolution was always right.** No save is wrong and no
+outcome changes; what changes is whether the player can see why he lost.
+
+*(Filed and closed 2026-08-25, found while probing a fight widget for unrelated work.)*
+
+**Two numbers for one thing.** `combat.js playerDefenceFor` computes the Defence an enemy rolls
+against: a `playerDefence=` override wins outright, else the sheet Defence less the worn armour's
+bonus when `modifiers="noarmour"`, plus the section's `<tick special="defence">` boon and the
+fight's own Defence-through-Faith raise. `render-combat.js playerStatsRow` computed its own —
+`state.defence() + fightDefenceBonus() + defenceBonus` — which has the two section/fight bonuses
+and **neither fight-local term**.
+
+**Measured, on shipped pages.** book5/689 (the Water Drake, the corpus's one
+`modifiers="noarmour"` fight) with a +5 armour: the row prints **Your Defence 12** and the log
+line beneath it prints **vs your Def 7**. The two `playerDefence=` fights, book6/473 and
+book6/718, have the same shape — the row shows the sheet score while the enemy rolls against the
+override, and there the gap can run either way.
+
+**The row's own comment names the invariant it was breaking.** It says the transient bonuses are
+folded in "so the shown values match what resolution uses". They were, and the fight-local terms
+were not — because the row re-implements the sum rather than calling it. A view that re-computes
+what a resolver computes is a lie waiting for the resolver to gain a branch, and this one gained
+two.
+
+**The fix.** `playerDefenceFor` is exported as `playerFightDefence(state, fight)` and
+`playerStatsRow` takes the FIGHT rather than a bonus number, so there is one implementation and
+the row cannot drift again. Both call sites already hold the fight (the group row passes
+`fights[0]`, which may be absent when every member is defeated — a null fight reads as no
+fight-local term, which is the honest answer for a row with no fight left to describe). No rule
+module changes; `combat.js` gains an export and `render-combat.js` loses a computation. This is
+the architecture rule in `AGENTS.md` applied to a number rather than to a decision: the view
+builds DOM, the rule module owns the arithmetic.
+
+**Assertions.** A `modifiers="noarmour"` fight shows the unarmoured Defence and it equals the
+`vs your Def N` the log prints; a `playerDefence="7"` fight shows 7 where the sheet says
+otherwise, and again matches the log; an ordinary fight is unchanged, armour included. The log is
+the independent witness in each case, since it is printed by the resolver and not by the row.
+
 ## 305. a `<tick god=>` shares `readEffects` with the afflictions, so it accepts `ability="defence"` (task 304) and `ability="stamina"` (task 185) — and `data.effects` is read only by the core-ability paths, so both parse, store and move nothing
 
 **Priority: LOW — no corpus site either way.** Filed as a hole task 304 *opened*; implementing it
@@ -2296,6 +2338,21 @@ save/load round-trip un-clamped, and takes current Stamina down with it when ren
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-25 (filed and closed, task 306): filed and closed **306** — the fight widget's
+"Your Defence" row re-derived the score rather than asking the resolver, so the two fight-LOCAL
+terms were invisible to it: book5/689's Water Drake row reads `Your Defence 12` with a +5 armour
+while the log line beneath it reads `vs your Def 7`, and book6/473 and book6/718's
+`playerDefence=` overrides have the same shape. Found while probing a fight widget for unrelated
+work, which is the second time a probe written for one page has returned a defect in the widget it
+happened to use. Fixed by exporting `combat.js playerDefenceFor` as `playerFightDefence` and
+having `playerStatsRow` take the FIGHT instead of a bonus number, so one implementation serves the
+resolver and the row and the row cannot drift again — the `AGENTS.md` architecture rule applied to
+a number rather than to a decision. Five assertions in `suite-combat`, each reading the widget and
+the resolver's own log line in the same run. No rule-module logic changed; `combat.js` gains an
+export and `render-combat.js` loses a computation. The reusable half is the smell, not the bug:
+**a view that re-computes what a resolver computes is a lie waiting for the resolver to gain a
+branch**, and this one gained two before anyone looked.
 
 Worked 2026-08-25 (implementation pass, task 305): closed **305** by widening the engine — a god's
 `<effect>` naming `defence` or `stamina` now lands. Four changes in `state.js`: `defenceForMode`
