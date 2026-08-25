@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-298 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **299 is open in MEDIUM**. File new
+299 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **300 is open in LOW**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -27,6 +27,8 @@ there once the buckets below are clear.
 - [x] 296. `rewardWasteReason` refuses a new resurrection deal to anyone already holding one, where `addResurrection` implements the replacement the books print — so book1/597's third reward is dead to a deal-holder
 
 **LOW**
+
+- [ ] 300. nothing validates a `modifier=`/`modifiers=` value, so one misspelling silently reverts a check to the very score the page says not to use — across 42 shipped sites, and it is task 46's defect from the source side
 
 - [x] 297. the resurrection waste guard is a blanket engine rule that only book1/597's printed wording justifies, so the first flag-linked offer on a page printing the replacement rule will be refused an option its own text grants
 
@@ -1961,11 +1963,103 @@ Add the tag and its attributes to `build/validate-source.ps1`'s allowlist in the
 
 ---
 
+## 300. Nothing validates a `modifier=`/`modifiers=` value, so one misspelling silently reverts a check to the very score the page says not to use — across 42 shipped sites, and it is task 46's defect from the source side
+
+**Priority: LOW — a latent trap, not a live defect.** All 42 values in the shipped corpus are legal
+today; what is missing is anything that would say so if one were not. It is filed because the
+failure mode is silent in every direction — no build error, no console warning, no failing
+assertion, and a game that plays on with a check made easier than the page prints it — and because
+the build already has the mechanism to close it.
+
+*(Filed 2026-08-25 during conversion work on an unpublished book. Books 1–6 evidence only, below.)*
+
+**The two attributes and where they sit.** `modifier=` is the ability-resolution mode and appears
+**41** times across books 1–6: `<set>` ×33, `<difficulty>` ×4, `<if>` ×2, `<adjust>` ×2, spelled
+`natural` ×35, `noweapon` ×5 and `affected` ×1 (`notool`, a legal fourth, is unused). `modifiers=`
+is the fight mode and appears **once** — `book5/689`'s Water Drake, `modifiers="noarmour"`. Both
+attribute NAMES are already on `validate-source.ps1`'s allowlist; neither VALUE is checked by
+anything.
+
+**Four readers, and every one of them treats an unknown value as "no modifier at all".**
+
+- `state.js abilityForMode` — `natural` → `abilityNatural`, `noweapon`/`notool` → `abilityNoWeapon`,
+  **anything else → `ability()`**, the full affected score.
+- `engine.js setValueMode` — returns `natural`/`affected` or **`null`**, and `null` is the current /
+  affected reading. This is the `<set>` path, and so 33 of the 41 sites.
+- `engine.js`'s condition path — `const natural = normalize(get('modifier')) === 'natural'`, so a
+  typo means "affected". One exception worth knowing: for `ability="stamina"` the test is the
+  *truthiness* of `modifier=`, so there a misspelling still selects the unwounded maximum and
+  changes nothing. It is the only place in the family where a typo is harmless.
+- `combat.js makeFight` — `modifiers.includes('noarmour')` on the raw lower-cased attribute. That is
+  a **substring** test rather than a parse, so it fails open in both directions: `noarmor` matches
+  nothing, and any string *containing* `noarmour` matches.
+
+**Why the harm is one-directional.** Every one of the 35 `natural` sites exists because the page
+says the roll is made before item bonuses. Falling through to the affected score adds the weapon or
+tool bonus back, which makes each of those checks **easier than printed** — the player never
+notices, and neither does anything else.
+
+**This is already a filed defect from the other side.** Task 46 fixed `modifier=` being *misread by
+the engine*: `<set>` treated it as an additive amount, so `resolveValue(state,'natural')` looked up a
+non-existent variable, returned 0, and every book-2 rank ceremony's `<set var="r" value="rank"
+modifier="natural"/>` stored `r=0` — making "roll 2d over r to gain a Rank" auto-succeed. The
+comment above `setValueMode` records it. The engine side is correct now; the **source** side has
+never had a guard, and the same attribute misspelled in a section produces the same class of silent
+auto-success.
+
+**Suggested fix — the tables that already exist.** `build/validate-source.ps1` closes value sets in
+two places: `FL_ENUMS`, with nine keys (`ability`, `abilityDamaged`, `choose`, `blessing`, `crew`,
+`gender`, `profession`, `ship`, `special`), and `FL_TYPE_VALUES` (`type`, per tag). Neither lists
+these two.
+
+- Add `'modifier' = 'affected natural noweapon notool'` to `FL_ENUMS`. That table splits on `|`,
+  which costs nothing here — no shipped site unions two modes.
+- `modifiers=` is not an enum, because the engine matches it as a substring list. Give it its own
+  check: split on whitespace and commas and require every word to be a known mode (today,
+  `noarmour` alone). Consider making the engine parse the same token list rather than calling
+  `includes()`, so the two agree; the substring match is the part that makes a typo undetectable in
+  both directions, and it is a one-line change with one shipped site to re-verify.
+- Add one corpus assertion pinned to the **word set** rather than to a section list, so it survives
+  the edition growing: every `modifier=`/`modifiers=` value under `data.availableBooks()` is one the
+  engine acts on. A section-list pin would have to be re-pinned by every book that ships.
+
+**Assertions.** The gate rejects `modifier="naturel"` on each of the four tags that carry it and
+`modifiers="noarmor"` on `<fight>`, and accepts all four legal `modifier=` spellings and `noarmour`;
+`build/validate-selftest.ps1` drives both directions over fixtures; the corpus census reads zero.
+No allowlist name to add — both attributes are already listed, which is exactly how they were
+missed.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-25 (single finding, no implementation): **300** in LOW — nothing validates a
+`modifier=`/`modifiers=` value. Found during conversion work on an unpublished book, which needed a
+mode word and went looking for where mode words are checked; the answer is nowhere. Measured before
+filing: `modifier=` reads 41 sites in books 1–6 (33 `<set>`, 4 `<difficulty>`, 2 `<if>`, 2
+`<adjust>`; `natural` ×35, `noweapon` ×5, `affected` ×1) and `modifiers=` exactly one
+(`book5/689`), and all 42 are legal today, so nothing is broken — which is why it is LOW rather
+than not filed at all.
+
+**Two things make it worth an integer.** The fall-through is *toward* the score the page excludes:
+all four readers treat an unknown value as "no modifier", so a misspelling on any of the 35
+`natural` sites silently adds the item bonus back and makes that check easier than printed. And it
+is **task 46 from the other side** — that task fixed `modifier=` being misread by the *engine* (a
+`<set>` stored 0 and every book-2 rank ceremony auto-succeeded); the engine is right now and the
+source has never had a guard, so the identical silent auto-success is one typo away. The comment
+above `setValueMode` records the old bug and does not notice that.
+
+**The gap is a missing table entry, not a missing mechanism.** `validate-source.ps1` already closes
+nine value sets in `FL_ENUMS` and `type` per tag in `FL_TYPE_VALUES`; these two attributes are on
+the *name* allowlist and in neither value table, which is how they were missed — a name that
+validates looks validated. Worth a habit rather than only a fix: **when adding an attribute whose
+value selects a BEHAVIOUR, put it in a value table in the same change**, because the name allowlist
+will accept every misspelling of it forever. `modifiers=` additionally wants its engine read
+looked at — `includes('noarmour')` is a substring test, so it fails open in both directions.
 
 Worked 2026-08-24 (implementation pass, task 299): closed **299** — `<bookchange name="X"
 [once="t"]>` is now a standing rule the sheet carries and a change of book pays.
