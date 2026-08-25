@@ -32,7 +32,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 305. task 304 made `<effect ability="defence">` parse on a `<tick god=>` as well as on an affliction, and a god's effects land in `data.effects`, which `defence()` does not read — so that one path now accepts the word and drops it
+- [x] 305. a `<tick god=>` shares `readEffects` with the afflictions, so it accepts `ability="defence"` (task 304) and `ability="stamina"` (task 185) — and `data.effects` is read only by the core-ability paths, so both parse, store and move nothing
 
 - [x] 302. the port acts on neither `modifier="noarmour"` nor `modifier="current"` off `<adjust>`, though the JaFL spec defines both — so two spec-legal spellings are build errors this port cannot honour
 
@@ -2235,12 +2235,13 @@ fight against a cursed player reads the reduced Defence.
 
 ---
 
-## 305. task 304 made `<effect ability="defence">` parse on a `<tick god=>` as well as on an affliction, and a god's effects land in `data.effects`, which `defence()` does not read — so that one path now accepts the word and drops it
+## 305. a `<tick god=>` shares `readEffects` with the afflictions, so it accepts `ability="defence"` (task 304) and `ability="stamina"` (task 185) — and `data.effects` is read only by the core-ability paths, so both parse, store and move nothing
 
-**Priority: LOW — no corpus site, and the word was rejected outright before.** This is a hole task
-304 *opened*, not one it left: filed on the same pass, in the shape task 302's log named.
+**Priority: LOW — no corpus site either way.** Filed as a hole task 304 *opened*; implementing it
+found the `stamina` half, which has been live since task 185 and is nobody's regression.
 
-*(Filed 2026-08-25 while implementing task 304.)*
+*(Filed 2026-08-25 while implementing task 304. Widened and closed the same day — the heading and
+the census below are the corrected ones; the original filing named `defence` only.)*
 
 **One function serves two callers.** `engine.js readEffects` is called from `applyAffliction`
 (a `<curse>`/`<disease>`/`<poison>` body) and from `applyTick`'s `<tick god="…">` branch, and
@@ -2252,26 +2253,41 @@ pushes its effects into `data.effects` tagged `source: 'god:<name>'`, and `defen
 So `<tick god="Nagil"><effect ability="defence" bonus="2"/></tick>` would now validate, parse,
 store, display nothing and change nothing.
 
-**Census: zero.** No `<tick god=>` in books 1-6 carries any `<effect>` naming `defence` (all seven
-`ability="defence"` sites are the four item auras, the one curse, and the two `<if>`s). So this is
-capability, not repair — which is why it is LOW and why 304 did not fold it in.
+**It was two words, not one — and the second is older than the task.** `afflictionAbility` admits
+`stamina` as well, and has since task 185. `effectiveStaminaMax()` reads
+`afflictionStaminaMod() + auraBonus('stamina')` and **never `effectBonus`**, so a
+`<tick god="X"><effect ability="stamina" bonus="5"/></tick>` has always parsed, stored and moved
+nothing. `effectBonus` has exactly one writer (`setGod`) and had two readers (`ability`,
+`abilityNoWeapon`) — both core-ability paths — so *every* non-core word the parser accepts on the
+god path was dead, not just the one 304 added.
 
-**The fix is one term, and the reason to think before adding it is the double-count question
-again.** `defenceForMode` would gain `+ this.effectBonus('defence')`, guarded by the same
-`natural` strip as the aura and affliction terms. `effectBonus(ability)` already feeds `ability()`,
-so a god effect naming COMBAT reaches Defence through the combat term exactly once, and one naming
-`defence` would reach it only through the new term — the same argument 304 wrote down. Provably
-zero today, so it cannot regress anything; that is also the argument for leaving it out until a
-book needs it.
+**Census: zero, both words.** Books 1-6 hold two `<tick god=>` sites carrying an `<effect>`
+(§1.437, §2.334 — Sig's initiate `+1 THIEVERY`), and both name a core ability that has always
+worked. None names `defence` or `stamina`. And the spec settles the shape question: `<effect>` is
+defined there as "an effect of an item or curse", so the god-effect form is port-local
+(task 59) and the spec neither blesses nor restricts which abilities it may name.
 
-**Or close it the other way.** Task 301's rule was *where the engine has no branch for a value, the
-gate must reject it* — `readEffects` could take the caller's context and refuse `defence` on the
-god path, so the markup fails the build naming the file instead of resolving to nothing. Pick one
-before writing code; do not ship both.
+**Closed by widening the engine, per the choice made 2026-08-25.** The alternative on the table
+was task 301's rule — *where the engine has no branch for a value, the gate must reject it* — with
+`validate-source.ps1` refusing `<effect ability="defence|stamina">` under a `<tick|gain god=>`. It
+was rejected because it removes a capability with no workaround for a shape the spec does not
+restrict, and because widening is where 301→302 already pointed: rejecting first and widening later
+is two changes where one does.
 
-**Assertions.** Whichever way: a `<tick god=>` carrying `<effect ability="defence" bonus="2"/>`
-either moves `defence()` by exactly 2 and by 0 once the god is renounced, or is refused with a
-message naming the tag — and either way a god effect naming COMBAT still moves Defence once.
+**The fix.** `defenceForMode` gains `+ this.effectBonus('defence')` and `effectiveStaminaMax()`
+gains `+ this.effectBonus('stamina')`, both guarded like the aura term. Two consequences have to
+travel with them or the fix is worse than the hole:
+- **`sanitizeData`'s Stamina ceiling recomputes `effectiveStaminaMax` by hand** and must gain the
+  god term too, or a god-raised save is clamped back down on every load. That means moving the
+  `out.effects` sanitize above the clamp, since the clamp now reads it.
+- **`removeGod` must cap current Stamina to the new ceiling**, the way `reconcileEquipment` does
+  when a Stamina-raising aura item is dropped. Renouncing used to strip a number nothing read.
+
+**Assertions.** A god granting Defence moves `defence()` by exactly 2 and back to 0 on
+renunciation, is kept by `noarmour` and stripped by `natural`; one granting COMBAT still moves
+Defence once, not twice; a god granting Stamina raises the effective maximum, survives a
+save/load round-trip un-clamped, and takes current Stamina down with it when renounced; and
+§1.437's shipped Sig grant still reaches THIEVERY and nothing else.
 
 ---
 
@@ -2280,6 +2296,52 @@ message naming the tag — and either way a god effect naming COMBAT still moves
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-25 (implementation pass, task 305): closed **305** by widening the engine — a god's
+`<effect>` naming `defence` or `stamina` now lands. Four changes in `state.js`: `defenceForMode`
+sums `effectBonus('defence')`, `effectiveStaminaMax()` sums `effectBonus('stamina')`,
+`sanitizeData`'s hand-recomputed Stamina ceiling gains the same term (which meant moving the
+`out.effects` sanitize above it), and `removeGod` caps current Stamina to the new ceiling. Eleven
+assertions in `suite-engine`. The suite moves `RESULT ALL PASS pass=2967 fail=0` →
+`pass=2978 fail=0`; `web/` only, so a stamp and not a data rebuild.
+
+**The task was one word short, and the word it missed was four months older than the task.** 305
+was filed as "task 304 opened this". Half true: `afflictionAbility` has admitted `stamina` since
+**task 185**, and `effectiveStaminaMax()` has never read `effectBonus` — so a `<tick god=>`
+granting Stamina has parsed, stored and done nothing that whole time. The generalisation is the
+useful bit: `effectBonus` had **one writer** (`setGod`) and **two readers** (`ability`,
+`abilityNoWeapon`), both core-ability paths, so *every* non-core word the shared parser accepted
+on the god path was dead. Enumerating a function's readers is what 302 said to do when widening a
+value set; doing it for `effectBonus` — rather than for the one word I had just added — is what
+turned a one-line task into the right two-line one. **A filing that blames the previous commit is
+worth re-deriving from the readers before you believe it.**
+
+**The spec dissolved the harder half of the choice, as it did for 301.** `rules/JaFL-XML-Tags.md`
+defines `<effect>` as "an effect of an item or curse" — the `<tick god=><effect>` form is
+port-local (task 59), so the spec neither blesses it nor restricts which abilities it may name.
+That killed the gate-rejection option on its merits rather than on taste: task 301's rule is
+*where the engine has no branch for a **spec-legal** value, the gate must reject it*, and it does
+not reach a shape the spec never defines. Rejecting would have removed a capability with no
+workaround, and 301→302 had already established that the end state is a widened engine — so
+rejecting first would have been two changes where one does.
+
+**Two things had to travel with the terms, and both are the same failure the last three tasks
+were about.** (a) `sanitizeData` recomputes the Stamina ceiling **by hand**, because it works on a
+plain object and not a `GameState`; adding the god term to `effectiveStaminaMax` without adding it
+there would have clamped a god-raised save back down on **every load** — the mirror drifting from
+the method, which is precisely what 304 fixed in `defence()` by delegating. (b) `removeGod` never
+capped current Stamina, because before this the term it strips was unread; now renouncing a
+Stamina-granting god can leave the player above the new maximum unless it does what
+`reconcileEquipment` already does for a dropped aura item. Neither is visible from the diff of the
+two terms themselves. **Adding a term to a derived stat means finding every place that stat is
+recomputed by hand and every event that can now lower it.**
+
+**Five of the eleven assertions fail without the fix; six pass either way, deliberately.** The six
+are the controls — the mode agreement, the `natural` strip, the COMBAT-once double-count guard,
+and §1.437's shipped Sig grant still reaching THIEVERY and nothing else. The one worth naming is
+the fifth failure: `renouncing lowers the maximum again and takes current Stamina with it` reported
+`max=9 stam=14` against the unpatched tree, which is the `removeGod` hole stated as a number. An
+assertion suite built only from "the new term adds up" would have shipped that.
 
 Worked 2026-08-25 (implementation pass, task 304): closed **304** — §5.638's Curse of
 Vulnerability now takes its 3 points off Defence. It took **two** fixes, not the one the task

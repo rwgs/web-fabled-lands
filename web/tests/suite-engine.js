@@ -171,6 +171,64 @@ export async function run(ctx) {
     ok('task304: an ability="*" affliction reaches Defence once, through COMBAT',
        gStar.defence() === starBefore - 1, `${starBefore}->${gStar.defence()}`);
 
+    // --- task 305: readEffects serves <tick god=> too, and its output had two dead words ------
+    // A god's effects land in data.effects, whose ONLY reader was effectBonus — summed by
+    // ability() and abilityNoWeapon(), both core-ability paths. So `defence` (which task 304
+    // taught the parser) and `stamina` (which it has accepted since task 185) both parsed,
+    // stored, and moved nothing. The stamina half predates 304; it is closed here because it
+    // is the same defect in the same function and splitting it would ship half a fix.
+    const g305 = GameState.create({ name:'God', gender:'m', profession:'Warrior', book:1, adv });
+    const D305 = g305.defence(), arm305 = g305.armourBonus();
+    eng.applyEffect(parse('<tick god="Nagil"><effect ability="defence" bonus="2"/></tick>'), g305, {});
+    ok('task305: a god granting Defence raises it by exactly 2',
+       g305.defence() === D305 + 2, `${D305}->${g305.defence()}`);
+    ok('task305: the sheet score and the mode-aware read still agree',
+       g305.defence() === g305.abilityForMode('defence', null));
+    ok('task305: modifier="noarmour" keeps the god bonus and drops only the armour',
+       g305.abilityForMode('defence', 'noarmour') === D305 + 2 - arm305);
+    ok('task305: modifier="natural" strips it — a god bonus is not on the written score',
+       g305.abilityForMode('defence', 'natural') === g305.abilityNatural('combat') + g305.rankValue());
+    eng.applyEffect(parse('<lose god="Nagil"/>'), g305, {});
+    ok('task305: renouncing the god takes the bonus back with it',
+       g305.defence() === D305 && !g305.hasGod('Nagil'), String(g305.defence()));
+    // The control that says the new term is not a second helping of an old one.
+    const gGodC = GameState.create({ name:'GodC', gender:'m', profession:'Warrior', book:1, adv });
+    const dGodC = gGodC.defence();
+    eng.applyEffect(parse('<tick god="Nagil"><effect ability="combat" bonus="2"/></tick>'), gGodC, {});
+    ok('task305: a god granting COMBAT moves Defence by 2, through the combat term only',
+       gGodC.defence() === dGodC + 2, `${dGodC}->${gGodC.defence()}`);
+    // The shipped shape must not shift: §1.437/§2.334's Sig grant names THIEVERY and always
+    // worked, because ability() has summed effectBonus all along.
+    const gSig = GameState.create({ name:'Sig', gender:'m', profession:'Warrior', book:1, adv });
+    const tSig = gSig.ability('thievery'), dSig = gSig.defence();
+    const tick437 = (await data.getSection(1, '437')).querySelector('tick[god]');
+    ok('task305: fixture — §1.437 still grants Sig with a THIEVERY effect',
+       !!tick437 && tick437.querySelector('effect')?.getAttribute('ability') === 'thievery',
+       tick437 ? 'god=' + tick437.getAttribute('god') : 'no <tick god=> in §1.437');
+    eng.applyEffect(tick437, gSig, {});
+    ok('task305: control — the shipped Sig initiate bonus still reaches THIEVERY, and only it',
+       gSig.ability('thievery') === tSig + 1 && gSig.defence() === dSig,
+       `thievery ${tSig}->${gSig.ability('thievery')} def ${dSig}->${gSig.defence()}`);
+
+    // The Stamina half — and the load-time mirror that had to move with it. sanitizeData
+    // clamps current Stamina to a ceiling it recomputes by hand; if that copy skipped the god
+    // term it would cut a god-raised save back down on every load, which is the mirror-drift
+    // shape task 304 closed in defence().
+    const gStam = GameState.create({ name:'Stam', gender:'m', profession:'Warrior', book:1, adv });
+    const maxStam = gStam.effectiveStaminaMax();
+    eng.applyEffect(parse('<tick god="Alvir"><effect ability="stamina" bonus="5"/></tick>'), gStam, {});
+    ok('task305: a god granting Stamina raises the effective maximum by 5',
+       gStam.effectiveStaminaMax() === maxStam + 5, `${maxStam}->${gStam.effectiveStaminaMax()}`);
+    gStam.data.stamina = maxStam + 5;
+    const gStamLoaded = new GameState(sanitizeData(JSON.parse(JSON.stringify(gStam.data))));
+    ok('task305: a save at the god-raised total survives the load-time clamp intact',
+       gStamLoaded.data.stamina === maxStam + 5 && gStamLoaded.effectiveStaminaMax() === maxStam + 5,
+       `stam=${gStamLoaded.data.stamina} max=${gStamLoaded.effectiveStaminaMax()}`);
+    eng.applyEffect(parse('<lose god="Alvir"/>'), gStam, {});
+    ok('task305: renouncing lowers the maximum again and takes current Stamina with it',
+       gStam.effectiveStaminaMax() === maxStam && gStam.data.stamina <= maxStam,
+       `max=${gStam.effectiveStaminaMax()} stam=${gStam.data.stamina}`);
+
     // multi-attribute <if>: recognized attributes combine as OR (JaFL
     // IfNode.meetsConditions), then not="t" negates the whole result. (task 3)
     const gcond = GameState.create({ name:'C', gender:'m', profession:'Mage', book:1, adv });

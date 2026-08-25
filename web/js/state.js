@@ -62,6 +62,17 @@ function sumAuraBonus(items, key) {
   }
   return sum;
 }
+// Summed god-granted effect bonus for an ability across an effects array (pure).
+// data.effects has exactly one writer — setGod, which tags each entry `god:<name>`
+// and removeGod strips them again — so this is the god term of every score that has
+// one. A `target` effect pins rather than adds and is not summed here. Shared by
+// GameState.effectBonus and the load-time Stamina reconcile, which has to agree with
+// effectiveStaminaMax or a god-raised save is clamped back down on load. (task 305)
+function sumEffectBonus(effects, ability) {
+  let sum = 0;
+  for (const e of (effects || [])) if (e.ability === ability && e.type !== 'target') sum += (e.bonus || 0);
+  return sum;
+}
 // Summed Stamina-total modifier (≤0) from affliction lists (pure). Shared by
 // GameState.afflictionStaminaMod and the load-time Stamina reconcile. (task 60/124)
 // Does one affliction effect apply to `ability`? An exact key match, or `ability="*"`
@@ -300,11 +311,7 @@ export class GameState {
   /** The WORN armour's Defence bonus — again the player's choice, not simply the highest. */
   armourBonus() { return this.wornArmour()?.bonus || 0; }
 
-  effectBonus(ability) {
-    let sum = 0;
-    for (const e of this.data.effects) if (e.ability === ability && e.type !== 'target') sum += (e.bonus || 0);
-    return sum;
-  }
+  effectBonus(ability) { return sumEffectBonus(this.data.effects, ability); }
 
   /** Total additive ability penalty/bonus from active afflictions
    *  (curses/diseases/poisons). Removed automatically when the affliction is
@@ -346,8 +353,13 @@ export class GameState {
   /** The Stamina maximum the player currently has, after any affliction cut and any
    *  item aura raise (never below 1). A Stamina-cutting affliction (task 60) or a
    *  Stamina-raising aura like the ring of ultimate power's +10 (task 44) folds in
-   *  here, so the sheet/fight display, healing and rest all track it automatically. */
-  effectiveStaminaMax() { return Math.max(1, this.data.staminaMax + this.afflictionStaminaMod() + this.auraBonus('stamina')); }
+   *  here, so the sheet/fight display, healing and rest all track it automatically.
+   *  The god term is the one that was missing: afflictionAbility has accepted
+   *  `ability="stamina"` since task 185, so a `<tick god=>` carrying one parsed and
+   *  stored — and nothing read it, because effectBonus feeds only ability() and
+   *  abilityNoWeapon(), both core-ability paths. Zero corpus sites, and predates
+   *  task 304 rather than being opened by it. (task 305) */
+  effectiveStaminaMax() { return Math.max(1, this.data.staminaMax + this.afflictionStaminaMod() + this.auraBonus('stamina') + this.effectBonus('stamina')); }
 
   /** The player's effective Rank, including any item-aura raise (the ring of
    *  ultimate power's +2 Rank — book5/564). Feeds Defence and rank checks. (task 44) */
@@ -467,7 +479,16 @@ export class GameState {
     // deliberately NOT applied here — no corpus affliction names `defence`, so where a
     // halving would fall in this sum is a rule to decide, not a term to add. (task 304)
     const affliction = (m === 'natural') ? 0 : this.afflictionBonus('defence');
-    return combat + this.rankValue() + armour + aura + affliction;
+    // A god's `<tick god="X"><effect ability="defence" bonus="N"/></tick>` grant. Rides with
+    // the aura and affliction terms for the same reason: a god bonus is not a number the
+    // written score carries, so `natural` strips it and the narrower modes keep it. Zero
+    // corpus sites today — the two god effects in books 1-6 name THIEVERY (§1.437/§2.334
+    // Sig) and reach their score through ability() — so this can only ever be a term
+    // markup has to ask for. It is here because task 304 taught afflictionAbility the word
+    // `defence`, which made the god path accept it too, and a parser that stores what no
+    // reader sums is the shape that made the Curse of Vulnerability inert. (task 305)
+    const godly = (m === 'natural') ? 0 : this.effectBonus('defence');
+    return combat + this.rankValue() + armour + aura + affliction + godly;
   }
 
   /** Ability score for a <set value=> arithmetic read (JaFL SetVarNode.resolveIdentifier):
@@ -995,6 +1016,12 @@ export class GameState {
     const strippedEffects = kept.length !== this.data.effects.length;
     if (i >= 0) this.data.gods.splice(i, 1);
     if (strippedEffects) this.data.effects = kept;
+    // A god whose grant raised the Stamina TOTAL (an `<effect ability="stamina">`) takes it
+    // away again on renunciation, so cap current Stamina to the new ceiling — the same guard
+    // reconcileEquipment applies when a Stamina-raising aura item is dropped. Only reachable
+    // since effectiveStaminaMax started summing the god term: before that this stripped a
+    // number nothing read. (task 305)
+    if (strippedEffects) { const cap = this.effectiveStaminaMax(); if (this.data.stamina > cap) this.data.stamina = cap; }
     // Renouncing a god also cancels any resurrection deal tied to it — JaFL's
     // removeAGod forfeits that god's extra life. A godless deal (god:null), bought
     // while not a worshipper, is not tied to any god and survives. (task 135)
@@ -1401,11 +1428,22 @@ export function sanitizeData(raw) {
   out.diseases = asArr(d.diseases).map((a) => sanitizeAffliction(a, 'disease')).filter(Boolean);
   out.poisons = asArr(d.poisons).map((a) => sanitizeAffliction(a, 'poison')).filter(Boolean);
 
-  // Now that items and afflictions are sanitized, clamp current Stamina to the
-  // effective ceiling — mirrors GameState.effectiveStaminaMax / reconcileEquipment
+  // Sanitized here rather than with the other lists below because the Stamina ceiling
+  // on the next line reads them: effectiveStaminaMax sums a god's `ability="stamina"`
+  // grant, so a ceiling that skipped it would clamp a god-raised save back down on every
+  // load — the mirror drifting from the method, which is exactly the shape task 304
+  // closed in defence(). Nothing between here and their old position touches them. (task 305)
+  out.effects = asArr(d.effects).map((e) => {
+    const o = asObj(e);
+    if (!o.ability && !o.type) return null;
+    return { ability: typeof o.ability === 'string' ? o.ability : null, bonus: asNum(o.bonus, 0, { int: true }), type: typeof o.type === 'string' ? o.type : null, uses: o.uses == null ? null : asNum(o.uses, 0, { min: 0, int: true }), text: asStr(o.text), source: typeof o.source === 'string' ? o.source : null };
+  }).filter(Boolean);
+
+  // Now that items, afflictions and god effects are sanitized, clamp current Stamina to
+  // the effective ceiling — mirrors GameState.effectiveStaminaMax / reconcileEquipment
   // so an aura-raised save (ring +10) is preserved while a hand-edited over-max
-  // value is still floored to what the character could legitimately hold. (task 124)
-  const staminaCeiling = Math.max(1, out.staminaMax + sumAfflictionStamina([out.curses, out.diseases, out.poisons]) + sumAuraBonus(out.items, 'stamina'));
+  // value is still floored to what the character could legitimately hold. (task 124/305)
+  const staminaCeiling = Math.max(1, out.staminaMax + sumAfflictionStamina([out.curses, out.diseases, out.poisons]) + sumAuraBonus(out.items, 'stamina') + sumEffectBonus(out.effects, 'stamina'));
   if (out.stamina > staminaCeiling) out.stamina = staminaCeiling;
 
   out.codewords = {};
@@ -1427,11 +1465,6 @@ export function sanitizeData(raw) {
     const o = asObj(r);
     return { book: asNum(o.book, out.book, { min: 1, int: true }), section: o.section == null ? null : asStr(o.section), text: asStr(o.text), god: o.god == null ? null : asStr(o.god), supplemental: asBool(o.supplemental) };
   });
-  out.effects = asArr(d.effects).map((e) => {
-    const o = asObj(e);
-    if (!o.ability && !o.type) return null;
-    return { ability: typeof o.ability === 'string' ? o.ability : null, bonus: asNum(o.bonus, 0, { int: true }), type: typeof o.type === 'string' ? o.type : null, uses: o.uses == null ? null : asNum(o.uses, 0, { min: 0, int: true }), text: asStr(o.text), source: typeof o.source === 'string' ? o.source : null };
-  }).filter(Boolean);
   out.abilityFlags = {};
   for (const [k, v] of Object.entries(asObj(d.abilityFlags))) { const o = asObj(v); const f = {}; if (o.fixed) f.fixed = true; if (o.cursed) f.cursed = true; if (Object.keys(f).length) out.abilityFlags[k] = f; }
 
