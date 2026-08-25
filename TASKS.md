@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-296 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **297 is open in LOW**. File new
+298 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **299 is open in MEDIUM**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -21,6 +21,8 @@ there once the buckets below are clear.
 - [x] 294. book4/257 leaves a mixed pair of rolls with no exit at all, so succeeding one check and failing the other ends the adventure
 
 **MEDIUM**
+
+- [ ] 299. nothing in the port fires on a change of BOOK, so book5/681's golden hair never pays the 20 Shards it promises on every crossing — and the corpus's only two `TODO` comments say so
 
 - [x] 296. `rewardWasteReason` refuses a new resurrection deal to anyone already holding one, where `addResurrection` implements the replacement the books print — so book1/597's third reward is dead to a deal-holder
 
@@ -1882,11 +1884,99 @@ user, prints no exclusion and is unmoved.
 
 ---
 
+## 299. Nothing in the port fires on a change of BOOK, so book5/681's golden hair never pays the 20 Shards it promises on every crossing — and the corpus's only two `TODO` comments say so
+
+**Priority: MEDIUM — a printed reward the port never grants, reachable in normal play, in two live
+sections of a published book.** Not severe (20 Shards a crossing), but it is the "narrates a reward
+it never grants" species rather than a latent trap, and the source files admit it in as many words.
+
+*(Filed 2026-08-24 during conversion work on an unpublished book, where the same printed event has
+further sites. Books 1–6 evidence only, below.)*
+
+Holyamu turns the player's hair to spun gold at **book5/681**: the section ticks the codeword *Elk*
+and prints "Note that whenever you travel to another book in the *Fabled Lands* series you can add
+20 Shards to your Adventure Sheet. This represents your hair growing, and you cutting it and selling
+the gold!" **book5/587** is the undo — Holyamu "has turned your hair back to normal", the codeword is
+lost, and it prints "You can no longer receive 20 Shards every time you travel to another book."
+
+Both sections carry `<!-- TODO: implement gold-hair effects -->`, and
+
+```
+grep -rn "TODO\|FIXME\|XXX" --include='*.xml' books/
+```
+
+returns **exactly those two lines** across the whole shipped corpus. So this is not a defect that
+had to be found: it is the only one the source files themselves flag, and it has been sitting behind
+a codeword that is granted, tested and lifted correctly.
+
+**Why it cannot be tagged today.** The rule is keyed on an *event* — travelling to a different book
+— and no node in the format fires on one. `state.goTo(book, section)` (`state.js`) is the single
+choke point for every move, and it sets `data.book` without anyone reading the delta;
+`app.js`'s `navigate()` is its only caller. There is no per-book entry hook, and the shipped tags
+all fire where they are written: a `<tick>`/`<gain>` applies on the page, an `<extrachoice>` waits at
+a named section or a section `tag=`, an item `<effect type="use">` waits for a button. The closest
+shipped thing is `<extrachoice>` — a keyed, persistent, sheet-carried rule the books "note on your
+Adventure Sheet" — and it is persistent *navigation*, with no way to carry an effect.
+
+**Suggested fix — a standing rule the sheet carries, fired on the crossing.** A `<bookchange
+name="X" [once="t"]>` at effect position, whose body is an ordinary effect body, registered where
+the page prints it and applied when the book number changes:
+
+```xml
+<!-- book5/681 -->
+<bookchange name="5.681"><gain shards="20"/></bookchange>
+<!-- book5/587 -->
+<lose bookchange="5.681">You can no longer receive 20 Shards every time you travel to another book</lose>
+```
+
+Four notes on the shape, each of which has a shipped precedent to copy rather than a decision to
+take:
+
+- **Store the body as markup and re-parse it at firing time.** That is `readItemEffects`'
+  contract for an `<effect type="use">` body (task 41) — serialise the element children with
+  `XMLSerializer`, keep the string on the sheet, and let the VIEW parse it back
+  (`app.js` already does exactly this for a Use button). It is the only way a rule module can hold
+  markup without a DOM, which the module-seam test (`web/tests/node-import.mjs`) enforces.
+- **Key it by `name=`, and replace on re-registration.** `addExtraChoice`'s contract: a second visit
+  to the granting section must not register a second copy, and a cancel needs a handle. book5/587's
+  cancel is the same shape as `<extrachoice remove=>`.
+- **`once=` is the difference between the two halves of the family.** Hair keeps growing; a rule that
+  fires and then stops needs to deregister itself. book5/681 wants no `once=`.
+- **Fire before the arriving section renders and before `state.snapshot()`.** The page you land on
+  must already see the change, and undo must restore the previous section's entry state, which is
+  taken before the crossing. Both fall out of putting the call between `state.goTo()` and
+  `state.snapshot()` in `navigate()`.
+
+An inner `<goto>` in such a body should be ignored: the rule fires *during* a move the player has
+already committed to, so it has no navigation of its own to offer.
+
+**Assertions.** A registered rule is written to the sheet and its body does NOT apply on the page
+that prints it; a crossing to a different book fires it (and a move within the same book does not);
+`once="t"` deregisters after the first firing while a plain rule pays on every crossing; a second
+registration under one name replaces rather than duplicates, and a rule with no `name=` is refused;
+the rules survive a save round trip, bodies and all; `<lose bookchange="X">` lifts a standing rule
+and stops it paying; and book5/681 → another book → book5/587 → another book pays exactly once.
+Add the tag and its attributes to `build/validate-source.ps1`'s allowlist in the same change
+(task 199's rule), and delete both `TODO` comments with the markup that answers them.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-24 (finding pass, no code): **299** — nothing fires on a change of book, so
+book5/681's printed 20-Shards-per-crossing is never paid and book5/587's cancel has nothing to
+cancel. Found by censusing the printed EVENT rather than a resource: `(different|another|any
+other|the next) book` and `in the series` over the shipped `^\d+[a-z]?$` basenames. The finding that
+makes it worth reading twice is the corroboration — `grep -rn "TODO\|FIXME\|XXX" --include='*.xml'
+books/` returns **exactly two lines in the whole corpus** and both are these sections'
+`<!-- TODO: implement gold-hair effects -->`. **A corpus-wide `TODO` census is one command and had
+never been run**; it is worth running on any pass with time for the cheap structural checks, and it
+is the only census in this project whose hits were written by somebody who already knew the answer.
+Nothing else was filed and nothing was changed.
 
 Worked 2026-08-24 (implementation pass, task 298): closed **298** — the `hidden="t"` registration
 reads the exclusion too, so `unique="t"` now means the same thing on all three paths that arrange a
