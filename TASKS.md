@@ -24,13 +24,15 @@ there once the buckets below are clear.
 
 - [x] 303. `<if ability="defence">` compares against 0, not the player's Defence, so book5/361's §160 route is unreachable at any Defence and book1/313's daggers always hit — task 68's fix for `rank`/`stamina`, never extended to the third stat
 
-- [ ] 304. `defence()` sums items, Rank and auras but not afflictions, so book5/638's Curse of Vulnerability subtracts its 3 points from nothing and the curse is inert
+- [x] 304. `defence()` sums items, Rank and auras but not afflictions, so book5/638's Curse of Vulnerability subtracts its 3 points from nothing and the curse is inert
 
 - [x] 299. nothing in the port fires on a change of BOOK, so book5/681's golden hair never pays the 20 Shards it promises on every crossing — and the corpus's only two `TODO` comments say so
 
 - [x] 296. `rewardWasteReason` refuses a new resurrection deal to anyone already holding one, where `addResurrection` implements the replacement the books print — so book1/597's third reward is dead to a deal-holder
 
 **LOW**
+
+- [ ] 305. task 304 made `<effect ability="defence">` parse on a `<tick god=>` as well as on an affliction, and a god's effects land in `data.effects`, which `defence()` does not read — so that one path now accepts the word and drops it
 
 - [x] 302. the port acts on neither `modifier="noarmour"` nor `modifier="current"` off `<adjust>`, though the JaFL spec defines both — so two spec-legal spellings are build errors this port cannot honour
 
@@ -2233,11 +2235,106 @@ fight against a cursed player reads the reduced Defence.
 
 ---
 
+## 305. task 304 made `<effect ability="defence">` parse on a `<tick god=>` as well as on an affliction, and a god's effects land in `data.effects`, which `defence()` does not read — so that one path now accepts the word and drops it
+
+**Priority: LOW — no corpus site, and the word was rejected outright before.** This is a hole task
+304 *opened*, not one it left: filed on the same pass, in the shape task 302's log named.
+
+*(Filed 2026-08-25 while implementing task 304.)*
+
+**One function serves two callers.** `engine.js readEffects` is called from `applyAffliction`
+(a `<curse>`/`<disease>`/`<poison>` body) and from `applyTick`'s `<tick god="…">` branch, and
+both filter their `ability=` through `afflictionAbility`. Task 304 added `defence` to that filter
+so §5.638's curse would stop being discarded at parse time. The affliction side then reads it —
+`state.js defenceForMode` sums `afflictionBonus('defence')`. The god side does not: `setGod`
+pushes its effects into `data.effects` tagged `source: 'god:<name>'`, and `defence()` sums
+`itemBonus`/`auraBonus`/`armourBonus`/`afflictionBonus` but **never `effectBonus`** for Defence.
+So `<tick god="Nagil"><effect ability="defence" bonus="2"/></tick>` would now validate, parse,
+store, display nothing and change nothing.
+
+**Census: zero.** No `<tick god=>` in books 1-6 carries any `<effect>` naming `defence` (all seven
+`ability="defence"` sites are the four item auras, the one curse, and the two `<if>`s). So this is
+capability, not repair — which is why it is LOW and why 304 did not fold it in.
+
+**The fix is one term, and the reason to think before adding it is the double-count question
+again.** `defenceForMode` would gain `+ this.effectBonus('defence')`, guarded by the same
+`natural` strip as the aura and affliction terms. `effectBonus(ability)` already feeds `ability()`,
+so a god effect naming COMBAT reaches Defence through the combat term exactly once, and one naming
+`defence` would reach it only through the new term — the same argument 304 wrote down. Provably
+zero today, so it cannot regress anything; that is also the argument for leaving it out until a
+book needs it.
+
+**Or close it the other way.** Task 301's rule was *where the engine has no branch for a value, the
+gate must reject it* — `readEffects` could take the caller's context and refuse `defence` on the
+god path, so the markup fails the build naming the file instead of resolving to nothing. Pick one
+before writing code; do not ship both.
+
+**Assertions.** Whichever way: a `<tick god=>` carrying `<effect ability="defence" bonus="2"/>`
+either moves `defence()` by exactly 2 and by 0 once the god is renounced, or is refused with a
+message naming the tag — and either way a god effect naming COMBAT still moves Defence once.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-25 (implementation pass, task 304): closed **304** — §5.638's Curse of
+Vulnerability now takes its 3 points off Defence. It took **two** fixes, not the one the task
+described: `engine.js afflictionAbility` accepts `defence`, and `state.js defenceForMode` sums
+`afflictionBonus('defence')` while `defence()` delegates to it. Nine assertions (eight in
+`suite-engine`, one in `suite-combat`). The suite moves `RESULT ALL PASS pass=2958 fail=0` →
+`pass=2967 fail=0`; `web/` only, so a stamp and not a data rebuild. **305** filed.
+
+**The task's own measurement was of a fixture, not of the shipped page, and that hid half the
+bug.** 304 stated that `afflictionBonus('defence')` "returns **-3** correctly — the sum is
+computed and then never read". It does, for a curse built by hand in a test. For the curse the
+book actually prints it returns **0**, because `readEffects` filters every `ability=` through
+`afflictionAbility`, which admitted `stamina`, `*` and the six `ABILITIES` — so §5.638's
+`<effect ability="defence" bonus="-3"/>` was dropped at **parse** time and never reached the
+sheet at all. Shipping the described one-line fix would have left `RESULT ALL PASS` and an
+inert curse, and the passing suite would have said the task was done. **The rule: a filing that
+quotes a measured number has to say what it measured it on, and an implementer re-measures
+against the shipped markup before trusting it** — which is why two of this pass's assertions
+apply the real §5.638 `<curse>` element out of the bundled data rather than a transcription.
+
+**This is the third face of task 303's lesson, and it is the one that bites hardest.** 303 wrote
+down that `ABILITIES` is a six-element list and every read of it is a place a derived stat can
+fall through; it fixed the *condition* reader and named `adjustAmount`/`rollDifficulty` as the
+others (302 then did those). Nobody looked at the **parser**. A fall-through in a reader gives
+you the wrong number; a fall-through in the parser gives you no data, which is strictly worse —
+`afflictionBonus` cannot be wrong about an effect it was never handed. Worth enumerating the
+*writers* of a stat as well as the readers next time this shape appears.
+
+**Both halves were checked to be load-bearing, separately.** With only the `state.js` term the
+same three assertions fail (the effect is still discarded); with only the `afflictionAbility`
+widening they fail identically (the sum is still unread). Six of the nine pass either way — the
+mode controls, the double-count guards — and a suite made only of those would have reported a
+clean pass over both defects at once.
+
+**`defence()` now delegates to `defenceForMode(null)` instead of re-summing.** The two were
+byte-equivalent when 302 wrote the second one, and 302's log asserted that equivalence in prose;
+one term added to one of them is all it would ever have taken to break it silently, since no
+assertion compared them. Delegation makes the invariant structural, and matches how
+`abilityForCheck` already delegates to `abilityForMode` in the same file. The affliction term
+rides with the aura term — stripped by `natural`, kept by `noarmour`/`noweapon` — because a curse
+is not a bonus the written score carries.
+
+**The double-count question is answered by the wildcard's scope, and that is worth saying out
+loud.** `afflictionHits` expands `ability="*"` over `ABILITIES` only, so §2.136's Leprosy reaches
+Defence exactly once, through the COMBAT term, and never again through the new one. A derived
+stat is only ever hit **by name** — which is precisely why `defence` had to be added to
+`afflictionAbility` as an explicit word rather than by widening the list `*` expands over.
+
+**One hole opened, filed rather than papered over.** `readEffects` serves `<tick god=>` too, and
+a god's effects land in `data.effects`, which `defence()` does not read — so that path now
+accepts the word and drops it. Zero corpus sites, so **305** records both ways to close it (add
+the `effectBonus` term, or make the gate refuse the word on that path) and says to pick one.
+Task 302's rule again: **widening what a value may be is a promise every reader honours it, and
+the readers have to be enumerated again** — this time the widening was in a parser, so the
+readers to enumerate were the parser's *callers*.
 
 Worked 2026-08-25 (implementation pass, task 302): closed **302** — `modifier="noarmour"` and
 `modifier="current"` are now words the engine acts on rather than words the gate has to refuse.

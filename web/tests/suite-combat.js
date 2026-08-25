@@ -848,6 +848,19 @@ export async function run(ctx) {
     const naBefore = gna.data.stamina;
     fightRound(gna, fna, null); // one enemy strike lands for certain under noarmour
     ok('modifiers="noarmour" drops the armour bonus (a hit lands)', armN === 11 && gna.data.stamina < naBefore, `arm=${armN} stam ${naBefore}->${gna.data.stamina}`);
+    // task 304: a Defence-naming affliction is only ever going to bite in a fight, and the fight
+    // takes its number from state.defence() — so the −3 has to arrive here or the curse is inert.
+    // The strike logs the Defence it scored against, which pins it without depending on the dice.
+    const gvul = GameState.create({ name:'Vuln', gender:'m', profession:'Warrior', book:5, adv });
+    gvul.data.stamina = 200; gvul.data.staminaMax = 200;
+    const defVul0 = gvul.defence();
+    eng.applyEffect((await data.getSection(5, '638')).querySelector('curse'), gvul, {});
+    const fvul = makeFight(parse('<fight name="Faerie" combat="4" defence="99" stamina="99"/>'), gvul);
+    fightRound(gvul, fvul, null);
+    ok('task304: a fight scores against the CURSED Defence (§5.638 −3), not the sheet\'s old one',
+       gvul.defence() === defVul0 - 3
+       && fvul.log.some((l) => new RegExp('vs your Def ' + (defVul0 - 3) + '(?!\\d)').test(l)),
+       `def ${defVul0}->${gvul.defence()} | ${fvul.log.join(' | ')}`);
     // abilityDamaged="stamina": the wound permanently reduces max Stamina (§Big Boy/§Giant).
     const gabd = GameState.create({ name:'ABD', gender:'m', profession:'Warrior', book:6, adv });
     gabd.data.stamina = 200; gabd.data.staminaMax = 200;

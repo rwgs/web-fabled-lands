@@ -459,7 +459,15 @@ export class GameState {
       : this.ability('combat');
     const armour = (m === 'natural' || m === 'noarmour') ? 0 : this.armourBonus();
     const aura = (m === 'natural') ? 0 : this.auraBonus('defence');
-    return combat + this.rankValue() + armour + aura;
+    // A curse/disease/poison naming Defence itself (book5/638's Curse of Vulnerability, −3 —
+    // the corpus's one such site), stripped by `natural` like any other unwritten adjustment
+    // and kept by the narrower modes. Nothing is double-counted: an affliction naming COMBAT
+    // is already inside the combat term, and an `ability="*"` one covers the six CORE
+    // abilities only, never `defence`. afflictionMod's divide/target transforms are
+    // deliberately NOT applied here — no corpus affliction names `defence`, so where a
+    // halving would fall in this sum is a rule to decide, not a term to add. (task 304)
+    const affliction = (m === 'natural') ? 0 : this.afflictionBonus('defence');
+    return combat + this.rankValue() + armour + aura + affliction;
   }
 
   /** Ability score for a <set value=> arithmetic read (JaFL SetVarNode.resolveIdentifier):
@@ -492,9 +500,12 @@ export class GameState {
 
   defence() {
     // COMBAT (incl. weapon bonus) + Rank + best armour bonus, plus any item aura
-    // that boosts Defence directly (sword of stone, ring of guarding, Jade Defender).
+    // that boosts Defence directly (sword of stone, ring of guarding, Jade Defender)
+    // and any affliction that penalises it (book5/638's Curse of Vulnerability).
     // rankValue() adds the ring of ultimate power's +2 Rank so Defence rises by 2.
-    return this.ability('combat') + this.rankValue() + this.armourBonus() + this.auraBonus('defence');
+    // Delegating rather than re-summing is what keeps the sheet score and the mode-aware
+    // reads from drifting apart — the drift is how the curse went missing. (task 304)
+    return this.defenceForMode(null);
   }
 
   // The weapon being fought with / the armour being worn: the player's explicit choice

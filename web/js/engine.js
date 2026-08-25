@@ -1428,14 +1428,20 @@ function applyAffliction(el, state, type) {
 }
 
 /** Ability key for an affliction/god effect — the six core abilities, `stamina`
- *  (an affliction may cut the Stamina total, held until cured), or `*` for every
- *  core ability at once (§2.136 Leprosy's single `<effect ability="*" bonus="-1"/>`
- *  is its whole stated penalty — "lose 1 point from each of your abilities"). The
- *  wildcard covers the six abilities only, never Rank or Stamina. (task 185) */
+ *  (an affliction may cut the Stamina total, held until cured), `defence` (§5.638's
+ *  Curse of Vulnerability, "subtract 3 from your Defence" — the corpus's one such
+ *  site), or `*` for every core ability at once (§2.136 Leprosy's single
+ *  `<effect ability="*" bonus="-1"/>` is its whole stated penalty — "lose 1 point
+ *  from each of your abilities"). The wildcard covers the six abilities only, never
+ *  Rank, Stamina or Defence — so a derived stat is only ever hit by NAME and can
+ *  never be counted twice through a term it is built from. `defence` is named here
+ *  because ABILITIES is a six-element list and every read of it is a place a derived
+ *  stat falls through: this one dropped the effect at parse time, so the curse was
+ *  inert before defence() ever got the chance to ignore it. (tasks 185, 304) */
 function afflictionAbility(attr) {
   if (!attr) return null;
   const a = attr.split('|')[0].trim().toLowerCase();
-  if (a === 'stamina' || a === '*') return a;
+  if (a === 'stamina' || a === 'defence' || a === '*') return a;
   return ABILITIES.includes(a) ? a : null;
 }
 

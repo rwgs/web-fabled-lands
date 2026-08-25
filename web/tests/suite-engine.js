@@ -130,6 +130,47 @@ export async function run(ctx) {
     ok('task302: control — a core ability still resolves the way it always did',
        eng.rollDifficulty(g302, 'combat', 10, 0, null).abilityScore === g302.ability('combat'));
 
+    // --- task 304: the affliction term Defence never had ---------------------------------------
+    // defence() summed COMBAT, Rank, armour and auras and stopped there, so the corpus's ONE
+    // affliction naming Defence — §5.638's Curse of Vulnerability — had its −3 computed by
+    // afflictionBonus and read by nobody: the page said "cursed", the sheet listed the curse,
+    // and no number moved. defence() now delegates to defenceForMode, so the sheet score and
+    // every mode-aware read are the same sum and cannot drift apart again.
+    const g304 = GameState.create({ name:'Vuln', gender:'m', profession:'Warrior', book:5, adv });
+    g304.data.abilities.combat = 8; g304.data.rank = 3;
+    const D304 = g304.defence(), arm304 = g304.armourBonus();
+    const curse638 = (await data.getSection(5, '638')).querySelector('curse');
+    ok('task304: fixture — §5.638 still inflicts a curse naming Defence at −3',
+       !!curse638 && curse638.querySelector('effect[ability="defence"]')?.getAttribute('bonus') === '-3',
+       curse638 ? 'curse=' + curse638.getAttribute('name') : 'no <curse> in §5.638');
+    eng.applyEffect(curse638, g304, {});
+    ok('task304: the shipped Curse of Vulnerability takes 3 off Defence, as the page prints',
+       g304.defence() === D304 - 3, `${D304}->${g304.defence()}`);
+    ok('task304: the sheet score and the mode-aware read are one sum, so neither can drift',
+       g304.defence() === g304.abilityForMode('defence', null));
+    ok('task304: modifier="noarmour" keeps the curse — it strips the armour and nothing else',
+       g304.abilityForMode('defence', 'noarmour') === D304 - 3 - arm304,
+       'got ' + g304.abilityForMode('defence', 'noarmour') + ' want ' + (D304 - 3 - arm304));
+    ok('task304: modifier="natural" strips it with the rest of the unwritten terms',
+       g304.abilityForMode('defence', 'natural') === g304.abilityNatural('combat') + g304.rankValue());
+    eng.applyEffect(parse('<lose curse="Curse of Vulnerability"/>'), g304, {});
+    ok('task304: lifting the curse restores the Defence exactly',
+       g304.defence() === D304 && !g304.hasCurse('Curse of Vulnerability'), String(g304.defence()));
+    // The double-count question, asked from the side that would be silent: an affliction naming
+    // COMBAT already reaches Defence through the combat term, so it must move it by 1, not 2.
+    const gDbl = GameState.create({ name:'Dbl', gender:'m', profession:'Warrior', book:1, adv });
+    const dblBefore = gDbl.defence();
+    eng.applyEffect(parse('<curse name="Curse of Tambu"><effect ability="combat" bonus="-1"/></curse>'), gDbl, {});
+    ok('task304: a curse naming COMBAT moves Defence by exactly 1, not twice',
+       gDbl.defence() === dblBefore - 1, `${dblBefore}->${gDbl.defence()}`);
+    // ability="*" (§2.136 Leprosy) covers the six CORE abilities and never the derived stat,
+    // so it too arrives once, through COMBAT.
+    const gStar = GameState.create({ name:'Star', gender:'m', profession:'Warrior', book:1, adv });
+    const starBefore = gStar.defence();
+    eng.applyEffect(parse('<disease name="Leprosy"><effect ability="*" bonus="-1"/></disease>'), gStar, {});
+    ok('task304: an ability="*" affliction reaches Defence once, through COMBAT',
+       gStar.defence() === starBefore - 1, `${starBefore}->${gStar.defence()}`);
+
     // multi-attribute <if>: recognized attributes combine as OR (JaFL
     // IfNode.meetsConditions), then not="t" negates the whole result. (task 3)
     const gcond = GameState.create({ name:'C', gender:'m', profession:'Mage', book:1, adv });
