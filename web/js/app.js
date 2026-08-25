@@ -4,7 +4,7 @@ import * as data from './data.js';
 import { GameState, reconcileSlotMeta, deleteSlot, nextFreeSlot, readSlotData, importSave } from './state.js';
 import { ABILITIES, ABILITY_LABEL, ABILITY_BLURB, PROFESSIONS, rankTitle, ordinal } from './rules.js';
 import { Story } from './render.js';
-import { seedRng, reviveWithResurrection } from './engine.js';
+import { seedRng, reviveWithResurrection, applyBookChange } from './engine.js';
 import { renderSheet, modal, toast, escapeHtml, renderStatic } from './ui.js';
 import { VERSION } from './version.js';
 import { Narrator } from './tts.js'; // [TTS] optional narration — remove this + the [TTS] hooks below to drop the feature
@@ -861,7 +861,17 @@ async function navigate(book, section) {
     toast(`Section ${section} not found in Book ${book}.`, 'warn');
     return false;
   }
+  const fromBook = state.data.book;
   state.goTo(book, section);
+  // Standing <bookchange> rules fire on the crossing itself (task 299), between the move and
+  // the entry snapshot: the arriving page must already see the change, and undo must restore
+  // the state the PREVIOUS section was entered with — which is the snapshot taken before it.
+  // The bodies are stored markup, so the parse (a DOM job) happens here, as it does for an
+  // item's Use body in onUseItem.
+  const bcNotes = applyBookChange(state, fromBook, book, (body) => {
+    try { return data.parseXml(`<effect>${body}</effect>`); } catch { return null; }
+  });
+  if (bcNotes.length) toast(bcNotes.join(', '));
   state.snapshot(); // entry state for this section (before its effects run) — enables undo
   story.state = state;
   story.begin(sectionEl, book, section);

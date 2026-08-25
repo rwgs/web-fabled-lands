@@ -117,6 +117,7 @@ function freshData() {
     currencies: {},       // name -> amount (alternate-currency markets, e.g. Mithral — task 40)
     potionBonus: {},      // ability -> +N temporary boost from a drunk potion (task 41)
     extraChoices: [],     // {key, atBook, atSection, tag, book, section, text} persistent <extrachoice> menu (task 32)
+    bookChanges: [],      // {name, once, body} standing <bookchange> rules fired on a crossing (task 299)
     book: 1,
     section: null,
     startBook: 1,
@@ -746,6 +747,30 @@ export class GameState {
     return this.data.extraChoices.filter((c) =>
       (c.atSection != null && String(c.atSection) === String(section) && (c.atBook == null || Number(c.atBook) === Number(book)))
       || (c.tag && sectionTag && c.tag === sectionTag));
+  }
+
+  // ---- standing book-change rules (<bookchange>, task 299) -------------
+  // A rule the books "note on your Adventure Sheet" that fires on an EVENT rather than
+  // where it is written: book5/681's golden hair pays 20 Shards "whenever you travel to
+  // another book in the series". The effect body is kept as MARKUP (serialised at
+  // registration, re-parsed by the view at firing time) — the same contract an item's
+  // <effect type="use"> body keeps, and the only way a rule module holds markup without
+  // a DOM. Keyed by name= like addExtraChoice: a second visit to the granting section
+  // replaces rather than duplicates, and the name is the handle a cancel names.
+  addBookChange(rule) {
+    if (!rule || !rule.name) return; // a nameless rule could never be replaced or lifted
+    this.data.bookChanges = this.data.bookChanges.filter((r) => r.name !== rule.name);
+    this.data.bookChanges.push(rule);
+    this.changed();
+  }
+  /** Lift a standing rule (<lose bookchange="X">). True when one was actually removed. */
+  removeBookChange(name) {
+    if (!name) return false;
+    const before = this.data.bookChanges.length;
+    this.data.bookChanges = this.data.bookChanges.filter((r) => r.name !== name);
+    if (this.data.bookChanges.length === before) return false;
+    this.changed();
+    return true;
   }
 
   // ---- boxes / visit ticks --------------------------------------------
@@ -1398,6 +1423,14 @@ export function sanitizeData(raw) {
       section,
       text: asStr(o.text).trim(),
     };
+  }).filter(Boolean);
+  // Standing <bookchange> rules (task 299). `body` is our own serialised markup, so it
+  // passes through as a string; a rule with no name has no handle and is dropped.
+  out.bookChanges = asArr(d.bookChanges).map((r) => {
+    const o = asObj(r);
+    const name = asStr(o.name).trim();
+    if (!name) return null;
+    return { name, once: asBool(o.once), body: asStr(o.body) || null };
   }).filter(Boolean);
 
   out.book = asNum(d.book, base.book, { min: 1, int: true });

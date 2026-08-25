@@ -51,6 +51,10 @@ $script:FL_TAG_ATTRS = @{
     'choice' = 'book box currency dead flee god item pay profession revisit sail section shards tags'
     'goto' = 'book dead force hidden price sail section visit'
     'extrachoice' = 'atbook atsection book key remove section tag text'
+    # <bookchange> registers a standing rule keyed by name= whose body is the effect a
+    # CHANGE OF BOOK pays - book5/681's spun-gold hair, "20 Shards whenever you travel to
+    # another book". once='t' makes it fire only once; <lose bookchange=> lifts it. (task 299)
+    'bookchange' = 'name once'
     'if' = 'ability armour blessing bonus book cache cargo codeword crew curse dead dice disease docked equals gender god greaterthan group item lessthan modifier name not poison profession resurrection safeAddGod shards ship tags ticks title tool using var weapon'
     'elseif' = 'codeword crew equals god hidden item lessthan profession ship ticks title var weapon'
     'group' = 'force'
@@ -69,7 +73,7 @@ $script:FL_TAG_ATTRS = @{
     'failure' = 'book section var'
     # -- rewards, costs and state --
     'gain' = 'ability amount blessing codeword crew flag force hidden price shards title'
-    'lose' = 'ability amount armour blessing bonus cache cargo chance choose codeword crew curse disease fatal flag force god group hidden item itemAt multiple poison price resurrection shards ship stamina staminato tags title using weapon'
+    'lose' = 'ability amount armour blessing bonus bookchange cache cargo chance choose codeword crew curse disease fatal flag force god group hidden item itemAt multiple poison price resurrection shards ship stamina staminato tags title using weapon'
     'tick' = 'ability addbonus addtag amount blessing bonus cache cargo codeword count crew effect flag force god hidden item name permanent price profession quantity removetag shards special tags title titleAdjust titlePattern titleValue using weapon'
     'set' = 'cache codeword dock force hidden item modifier success tags value var weapon'
     'adjust' = 'ability amount codeword crew default god greaterthan item modifier name profession ship tags title titleVal value'
@@ -114,7 +118,7 @@ $script:FL_TAG_ATTRS = @{
 
 # Attributes whose value is a JaFL truth flag. The books write both letters and words.
 $script:FL_BOOL_ATTRS = @('force', 'hidden', 'dead', 'not', 'using', 'sail', 'start', 'revisit',
-                          'cumulative', 'permanent', 'supplemental', 'unique', 'visit', 'playerFirst', 'fatal')
+                          'cumulative', 'once', 'permanent', 'supplemental', 'unique', 'visit', 'playerFirst', 'fatal')
 $script:FL_BOOL_VALUES = @('t', 'f', 'true', 'false')
 
 # Closed value sets, mirroring the engine's own canonical lists (web/js/rules.js ABILITIES /

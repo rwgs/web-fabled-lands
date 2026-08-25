@@ -5,7 +5,7 @@
 	</p>
 	<p><tick codeword="Elk"/>.</p>
 	<p>
-		<!-- TODO: implement gold-hair effects -->
+		<bookchange name="5.681"><gain shards="20"/></bookchange>
 		This can be useful. Note than whenever you travel to another book in the <i>Fabled Lands</i> series you can add 20 Shards to your Adventure Sheet. This represents your hair growing, and you cutting it and selling the gold!
 	</p>
 	<p>When you are ready, <goto section="211"/>.</p>

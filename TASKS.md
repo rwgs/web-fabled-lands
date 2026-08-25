@@ -22,7 +22,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 299. nothing in the port fires on a change of BOOK, so book5/681's golden hair never pays the 20 Shards it promises on every crossing — and the corpus's only two `TODO` comments say so
+- [x] 299. nothing in the port fires on a change of BOOK, so book5/681's golden hair never pays the 20 Shards it promises on every crossing — and the corpus's only two `TODO` comments say so
 
 - [x] 296. `rewardWasteReason` refuses a new resurrection deal to anyone already holding one, where `addResurrection` implements the replacement the books print — so book1/597's third reward is dead to a deal-holder
 
@@ -1966,6 +1966,37 @@ Add the tag and its attributes to `build/validate-source.ps1`'s allowlist in the
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-24 (implementation pass, task 299): closed **299** — `<bookchange name="X"
+[once="t"]>` is now a standing rule the sheet carries and a change of book pays.
+`books/book5/681.xml` registers `5.681` with a `<gain shards="20"/>` body and
+`books/book5/587.xml` lifts it with `<lose bookchange="5.681">`; both `TODO` comments are gone,
+the corpus census is back to zero, and a tag-stripped diff of each file is byte-identical.
+Seventeen assertions. The suite moves `RESULT ALL PASS pass=2917 fail=0` → `pass=2934 fail=0`;
+`books/` changed, so this is a data rebuild. Nothing new filed.
+
+**The event had exactly two writers, and only one of them is a journey.** `data.book` is
+assigned in two places — `goTo` (every move) and `restoreReturn` (a `<return>` reversing a
+detour) — so "fires on a crossing" had one honest home: between `goTo()` and `snapshot()` in
+`app.navigate`, which is where the arriving page can see the change and undo still restores
+the departing section's entry state. A `<return>` deliberately counts no turn and pushes no
+history, so it fires nothing; that is an asymmetry (travelling back IS travelling to another
+book) but an **unreachable** one — of the 15 sections carrying a `<return>`, none is the target
+of a genuine cross-book `<goto>` in the shipped corpus. Recorded here rather than filed.
+
+**The body is markup, and the printed sentence stays outside the tag.** The rule fires long
+after its page is gone, so the body cannot be a live node — it is serialised at registration
+and re-parsed by the view at firing time, `readItemEffects`' contract for an item's Use body
+and the only way a rule module holds markup without a DOM. That makes the registration silent
+(a bare `<gain shards="20"/>` inside it would otherwise print filler on the granting page), so
+book5/681's own three sentences sit beside the tag, not inside it, and `renderBookChange`
+prints nothing at all.
+
+**The negative controls are what the assertions are really for.** Three of the seventeen say
+what must NOT happen: the body does not apply on the page that prints it, a move within the
+same book fires nothing, and a `once="t"` rule that has fired pays nothing on the next
+crossing. The end-to-end arc — §5.681 → another book → §5.587 → another book — is one
+assertion that the whole family composes: exactly one 20-Shard payment.
 
 Filed 2026-08-24 (finding pass, no code): **299** — nothing fires on a change of book, so
 book5/681's printed 20-Shards-per-crossing is never paid and book5/587's cancel has nothing to

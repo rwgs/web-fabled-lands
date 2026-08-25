@@ -1207,6 +1207,84 @@ export async function run(ctx) {
       ok('task32: it does NOT surface at a non-temple section', !c32t.querySelector('.extra-choice'));
     }
 
+    // --- task 299: <bookchange> — a standing rule fired by a change of BOOK ---------
+    { // block-scoped so its consts can't collide with the rest of run()
+      // The view's job at firing time: turn a stored body string back into a node. Mirrors
+      // app.navigate's parse, which is the only DOM the rule module is allowed to want.
+      const bcParse = (body) => parse(`<effect>${body}</effect>`);
+      const cross = (g, from, to) => eng.applyBookChange(g, from, to, bcParse);
+      const mkStory = (g) => new Story(document.createElement('div'), g, { navigate(){}, onDeath(){}, notify(){} });
+
+      // Registration is silent book-keeping: the rule reaches the sheet, its body does NOT
+      // apply on the page that prints it, and the page's own printed sentence survives.
+      const g299 = GameState.create({ name:'BC', gender:'m', profession:'Warrior', book:5, adv });
+      const c299 = document.createElement('div');
+      const st299 = new Story(c299, g299, { navigate(){}, onDeath(){}, notify(){} });
+      const purse299 = g299.data.shards;
+      st299.begin(parse('<section name="681"><p><bookchange name="5.681"><gain shards="20"/></bookchange> Your hair is spun gold.</p></section>'), 5, '681');
+      ok('task299: <bookchange> registers a standing rule on the sheet',
+        g299.data.bookChanges.length === 1 && g299.data.bookChanges[0].name === '5.681' && /gain/.test(g299.data.bookChanges[0].body || ''),
+        JSON.stringify(g299.data.bookChanges));
+      ok('task299: its body does NOT apply on the page that prints it', g299.data.shards === purse299, `${g299.data.shards} vs ${purse299}`);
+      ok('task299: the registration is silent, and the printed prose still renders',
+        !/20 Shards/.test(c299.textContent) && /Your hair is spun gold/.test(c299.textContent), c299.textContent);
+
+      // A move within the same book is not a crossing; a move to another book is.
+      ok('task299: a move within the same book fires nothing', cross(g299, 5, 5).length === 0 && g299.data.shards === purse299);
+      const notes299 = cross(g299, 5, 3);
+      ok('task299: a crossing to another book fires the rule', g299.data.shards === purse299 + 20 && /\+20 Shards/.test(notes299.join(',')), `${g299.data.shards} ${notes299.join(',')}`);
+      cross(g299, 3, 5);
+      ok('task299: a plain rule pays on EVERY crossing', g299.data.shards === purse299 + 40 && g299.data.bookChanges.length === 1, String(g299.data.shards));
+
+      // once="t" deregisters after its first firing.
+      const g299o = GameState.create({ name:'BC1', gender:'m', profession:'Warrior', book:1, adv });
+      mkStory(g299o).begin(parse('<section name="t"><bookchange name="once.1" once="t"><gain shards="7"/></bookchange></section>'), 1, 't');
+      const purseO = g299o.data.shards;
+      cross(g299o, 1, 2);
+      ok('task299: a once="t" rule pays and then deregisters', g299o.data.shards === purseO + 7 && g299o.data.bookChanges.length === 0, String(g299o.data.shards));
+      cross(g299o, 2, 3);
+      ok('task299: the deregistered rule pays nothing on the next crossing', g299o.data.shards === purseO + 7, String(g299o.data.shards));
+
+      // Same name replaces rather than duplicates; a nameless rule is refused.
+      const g299r = GameState.create({ name:'BC2', gender:'m', profession:'Warrior', book:1, adv });
+      const st299r = mkStory(g299r);
+      st299r.begin(parse('<section name="a"><bookchange name="dup"><gain shards="5"/></bookchange></section>'), 1, 'a');
+      st299r.begin(parse('<section name="b"><bookchange name="dup"><gain shards="9"/></bookchange></section>'), 1, 'b');
+      ok('task299: a second registration under one name replaces rather than duplicates',
+        g299r.data.bookChanges.length === 1 && /9/.test(g299r.data.bookChanges[0].body || ''), JSON.stringify(g299r.data.bookChanges));
+      st299r.begin(parse('<section name="c"><bookchange><gain shards="5"/></bookchange></section>'), 1, 'c');
+      ok('task299: a rule with no name= is refused', g299r.data.bookChanges.length === 1);
+
+      // The rules survive a save round trip, bodies and all.
+      const round299 = sanitizeData(JSON.parse(JSON.stringify(g299r.data)));
+      ok('task299: standing rules survive a sanitize round-trip, bodies and all',
+        round299.bookChanges.length === 1 && round299.bookChanges[0].name === 'dup' && /shards="9"/.test(round299.bookChanges[0].body || ''),
+        JSON.stringify(round299.bookChanges));
+
+      // <lose bookchange="X"> lifts the rule and stops it paying.
+      const st299l = mkStory(g299r);
+      st299l.begin(parse('<section name="d"><p><lose bookchange="dup">the rule ends</lose>.</p></section>'), 1, 'd');
+      ok('task299: <lose bookchange=> lifts the standing rule', g299r.data.bookChanges.length === 0);
+      const purseL = g299r.data.shards;
+      cross(g299r, 1, 2);
+      ok('task299: a lifted rule pays nothing on the next crossing', g299r.data.shards === purseL, String(g299r.data.shards));
+
+      // The corpus end to end: §5.681 grants it, a crossing pays, §5.587 cancels it, and the
+      // next crossing pays nothing — exactly one 20-Shard payment for the whole arc.
+      const g299c = GameState.create({ name:'Elk', gender:'m', profession:'Warrior', book:5, adv });
+      const st299c = mkStory(g299c);
+      const purseC = g299c.data.shards;
+      st299c.begin(await data.getSection(5, '681'), 5, '681');
+      ok('task299: book5/681 registers the golden-hair rule and pays nothing yet',
+        g299c.data.bookChanges.length === 1 && g299c.data.shards === purseC && g299c.hasCodeword('Elk'), JSON.stringify(g299c.data.bookChanges));
+      cross(g299c, 5, 1);
+      ok('task299: travelling to another book pays the 20 Shards', g299c.data.shards === purseC + 20, String(g299c.data.shards));
+      st299c.begin(await data.getSection(5, '587'), 5, '587');
+      ok('task299: book5/587 lifts it (and the codeword with it)', g299c.data.bookChanges.length === 0 && !g299c.hasCodeword('Elk'));
+      cross(g299c, 5, 2);
+      ok('task299: the whole arc pays exactly once', g299c.data.shards === purseC + 20, String(g299c.data.shards));
+    }
+
     // --- task 64: asset-only releases invalidate the PWA cache + illus precache ---
     { // block-scoped
       const swSrc = await (await fetch('./sw.js')).text();

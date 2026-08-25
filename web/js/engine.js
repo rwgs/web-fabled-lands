@@ -630,6 +630,9 @@ function applyLose(el, state, opts) {
       notes.push(state.isBlessingPermanent(b) ? 'blessing invoked (permanent)' : 'lost blessing');
     }
   }
+  // Lift a standing <bookchange> rule by name — book5/587's "You can no longer receive 20
+  // Shards every time you travel to another book", the cancel half of the family. (task 299)
+  if (get('bookchange') != null) { if (state.removeBookChange(get('bookchange'))) notes.push('rule lifted'); }
   if (get('curse') != null) { if (state.removeCurse(get('curse'))) notes.push('curse lifted'); }
   if (get('disease') != null) { if (state.removeDisease(get('disease'))) notes.push('cured disease'); }
   if (get('poison') != null) { if (state.removePoison(get('poison'))) notes.push('cured poison'); }
@@ -1515,6 +1518,28 @@ export function useItemEffect(state, item, effect, bodyNode = null) {
     state.changed();
   }
   return { removeItem, goto, image };
+}
+
+/** Fire the player's standing <bookchange> rules for a move from book `from` to book `to`
+ *  (task 299). A move WITHIN a book is not a crossing and fires nothing; a crossing pays
+ *  every registered rule, which is what book5/681's golden hair promises — 20 Shards
+ *  "whenever you travel to another book in the series". Each rule's body was stored as
+ *  markup at registration (a rule module cannot hold a DOM), so the VIEW supplies `parse`:
+ *  one body string in, a parsed node or null out. An inner <goto> is deliberately ignored —
+ *  the rule fires DURING a move the player has already committed to, so it has no
+ *  navigation of its own to offer. A once="t" rule deregisters after its first firing;
+ *  a plain one keeps paying. Returns the effect notes for the caller to surface. */
+export function applyBookChange(state, from, to, parse) {
+  if (Number(from) === Number(to)) return [];
+  const log = [];
+  for (const rule of state.data.bookChanges.slice()) {
+    if (rule.body) {
+      const node = parse(rule.body);
+      if (node) applyEffectBody(node, state, log); // a <goto> inside is inert here
+    }
+    if (rule.once) state.removeBookChange(rule.name);
+  }
+  return log;
 }
 
 /** Evaluate a <set value="..."> expression. A recursive-descent parser over the

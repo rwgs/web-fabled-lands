@@ -136,6 +136,10 @@ const TAG_RENDERERS = {
   // Explicit entries let the default case become strict later.
   field:           (s, c, n, p) => s.renderField(c, n, p),
   extrachoice:     (s, c, n, p) => s.renderExtraChoice(c, n, p),
+  // <bookchange> registers a standing rule fired on a change of book (task 299) — silent
+  // book-keeping, like an <extrachoice remove>: its body is the effect the CROSSING pays,
+  // never anything this page prints.
+  bookchange:      (s, c, n, p) => s.renderBookChange(c, n, p),
   // <while var="V"> repeats its body until V is assigned (task 100): each pass is a
   // fresh iteration with its own roll/effects, and a live unterminated loop blocks
   // the rest of the section (JaFL WhileNode holds execution until the loop ends).
@@ -1484,6 +1488,29 @@ export class Story {
     }
     // Show the note's descriptive text (a <extrachoice remove> is silent).
     if (!remove) { const span = document.createElement('span'); this.appendChildren(span, node, path); container.appendChild(span); return span; }
+    return null;
+  }
+
+  // <bookchange name="X" [once="t"]> — register a standing rule the sheet carries and the
+  // CROSSING to another book pays: book5/681's spun-gold hair, "whenever you travel to
+  // another book in the series you can add 20 Shards". Registration is silent book-keeping
+  // applied once per visit; the body is serialised as markup and applied by
+  // engine.applyBookChange at firing time, so it must NOT apply on the page that prints it.
+  // The body holds markup only — the book's own sentence stays outside the tag, where the
+  // walk prints it as ordinary prose. A rule with no name= has no handle to be replaced or
+  // lifted by, and is refused. (task 299)
+  renderBookChange(container, node, path) {
+    const memo = 'bc@' + path;
+    if (this.ctx.applied.has(memo)) return null;
+    this.ctx.applied.add(memo);
+    const name = node.getAttribute('name');
+    if (name) {
+      this.state.addBookChange({
+        name,
+        once: boolAttr(node.getAttribute('once')),
+        body: Array.from(node.children).map((c) => new XMLSerializer().serializeToString(c)).join('') || null,
+      });
+    }
     return null;
   }
 
