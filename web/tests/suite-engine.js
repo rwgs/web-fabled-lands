@@ -38,6 +38,40 @@ export async function run(ctx) {
     ok('if var greaterthan', eng.evaluateCondition(parse('<if var="x" greaterthan="4"/>'), gs));
     ok('if var lessthan false', eng.evaluateCondition(parse('<if var="x" lessthan="3"/>'), gs) === false);
 
+    // --- task 303: `defence` is the third derived stat the condition path has to route --------
+    // firstAbility() knows the six CORE abilities only, so <if ability="defence"> fell to the
+    // else arm and compared 0. Task 68 added arms for `rank` and `stamina` and stopped there.
+    // Both shipped sites therefore took the wrong branch for every character, every visit.
+    // The greaterthan case is pinned at a Defence that CLEARS the threshold, because that is
+    // the one the bug made indistinguishable from an honest failure: 0 > 13 is false, and so
+    // is 16 > 13 when the 16 never reaches the comparison.
+    const gdef = GameState.create({ name:'Def', gender:'m', profession:'Warrior', book:1, adv });
+    gdef.data.abilities.combat = 12; gdef.data.rank = 3;
+    const D303 = gdef.defence();
+    ok('task303: fixture — a Defence that clears §5.361\'s printed threshold ('+D303+')', D303 >= 14);
+    ok('task303: <if ability="defence" greaterthan=> is TRUE when Defence clears it',
+       eng.evaluateCondition(parse('<if ability="defence" greaterthan="13"/>'), gdef) === true);
+    ok('task303: ...and FALSE when it does not — the comparison is real, not always-true',
+       eng.evaluateCondition(parse('<if ability="defence" greaterthan="'+D303+'"/>'), gdef) === false);
+    gdef.setVar('x', D303 - 1);
+    ok('task303: §1.313 the daggers MISS when the dice total is under Defence',
+       eng.evaluateCondition(parse('<if ability="defence" lessthan="x"/>'), gdef) === false);
+    gdef.setVar('x', D303 + 1);
+    ok('task303: §1.313 the daggers HIT when the dice total beats Defence',
+       eng.evaluateCondition(parse('<if ability="defence" lessthan="x"/>'), gdef) === true);
+    // The shipped markup itself, not a transcription of it — so a re-worded section is caught.
+    const if361 = (await data.getSection(5, '361')).querySelector('if[ability="defence"]');
+    ok('task303: §5.361 grants its §160 route to a Defence of 14 or more',
+       !!if361 && eng.evaluateCondition(if361, gdef) === true,
+       if361 ? 'the shipped <if> evaluated false at Defence '+D303 : 'no <if ability="defence"> in §5.361');
+    const if313 = (await data.getSection(1, '313')).querySelector('if[ability="defence"]');
+    gdef.setVar('x', D303 - 1);
+    ok('task303: §1.313 spares a high-Defence character the dagger it always threw',
+       !!if313 && eng.evaluateCondition(if313, gdef) === false,
+       if313 ? 'the shipped <if> evaluated true at Defence '+D303+' vs x='+(D303-1) : 'no <if ability="defence"> in §1.313');
+    ok('task303: control — task 68\'s rank arm still routes',
+       eng.evaluateCondition(parse('<if ability="rank" greaterthan="2"/>'), gdef) === true);
+
     // multi-attribute <if>: recognized attributes combine as OR (JaFL
     // IfNode.meetsConditions), then not="t" negates the whole result. (task 3)
     const gcond = GameState.create({ name:'C', gender:'m', profession:'Mage', book:1, adv });

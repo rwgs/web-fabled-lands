@@ -275,13 +275,18 @@ export function evaluateCondition(el, state, opts = {}) {
   // §5.680's branch open with no wand and gave away the ring of ultimate power). (task 128)
   const hasEquipSelector = get('weapon') != null || get('armour') != null || get('tool') != null;
   if (!hasEquipSelector) add(get('ability'), () => {
-    // `rank`/`stamina` are stats, not core abilities — firstAbility() ignores them,
-    // so route them the way evalExpression/adjustAmount do (else the comparison ran
+    // `rank`/`stamina`/`defence` are stats, not core abilities — firstAbility() ignores
+    // them, so route them the way evalExpression/adjustAmount do (else the comparison ran
     // against 0: every `<if ability="rank" greaterthan=N>` gate stayed shut). (task 68)
+    // `defence` is the third of them and was left out until task 303: §5.361's "if your
+    // Defence is 14 or more" compared 0 > 13 and shut its §160 route at ANY Defence, and
+    // §1.313's `lessthan="x"` compared 0 < the 2-dice total — true for every roll of 2-12,
+    // so the daggers always hit and the printed "the daggers all miss" was unreachable.
     const spec = get('ability').split('|')[0].trim().toLowerCase();
     const natural = normalize(get('modifier') || '') === 'natural';
     let v;
     if (spec === 'rank') v = state.rankValue();
+    else if (spec === 'defence') v = state.defence();
     else if (spec === 'stamina') v = get('modifier') ? state.effectiveStaminaMax() : state.data.stamina;
     else { const ab = firstAbility(get('ability')); v = ab ? state.abilityForCheck(ab, natural) : 0; }
     const cmp = compare(v);

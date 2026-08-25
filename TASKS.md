@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 299 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **302 is open in LOW**. File new
+misdiagnosis (see the Review log); **302 is open in LOW, 304 in MEDIUM**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -21,6 +21,10 @@ there once the buckets below are clear.
 - [x] 294. book4/257 leaves a mixed pair of rolls with no exit at all, so succeeding one check and failing the other ends the adventure
 
 **MEDIUM**
+
+- [x] 303. `<if ability="defence">` compares against 0, not the player's Defence, so book5/361's §160 route is unreachable at any Defence and book1/313's daggers always hit — task 68's fix for `rank`/`stamina`, never extended to the third stat
+
+- [ ] 304. `defence()` sums items, Rank and auras but not afflictions, so book5/638's Curse of Vulnerability subtracts its 3 points from nothing and the curse is inert
 
 - [x] 299. nothing in the port fires on a change of BOOK, so book5/681's golden hair never pays the 20 Shards it promises on every crossing — and the corpus's only two `TODO` comments say so
 
@@ -2129,11 +2133,154 @@ rejection to an acceptance, and the engine gains the assertion that the mode cha
 
 ---
 
+## 303. `<if ability="defence">` compares against 0, not the player's Defence, so book5/361's §160 route is unreachable at any Defence and book1/313's daggers always hit
+
+**Priority: MEDIUM — live, on two shipped pages, wrong on every visit.** Not an edge case and not a
+latent trap: both sections take the wrong branch for every character in every playthrough, and one
+of them charges Stamina for it.
+
+*(Filed 2026-08-25 while implementing task 302, which needs this route to exist.)*
+
+**The bug is one missing `else if`.** `engine.js evaluateCondition` routes an `ability=` comparison
+through `firstAbility`, and `ABILITIES` (`rules.js`) is **the six core abilities only** — `rank`,
+`stamina` and `defence` are derived stats, not members. Task 68 saw this and added arms for `rank`
+and `stamina`:
+
+```js
+if (spec === 'rank') v = state.rankValue();
+else if (spec === 'stamina') v = get('modifier') ? state.effectiveStaminaMax() : state.data.stamina;
+else { const ab = firstAbility(get('ability')); v = ab ? state.abilityForCheck(ab, natural) : 0; }
+```
+
+`defence` falls to the `else`, `firstAbility('defence')` returns `null`, and **`v = 0`**. Task 68's
+own comment names the failure — *"else the comparison ran against 0: every `<if ability="rank"
+greaterthan=N>` gate stayed shut"* — and it is the third stat's turn.
+
+**Measured, not read.** A character with COMBAT 8 and Rank 3 has `defence() = 11`, and
+`ability('defence')` reads **1** (0 clamped) because `defence` is not a key in `data.abilities`:
+
+- **book5/361** — *"If your Defence is 14 or more, `<goto section="160"/>`."* Markup:
+  `<if ability="defence" greaterthan="13">`. Evaluates `0 > 13` → false. Raising the character to
+  Defence **17** and re-evaluating still returns **false**: §160 is unreachable at *any* Defence,
+  and every player falls through to §271.
+- **book1/313** — *"If the total is higher than your Defence, a dagger hits you and you lose 1-6
+  Stamina."* Markup: `<if ability="defence" lessthan="x">` with `x` the 2-dice total. Evaluates
+  `0 < x`, true for every roll of 2-12, so **the daggers always hit** and the `<else>` ("the daggers
+  all miss") is unreachable. The printed odds are roughly even for a mid-game Defence; the port
+  charges 1-6 Stamina unconditionally.
+
+**The fix.** One arm, resolving it the way `evalExpression` already does (`engine.js`: `if (w ===
+'defence') return state.defence();`) — which is precisely the rule task 68 wrote down: *route them
+the way evalExpression/adjustAmount do*. `adjustAmount` and `rollDifficulty` have the same hole for
+`defence`, but **no corpus section uses `<adjust ability="defence">` or `<difficulty
+ability="defence">`** (the census is `<if>` ×2 and `<effect>` ×5, nothing else), so extending them
+is task 302's business where it needs a roll path, not this one's.
+
+**Assertions.** `<if ability="defence" greaterthan="N">` is true exactly when `defence()` exceeds N
+and false when it does not — pinned at a Defence that clears the threshold, since that is the case
+the bug makes indistinguishable from failure; `<if ability="defence" lessthan="var">` matches only
+when the var beats Defence; and the two shipped sections evaluate the branch the printed sentence
+describes. A control on `rank` keeps task 68's arm honest.
+
+---
+
+## 304. `defence()` sums items, Rank and auras but not afflictions, so book5/638's Curse of Vulnerability subtracts its 3 points from nothing and the curse is inert
+
+**Priority: MEDIUM — live, and the rule does literally nothing.** One shipped page, one curse, zero
+effect: the player is told they are cursed, the sheet shows the curse, and no number moves.
+
+*(Filed 2026-08-25 while implementing task 302, alongside 303 — same method, same family.)*
+
+**Every other contributor is there.** `state.js defence()` reads:
+
+```js
+return this.ability('combat') + this.rankValue() + this.armourBonus() + this.auraBonus('defence');
+```
+
+`ability('combat')` folds in `itemBonus`, `effectBonus`, `afflictionBonus`, `auraBonus` and
+`potionBonusFor` — **for COMBAT**. `rankValue()` adds the ring's aura. `armourBonus()` is the worn
+armour. `auraBonus('defence')` catches the `type="aura"`/`type="wielded"` effects that name Defence
+directly (the sword of stone, ring of guarding, Jade Defender — 4 of the corpus's 5
+`<effect ability="defence">` sites). What is missing is **`afflictionBonus('defence')`**, the fifth.
+
+**The one site, and it is a curse.** `books/book5/638.xml`:
+
+```xml
+<curse name="Curse of Vulnerability">
+    <effect ability="defence" bonus="-3"/>
+```
+
+Measured: with COMBAT 8 and Rank 3, `afflictionBonus('defence')` returns **-3** correctly — the sum
+is computed and then never read. `defence()` is **11** before the curse and **11** after; the book
+says 8. Because `combat.js` takes the player's Defence from `state.defence()`, the curse is inert in
+fights too, which is the only place a Defence penalty was ever going to bite.
+
+**Why it reads as an oversight rather than a decision.** `effectiveStaminaMax()` and `rankValue()`
+— the two sibling derived stats — both fold in their affliction/aura contributions, and
+`afflictionBonus` is written to take any ability key including `defence`. Nothing in the file argues
+for the exclusion.
+
+**The fix.** Add `+ this.afflictionBonus('defence')` to `defence()`. Watch the double-count
+question and answer it in a comment: a `<curse><effect ability="combat">` is already inside
+`ability('combat')`, so only effects naming `defence` itself are added here, which is exactly what
+`afflictionBonus('defence')` returns. Consider `afflictionMod` too — a `divide`/`target` transform
+naming `defence` would have the same problem — but no corpus affliction does, so leave it and say
+so.
+
+**Assertions.** Applying book5/638's curse drops `defence()` by exactly 3 and lifting it restores
+the original; a curse naming COMBAT moves Defence by its COMBAT effect once and not twice; and a
+fight against a cursed player reads the reduced Defence.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-25 (implementation pass, task 303): closed **303** — `<if ability="defence">` routes
+through `state.defence()` instead of falling to `firstAbility`, which knows the six core abilities
+only and returned `null`, making the comparison run against **0**. One `else if` in
+`engine.js evaluateCondition`, nine assertions in `suite-engine`. The suite moves
+`RESULT ALL PASS pass=2935 fail=0` → `pass=2943 fail=0`; `web/` only, so a stamp and not a data
+rebuild.
+
+**Two shipped pages were wrong on every visit, in opposite directions.** §5.361 prints *"If your
+Defence is 14 or more"* and marks it `greaterthan="13"`: against 0 that is false, so the §160 route
+was shut for **every character at every Defence** — a character measured at Defence 17 still fell
+through to §271. §1.313 prints *"if the total is higher than your Defence, a dagger hits you"* and
+marks it `lessthan="x"`: against 0 that is true for every 2-dice total of 2-12, so the daggers
+**always** hit and the printed "the daggers all miss" `<else>` was unreachable. The first silently
+removes a route; the second silently charges 1-6 Stamina on a coin-flip the player was supposed to
+be able to win.
+
+**This is task 68 finishing.** That task found the same hole for `rank` and `stamina` and wrote the
+rule down in the comment it left — *route them the way `evalExpression`/`adjustAmount` do* — and
+`evalExpression` has resolved `defence` to `state.defence()` the whole time. What it did not do is
+enumerate the derived stats: there are **three**, and the fix listed two. The lesson worth keeping
+is that **`ABILITIES` is a six-element list and every read of it is a place a derived stat can fall
+through** — the same shape may still be open in `adjustAmount` and `rollDifficulty`, which is left
+alone here because no shipped section uses `<adjust ability="defence">` or `<difficulty
+ability="defence">` (the census is `<if>` ×2 and `<effect>` ×5, nothing else).
+
+**The assertions were checked against the broken engine before being trusted.** Removing the new
+`else if` and re-running fails exactly four of the nine and passes the other five, which is the
+point: the five that survive (Defence *not* clearing the bar, the dice total *beating* Defence, the
+`rank` control) are the cases where 0 and the true Defence happen to agree, and an assertion suite
+made only of those would have reported a clean pass over the bug. The `greaterthan` case is
+deliberately pinned at a Defence that **clears** its threshold, because that is the only side the
+defect makes indistinguishable from an honest failure. Two of the nine evaluate the real §5.361 and
+§1.313 elements out of the bundled data rather than a transcription, so a re-worded section is
+caught rather than silently passing against a fixture nobody updated.
+
+**Found while implementing 302, and it blocked it.** `modifier="noarmour"` excludes the armour's
+bonus, and in this port armour reaches no core ability — `itemBonus` covers tools and the wielded
+weapon, and `armourBonus()` feeds `defence()` alone. So `noarmour` is only ever observable on
+Defence, and Defence did not reach `abilityForMode` at all. Implementing 302's half without this
+would have shipped a branch nothing could reach and a gate word that still silently meant "full
+score" — the exact fall-through 302 exists to prevent. **304** was filed on the same pass and is
+independent.
 
 Worked 2026-08-25 (implementation pass, task 301): closed **301** as a non-issue and filed **302**
 in its place. The whole pass is one lesson: **301 was filed without reading `rules/`, and reading
