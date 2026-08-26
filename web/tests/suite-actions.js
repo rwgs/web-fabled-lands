@@ -3772,6 +3772,58 @@ export async function run(ctx) {
       ok('task119: groupPlan collects flag-linked awards outside the group (task 125)',
          linked.kind === 'action' && linked.linkedAwards.length === 1 && linked.linkedAwards[0].getAttribute('name') === 'potion of restoration');
 
+      // task 308: the group stands in for the award's own Take, and every Take a payment arms
+      // grants ONE reward and consumes the flag. So a key naming two or more rewards is not the
+      // group's to spend: granting on its behalf would hand over every item row at once and, by
+      // consuming the flag, leave a blessing/deal row on the same key permanently dead. The
+      // group's <lose price=> arms the flag either way, so the picks are live for the player.
+      const menu308 = parse('<section><group><text>Pay 100</text><lose shards="100" price="k"/></group>'
+        + '<item flag="k" name="amber wand"/><item flag="k" name="silver ring"/><tick blessing="storm" flag="k"/></section>');
+      ok('task308: a group paying for a choose-one menu plans none of its item rows',
+         rules.groupPlan(menu308, menu308.querySelector('group')).linkedAwards.length === 0
+           && rules.isChooseOne(menu308, 'k') === true);
+      const barter308 = parse('<section><group><text>Hand it over</text><lose item="pearls" price="k"/></group>'
+        + '<item flag="k" name="magic trident"/><item flag="k" name="ink sac"/></section>');
+      ok('task308: nor a pure item-family barter, where one payment still buys one row',
+         rules.groupPlan(barter308, barter308.querySelector('group')).linkedAwards.length === 0
+           && rules.isPricedItemAward(barter308, 'k') === true);
+      const solo308 = parse('<section><group><text>Pay 100</text><lose shards="100" price="k"/></group>'
+        + '<item flag="k" name="potion of restoration"/><tick blessing="storm" flag="j"/></section>');
+      ok('task308: a lone reward on the key is still planned, with another key beside it',
+         rules.groupPlan(solo308, solo308.querySelector('group')).linkedAwards.length === 1);
+
+      // The census the guard was scoped against, over the bundled corpus (per task 270). Both
+      // arms are INERT for the published edition — every non-roll <group> carrying a price=
+      // names exactly one reward on that key, so nothing shipped changes hands differently.
+      // A section arriving with two wants measuring, not assuming (the task 286 idiom).
+      {
+        const paid308 = [], multi308 = [];
+        for (const b of data.availableBooks()) {
+          const raw = await data.loadBook(b);
+          for (const key of Object.keys(raw)) {
+            if (!/<group\b/i.test(raw[key]) || !/\bprice\s*=/i.test(raw[key])) continue;
+            const sec = parse(raw[key]);
+            if (!sec) continue;
+            for (const g of sec.querySelectorAll('group')) {
+              const plan = rules.groupPlan(sec, g);
+              if (plan.kind !== 'action') continue;
+              for (const fx of plan.effects) {
+                const k = fx.getAttribute('price');
+                if (!k) continue;
+                const rewards = rules.linkedRewards(sec, k);
+                if (!rewards.some((r) => rules.ITEM_FAMILY_TAGS.has(r.tagName.toLowerCase()) && !g.contains(r))) continue;
+                paid308.push(b + '/' + key);
+                if (rewards.length !== 1) multi308.push(b + '/' + key + ' key=' + k + ' n=' + rewards.length);
+              }
+            }
+          }
+        }
+        ok('task308: exactly two shipped sections pair a group price with an item award outside it',
+           paid308.sort().join(' ') === '1/342 4/111', paid308.join(' '));
+        ok('task308: and neither names a second reward on that key, so both still grant',
+           multi308.length === 0, multi308.join(' '));
+      }
+
       // task 246: an action group's effect list is DERIVED from engine.js's passive-effect
       // set, not written out beside it. Task 230's silent drop was that copy missing
       // <adjustmoney>, and a group renders only its button — it never walks its children —

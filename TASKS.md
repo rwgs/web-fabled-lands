@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 307 is complete (listed under **Done** below or in the buckets), apart from 207,
-withdrawn as a misdiagnosis (see the Review log); **308 is open in LOW**. File new
+withdrawn as a misdiagnosis (see the Review log); **no task is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -32,7 +32,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 308. `groupPlan.linkedAwards` grants EVERY item-family award sharing the price flag, where the Take path it stands in for grants one — so a `<group>` paying for a "choose one" menu would hand over the whole item half of it and kill the rest
+- [x] 308. `groupPlan.linkedAwards` grants EVERY item-family award sharing the price flag, where the Take path it stands in for grants one — so a `<group>` paying for a "choose one" menu would hand over the whole item half of it and kill the rest
 
 - [x] 307. a `<group>` that pays for a flag-linked award grants it and leaves the award's own Take button on the page, disabled and captioned "Pay first to choose this." — so book1/342 offers to sell you a potion you are already carrying
 
@@ -2247,7 +2247,8 @@ fight against a cursed player reads the reduced Defence.
 latent case to close before it ships, not a live defect. Filed the way task 286's census arms were:
 a section arriving in the list wants measuring, not assuming.
 
-*(Filed 2026-08-26 while implementing task 307, which read the same seam from the view side.)*
+*(Filed 2026-08-26 while implementing task 307, which read the same seam from the view side, and
+closed the same day — the fix section records where implementing it moved the line.)*
 
 **The asymmetry.** `renderItemAward` routes a flag-linked award two ways and the two are mutually
 exclusive by construction: `isChooseOne` (two or more linked rewards, at least one of them NOT
@@ -2272,22 +2273,34 @@ state that should never have been reached.
 **Census (shipped corpus, per task 270).** Every non-roll `<group>` carrying a `price=`, against the
 `[flag=]` rewards outside it: **two sections, one reward each, both item-family** — `book1/342` and
 `book4/111`, the same potion of restoration on the same shape. No group in the published edition
-pays for a choose-one menu, so nothing is mis-granted today.
+pays for a menu of any kind, so nothing is mis-granted today and the guard changes no shipped page.
 
-**Suggested fix.** Give `linkedAwards` the guard the view already has: skip the key entirely when
-`isChooseOne(sectionEl, k)` — a choose-one menu's payment is not the group's to spend on the
-player's behalf, since the whole point of the menu is that the player names the reward. Both
-helpers live in `render-rules.js`, so the guard is one call and no new concept. Whether the group
-should then render the menu's picks at all is the open question: the group collapses to a button,
-so a menu it pays for has no live pick until the next render — which is the shape task 307 just
-showed is *not* hidden, so the picks would in fact be there, armed. Worth measuring before
-choosing.
+**The fix, and why it is not the one first sketched.** The obvious guard is `isChooseOne` — skip
+the key when the menu is heterogeneous. Implementing it showed that helper is the wrong line to
+draw: `isPricedItemAward` covers a *pure item-family barter* too, and §4.634 is one — three goods
+on one flag, where taking one clears the flag and re-locks the other two. `isChooseOne` is false
+there (no non-item row), so an `isChooseOne` guard would still have let a group hand over all
+three. The invariant is not "is this menu heterogeneous" but **how many rewards the key names**:
+every Take path a payment arms grants ONE reward and consumes the flag, so the group can stand in
+for it only where there is exactly one to stand in for. The shipped guard is
+`linkedRewards(sectionEl, k).length !== 1 → skip`, which subsumes both shapes and reads as what it
+means.
 
-**Assertions to write.** Over a fixture section (nothing in the corpus to drive): a `<group>` whose
-`price=` key has two item awards plus a blessing plans **no** linked awards; the same group with a
-single item award still plans it (task 125's shape, unchanged). Plus the corpus census above as a
-standing assertion, so a book conversion that introduces the shape fails here rather than shipping
-it.
+The open question — whether a skipped menu then has any live pick, since the group collapses to a
+button — settles by reading `engine.js`: the group's own `<lose price=>` **arms the flag**
+(`applyEffect`, `state.setFlag(get('price'), true)`), and task 307 established that the branch
+holding the picks is not re-decided mid-visit. So the picks are on the page and armed on the
+redraw, and the player names his own reward. Nothing needed adding for that.
+
+**Assertions.** Three fixtures, since the corpus drives none of it: a group paying a key carrying
+two items plus a blessing plans no linked awards (and `isChooseOne` confirms the fixture is the
+shape claimed); a pure two-item barter likewise (with `isPricedItemAward` confirming it); and a
+lone reward on the key is still planned with a second key beside it, so the guard is narrowing by
+count and not by "is there more than one key". Plus the census as a standing assertion in the task
+286 idiom — exactly `1/342 4/111` pair a group price with an item award outside it, and neither
+names a second reward on that key — so a book conversion that introduces the shape fails here
+rather than shipping it. Verified as regression tests by disabling the guard alone: both
+`task308` fixture arms fail, the census arms do not.
 
 ## 307. a `<group>` that pays for a flag-linked award grants it and leaves the award's own Take button on the page, disabled and captioned "Pay first to choose this." — so book1/342 offers to sell you a potion you are already carrying
 

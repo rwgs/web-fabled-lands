@@ -386,11 +386,18 @@ export function groupPlan(sectionEl, node) {
   // awards on its click and consume the flag so the Take can never double-grant. (task 125)
   // The Take itself stays on the page — the taken branch is not re-decided mid-visit — so
   // renderGroup also records the grant and the button redraws as ☑ taken. (task 307)
+  // Only where the key names exactly ONE reward. Every Take path a payment arms grants a
+  // single reward and consumes the flag — a "choose one" menu (isChooseOne) and a pure
+  // item-family barter (isPricedItemAward over several rows) both work that way — so with
+  // two or more on the key the group cannot stand in: it would hand over every item row at
+  // once and, by consuming the flag, leave the blessing/deal rows dead. The group's own
+  // <lose price=> arms the flag (engine.js), so those picks are live on the redraw and the
+  // player names his own. Both shipped sites carry one reward on the key. (task 308)
   const linkedAwards = [];
   if (sectionEl) {
     effects.forEach((fx) => {
       const k = fx.getAttribute('price');
-      if (!k) return;
+      if (!k || linkedRewards(sectionEl, k).length !== 1) return;
       sectionEl.querySelectorAll(`[flag="${k}"]`).forEach((r) => {
         if (ITEM_FAMILY_TAGS.has(r.tagName.toLowerCase()) && !node.contains(r)) linkedAwards.push(r);
       });
