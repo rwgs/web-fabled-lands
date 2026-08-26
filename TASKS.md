@@ -36,6 +36,8 @@ there once the buckets below are clear.
 
 **LOW**
 
+- [x] 312. task 311 lifted the effective-ability ceiling and left `ability()`'s own doc comment reading "clamped 1..12" — while the comment 311 wrote six lines below it says "Floor of 1, no ceiling", and the one it wrote on `abilityNoWeapon` says "Floored, not capped, for the same reason `ability()` is", citing the stale line as its authority
+
 - [x] 309. `ROADMAP.md` sizes the map-position work against "the 4,437 section files", which is the glob count task 270 was filed to stop anyone quoting — the shipped corpus is 4,369
 
 - [x] 308. `groupPlan.linkedAwards` grants EVERY item-family award sharing the price flag, where the Take path it stands in for grants one — so a `<group>` paying for a "choose one" menu would hand over the whole item half of it and kill the rest
@@ -2246,6 +2248,59 @@ the original; a curse naming COMBAT moves Defence by its COMBAT effect once and 
 fight against a cursed player reads the reduced Defence.
 
 ---
+
+## 312. task 311 lifted the effective-ability ceiling and left `ability()`'s doc comment reading "clamped 1..12" — which `abilityNoWeapon`'s new comment then cites as its authority
+
+**Priority: LOW — a comment, not behaviour.** Nothing computes wrongly, no branch changes and no
+test can fail on it. It is filed with a number rather than folded into 311 because of its shape:
+the commit that made this line wrong also wrote a second comment that **points at it**, so the
+stale text is not merely wrong on its own, it is the thing a correct comment defers to.
+
+*(Filed 2026-08-26, one commit after 311 landed, by a reader who had to work out which of
+`ability()`'s two comments to believe before extending it.)*
+
+**What the code says.** `state.js:420`, six lines apart:
+
+```js
+  /** Affected ability score, including item/effect/affliction bonuses, clamped
+   *  1..12. ... */
+  ability(ability) {
+    ...
+    // Floor of 1, no ceiling: the printed 12 bounds the WRITTEN score ... (task 311)
+    return floorAbility(this.afflictionMod(ability, sum));
+  }
+```
+
+The body is right and the doc comment is the pre-311 text, untouched. 311 changed the return
+expression and added the explanation beneath it, and did not re-read the four lines above.
+
+**Why the citation is the point.** `abilityNoWeapon` (`state.js:510`), whose comment 311 DID
+update, reads: "Floored, not capped, **for the same reason `ability()` is**." A reader who
+follows that reference lands on "clamped 1..12" and has two comments by the same author, in the
+same commit, saying opposite things about the same rule. The port's own rule is stated correctly
+in the place it belongs — `rules.js` documents `clampAbility` as the WRITTEN score (bounded
+1..12, with the `Rules.xml` quotation) and `floorAbility` as the EFFECTIVE one (floor of 1, no
+ceiling) — so nothing is unresolved, only mis-signposted.
+
+**Scope: exactly one comment.** `abilityForMode` and `abilityForValue` clamp nothing themselves
+(they delegate to `ability()`/`abilityNoWeapon()`/`abilityNatural()`), `defenceForMode` composes
+an unclamped sum, and the two remaining `clampAbility` call sites — `adjustAbility` and
+`sanitizeData` — are the WRITTEN-score path, where the 12 has a source and both comments are
+accurate. Censused over `state.js`, `rules.js` and `combat.js`: this is the only line that says
+an effective ability score is capped.
+
+**The fix.** Rewrite `ability()`'s doc comment to say what the body says and to point at
+`floorAbility` rather than restate its argument, which is what keeps the reasoning in one place
+the next time the bound moves. No behaviour changes; the build stamp moves on the comment text,
+which is the stamp working.
+
+**The rule worth keeping.** A change to a function's return value has to re-read that function's
+OWN doc comment before it re-reads anybody else's — 311 updated a sibling's comment and its own
+body while leaving the header between them, which is the one position from which a wrong comment
+can mislead a correct one.
+
+**Verified.** `RESULT ALL PASS pass=3015 fail=0`, unmoved from 311's — a comment-only change
+cannot move an assertion, and a run that says so is the check that nothing else went with it.
 
 ## 311. `ability()` clamps the EFFECTIVE score to 12, so book4/103's white sword is worth +5 to a book4 Warrior and +4 to a book5/6 one — and the attack roll reads the capped number
 

@@ -417,9 +417,10 @@ export class GameState {
     this._fightBonus = { attack: a, defence: d };
   }
 
-  /** Affected ability score, including item/effect/affliction bonuses, clamped
-   *  1..12. The fixed/cursed flags are deliberately NOT applied here — like JaFL,
-   *  the displayed/derived score is the real one; the flags bite only in checks. */
+  /** Affected ability score, including item/effect/affliction bonuses, floored at 1
+   *  and NOT capped — see `floorAbility` and the note in the body. The fixed/cursed
+   *  flags are deliberately NOT applied here — like JaFL, the displayed/derived score
+   *  is the real one; the flags bite only in checks. (task 312) */
   ability(ability) {
     const base = this.data.abilities[ability] || 0;
     const sum = base + this.itemBonus(ability) + this.effectBonus(ability) + this.afflictionBonus(ability) + this.auraBonus(ability) + this.potionBonusFor(ability);
