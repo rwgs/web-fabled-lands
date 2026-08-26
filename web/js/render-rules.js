@@ -380,11 +380,12 @@ export function groupPlan(sectionEl, node) {
   // checks enforced, quantity= honoured). No collapsed group carries a <sell>. (task 126)
   const buyNodes = Array.from(node.querySelectorAll('buy'));
   // Item/weapon/... rewards linked by flag= to a price this group pays but rendered
-  // OUTSIDE the group — §1.342/§4.111's potion of restoration sits after the group,
-  // inside an affordability <if shards><if item> that flips false the moment the group
-  // is paid, so the reward's own gated Take button vanishes before it can be clicked.
-  // The group is the real payment, so grant those awards on its click and consume the
-  // flag so the (now-hidden) Take can never double-grant. (task 125)
+  // OUTSIDE the group — §1.342/§4.111's potion of restoration sits after the group, inside
+  // an affordability <if shards><if item> that can never re-arm the reward once the group
+  // has spent the money and the ingredient. The group is the real payment, so grant those
+  // awards on its click and consume the flag so the Take can never double-grant. (task 125)
+  // The Take itself stays on the page — the taken branch is not re-decided mid-visit — so
+  // renderGroup also records the grant and the button redraws as ☑ taken. (task 307)
   const linkedAwards = [];
   if (sectionEl) {
     effects.forEach((fx) => {

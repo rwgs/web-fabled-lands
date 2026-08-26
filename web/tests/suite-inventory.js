@@ -430,8 +430,8 @@ export async function run(ctx) {
     ok('§346 re-entry with no trophy offers no free medallion', c346.querySelector('.reward-pick').disabled && g346.data.shards === sh0346 + 200);
 
     // §1.342: the alchemist's potion needs 250 Shards AND an ink sac, bundled in one
-    // <group> inside an affordability <if> — paying the group must grant the potion (its
-    // own Take vanishes with the branch), and merely holding the ingredients does not.
+    // <group> inside an affordability <if> — paying the group must grant the potion, and
+    // merely holding the ingredients does not.
     const g342 = GameState.create({ name:'Alch', gender:'m', profession:'Warrior', book:1, adv });
     g342.data.shards = 300;
     g342.addItem(makeItem('item', 'ink sac'));
@@ -445,6 +445,19 @@ export async function run(ctx) {
     grp342.click();
     ok('§342 the group takes 250 Shards and the ink sac', g342.data.shards === 50 && g342.findItems('ink sac').length === 0, `sh=${g342.data.shards} ink=${g342.findItems('ink sac').length}`);
     ok('§342 paying the group grants the potion of restoration exactly once', g342.findItems('potion of restoration').length === 1);
+    // task 307: the award's own Take does NOT vanish with the branch — the taken branch stays
+    // rendered for the rest of the visit (that is what keeps the paid group's ☑ on the page),
+    // so the button is redrawn beside it with the flag already consumed. It must read as taken;
+    // before the fix it was disabled and captioned "Pay first to choose this.", the inverse of
+    // the one thing the player had certainly done.
+    const take342 = () => Array.from(c342.querySelectorAll('.reward-pick')).find((b) => /potion of restoration/i.test(b.textContent));
+    ok('§342 after paying, no enabled control offers the potion a second time',
+       Array.from(c342.querySelectorAll('button')).every((b) => b.disabled || !/potion of restoration/i.test(b.textContent)));
+    ok('§342 the potion control reads as taken, not as unpaid (task 307)',
+       !!take342() && take342().disabled && /^☑/.test(take342().textContent) && !/pay first/i.test(take342().title || ''),
+       `text=${take342() && take342().textContent} title=${take342() && take342().title}`);
+    ok('§342 and the paid group keeps its own ☑ beside it', (c342.querySelector('.group-action') || {}).textContent?.startsWith('☑'),
+       `group=${(c342.querySelector('.group-action') || {}).textContent}`);
 
     // book4/634 barter (task 63's free-take status quo, superseded by task 125): each
     // offered good now gates on the flag its matching forfeit arms — give one, take one.

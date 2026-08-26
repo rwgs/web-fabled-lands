@@ -140,7 +140,15 @@ export function renderGroup(story, container, node, path) {
       plan.effects.forEach((fx) => applyEffect(fx, story.state, chooser && fx === forfeit.node ? { chooser } : {}));
       plan.buyNodes.forEach((b) => runBuyNode(story, b));
       plan.itemNodes.forEach((n) => grantItemNode(story, n));
-      plan.linkedAwards.forEach((n) => { grantItemNode(story, n); const f = n.getAttribute('flag'); if (f) story.state.setFlag(f, false); });
+      // The linked award is granted here and its flag consumed, but its own Take button is
+      // still on the page (the taken branch stays rendered — that is what keeps this ☑ up),
+      // so record the grant against the flag: renderChoosableReward reads it and draws the
+      // done form instead of captioning a paid reward "Pay first to choose this." (task 307)
+      plan.linkedAwards.forEach((n) => {
+        grantItemNode(story, n);
+        const f = n.getAttribute('flag');
+        if (f) { story.state.setFlag(f, false); story.ctx.applied.add(linkedGrantKey(f)); }
+      });
       plan.restNodes.forEach((r) => {
         const perUse = r.hasAttribute('stamina') ? r.getAttribute('stamina') : null;
         const cost = r.getAttribute('shards') ? resolveValue(story.state, r.getAttribute('shards')) : 0;
@@ -782,6 +790,18 @@ export function renderChoosableReward(story, container, node, path, key) {
   const armed = story.state.getFlag(key);
   const btn = document.createElement('button');
   btn.className = 'btn-mini reward-pick';
+  // A <group> that pays for this award grants it on its own click and consumes the flag
+  // (renderGroup, task 125), and the item-family awards it grants are exactly the ones
+  // groupPlan.linkedAwards collects. The award is on the sheet before this button is
+  // redrawn, so show the ☑ done form every other taken award uses — the unarmed branch
+  // below would otherwise caption the paid reward "Pay first to choose this." (task 307)
+  if (story.ctx.applied.has(linkedGrantKey(key)) && ITEM_FAMILY_TAGS.has(node.tagName.toLowerCase())) {
+    btn.disabled = true;
+    btn.className += ' done';
+    btn.textContent = '☑ ' + itemAwardDisplay(node);
+    container.appendChild(btn);
+    return btn;
+  }
   btn.textContent = rewardLabel(node);
   const held = rewardWasteReason(story.state, node);
   if (!armed) {
@@ -802,20 +822,29 @@ export function renderChoosableReward(story, container, node, path, key) {
   return btn;
 }
 
+// The visit memo key recording that a <group> paid for — and granted — the awards
+// linked to a price/flag key. Written by renderGroup, read by renderChoosableReward. (task 307)
+function linkedGrantKey(key) { return 'linked@' + key; }
+
+// What an item-family award displays under — "amber wand (Magic +1)", "500 Shards".
+// The Take button prefixes it; the done form ticks it.
+function itemAwardDisplay(node) {
+  const tag = node.tagName.toLowerCase();
+  const rawName = node.getAttribute('name') || tag;
+  const currency = tag === 'item' ? currencyAward(rawName) : null;
+  if (currency != null) return `${currency} Shards`;
+  const { name } = splitItemName(rawName);
+  const bonus = node.getAttribute('bonus') ? parseInt(node.getAttribute('bonus'), 10) : 0;
+  const ability = node.getAttribute('ability');
+  return `${titleCase(name)}${bonusSuffix(tag, bonus, ability)}`;
+}
+
 // A short label for a "choose one" reward button: its own words, else the
 // blessing/curse/disease/poison it grants or lifts.
 function rewardLabel(node) {
   const tag = node.tagName.toLowerCase();
   // Item/weapon/armour/tool award: "Take amber wand (Magic +1)".
-  if (ITEM_FAMILY_TAGS.has(tag)) {
-    const rawName = node.getAttribute('name') || tag;
-    const currency = tag === 'item' ? currencyAward(rawName) : null;
-    if (currency != null) return `Take ${currency} Shards`;
-    const { name } = splitItemName(rawName);
-    const bonus = node.getAttribute('bonus') ? parseInt(node.getAttribute('bonus'), 10) : 0;
-    const ability = node.getAttribute('ability');
-    return `Take ${titleCase(name)}${bonusSuffix(tag, bonus, ability)}`;
-  }
+  if (ITEM_FAMILY_TAGS.has(tag)) return `Take ${itemAwardDisplay(node)}`;
   const txt = (node.textContent || '').trim();
   if (txt) return txt;
   // A bare shards tick ("<tick shards='500' flag='x'/>") — book1/597's 500 Shards.

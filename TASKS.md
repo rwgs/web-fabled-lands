@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-299 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **304 is open in MEDIUM**. File new
+307 is complete (listed under **Done** below or in the buckets), apart from 207,
+withdrawn as a misdiagnosis (see the Review log); **no task is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -32,7 +32,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 307. a `<group>` that pays for a flag-linked award grants it and leaves the award's own Take button on the page, disabled and captioned "Pay first to choose this." — so book1/342 offers to sell you a potion you are already carrying
+- [x] 307. a `<group>` that pays for a flag-linked award grants it and leaves the award's own Take button on the page, disabled and captioned "Pay first to choose this." — so book1/342 offers to sell you a potion you are already carrying
 
 - [x] 306. the fight widget's "Your Defence" row re-derives the score instead of asking the resolver, so a `modifiers="noarmour"` fight shows the armoured number the enemy is not rolling against — book5/689 reads 12 while the drake rolls against 7
 
@@ -2287,12 +2287,26 @@ generic ("cross it off", "adjust your Adventure Sheet accordingly") the disabled
 control naming the reward, so it is the one a player reads to find out whether the deal went
 through.
 
-**Suggested fix.** `classifyRewardNode`'s `flag=` branch already asks whether the linked `[price=]`
-partner exists; it should also ask whether the award has been GRANTED — `ctx.applied`/`awardCounts`
-carries that for every other award path, and `groupPlan` is the writer. A granted flag-linked award
-should render as the done form (`☑ Potion Of Restoration`) that every other taken award uses,
-rather than as an un-armed offer. The alternative — suppressing the node entirely — is worse: the
+**The fix.** `renderGroup`'s `linkedAwards` loop already consumes the flag; it now also records the
+grant against that flag in the visit memo (`ctx.applied`, key `linked@<flag>`), and
+`renderChoosableReward` reads it: a granted item-family award renders the `☑ Potion Of Restoration`
+done form every other taken award uses, before the un-armed branch that would have captioned it.
+The award node's own path is not available where the group commits, so the flag is the key — which
+is exact, because the awards `groupPlan.linkedAwards` grants are precisely the item-family nodes
+carrying that flag outside the group. The `ITEM_FAMILY_TAGS` guard on the read keeps a non-item
+sibling sharing the flag (none in the corpus) from being marked taken when it was not granted.
+`rewardLabel`'s item branch is split so the Take prefix and the done tick draw the same display
+string (`itemAwardDisplay`) rather than two spellings of it. Suppressing the node was rejected: the
 reward's name is printed prose on these pages and would disappear from the sentence.
+
+Both stale comments are corrected in place — `groupPlan`'s claim that the Take "vanishes before it
+can be clicked", and the §342 test's copy of the same premise. A conditional branch is not
+re-decided mid-visit, which is the point of the taken branch and is why the button is still there.
+
+**Where it does not reach.** `ctx.applied` is per-visit, so a fresh landing on §1.342 draws the
+offer again — correct, since a player who has bought another ink sac may buy another potion. The
+census behind the flag-keyed marker: exactly two sections in the shipped corpus pair a `<group>`
+with an item-family award linked outside it (§1.342 and §4.111), each with one reward on one flag.
 
 **Where it bites.** Every section pairing a `<group>` with a flag-linked item award outside it, of
 which book1/342 is the corpus's own cited precedent for task 125 (book4/111 is the same potion on
@@ -2300,9 +2314,13 @@ the same shape). Nothing about the shape is unusual; it is simply that the two m
 group that grants on behalf of a linked award, and a taken branch that stays on the page — were
 built for different reasons and have never been rendered together in a test.
 
-**Assertions to write.** After the group's click on book1/342: the potion is possessed exactly
-once; no enabled control offers it a second time; and the control naming it is not captioned as
-unpaid. The third is the one that fails today.
+**Assertions.** In `suite-inventory`'s existing §1.342 block, after the group's click: the potion
+is possessed exactly once (already asserted); no enabled control offers it a second time; the
+control naming it reads `☑ …` and is not captioned "Pay first"; and the paid group still shows its
+own `☑` beside it — the last pins the redraw the whole defect depends on, so a future change that
+made the branch vanish would have to say so rather than silently satisfying the caption assertion.
+Verified as a regression test by disabling the writer alone: `FAIL §342 the potion control reads as
+taken, not as unpaid (task 307) :: text=Take Potion Of Restoration title=Pay first to choose this.`
 
 ## 306. The fight widget's "Your Defence" row re-derives the score instead of asking the resolver, so a `modifiers="noarmour"` fight shows the armoured number the enemy is not rolling against
 
