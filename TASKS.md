@@ -22,7 +22,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 310. `reconcileEquipment` writes the DEFAULT weapon/armour back into `data.equipped`, so an implicit default is stored as an explicit choice and "else the strongest of that kind" can never fire again — a pregen Warrior who buys a magic sword keeps swinging their battle-axe at COMBAT 8 instead of 10
+- [x] 310. `reconcileEquipment` writes the DEFAULT weapon/armour back into `data.equipped`, so an implicit default is stored as an explicit choice and "else the strongest of that kind" can never fire again — a pregen Warrior who buys a magic sword keeps swinging their battle-axe at COMBAT 8 instead of 10
 
 - [x] 303. `<if ability="defence">` compares against 0, not the player's Defence, so book5/361's §160 route is unreachable at any Defence and book1/313's daggers always hit — task 68's fix for `rank`/`stamina`, never extended to the third stat
 
@@ -2294,6 +2294,43 @@ unchosen loadout following the best piece — since the two have been the same c
 
 **Armour has the identical shape** through `wornArmour`/`armourBonus`, and Defence is where it
 compounds, because `defence()` reads the worn armour and the Rank together.
+
+**Fixed 2026-08-26.** `reconcileEquipment` now clears a stale entry — one naming an item that has
+left the pack — and writes nothing else, so `data.equipped` holds deliberate picks only and the
+per-item `wielded`/`worn` display flags are rewritten from the readers as before. The sheet is
+unchanged: `ui.js` shows the pressed Wield/Wear button from those flags, so an unchosen default
+still reads as the piece in hand, and clicking another still makes the choice explicit.
+
+**The load path had to move with it, and the filing did not see that.** `sanitizeData` migrates a
+loadout from the legacy per-item flag whenever the stored id is absent or stale — written for a
+pre-186 save, where the flag is the one record of what reconcile had picked. After this fix that
+flag marks the **default**, and `equipped: {weapon: null}` is the normal state of an unchosen slot,
+so the migration would have frozen the default into a choice on **every load**: the engine fix
+would hold for one session and the bug would return on the next page refresh, service-worker
+reload or import. The discriminator is the presence of the `equipped` object itself — a pre-186 save
+has no such key at all — so the flag is now read only when the key is missing. A post-186 save's
+stale id is dropped instead, which is what reconcile does in play. A pre-310 save's populated
+`equipped` is still honoured verbatim: its stored id is indistinguishable from a real choice and
+names the loadout the sheet was showing, the same reasoning the pre-186 migration rests on.
+
+**Two existing fixtures asserted the bug**, which is the "they have been the same code path"
+warning above arriving in the tests. `suite-inventory`'s `mk186` and `suite-economy`'s Jade Defender
+case both relied on the Defender *arriving first* to be wielded, and both passed only because the
+write-back had promoted that default to a stored choice — so "a stronger later weapon does not
+steal the wield" was testing the defect, not task 186's rule. Both now call `setEquipped` to take
+it in hand, which is what task 186 was always about; the two §186 assertions that read
+`data.equipped` after a loss or a stale load were rewritten to the new invariant.
+
+**Assertions** (13, `suite-inventory`, both directions since they were one path): the measured
+four-line table as live arms — a lone weapon wielded with nothing stored, a better one taking over
+an unchosen slot, a loss falling back, and a better weapon *after* that loss still picked up (the
+half that the write-back's second-order case broke); the sheet flags following the reader; an
+explicit pick surviving a better acquisition; the same four for armour through `armourBonus`/
+`defence()`, plus the lesser piece still honoured when chosen; and the load path both ways —
+unchosen reloads unchosen and keeps following the best piece, a choice reloads as the same choice,
+a pre-186 save still migrates from the flag. Verified as regression tests by reinstating each half
+of the fix alone: the write-back alone fails 10 arms (reporting `wielded=battle-axe combat=8/6`,
+the filed table), and removing the load-path guard alone fails the three reload arms.
 
 ## 309. `ROADMAP.md` sizes the map-position work against "the 4,437 section files", the glob count task 270 was filed to stop anyone quoting
 

@@ -560,15 +560,21 @@ export class GameState {
   setEquipLock(kind, on = true) { (this._equipLock ||= { weapon: false, armour: false })[kind] = !!on; }
   clearEquipLocks() { this._equipLock = { weapon: false, armour: false }; }
 
-  /** Settle the equipment choice and its display flags: an absent or stale selection
-   *  falls back to the strongest of that kind and is written back, so the stored ids are
-   *  always the live loadout. */
+  /** Settle the equipment choice and its display flags: a stale selection — one naming an
+   *  item that has left the pack — is CLEARED, and the per-item wielded/worn flags are
+   *  rewritten from the live readers.
+   *  It must clear rather than write the fallback back: `data.equipped` holds explicit
+   *  choices only, so that `_equipped` keeps defaulting to the strongest of that kind as
+   *  the pack changes. Persisting the fallback here made the two branches of that reader
+   *  indistinguishable — a Warrior who bought a better sword kept swinging the battle-axe
+   *  the default had frozen into a choice. (task 310) */
   reconcileEquipment() {
+    const eq = (this.data.equipped ||= { weapon: null, armour: null });
+    for (const kind of ['weapon', 'armour']) {
+      if (eq[kind] && !this.data.items.some((it) => it.id === eq[kind] && it.kind === kind)) eq[kind] = null;
+    }
     const w = this.wieldedWeapon();
     const a = this.wornArmour();
-    const eq = (this.data.equipped ||= { weapon: null, armour: null });
-    eq.weapon = w ? w.id : null;
-    eq.armour = a ? a.id : null;
     for (const it of this.data.items) {
       it.wielded = (it.kind === 'weapon' && it === w);
       it.worn = (it.kind === 'armour' && it === a);
@@ -1393,14 +1399,19 @@ export function sanitizeData(raw) {
 
   out.items = asArr(d.items).map(sanitizeItem).filter(Boolean);
   // The explicit wielded-weapon / worn-armour choice (task 186). Keep a stored id only
-  // while it still names a carried item of that kind; otherwise migrate from the legacy
-  // per-item wielded/worn flag, which every pre-186 save already carries on the item
-  // reconcileEquipment had picked — so an old save loads the exact loadout it was showing.
-  // With neither, null leaves reconcileEquipment to choose the strongest as the default.
+  // while it still names a carried item of that kind; a stale one is dropped, exactly as
+  // reconcileEquipment drops it in play, leaving reconcileEquipment to default afresh.
+  // The legacy per-item wielded/worn flag is read only when the save carries NO `equipped`
+  // object at all — a pre-186 save, where the flag is the one record of the loadout it was
+  // showing. Every later save has the key, and since task 310 a null in it means "no
+  // explicit choice" while the flag still marks the DEFAULT; migrating from the flag there
+  // would freeze that default into a choice on every reload and restore the bug per load.
+  const hasEqKey = !!d.equipped && typeof d.equipped === 'object' && !Array.isArray(d.equipped);
   const eqIn = asObj(d.equipped);
   const equippedId = (kind, flag) => {
     const id = asStr(eqIn[kind]);
     if (id && out.items.some((it) => it.id === id && it.kind === kind)) return id;
+    if (hasEqKey) return null;
     const flagged = out.items.find((it) => it.kind === kind && it[flag]);
     return flagged ? flagged.id : null;
   };

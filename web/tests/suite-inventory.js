@@ -1631,6 +1631,9 @@ export async function run(ctx) {
         g.reconcileEquipment();
         eng.applyEffect((await data.getSection(5, '628')).querySelector('weapon'), g, {}); // Jade Defender +3
         const jade = g.data.items.find((it) => it.name === 'Jade Defender');
+        // Take it in hand explicitly. Arriving first is NOT a choice — data.equipped holds
+        // deliberate picks only, so an unchosen loadout follows the best piece (task 310).
+        g.setEquipped('weapon', jade.id);
         const plain = g.addItem(makeItem('weapon', 'broadsword', 4));
         return { g, jade, plain };
       };
@@ -1664,7 +1667,9 @@ export async function run(ctx) {
       eKeep.g.setEquipped('weapon', eKeep.jade.id);
       eng.applyEffect(lose186, eKeep.g, {});
       ok('§186 a using="t" loss takes the CHOSEN weapon, not the strongest', !eKeep.g.data.items.some((it) => it.name === 'Jade Defender') && eKeep.g.data.items.some((it) => it.name === 'broadsword'), eKeep.g.data.items.map((it) => it.name).join(','));
-      ok('§186 losing the chosen weapon falls back to the strongest remaining', eKeep.g.wieldedWeapon().name === 'broadsword' && eKeep.g.data.equipped.weapon === eKeep.g.data.items.find((it) => it.name === 'broadsword').id);
+      // The fallback is READ, never stored: reconcile clears the dead id and leaves the slot
+      // unchosen, so the next better blade is picked up in turn (task 310).
+      ok('§186 losing the chosen weapon falls back to the strongest remaining', eKeep.g.wieldedWeapon().name === 'broadsword' && eKeep.g.data.equipped.weapon === null, JSON.stringify(eKeep.g.data.equipped));
       // Acquiring a stronger weapon later must not silently re-pick it.
       const eNew = await mk186();
       eNew.g.setEquipped('weapon', eNew.jade.id);
@@ -1678,7 +1683,10 @@ export async function run(ctx) {
       const staleData = JSON.parse(JSON.stringify(ePer.g.data));
       staleData.equipped.weapon = 'no-such-item';
       const gStale = new GameState(sanitizeData(staleData));
-      ok('§186 a stale selected id falls back to the wielded flag then the strongest', gStale.wieldedWeapon().name === 'Jade Defender', JSON.stringify(gStale.data.equipped));
+      // A save that HAS the key records its choices there, so a stale id in it is a choice
+      // whose item has gone: dropped, and the slot defaults, matching what reconcile does in
+      // play. The per-item flag is read only for a pre-186 save (the next case). (task 310)
+      ok('§186 a stale selected id is dropped and the slot defaults to the strongest', gStale.wieldedWeapon().name === 'broadsword' && gStale.data.equipped.weapon === null, JSON.stringify(gStale.data.equipped));
       const legacy = JSON.parse(JSON.stringify(ePer.g.data));
       delete legacy.equipped; legacy.items.forEach((it) => { it.wielded = false; it.worn = false; });
       const gLegacy = new GameState(sanitizeData(legacy));
@@ -1749,6 +1757,66 @@ export async function run(ctx) {
       stAcid.begin(await data.getSection(2, '290'), 2, '290');
       ok('§2.290 the acid takes the WORN armour, sparing the better piece', !gAcid.data.items.some((it) => it.id === acidJerkin.id) && gAcid.data.items.some((it) => it.id === acidMail.id), gAcid.data.items.map((it) => it.name).join(','));
       ok('§2.290 the armour branch is taken, so no Stamina is lost instead', gAcid.data.stamina === stamAcid && gAcid.wornArmour() === acidMail, `stamina=${gAcid.data.stamina}/${stamAcid}`);
+    }
+
+    // --- task 310: the DEFAULT loadout is read, never stored -------------------------
+    // reconcileEquipment used to end `eq.weapon = this.wieldedWeapon()?.id`, persisting
+    // whatever the reader returned — including the "strongest of that kind" fallback. Every
+    // character therefore had a stored "choice" from turn one, and the fallback branch could
+    // then fire only when the stored item LEFT the pack, never when a better one arrived: a
+    // pregen Warrior who bought a magic sword kept swinging the battle-axe at COMBAT 8.
+    // Both directions matter, because until now they were one code path.
+    {
+      const mk310 = (kind) => {
+        const g = GameState.create({ name:'T310', gender:'m', profession:'Warrior', book:1, adv });
+        g.ephemeral = true;
+        g.data.items = g.data.items.filter((it) => it.kind !== kind);
+        g.reconcileEquipment();
+        return g;
+      };
+      // Direction 1 — unchosen: the loadout follows the best piece, in and out of the pack.
+      const gW = mk310('weapon');
+      const cb0 = gW.ability('combat');
+      const axe = gW.addItem(makeItem('weapon', 'battle-axe', 2));
+      ok('§310 a lone weapon is wielded by default and stores no choice', gW.wieldedWeapon() === axe && gW.ability('combat') === cb0 + 2 && gW.data.equipped.weapon === null, `combat=${gW.ability('combat')}/${cb0} stored=${JSON.stringify(gW.data.equipped)}`);
+      const magic = gW.addItem(makeItem('weapon', 'magic sword', 4));
+      ok('§310 buying a better weapon moves an UNCHOSEN wield to it', gW.wieldedWeapon() === magic && gW.ability('combat') === cb0 + 4 && gW.data.equipped.weapon === null, `wielded=${gW.wieldedWeapon().name} combat=${gW.ability('combat')}/${cb0}`);
+      ok('§310 the sheet flags follow the reader', magic.wielded === true && axe.wielded === false);
+      gW.removeItemById(magic.id);
+      ok('§310 losing the default falls back to what is left', gW.wieldedWeapon() === axe && gW.ability('combat') === cb0 + 2 && gW.data.equipped.weapon === null, `wielded=${gW.wieldedWeapon().name}`);
+      // The second half of the measured table: after a loss the old code wrote the fallback
+      // back, so the NEXT better weapon was ignored too (§6.635's confiscation, §4.103's
+      // white sword). Re-arming is what proves the write-back is gone.
+      const holy = gW.addItem(makeItem('weapon', 'holy sword', 7));
+      ok('§310 a better weapon after a loss is still picked up', gW.wieldedWeapon() === holy && gW.ability('combat') === Math.min(12, cb0 + 7), `wielded=${gW.wieldedWeapon().name} combat=${gW.ability('combat')}`);
+      // Direction 2 — chosen: a deliberate pick is not stolen by anything better (§5.628).
+      const gC = mk310('weapon');
+      const keep = gC.addItem(makeItem('weapon', 'Jade Defender', 3));
+      gC.setEquipped('weapon', keep.id);
+      gC.addItem(makeItem('weapon', 'greatsword', 5));
+      ok('§310 an explicit pick survives a better acquisition', gC.wieldedWeapon() === keep && gC.data.equipped.weapon === keep.id, `wielded=${gC.wieldedWeapon().name} stored=${JSON.stringify(gC.data.equipped)}`);
+      // Armour has the identical shape through wornArmour/armourBonus, and Defence is where
+      // it compounds, because defence() reads the worn armour and the Rank together.
+      const gA = mk310('armour');
+      const def0 = gA.defence();
+      const jerkin = gA.addItem(makeItem('armour', 'leather jerkin', 1));
+      ok('§310 a lone piece of armour is worn by default and stores no choice', gA.wornArmour() === jerkin && gA.armourBonus() === 1 && gA.defence() === def0 + 1 && gA.data.equipped.armour === null, `def=${gA.defence()}/${def0} stored=${JSON.stringify(gA.data.equipped)}`);
+      const mail310 = gA.addItem(makeItem('armour', 'chain mail', 3));
+      ok('§310 buying better armour moves an UNCHOSEN wear to it, and Defence with it', gA.wornArmour() === mail310 && gA.armourBonus() === 3 && gA.defence() === def0 + 3 && gA.data.equipped.armour === null, `def=${gA.defence()}/${def0}`);
+      ok('§310 choosing the lesser piece is still honoured against a better one', gA.setEquipped('armour', jerkin.id) === true && gA.wornArmour() === jerkin && gA.defence() === def0 + 1 && gA.data.equipped.armour === jerkin.id, `def=${gA.defence()}/${def0}`);
+      // The store must survive a reload as it stands, or the bug returns once per load:
+      // the per-item wielded/worn flag marks the DEFAULT now, so sanitizeData may migrate
+      // from it only for a pre-186 save, which has no `equipped` key at all.
+      const rtW = new GameState(sanitizeData(JSON.parse(JSON.stringify(gW.data))));
+      rtW.ephemeral = true;
+      ok('§310 an unchosen loadout reloads unchosen, not frozen into a choice', rtW.wieldedWeapon().name === 'holy sword' && rtW.data.equipped.weapon === null, JSON.stringify(rtW.data.equipped));
+      rtW.addItem(makeItem('weapon', 'sword of the gods', 9));
+      ok('§310 and so keeps following the best piece after the reload', rtW.wieldedWeapon().name === 'sword of the gods', `wielded=${rtW.wieldedWeapon().name}`);
+      const rtC = new GameState(sanitizeData(JSON.parse(JSON.stringify(gC.data))));
+      ok('§310 a chosen loadout reloads as the same choice', rtC.wieldedWeapon().name === 'Jade Defender' && rtC.data.equipped.weapon === gC.data.equipped.weapon, JSON.stringify(rtC.data.equipped));
+      const pre186 = JSON.parse(JSON.stringify(gC.data));
+      delete pre186.equipped;
+      ok('§310 a pre-186 save still migrates its loadout from the per-item flag', new GameState(sanitizeData(pre186)).wieldedWeapon().name === 'Jade Defender');
     }
 
     // --- task 74: standalone force="f" effects are opt-in, not auto-applied ----------

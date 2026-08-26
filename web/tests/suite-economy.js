@@ -681,10 +681,12 @@ export async function run(ctx) {
       const gjd = GameState.create({ name: 'Jd', gender: 'm', profession: 'Warrior', book: 5, adv });
       gjd.data.items = gjd.data.items.filter((it) => it.kind !== 'weapon'); gjd.reconcileEquipment();
       const jdDefBefore = gjd.defence();
-      gjd.addItem(mk('weapon', 'Jade Defender', 3, parse('<weapon name="Jade Defender" bonus="3"><effect type="wielded" ability="defence" bonus="3"/></weapon>')));
+      const jd = gjd.addItem(mk('weapon', 'Jade Defender', 3, parse('<weapon name="Jade Defender" bonus="3"><effect type="wielded" ability="defence" bonus="3"/></weapon>')));
       ok('wielded weapon adds its bonus (combat) and wielded aura (defence)', gjd.defence() === jdDefBefore + 3 + 3, `${jdDefBefore}->${gjd.defence()}`);
       // Acquiring a bigger blade no longer silently unwields the chosen one (task 186) —
-      // the wielded aura drops only when the player picks the greatsword themselves.
+      // the wielded aura drops only when the player picks the greatsword themselves. Take the
+      // Defender in hand first: arriving alone is the default, not a choice (task 310).
+      gjd.setEquipped('weapon', jd.id);
       const gsword = gjd.addItem(makeItem('weapon', 'greatsword', 5));
       ok('a stronger weapon does not auto-unwield the chosen one', gjd.data.items.find((it) => it.name === 'Jade Defender').wielded === true && gjd.auraBonus('defence') === 3, `aura=${gjd.auraBonus('defence')}`);
       gjd.setEquipped('weapon', gsword.id);
