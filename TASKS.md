@@ -32,6 +32,8 @@ there once the buckets below are clear.
 
 **LOW**
 
+- [x] 309. `ROADMAP.md` sizes the map-position work against "the 4,437 section files", which is the glob count task 270 was filed to stop anyone quoting — the shipped corpus is 4,369
+
 - [x] 308. `groupPlan.linkedAwards` grants EVERY item-family award sharing the price flag, where the Take path it stands in for grants one — so a `<group>` paying for a "choose one" menu would hand over the whole item half of it and kill the rest
 
 - [x] 307. a `<group>` that pays for a flag-linked award grants it and leaves the award's own Take button on the page, disabled and captioned "Pay first to choose this." — so book1/342 offers to sell you a potion you are already carrying
@@ -2240,6 +2242,32 @@ the original; a curse naming COMBAT moves Defence by its COMBAT effect once and 
 fight against a cursed player reads the reduced Defence.
 
 ---
+
+## 309. `ROADMAP.md` sizes the map-position work against "the 4,437 section files", the glob count task 270 was filed to stop anyone quoting
+
+**Priority: LOW — one number in a planning document.** Filed because task 270 exists precisely to
+stop it, and because the number is load-bearing for the phase it appears in.
+
+*(Filed 2026-08-26 on reading `ROADMAP.md` after the defect buckets came clear; fixed the same
+day.)*
+
+**The claim.** The Player-position roadmap's "the blocker is data, not code" paragraph reads "the
+4,437 section files have no location attribute", sizing phases 2 and 3 — which must give every
+section a position — against that figure.
+
+**Measured.** `books/**/*.xml` returns **4,437**; the `^\d+[a-z]?$` basenames of the published
+books, which is what `build-data.ps1` bundles and `data.loadBook`/`availableBooks()` can see,
+return **4,369**. The 68-file gap is the 20 superseded `temp/` working copies plus the 48 files
+that are not sections at all (`Adventurers.xml`, `New.xml` and the six pregen biographies, per
+book) — exactly the two inflations `AGENTS.md` names. So the paragraph both overstates the work by
+68 files and counts six pregen biographies per book as sections needing a map position.
+
+**The fix.** `4,369 shipped section files`, which says which set it measured, as task 270 requires
+of any filing that quotes a count.
+
+**Not touched.** The Review log's older passes quote 4,437 as well ("a 4,437-section corpus scan").
+Those are historical records of what a past pass did, not live claims about the corpus, and
+rewriting them would falsify the record rather than correct it.
 
 ## 308. `groupPlan.linkedAwards` grants EVERY item-family award sharing the price flag, where the Take path it stands in for grants one
 

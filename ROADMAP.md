@@ -22,7 +22,7 @@ something usable on its own.
 
 The blocker is data, not code. Nothing in the corpus carries a position: the
 maps are hand-drawn label illustrations with no grid or section numbers, the
-4,437 section files have no location attribute, and the reference `java-engine/`
+4,369 shipped section files have no location attribute, and the reference `java-engine/`
 has no map data either. The only positional state that exists is
 `state.data.location` — the current dock, set from a section's `dock=`
 ([state.js:995](web/js/state.js#L995)) — covering 25 named ports across 96
