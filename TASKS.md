@@ -32,6 +32,8 @@ there once the buckets below are clear.
 
 **LOW**
 
+- [ ] 307. a `<group>` that pays for a flag-linked award grants it and leaves the award's own Take button on the page, disabled and captioned "Pay first to choose this." — so book1/342 offers to sell you a potion you are already carrying
+
 - [x] 306. the fight widget's "Your Defence" row re-derives the score instead of asking the resolver, so a `modifiers="noarmour"` fight shows the armoured number the enemy is not rolling against — book5/689 reads 12 while the drake rolls against 7
 
 - [x] 305. a `<tick god=>` shares `readEffects` with the afflictions, so it accepts `ability="defence"` (task 304) and `ability="stamina"` (task 185) — and `data.effects` is read only by the core-ability paths, so both parse, store and move nothing
@@ -2236,6 +2238,71 @@ the original; a curse naming COMBAT moves Defence by its COMBAT effect once and 
 fight against a cursed player reads the reduced Defence.
 
 ---
+
+## 307. a `<group>` that pays for a flag-linked award grants it and leaves the award's own Take button on the page, disabled and captioned "Pay first to choose this." — so book1/342 offers to sell you a potion you are already carrying
+
+**Priority: LOW — display only. The grant is correct and the payment is correct;** what is wrong
+is a control that survives the transaction it belongs to and then describes it backwards.
+
+*(Filed 2026-08-26, found while probing an item award for unrelated work.)*
+
+**The shape.** book1/342's alchemist: a pair of guards, a `<group>` that pays, and the reward
+outside it, linked by the payment flag.
+
+```
+<if shards="250"><if item="ink sac">
+  If you pay the money, and have an <b>ink sac</b>
+  (<group><text>cross it off</text>
+     <lose shards="250" price=""/><lose item="ink sac" price="x"/></group>
+  your Adventure Sheet) he will make you a
+  <item name="potion of restoration" flag="x" verb="Drink">…</item>.
+</if></if>
+```
+
+`groupPlan` collects flag-linked item awards rendered OUTSIDE the group (task 125's
+`linkedAwards`) and grants them on the group's click, consuming the flag, because the group is the
+real payment. Its comment says the award's own Take button "vanishes" before it can be clicked —
+the affordability `<if shards="250">` is expected to flip false the moment the money is spent.
+
+**It does not vanish.** The taken branch stays rendered for the rest of the visit — deliberately,
+because that is what keeps the paid group's own `☑` on the page — so the Take is redrawn beside
+it. `classifyRewardNode` sees a `flag=` whose `[price=]` partner exists and returns a gated award;
+the flag has already been consumed, so `flagGate` reports `not yet available` and the button
+renders disabled with `title="Pay first to choose this."`.
+
+**Measured on book1/342**, a Warrior holding an ink sac and 250 Shards, clicked once:
+
+```
+BEFORE:    [ ] ☐ cross it off        [x] Take Potion Of Restoration «Pay first to choose this.»
+AFTER PAY: [x] ☑ cross it off        [x] Take Potion Of Restoration «Pay first to choose this.»
+ITEMS: leather jerkin|battle-axe|map|potion of restoration
+```
+
+The potion is on the sheet and the ink sac and money are gone — the transaction is right in every
+particular. The button beneath it says the player has not paid yet.
+
+**Why it matters more than it looks.** The caption is not merely stale, it is the *inverse* of the
+state: the one thing the player has certainly done is pay. On a page where the group's label is
+generic ("cross it off", "adjust your Adventure Sheet accordingly") the disabled Take is the only
+control naming the reward, so it is the one a player reads to find out whether the deal went
+through.
+
+**Suggested fix.** `classifyRewardNode`'s `flag=` branch already asks whether the linked `[price=]`
+partner exists; it should also ask whether the award has been GRANTED — `ctx.applied`/`awardCounts`
+carries that for every other award path, and `groupPlan` is the writer. A granted flag-linked award
+should render as the done form (`☑ Potion Of Restoration`) that every other taken award uses,
+rather than as an un-armed offer. The alternative — suppressing the node entirely — is worse: the
+reward's name is printed prose on these pages and would disappear from the sentence.
+
+**Where it bites.** Every section pairing a `<group>` with a flag-linked item award outside it, of
+which book1/342 is the corpus's own cited precedent for task 125 (book4/111 is the same potion on
+the same shape). Nothing about the shape is unusual; it is simply that the two mechanisms — a
+group that grants on behalf of a linked award, and a taken branch that stays on the page — were
+built for different reasons and have never been rendered together in a test.
+
+**Assertions to write.** After the group's click on book1/342: the potion is possessed exactly
+once; no enabled control offers it a second time; and the control naming it is not captioned as
+unpaid. The third is the one that fails today.
 
 ## 306. The fight widget's "Your Defence" row re-derives the score instead of asking the resolver, so a `modifiers="noarmour"` fight shows the armoured number the enemy is not rolling against
 
