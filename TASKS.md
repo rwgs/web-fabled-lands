@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 307 is complete (listed under **Done** below or in the buckets), apart from 207,
-withdrawn as a misdiagnosis (see the Review log); **no task is open**. File new
+withdrawn as a misdiagnosis (see the Review log); **308 is open in LOW**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -31,6 +31,8 @@ there once the buckets below are clear.
 - [x] 296. `rewardWasteReason` refuses a new resurrection deal to anyone already holding one, where `addResurrection` implements the replacement the books print — so book1/597's third reward is dead to a deal-holder
 
 **LOW**
+
+- [ ] 308. `groupPlan.linkedAwards` grants EVERY item-family award sharing the price flag, where the Take path it stands in for grants one — so a `<group>` paying for a "choose one" menu would hand over the whole item half of it and kill the rest
 
 - [x] 307. a `<group>` that pays for a flag-linked award grants it and leaves the award's own Take button on the page, disabled and captioned "Pay first to choose this." — so book1/342 offers to sell you a potion you are already carrying
 
@@ -2238,6 +2240,54 @@ the original; a curse naming COMBAT moves Defence by its COMBAT effect once and 
 fight against a cursed player reads the reduced Defence.
 
 ---
+
+## 308. `groupPlan.linkedAwards` grants EVERY item-family award sharing the price flag, where the Take path it stands in for grants one
+
+**Priority: LOW — inert in the published edition.** No shipped section has the shape, so this is a
+latent case to close before it ships, not a live defect. Filed the way task 286's census arms were:
+a section arriving in the list wants measuring, not assuming.
+
+*(Filed 2026-08-26 while implementing task 307, which read the same seam from the view side.)*
+
+**The asymmetry.** `renderItemAward` routes a flag-linked award two ways and the two are mutually
+exclusive by construction: `isChooseOne` (two or more linked rewards, at least one of them NOT
+item-family) means one payment must grant only the reward the player picks, and `isPricedItemAward`
+(every linked reward item-family) means arm-then-take. `groupPlan.linkedAwards` makes no such
+distinction — it collects every item-family node carrying the price flag that sits outside the
+group:
+
+```js
+sectionEl.querySelectorAll(`[flag="${k}"]`).forEach((r) => {
+  if (ITEM_FAMILY_TAGS.has(r.tagName.toLowerCase()) && !node.contains(r)) linkedAwards.push(r);
+});
+```
+
+`renderGroup` then grants all of them on one click and consumes the flag once. On a choose-one menu
+that is two wrongs at once: the player is handed the whole item half of a menu he was meant to pick
+one row of, and the non-item rows (a blessing, a resurrection) are left permanently dead, because
+their own Take reads the flag the group just consumed. Task 307's `linked@<flag>` marker inherits
+the same key, so it would then caption both wrongly-granted items as taken — correctly describing
+state that should never have been reached.
+
+**Census (shipped corpus, per task 270).** Every non-roll `<group>` carrying a `price=`, against the
+`[flag=]` rewards outside it: **two sections, one reward each, both item-family** — `book1/342` and
+`book4/111`, the same potion of restoration on the same shape. No group in the published edition
+pays for a choose-one menu, so nothing is mis-granted today.
+
+**Suggested fix.** Give `linkedAwards` the guard the view already has: skip the key entirely when
+`isChooseOne(sectionEl, k)` — a choose-one menu's payment is not the group's to spend on the
+player's behalf, since the whole point of the menu is that the player names the reward. Both
+helpers live in `render-rules.js`, so the guard is one call and no new concept. Whether the group
+should then render the menu's picks at all is the open question: the group collapses to a button,
+so a menu it pays for has no live pick until the next render — which is the shape task 307 just
+showed is *not* hidden, so the picks would in fact be there, armed. Worth measuring before
+choosing.
+
+**Assertions to write.** Over a fixture section (nothing in the corpus to drive): a `<group>` whose
+`price=` key has two item awards plus a blessing plans **no** linked awards; the same group with a
+single item award still plans it (task 125's shape, unchanged). Plus the corpus census above as a
+standing assertion, so a book conversion that introduces the shape fails here rather than shipping
+it.
 
 ## 307. a `<group>` that pays for a flag-linked award grants it and leaves the award's own Take button on the page, disabled and captioned "Pay first to choose this." — so book1/342 offers to sell you a potion you are already carrying
 
