@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-307 is complete (listed under **Done** below or in the buckets), apart from 207,
-withdrawn as a misdiagnosis (see the Review log); **no task is open**. File new
+310 is complete (listed under **Done** below or in the buckets), apart from 207,
+withdrawn as a misdiagnosis (see the Review log); **311 is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -21,6 +21,8 @@ there once the buckets below are clear.
 - [x] 294. book4/257 leaves a mixed pair of rolls with no exit at all, so succeeding one check and failing the other ends the adventure
 
 **MEDIUM**
+
+- [ ] 311. `ability()` clamps the EFFECTIVE score to 12, where the reference engine pegs only the minimum at 1, so book4/103's white sword is worth +5 to a book4 Warrior and +4 to a book5/6 one — and the attack roll and every `<difficulty>` check read the capped number
 
 - [x] 310. `reconcileEquipment` writes the DEFAULT weapon/armour back into `data.equipped`, so an implicit default is stored as an explicit choice and "else the strongest of that kind" can never fire again — a pregen Warrior who buys a magic sword keeps swinging their battle-axe at COMBAT 8 instead of 10
 
@@ -2245,6 +2247,72 @@ fight against a cursed player reads the reduced Defence.
 
 ---
 
+## 311. `ability()` clamps the EFFECTIVE score to 12, so book4/103's white sword is worth +5 to a book4 Warrior and +4 to a book5/6 one — and the attack roll reads the capped number
+
+**Priority: MEDIUM — live in books 4–6, silently and always in the player's disfavour.** Not a
+crash and no branch becomes unreachable (measured below), but it is uncorrectable from the sheet
+and undetectable from it: the Adventure Sheet shows COMBAT 12 for a character who should be at 15,
+so the missing points read as the rules.
+
+*(Filed 2026-08-26 while writing a task 310 assertion. The assertion needed `Math.min(12, cb0 + 7)`
+to pass, which is the cap admitting itself.)*
+
+**What the code does.** `ability()` (`state.js:426`) and `abilityForMode()` (`state.js:509`) both
+end `clampAbility(...)` applied to the **full sum** — natural score + `itemBonus` (which folds in
+the wielded weapon and the best tool) + `effectBonus` + `afflictionBonus` + `auraBonus` +
+`potionBonusFor`. `clampAbility` is `Math.max(1, Math.min(12, v))` over `ABILITY_MAX = 12`
+(`rules.js:28`, `rules.js:102`).
+
+**The reference engine pegs the minimum only.** `EffectSet.adjustAbility` ends:
+
+```java
+// Peg the minimum value for an affected ability at 1.
+// This stops curses from lowering an early character's stats below 1.
+return Math.max(1, value);
+```
+
+No maximum, and the comment says exactly why the one bound it has is there.
+`Adventurer.getAbilityValue` does not cap either. So the ceiling is port-introduced, and the floor
+— which the port also applies — is the part with a source.
+
+**The port already disagrees with itself about it.** `defence()`/`defenceForMode` is *not* clamped:
+COMBAT 8 + Rank 4 + a +6 armour reads **18**. So an effective score has a ceiling on the six core
+paths and none on the seventh, and `<if ability="defence" greaterthan="13">` (the corpus's one such
+gate) depends on the seventh having none.
+
+**Measured** (Node, `web/js/state.js`; corpus top bonuses first).
+
+The shipped corpus's highest bonuses are `weapon bonus="8"` — **one** item, book4/103's white sword,
+where the next-best weapon is +6 — and `tool bonus="6"`, the hyperium wand of book6/23 and
+book6/489 (`ability="magic"`). Against the pregen ability rows of the books that can reach them:
+
+```
+book4 Warrior   natural COMBAT 7 + white sword 8 = 15  ->  engine 12  (check reads 12)
+book4 Wayfarer  natural COMBAT 6 + white sword 8 = 14  ->  engine 12
+book4 Rogue     natural COMBAT 5 + white sword 8 = 13  ->  engine 12
+bk5/6 Warrior   natural COMBAT 8 + white sword 8 = 16  ->  engine 12
+bk5/6 Mage      natural MAGIC  8 + hyperium wand 6 = 14 ->  engine 12
+Defence         COMBAT 8 + Rank 4 + armour 6 = 18      ->  engine 18  (not clamped)
+```
+
+**It is not display-only.** `abilityForCheck` reads the capped number, so every `<difficulty>` and
+`<rankcheck>` roll uses it, and `combat.js:182` builds the attack roll from
+`state.ability('combat')` — a book5/6 Warrior with the white sword attacks at 12 where the rules
+give 16.
+
+**No branch is lost, and that is worth recording so the next reader need not re-derive it.** Census
+of `<if ability=>` gates over the shipped corpus (per task 270): the highest core-ability threshold
+is `sanctity greaterthan="8"`, and the only gate above 12 is `defence greaterthan="13"`, on the
+unclamped path. So the cap costs points on rolls, never a route — which is what separates this from
+task 303.
+
+**Deliberately not measured, and the fix must not assume it.** Whether clamping the **natural**
+score to 12 is right is a *different* question on *different* call sites — `gainAbility`
+(`state.js:727`) and `sanitizeData` (`state.js:1389`) — and a natural ceiling may well be the
+printed rule. Read the reference's `<gain ability=>` path before touching those two. This filing is
+about the effective total alone; the narrow change is to stop clamping the sum at the two reader
+sites while leaving the floor of 1, which the reference does have.
+
 ## 310. `reconcileEquipment` writes the DEFAULT weapon/armour back into `data.equipped`, so an implicit default is stored as an explicit choice
 
 **Priority: MEDIUM — live in every published book, from the first purchase.** Not a crash and the
@@ -2603,6 +2671,45 @@ save/load round-trip un-clamped, and takes current Stamina down with it when ren
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-26 (implementation pass, task 310; filed 311): closed **310** — `reconcileEquipment`
+persisted whatever `wieldedWeapon()`/`wornArmour()` returned, so the "strongest of that kind"
+fallback was written back as a choice on turn one and the fallback branch could thereafter fire only
+when the stored item *left* the pack. The fix is subtraction: clear a stale entry, write nothing
+else. Suite `pass=2991 → 3004`; `web/` only, so a stamp and not a data rebuild.
+
+**The load path had to move with the engine, and the filing did not see that — a one-site fix that
+was really two.** `sanitizeData` migrates a loadout from the legacy per-item `wielded`/`worn` flag
+whenever the stored id is absent or stale. That was written for a pre-186 save, where the flag is
+the only record; after this fix the flag marks the **default**, and an empty `equipped` is the
+normal state of an unchosen slot — so the migration would have re-frozen the default into a choice
+on **every load**. The engine fix would have held for one session and the bug returned on the next
+refresh, service-worker reload or import. **A change to what a field MEANS is a change to every
+reader that infers the field, not only to its writers** — the same enumerate-the-readers move task
+305 recorded, arriving this time on the deserialiser rather than on a getter. The discriminator is
+the presence of the `equipped` object itself, since a pre-186 save has no such key at all.
+
+**Two existing fixtures asserted the bug, which is how big the blind spot was.** `suite-inventory`'s
+`mk186` and `suite-economy`'s Jade Defender case both relied on the Defender *arriving first* to be
+wielded, and both passed only because the write-back had promoted that default to a stored choice.
+So "a stronger later weapon does not steal the wield" — task 186's headline assertion — was testing
+the defect. Both fixtures now call `setEquipped`, which is what task 186 was always about. The
+lesson generalises past this task: **a fixture that reaches its precondition by side effect is
+asserting the side effect.** Task 310's filing predicted the shape of this ("the two have been the
+same code path until now") without predicting that the tests had already been written on the wrong
+side of it.
+
+**Filed 311 from the assertion that would not go green.** The task 310 arm for "a better weapon
+after a loss is still picked up" needed `Math.min(12, cb0 + 7)` to pass, which is `clampAbility`
+capping the *effective* score. The reference's `EffectSet.adjustAbility` pegs only the minimum, with
+a comment saying why — so the ceiling is port-introduced, and it costs a book5/6 Warrior four points
+of COMBAT on every attack roll with book4/103's white sword. Two measurements kept it a MEDIUM
+rather than a HIGH and are recorded in the filing so they need not be redone: the corpus's highest
+`<if ability=>` core threshold is `sanctity greaterthan="8"`, so no route is lost, and `defence()`
+is on the *unclamped* path, which is where the port's disagreement with itself shows. The natural-
+score clamp is a different question on different call sites and is explicitly left unmeasured.
+**The most productive probe this pass was an assertion I had to weaken to make pass** — the
+weakening is the finding, and writing `Math.min` instead of asking why is how it stays hidden.
 
 Worked 2026-08-25 (filed and closed, task 306): filed and closed **306** — the fight widget's
 "Your Defence" row re-derived the score rather than asking the resolver, so the two fight-LOCAL
