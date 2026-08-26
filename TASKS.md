@@ -22,6 +22,8 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
+- [ ] 310. `reconcileEquipment` writes the DEFAULT weapon/armour back into `data.equipped`, so an implicit default is stored as an explicit choice and "else the strongest of that kind" can never fire again — a pregen Warrior who buys a magic sword keeps swinging their battle-axe at COMBAT 8 instead of 10
+
 - [x] 303. `<if ability="defence">` compares against 0, not the player's Defence, so book5/361's §160 route is unreachable at any Defence and book1/313's daggers always hit — task 68's fix for `rank`/`stamina`, never extended to the third stat
 
 - [x] 304. `defence()` sums items, Rank and auras but not afflictions, so book5/638's Curse of Vulnerability subtracts its 3 points from nothing and the curse is inert
@@ -2242,6 +2244,56 @@ the original; a curse naming COMBAT moves Defence by its COMBAT effect once and 
 fight against a cursed player reads the reduced Defence.
 
 ---
+
+## 310. `reconcileEquipment` writes the DEFAULT weapon/armour back into `data.equipped`, so an implicit default is stored as an explicit choice
+
+**Priority: MEDIUM — live in every published book, from the first purchase.** Not a crash and the
+player can correct it from the Adventure Sheet, but nothing tells them there is anything to
+correct: the sheet shows the weaker weapon as the wielded one and the COMBAT score agrees with it,
+so the loss reads as the rules rather than as a stuck selection.
+
+*(Filed 2026-08-26, found while writing an assertion about a section that consumes the weapon the
+player is wielding and then grants a replacement. The assertion was wrong and the engine was
+right, which is how the wider case came out.)*
+
+**The design task 186 wrote.** `_equipped(kind)` is documented as "the player's explicit choice
+(`data.equipped`) while it still names a carried item of that kind, else the strongest of that kind
+as the default" (`state.js`), and the reason the choice wins is real: book5/628's +3 Jade Defender
+carries a wielded Defence effect no plain +4 blade can match, so the port must not auto-switch away
+from a deliberate pick.
+
+**What the code does instead.** `reconcileEquipment` ends with `eq.weapon = w ? w.id : null` where
+`w = this.wieldedWeapon()` — i.e. it *persists whatever the reader just returned*, including the
+"strongest of that kind" fallback. It runs from `GameState.create`, `addItem`, `removeItemById`,
+`setEquipped` and the load path, so `data.equipped` is populated for every character from turn one
+and the two cases the comment distinguishes become indistinguishable. The fallback branch can then
+only ever fire when the stored item has LEFT the pack — never when a better one arrives.
+
+**Measured** (Node, `web/js/state.js` only):
+
+```
+items: battle-axe (+2)            -> wielded battle-axe, COMBAT 8   (correct)
+add magic sword (+4)              -> wielded battle-axe, COMBAT 8   (should be 10)
+lose battle-axe                   -> wielded magic sword, and the sword is now the STORED choice
+add holy sword (+7)               -> wielded magic sword, COMBAT 10 (should be 13)
+```
+
+Every pregen starts with a weapon, so the first line is every character: book1/16's market, or any
+of the corpus's weapon awards, is enough to reproduce it. The second half is the same fault one
+step on — book6/635's Warrior Maid confiscates a weapon, book4/103's white sword and book1/385's
+royal ring are the keep-protected pieces around it, and after any such loss the fallback is written
+back and sticks in turn.
+
+**The fix.** Keep `data.equipped` for explicit choices only. `setEquipped` writes it; the reconcile
+should CLEAR a stale entry rather than replace it with the fallback, leaving `_equipped` to
+default afresh on each read. That is what the existing comment already describes, so no behaviour
+the corpus depends on changes: a player who has chosen still keeps their choice (the Jade Defender
+case), and a player who has not gets the strongest, which is what the sheet already implies.
+Worth asserting in both directions — an explicit pick surviving a better acquisition, and an
+unchosen loadout following the best piece — since the two have been the same code path until now.
+
+**Armour has the identical shape** through `wornArmour`/`armourBonus`, and Defence is where it
+compounds, because `defence()` reads the worn armour and the Rank together.
 
 ## 309. `ROADMAP.md` sizes the map-position work against "the 4,437 section files", the glob count task 270 was filed to stop anyone quoting
 
