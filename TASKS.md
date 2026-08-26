@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-310 is complete (listed under **Done** below or in the buckets), apart from 207,
-withdrawn as a misdiagnosis (see the Review log); **311 is open**. File new
+311 is complete (listed under **Done** below or in the buckets), apart from 207,
+withdrawn as a misdiagnosis (see the Review log); **no task is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -22,7 +22,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 311. `ability()` clamps the EFFECTIVE score to 12, where the reference engine pegs only the minimum at 1, so book4/103's white sword is worth +5 to a book4 Warrior and +4 to a book5/6 one — and the attack roll and every `<difficulty>` check read the capped number
+- [x] 311. `ability()` clamps the EFFECTIVE score to 12, where the reference engine pegs only the minimum at 1, so book4/103's white sword is worth +5 to a book4 Warrior and +4 to a book5/6 one — and the attack roll and every `<difficulty>` check read the capped number
 
 - [x] 310. `reconcileEquipment` writes the DEFAULT weapon/armour back into `data.equipped`, so an implicit default is stored as an explicit choice and "else the strongest of that kind" can never fire again — a pregen Warrior who buys a magic sword keeps swinging their battle-axe at COMBAT 8 instead of 10
 
@@ -2307,11 +2307,78 @@ unclamped path. So the cap costs points on rolls, never a route — which is wha
 task 303.
 
 **Deliberately not measured, and the fix must not assume it.** Whether clamping the **natural**
-score to 12 is right is a *different* question on *different* call sites — `gainAbility`
-(`state.js:727`) and `sanitizeData` (`state.js:1389`) — and a natural ceiling may well be the
+score to 12 is right is a *different* question on *different* call sites — `adjustAbility`
+(`state.js:729`) and `sanitizeData` (`state.js:1394`) — and a natural ceiling may well be the
 printed rule. Read the reference's `<gain ability=>` path before touching those two. This filing is
 about the effective total alone; the narrow change is to stop clamping the sum at the two reader
 sites while leaving the floor of 1, which the reference does have.
+
+**Fixed 2026-08-26.** `rules.js` gains `floorAbility` (floor 1, no ceiling) beside `clampAbility`
+(1..12), and the two effective readers — `ability()` and `abilityNoWeapon()` — use it. The two
+natural-score sites keep `clampAbility`, so the change is to what a bonus may reach and never to
+what a `<gain ability=>` may write. Suite `pass=3004 → 3015`; `web/` only, so a stamp and not a
+data rebuild.
+
+**The printed rules settled it, and they nearly settled it the other way.** `rules/Rules.xml` does
+cap abilities at 12, twice — which is the first thing the fix had to survive rather than ignore:
+
+> Your **initial score** in each ability ranges from 1 (low ability) to 8. **Ability scores will
+> change** during your adventure, but you can never have an ability score lower than 1 or higher
+> than 12. *(the character-creation section)*
+>
+> You abilities (COMBAT, etc) can **increase** up to a maximum of 12. They can never go lower than
+> 1. **If you are told to lose a point off an ability which is already at 1, it stays as it is.**
+> *("Are there any limits on abilities?")*
+
+Both describe the number in the box: what an *initial score* is, what *increases*, and what
+happens when you are told to *lose a point*. Gains and losses are written-score operations — which
+is exactly where the port already applies `clampAbility`, correctly. Neither passage mentions a
+weapon.
+
+The genuine counter-argument, which is worth recording because a future reader will find it and
+should not have to re-weigh it alone: the same file uses "COMBAT score" to mean the
+weapon-inclusive number when it defines Defence — "your COMBAT score, **including any weapon
+bonus**, plus your Rank, plus the bonus for the armour you're wearing". So "ability score ... higher
+than 12" *could* be read as covering the total. Three things outweigh it. **JaFL**:
+`EffectSet.adjustAbility` — the function that applies weapon, tool, armour and aura bonuses — ends
+`return Math.max(1, value)`, and its comment explains the floor and never mentions a ceiling.
+**The corpus's own economy**: initial scores run to 8 and books 5–6 start a Warrior at COMBAT 8, so
+a total capped at 12 makes every weapon above +4 partly worthless to them and book4/103's +8 white
+sword worth +4 — a game does not sell a +8 sword it has already decided cannot be used. **The
+adjacent rule**: "count only the bonus given by your best item for each ability" answers *which*
+bonus applies with no ceiling on the result.
+
+**Defence moved with it, which the filing had backwards.** The filing said `defence()` "is not
+clamped", contrasting it with the six core paths. Half right: the *sum* is unclamped, but
+`defenceForMode` builds its COMBAT term from `this.ability('combat')` — the clamped reader — so the
+cap was costing Defence the same four points it cost the attack roll. That makes the defect larger
+than filed and the fix's reach wider: lifting the ceiling pays those points back in Defence too,
+which is what Rules.xml's "including any weapon bonus" requires. `modifier="noweapon"` still strips
+the weapon term exactly, because `abilityNoWeapon` sums its own terms rather than subtracting.
+
+**Two existing assertions were the ceiling's own fixtures**, and one of them was mine. Task 310's
+"a better weapon after a loss is still picked up" carried the `Math.min(12, cb0 + 7)` that filed
+this task, and is now `cb0 + 7` exactly. `suite-render`'s "noweapon computed pre-clamp (11, not
+12−2)" existed to prove the bare score was summed rather than subtracted off a clamped total — the
+fixture (COMBAT 11 + a +2 weapon) is the exact shape that hit the ceiling, so it is kept and
+re-pointed: the affected score is now the true 13, the bare score is unchanged at 11 (the original
+property, still holding), and re-adding the cap fails there first.
+
+**Assertions** (11: nine in `suite-engine`, one in `suite-combat`, the re-pointed one in
+`suite-render`). Driven from the shipped nodes, not fixtures: §4.103's white sword and §6.23's
+hyperium wand are read out of the corpus and applied, each with a guard arm on its `bonus=` so a
+re-worded section fails here rather than silently weakening the test. Then COMBAT 8 + 8 reading 16
+through `ability`, `abilityForCheck` and `rollDifficulty`; Defence carrying it; `noweapon` still
+stripping it; MAGIC 8 + 6 reading 14 off the tool path; the **floor** surviving a −9 curse (the
+bound that has a source); and a control that a written score still stops at 12. The
+`suite-combat` arm reads the fight log — `You roll 2+16=18 vs Def 10` — because the log line is
+where the number is legible to a player. Verified by reinstating the ceiling in `floorAbility`
+alone: seven arms fail across four suites, the log line reading `2+12=14`.
+
+**Still not measured, deliberately.** The natural-score cap is untouched and unexamined; the two
+`clampAbility` call sites are unchanged and the control arm pins them. Reading JaFL's
+`<gain ability=>` path is the work that would settle whether 12 is right *there*, and this task did
+not do it.
 
 ## 310. `reconcileEquipment` writes the DEFAULT weapon/armour back into `data.equipped`, so an implicit default is stored as an explicit choice
 
@@ -2671,6 +2738,42 @@ save/load round-trip un-clamped, and takes current Stamina down with it when ren
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-26 (implementation pass, task 311): closed **311** — the effective ability score is
+floored at 1 and no longer capped at 12, via a new `floorAbility` beside `clampAbility`, which keeps
+the written-score sites bounded 1..12. Suite `pass=3004 → 3015`; `web/` only.
+
+**The printed rules said "12" twice and still meant the other thing — reading them was the whole
+task.** `rules/Rules.xml` caps abilities at 12 in two places, so the cheap version of this pass was
+to read either passage, conclude the port was right, and withdraw the filing. What decides it is
+*which noun* the cap attaches to: both passages describe the number in the box — the *initial
+score*, what *increases*, and what happens when you are *told to lose a point* — and gains and
+losses are written-score operations, which is precisely where the port already clamps. **The
+counter-argument is real and is now recorded in the task rather than left for the next reader to
+rediscover**: the same file defines Defence as "your COMBAT score, *including any weapon bonus*",
+so "COMBAT score" is an overloaded phrase in the source and the cap's noun is genuinely ambiguous
+in isolation. Three independent things break the tie — JaFL's `EffectSet.adjustAbility` pegging the
+minimum alone with a comment explaining only the floor, the corpus selling a +8 sword to characters
+who start at COMBAT 8, and the adjacent "count only your best item's bonus" rule having no ceiling
+on its result. **A spec that states a number twice can still be silent on the question you are
+asking**, and the tell was that neither passage mentions a weapon.
+
+**The filing got Defence backwards, and the fix is bigger for it.** 311 was filed saying `defence()`
+"is not clamped", offering that as evidence the port disagreed with itself. The sum is indeed
+unclamped — but `defenceForMode` builds its COMBAT term from `ability('combat')`, the clamped
+reader, so the cap was quietly costing Defence the same four points as the attack roll. The
+port's inconsistency was narrower and the defect wider than filed. **A filing that contrasts two
+code paths is worth re-reading for whether one path calls the other** — this one did, one line down
+from the claim.
+
+**The most useful assertion in the last two passes is the one I weakened to get green.** Task 310's
+arm needed `Math.min(12, cb0 + 7)`; writing that and moving on would have buried this defect
+permanently, since nothing else in the suite exercised a score above 12. It is now `cb0 + 7`. The
+generalisation for the next pass: **when an expected value needs a clamp, a floor or a `Math.min`
+to match, the clamp is a claim about the system and should be justified or filed, not absorbed into
+the expectation.** `suite-render`'s "noweapon computed pre-clamp" was the same shape from the other
+direction — an assertion whose fixture existed only because of the ceiling — and it survives,
+re-pointed, as this task's tightest regression guard.
 
 Worked 2026-08-26 (implementation pass, task 310; filed 311): closed **310** — `reconcileEquipment`
 persisted whatever `wieldedWeapon()`/`wornArmour()` returned, so the "strongest of that kind"

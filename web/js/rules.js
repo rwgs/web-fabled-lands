@@ -99,6 +99,22 @@ export function canonCargo(name) {
 
 export const MAX_ITEMS = 12;
 
+/** The WRITTEN ability score — the number in the box on the Adventure Sheet, which
+ *  `<gain|lose ability=>` moves. Bounded 1..12: "your abilities can increase up to a
+ *  maximum of 12. They can never go lower than 1" (`rules/Rules.xml`, "Are there any
+ *  limits on abilities?"). Use this only where the written score is being SET. */
 export function clampAbility(v) {
   return Math.max(ABILITY_MIN, Math.min(ABILITY_MAX, v));
+}
+
+/** The EFFECTIVE score — the written score plus the weapon/tool, aura, god, potion and
+ *  affliction terms, as a roll or a check reads it. Floor of 1, and NO ceiling: the 12 is
+ *  a limit on what the sheet can hold, not on what a weapon can add to it, so a book5/6
+ *  Warrior at COMBAT 8 with book4/103's white sword (+8) fights at 16. JaFL agrees —
+ *  `EffectSet.adjustAbility` ends `return Math.max(1, value)`, pegging the minimum alone
+ *  ("this stops curses from lowering an early character's stats below 1") and capping
+ *  nothing. Capping the sum instead made every weapon above +4 partly or wholly worthless
+ *  to a high-COMBAT character, which is not a game that sells a +8 sword. (task 311) */
+export function floorAbility(v) {
+  return Math.max(ABILITY_MIN, v);
 }

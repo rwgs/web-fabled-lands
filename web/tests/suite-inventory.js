@@ -1788,7 +1788,9 @@ export async function run(ctx) {
       // back, so the NEXT better weapon was ignored too (§6.635's confiscation, §4.103's
       // white sword). Re-arming is what proves the write-back is gone.
       const holy = gW.addItem(makeItem('weapon', 'holy sword', 7));
-      ok('§310 a better weapon after a loss is still picked up', gW.wieldedWeapon() === holy && gW.ability('combat') === Math.min(12, cb0 + 7), `wielded=${gW.wieldedWeapon().name} combat=${gW.ability('combat')}`);
+      // `cb0 + 7` exactly, with no Math.min: needing one here to make this arm pass is what
+      // filed task 311, which removed the ceiling from the effective score.
+      ok('§310 a better weapon after a loss is still picked up', gW.wieldedWeapon() === holy && gW.ability('combat') === cb0 + 7, `wielded=${gW.wieldedWeapon().name} combat=${gW.ability('combat')}`);
       // Direction 2 — chosen: a deliberate pick is not stolen by anything better (§5.628).
       const gC = mk310('weapon');
       const keep = gC.addItem(makeItem('weapon', 'Jade Defender', 3));

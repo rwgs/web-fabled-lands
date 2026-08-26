@@ -171,6 +171,67 @@ export async function run(ctx) {
     ok('task304: an ability="*" affliction reaches Defence once, through COMBAT',
        gStar.defence() === starBefore - 1, `${starBefore}->${gStar.defence()}`);
 
+    // --- task 311: the 12 bounds the WRITTEN score, not the total a weapon adds to it ---------
+    // ability()/abilityNoWeapon() clamped the full sum to 1..12, so book4/103's white sword (+8,
+    // the corpus's one +8 weapon) was worth +4 to a book5/6 Warrior instead of +8 — and the
+    // capped number is what the attack roll, every <difficulty> check and the Defence combat
+    // term all read. `rules/Rules.xml` caps what the sheet can HOLD ("your abilities can
+    // increase up to a maximum of 12... if you are told to lose a point off an ability which is
+    // already at 1, it stays as it is" — gains and losses, i.e. the written box), and JaFL
+    // agrees from the other side: EffectSet.adjustAbility ends `return Math.max(1, value)`,
+    // pegging the minimum alone and capping nothing.
+    const g311 = GameState.create({ name:'Wht', gender:'m', profession:'Warrior', book:4, adv });
+    g311.ephemeral = true;
+    g311.data.items = g311.data.items.filter((it) => it.kind !== 'weapon');
+    g311.reconcileEquipment();
+    g311.data.abilities.combat = 8;                       // the book5/6 pregen Warrior's row
+    const sword311 = (await data.getSection(4, '103')).querySelector('weapon[name="white sword"]');
+    ok('task311: fixture — §4.103 still awards a white sword at bonus="8"',
+       !!sword311 && sword311.getAttribute('bonus') === '8',
+       sword311 ? 'bonus=' + sword311.getAttribute('bonus') : 'no white sword in §4.103');
+    eng.applyEffect(sword311, g311, {});
+    ok('task311: COMBAT 8 with the +8 white sword fights at 16, not the old ceiling of 12',
+       g311.ability('combat') === 16 && g311.abilityForCheck('combat') === 16,
+       `ability=${g311.ability('combat')} check=${g311.abilityForCheck('combat')}`);
+    ok('task311: a <difficulty> roll resolves against the uncapped score',
+       eng.rollDifficulty(g311, 'combat', 20, 0, null).abilityScore === 16,
+       String(eng.rollDifficulty(g311, 'combat', 20, 0, null).abilityScore));
+    // Defence carries the weapon bonus in its COMBAT term — "your COMBAT score, including any
+    // weapon bonus, plus your Rank, plus the bonus for the armour you're wearing" (Rules.xml).
+    // So the cap cost Defence the same four points, and lifting it pays them back there too.
+    ok('task311: Defence follows, because its COMBAT term is this score',
+       g311.defence() === 16 + g311.rankValue() + g311.armourBonus(),
+       `def=${g311.defence()} combat=16 rank=${g311.rankValue()} arm=${g311.armourBonus()}`);
+    ok('task311: modifier="noweapon" still strips the weapon term exactly',
+       g311.abilityNoWeapon('combat') === 8
+       && g311.abilityForMode('defence', 'noweapon') === 8 + g311.rankValue() + g311.armourBonus(),
+       `noweapon=${g311.abilityNoWeapon('combat')} def=${g311.abilityForMode('defence', 'noweapon')}`);
+    // book6/23's hyperium wand is the corpus's top TOOL (+6, MAGIC) — the same shape off the
+    // weapon path, so a Mage at MAGIC 8 reads 14.
+    const gWand = GameState.create({ name:'Wnd', gender:'f', profession:'Mage', book:6, adv });
+    gWand.ephemeral = true;
+    gWand.data.abilities.magic = 8;
+    const wand311 = (await data.getSection(6, '23')).querySelector('tool[name="hyperium wand"]');
+    ok('task311: fixture — §6.23 still awards a MAGIC tool at bonus="6"',
+       !!wand311 && wand311.getAttribute('bonus') === '6' && wand311.getAttribute('ability') === 'magic',
+       wand311 ? 'bonus=' + wand311.getAttribute('bonus') : 'no hyperium wand in §6.23');
+    eng.applyEffect(wand311, gWand, {});
+    ok('task311: a tool bonus is uncapped on the same rule', gWand.ability('magic') === 14, String(gWand.ability('magic')));
+    // The FLOOR is the bound that has a source, so it must survive: JaFL pegs it at 1 "to stop
+    // curses from lowering an early character's stats below 1", and Rules.xml says the same.
+    const gFloor = GameState.create({ name:'Flr', gender:'m', profession:'Warrior', book:1, adv });
+    gFloor.data.abilities.combat = 2;
+    eng.applyEffect(parse('<curse name="Curse of Weakness"><effect ability="combat" bonus="-9"/></curse>'), gFloor, {});
+    ok('task311: a curse still cannot take an effective score below 1',
+       gFloor.ability('combat') === 1 && gFloor.abilityForCheck('combat') === 1, String(gFloor.ability('combat')));
+    // Control, and the other half of the rule: the WRITTEN score is still capped at 12, so the
+    // change is to what a bonus may reach and not to what a <gain> may write.
+    const gWrit = GameState.create({ name:'Wrt', gender:'m', profession:'Warrior', book:1, adv });
+    gWrit.data.abilities.combat = 11;
+    gWrit.adjustAbility('combat', 5);
+    ok('task311: control — a written score still stops at 12, per Rules.xml',
+       gWrit.abilityNatural('combat') === 12, String(gWrit.abilityNatural('combat')));
+
     // --- task 305: readEffects serves <tick god=> too, and its output had two dead words ------
     // A god's effects land in data.effects, whose ONLY reader was effectBonus — summed by
     // ability() and abilityNoWeapon(), both core-ability paths. So `defence` (which task 304

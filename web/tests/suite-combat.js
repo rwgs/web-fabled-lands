@@ -374,6 +374,30 @@ export async function run(ctx) {
       ok('§1.586 an ordinary blessing is used up by the first storm', !g90o.hasBlessing('storm'));
     }
 
+    // --- task 311: the attack roll reads the uncapped COMBAT ---------------------------
+    // playerStrike builds its total from state.ability('combat'), which used to be clamped
+    // to 12 — so a book5/6 Warrior carrying book4/103's +8 white sword struck at 12 where
+    // the rules give 16, and the log line said so in plain sight. Asserted on the log
+    // because that is where the number is legible to a player. (task 311)
+    { // block-scoped (task 82)
+      const rnd311 = Math.random;
+      const g311c = GameState.create({ name: 'W311', gender: 'm', profession: 'Warrior', book: 5, adv });
+      g311c.ephemeral = true;
+      g311c.data.items = g311c.data.items.filter((it) => it.kind !== 'weapon');
+      g311c.reconcileEquipment();
+      g311c.data.abilities.combat = 8;
+      ok('task311: fixture — the Warrior is at the pregen COMBAT 8 with no weapon',
+         g311c.ability('combat') === 8, String(g311c.ability('combat')));
+      g311c.addItem(makeItem('weapon', 'white sword', 8));
+      const f311 = makeFight(parse('<fight name="Dummy" combat="1" defence="10" stamina="40"/>'), g311c);
+      Math.random = () => 0; // both dice minimal: the roll is 2, so the log shows 2+COMBAT
+      fightRound(g311c, f311, null);
+      Math.random = rnd311;
+      const line311 = f311.log.find((l) => /^You roll/.test(l));
+      ok('task311: the attack roll adds the full 16, not the old ceiling of 12',
+         /^You roll 2\+16=18 /.test(line311 || ''), line311 || 'no attack line');
+    }
+
     // --- task 91: COMBAT blessing retries a missed strike; Defence stays per-fight -----
     { // block-scoped (task 82)
       const rnd91 = Math.random;

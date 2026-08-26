@@ -1,7 +1,7 @@
 // state.js — the Adventure Sheet: the full mutable character/game state,
 // derived stats, and localStorage persistence with multiple save slots.
 
-import { ABILITIES, MAX_ITEMS, clampAbility, rankTitle, canonCargo } from './rules.js';
+import { ABILITIES, MAX_ITEMS, clampAbility, floorAbility, rankTitle, canonCargo } from './rules.js';
 
 const SAVE_PREFIX = 'fl_save_';
 const META_KEY = 'fl_meta';
@@ -423,7 +423,11 @@ export class GameState {
   ability(ability) {
     const base = this.data.abilities[ability] || 0;
     const sum = base + this.itemBonus(ability) + this.effectBonus(ability) + this.afflictionBonus(ability) + this.auraBonus(ability) + this.potionBonusFor(ability);
-    return clampAbility(this.afflictionMod(ability, sum));
+    // Floor of 1, no ceiling: the printed 12 bounds the WRITTEN score, not the total a
+    // weapon or tool adds to it (see floorAbility). Clamping the sum here cost a book5/6
+    // Warrior four points of COMBAT on every attack roll with book4/103's +8 white sword,
+    // and four points of Defence with it, since defenceForMode builds on this. (task 311)
+    return floorAbility(this.afflictionMod(ability, sum));
   }
 
   /** Ability score as seen by a check (difficulty/rank/if): a cursed ability
@@ -501,12 +505,13 @@ export class GameState {
 
   abilityNatural(ability) { return this.data.abilities[ability] || 0; }
 
-  /** The affected ability score without the weapon/tool (item) bonus — computed
-   *  before the 1..12 clamp so a ceiling hit doesn't distort it (JaFL NOTOOL). */
+  /** The affected ability score without the weapon/tool (item) bonus — summed from its own
+   *  terms rather than by subtracting the bonus back off ability(), so the omission is exact
+   *  (JaFL NOTOOL). Floored, not capped, for the same reason ability() is. (tasks 302, 311) */
   abilityNoWeapon(ability) {
     const base = this.data.abilities[ability] || 0;
     const sum = base + this.effectBonus(ability) + this.afflictionBonus(ability) + this.auraBonus(ability) + this.potionBonusFor(ability);
-    return clampAbility(this.afflictionMod(ability, sum));
+    return floorAbility(this.afflictionMod(ability, sum));
   }
 
   hasMask() { return this.data.items.some((it) => normalize(it.name).includes('mask')); }

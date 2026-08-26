@@ -113,11 +113,17 @@ export async function run(ctx) {
     ok('noweapon: the weapon lifts the affected COMBAT', combatFull === combatBare + 3, `full=${combatFull} bare=${combatBare}`);
     ok('rollDifficulty noweapon uses the bare COMBAT', eng.rollDifficulty(gnw,'combat',13,0,'noweapon').abilityScore === combatBare);
     ok('rollDifficulty default still counts the weapon', eng.rollDifficulty(gnw,'combat',13,0).abilityScore === combatFull);
-    // noweapon is computed pre-clamp: COMBAT 11 + a +2 weapon reads 12 affected but 11 bare.
+    // The shape that used to hit the ceiling, kept as its regression guard: COMBAT 11 + a +2
+    // weapon read 12 affected (the clamp) and 11 bare, and this assertion existed to prove the
+    // bare score was summed from its own terms rather than by subtracting 2 off the clamped 12.
+    // Task 311 removed the ceiling from the effective score — the printed 12 bounds the WRITTEN
+    // box, not what a weapon adds to it — so the affected score is now the true 13. The bare
+    // score is unchanged at 11, which is the original property still holding; re-adding the cap
+    // fails here first.
     const gcap = GameState.create({ name:'Cap', gender:'m', profession:'Warrior', book:3, adv });
     gcap.data.abilities.combat = 11; gcap.data.items = gcap.data.items.filter((i) => i.kind !== 'weapon');
     gcap.addItem(makeItem('weapon', 'runeblade', 2));
-    ok('noweapon computed pre-clamp (11, not 12−2)', gcap.ability('combat') === 12 && gcap.abilityNoWeapon('combat') === 11, `aff=${gcap.ability('combat')} bare=${gcap.abilityNoWeapon('combat')}`);
+    ok('task311: COMBAT 11 + a +2 weapon reads the true 13, and 11 bare (was clamped to 12)', gcap.ability('combat') === 13 && gcap.abilityNoWeapon('combat') === 11, `aff=${gcap.ability('combat')} bare=${gcap.abilityNoWeapon('combat')}`);
     // §3.235 rendered roll uses the bare COMBAT, not the weapon-boosted score.
     const c235 = document.createElement('div');
     const story235 = new Story(c235, gnw, { navigate(){}, onDeath(){}, notify(){} });
