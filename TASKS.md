@@ -2375,10 +2375,42 @@ bound that has a source); and a control that a written score still stops at 12. 
 where the number is legible to a player. Verified by reinstating the ceiling in `floorAbility`
 alone: seven arms fail across four suites, the log line reading `2+12=14`.
 
-**Still not measured, deliberately.** The natural-score cap is untouched and unexamined; the two
-`clampAbility` call sites are unchanged and the control arm pins them. Reading JaFL's
-`<gain ability=>` path is the work that would settle whether 12 is right *there*, and this task did
-not do it.
+**The natural-score cap: left untouched here, then read afterwards and confirmed correct.** The two
+`clampAbility` call sites — `adjustAbility` (`state.js:729`) and `sanitizeData` (`state.js:1394`) —
+are unchanged by this task, and the control arm pins them at 1..12. That was deliberate but
+unverified when the fix shipped; the check was made immediately after, and it holds. **This is the
+mirror image of the defect above**: on the effective path the 12 had no source, and on the written
+path it has two.
+
+`rules/Rules.xml` is the first, quoted above. JaFL is the second, and it states the rule in words
+before implementing it — `Adventurer.adjustAbility`'s doc comment reads "an ability can only be
+lowered to 1, and one of the major six can only go up to 12", and the body is exactly that:
+
+```java
+if (abilities[a].natural + delta < 1) { if (fatal) death = true; d = -abilities[a].natural + 1; }
+else if (abilities[a].natural + delta > 12) { d = 12 - abilities[a].natural; }
+```
+
+The port's `fatal` branch matches too (`if (fatal) death = true` against the drop to Stamina 0), and
+`d` is clamped *inside* JaFL's loop, so an `ability="*"` adjustment is bounded per ability — a loss
+takes a point off each ability above 1 and nothing off one already at 1. The port resolves `'*'` to
+all six (`engine.js:134`) and calls `adjustAbility` per target, each clamping on its own, so the two
+agree there as well. **No task: nothing to change, and the 12 on this path is not the unsourced
+ceiling that 311 was about.**
+
+**Three adjacent divergences found in the same read, none of them defects.** Recorded here so the
+next reader does not file them: (1) JaFL's `adjustAbility` returns the delta actually applied where
+the port returns the new score — a real difference, but inert, since all three callers
+(`combat.js:171`, `engine.js:172`, `engine.js:1801`) discard the return. (2) JaFL calls
+`isAbilityMaxed` from `TickNode.canBeSkipped`/`actionDoesAnything`, so a *forced* ability tick that
+would do nothing at 12 is neither presented as an action nor required of the player; the port has no
+equivalent and needs none, because all **141** ability-raising nodes in the shipped corpus are
+auto-applied on entry — **zero** carry `force="f"` — so there is no control to disable and no forced
+click to clear. With six books published and no seventh in the tree, a conversion cannot introduce
+the shape either. (3) Where such a tick carries an ability *effect* rather than an amount
+(book2/643's `effect="+fixed"`), JaFL's own condition (`!isAbilityMaxed(ability) || abilityEffect !=
+null`) exempts it from the maxed check regardless, which is what the port already does by applying
+effects separately from the numeric gain.
 
 ## 310. `reconcileEquipment` writes the DEFAULT weapon/armour back into `data.equipped`, so an implicit default is stored as an explicit choice
 
@@ -2774,6 +2806,20 @@ to match, the clamp is a claim about the system and should be justified or filed
 the expectation.** `suite-render`'s "noweapon computed pre-clamp" was the same shape from the other
 direction — an assertion whose fixture existed only because of the ceiling — and it survives,
 re-pointed, as this task's tightest regression guard.
+
+**Closed the loop the task left open, and filed nothing for it.** 311 shipped saying the
+**natural**-score cap was "untouched and unexamined" — an honest scope line, but a standing invitation
+to re-derive it. The read was made straight afterwards and the port is correct: `Rules.xml` and
+JaFL's `Adventurer.adjustAbility` both bound the written score 1..12, the latter stating it in its
+doc comment before implementing it, and JaFL clamps per ability inside its loop just as the port
+does by calling `adjustAbility` once per resolved target, so `ability="*"` is bounded per ability on
+both sides. The task's detail section now records that, with the
+three adjacent divergences the same read turned up — a discarded return value, `isAbilityMaxed`
+having no port equivalent (and needing none: all 141 ability-raising nodes in the corpus are
+auto-applied, zero carry `force="f"`), and the `abilityEffect` exemption the port already honours.
+**The point of writing them down is that all three look like defects and none are**; an unexamined
+scope line costs the next reader the same hour twice, and the backlog is for defects, so the place
+for a confirmed-correct finding is the task that deferred it.
 
 Worked 2026-08-26 (implementation pass, task 310; filed 311): closed **310** — `reconcileEquipment`
 persisted whatever `wieldedWeapon()`/`wornArmour()` returned, so the "strongest of that kind"
