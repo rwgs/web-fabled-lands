@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-311 is complete (listed under **Done** below or in the buckets), apart from 207,
-withdrawn as a misdiagnosis (see the Review log); **no task is open**. File new
+312 is complete (listed under **Done** below or in the buckets), apart from 207,
+withdrawn as a misdiagnosis (see the Review log); **313 is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -35,6 +35,8 @@ there once the buckets below are clear.
 - [x] 296. `rewardWasteReason` refuses a new resurrection deal to anyone already holding one, where `addResurrection` implements the replacement the books print — so book1/597's third reward is dead to a deal-holder
 
 **LOW**
+
+- [ ] 313. eighteen of the nineteen corpus censuses read the raw bundled section text, which KEEPS XML comments, so a commented-out node is counted as a real one — latent today, and the nineteenth already strips them
 
 - [x] 312. task 311 lifted the effective-ability ceiling and left `ability()`'s own doc comment reading "clamped 1..12" — while the comment 311 wrote six lines below it says "Floor of 1, no ceiling", and the one it wrote on `abilityNoWeapon` says "Floored, not capped, for the same reason `ability()` is", citing the stale line as its authority
 
@@ -2249,6 +2251,85 @@ fight against a cursed player reads the reduced Defence.
 
 ---
 
+## 313. eighteen of the nineteen corpus censuses read raw bundled text that keeps XML comments, so a commented-out node counts as a real one
+
+**Priority: LOW — latent, and measured to be latent.** Nothing is mis-measured today: stripping
+comments from the bundle before the suites run changes not one assertion, count or label across the
+whole run, measured (below). It is filed rather than dropped because the failure mode is
+**silent by construction** — these censuses exist to catch things "nothing anywhere says", so a
+census fed a phantom node reports a wrong number inside an assertion that may still pass — and
+because the input that triggers it is a practice the repository is actively growing: an explanatory
+comment that quotes the markup it explains.
+
+*(Filed 2026-08-28 by a reader who wrote such a comment, noticed it before committing, and then
+checked whether the corpus already contained any.)*
+
+**What the code does.** Every corpus census walks `data.loadBook(b)` and matches over the raw
+section string — nineteen of them, at `suite-actions.js` (11), `suite-corpus.js` (7) and
+`suite-inventory.js` (1). `loadBook` returns the bundled JSON verbatim, and **`build/build-data.ps1`
+does not strip comments**: book6/135’s
+
+```xml
+	<!-- modified so that even 'kept' weapons can be broken -->
+```
+
+is in `web/data/book6.json` today. So a census’s regex sees comment text exactly as it sees markup.
+Exactly one census already knows this — task 266’s `scan266` opens with
+`xml.replace(/<!--[\s\S]*?-->/g, '')` (`suite-actions.js`) — which is the argument that the other
+eighteen want it too, not that they are individually wrong.
+
+**The corpus already contains the input.** Five of the 64 shipped comments carry markup a census can
+match:
+
+| section | comment holds | seen as |
+| --- | --- | --- |
+| book2/726 | `<lose codeword="2.726.1" hidden="t"/>`, commented out | a real `<lose codeword>` node |
+| book1/605 | `<choice section="501">If paying a ransom</choice>` | a real `<choice>` with a link |
+| book2/248, book2/521, book3/640 | `choose="f"` | an attribute pair |
+
+book2/726 is the sharpest: task 273’s census opens `if (!/<lose\b[^>]*\bcodeword=/i.test(xml)) continue;`
+and that test passes **on the comment**, so the section is walked; `TAG273` then matches the
+commented-out node and counts it as a `<lose codeword>`. The pinned output is unaffected only
+because the node happens to sit under no `<if codeword>` guard — an accident of that page, not a
+property of the census.
+
+**Why "latent" is a measurement and not an assumption.** Patch `loadBook`’s cache to strip comments
+before any suite runs, and diff the whole `#results` block against an unpatched run:
+
+```
+with comments    : RESULT ALL PASS pass=3015 fail=0   (3016 result lines)
+comments stripped: RESULT ALL PASS pass=3015 fail=0   (3016 result lines)
+unified diff of the two blocks: empty
+```
+
+Diffing the **whole block** rather than the verdict is the part that matters: several censuses
+carry their figure inside a PASSING assertion’s label (task 300’s site count, task 266’s totals),
+so a verdict comparison would have proved nothing.
+
+**Fix.** Strip once, where every census gets it, rather than nineteen times. Two options:
+
+1. **In the suites** — a shared `rawSections(b)` helper in the test tree that wraps `loadBook` and
+   returns comment-free strings, with the nineteen call sites moved onto it and `scan266`’s own
+   `replace` deleted as redundant. Keeps the bundle byte-identical; touches only `web/tests`.
+2. **In the build** — drop comments when bundling. No runtime reader needs them (`parseXml` yields
+   comment nodes nothing walks, and the renderer never visits them), and it shrinks every
+   `book<N>.json`. This regenerates all of `web/data`, so it is the larger diff and it removes a
+   maintainer aid from the shipped artefact — the comments stay in `books/`, which is the source.
+
+Option 1 is recommended: the defect is in what the censuses read, and the bundle is not wrong.
+
+**Test.** One assertion in `suite-corpus.js`, pinned at zero over the bundled corpus: no section’s
+comment-stripped text differs from its raw text **in the count of tag opens** — i.e. no shipped
+comment contains markup. That fails today on book1/605 and book2/726, so pin it instead as "the
+censuses see the same tag count with and without comments", which the helper makes true and which
+keeps working when a future comment quotes markup. Whichever form, it must be a census of its own
+and not a fixture, because the input is the corpus.
+
+**Adjacent, and deliberately not folded in.** `build/validate-source.ps1` parses XML properly, so
+the build gate is unaffected — this is a test-tree defect only. And the reverse direction is
+already known and unrelated: a *prose* census over section text must strip comments too, which is a
+note about ad-hoc `grep`s rather than about the suite.
+
 ## 312. task 311 lifted the effective-ability ceiling and left `ability()`'s doc comment reading "clamped 1..12" — which `abilityNoWeapon`'s new comment then cites as its authority
 
 **Priority: LOW — a comment, not behaviour.** Nothing computes wrongly, no branch changes and no
@@ -2825,6 +2906,32 @@ save/load round-trip un-clamped, and takes current Stamina down with it when ren
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-28 (filing pass, no code): filed **313** — the corpus censuses read raw bundled
+text that keeps XML comments, so a commented-out node counts as a real one. Found while writing an
+explanatory comment that quoted the markup it explained, during conversion work on an unpublished
+book; the interesting half is that the repository’s own recorded remedy did not cover it.
+
+**The recorded rule was "a comment that quotes MARKUP is markup to a raw-text census, so write it
+without its closing `>`" — and that remedy is keyed on the wrong token.** The comment that prompted
+this filing contained no `<` at all; it quoted an attribute PAIR (`modifier="natural"`), and task
+300 matches `\bmodifiers?="([^"]*)"`. So the rule generalises to **quote a bare attribute NAME in a
+comment, never a `name="value"` pair**, and the check is one `grep` for `[A-Za-z]+="` inside
+`<!-- ... -->` over the diff. A remedy phrased against one syntactic form expires against the next
+census keyed on a different one.
+
+**Filed as latent on a measurement, not an inspection.** The cheap version of this pass was to read
+the six shipped comments, see that none currently changes a pinned number, and drop it. What makes
+the filing worth its number is the experiment: patching the book cache to strip comments and
+diffing the entire `#results` block (3,016 lines, byte-identical) proves latency across all nineteen
+censuses at once, including the ones whose figures ride inside PASSING assertion labels and which
+no reading of the failing set could have covered. **Prove a "nothing changes" claim by diffing the
+whole output, not the verdict** — a verdict comparison here would have been vacuous.
+
+**One census already had the fix and that is the argument for the task.** Task 266’s `scan266`
+strips comments in its first line, for the same reason, written when its own tag-walk needed it.
+Eighteen siblings written before and after it do not. A guard-rail that one of nineteen instances
+gets right is a shared-helper defect rather than nineteen oversights.
 
 Worked 2026-08-26 (implementation pass, task 311): closed **311** — the effective ability score is
 floored at 1 and no longer capped at 12, via a new `floorAbility` beside `clampAbility`, which keeps
