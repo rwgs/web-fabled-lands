@@ -8,6 +8,7 @@ import * as rules from '../js/render-rules.js';
 import * as gates from '../js/render-gates.js';
 import * as visit from '../js/visit-state.js';
 import { renderSheet } from '../js/ui.js';
+import { rawSections } from './corpus-text.js';
 
 export async function run(ctx) {
   const { ok, parse } = ctx;
@@ -3799,7 +3800,7 @@ export async function run(ctx) {
       {
         const paid308 = [], multi308 = [];
         for (const b of data.availableBooks()) {
-          const raw = await data.loadBook(b);
+          const raw = await rawSections(b);
           for (const key of Object.keys(raw)) {
             if (!/<group\b/i.test(raw[key]) || !/\bprice\s*=/i.test(raw[key])) continue;
             const sec = parse(raw[key]);
@@ -4451,7 +4452,7 @@ export async function run(ctx) {
       const SPEND263 = /<(?:buy|market|itemcache|moneycache)\b[^>]*>|<rest\b[^>]*\bshards\s*=[^>]*>/gi;
       const pairs263 = [], above263 = [];
       for (const b of data.availableBooks()) {
-        const raw = await data.loadBook(b);
+        const raw = await rawSections(b);
         for (const key of Object.keys(raw)) {
           const guards = [...raw[key].matchAll(GUARD263)].filter((m) => /\b(?:shards|item)\s*=/.test(m[0]));
           if (!guards.length) continue;
@@ -4642,7 +4643,7 @@ export async function run(ctx) {
       const TAG264 = /<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g;
       const under264 = [];
       for (const b of data.availableBooks()) {
-        const raw = await data.loadBook(b);
+        const raw = await rawSections(b);
         for (const key of Object.keys(raw)) {
           const xml = raw[key];
           if (!OPT264.test(xml)) { OPT264.lastIndex = 0; continue; }
@@ -4830,7 +4831,7 @@ export async function run(ctx) {
       };
       const pairs265 = [], above265 = [];
       for (const b of data.availableBooks()) {
-        const raw = await data.loadBook(b);
+        const raw = await rawSections(b);
         for (const key of Object.keys(raw)) {
           const guards = [...raw[key].matchAll(GUARD265)].filter((m) => /\b(?:shards|item)\s*=/.test(m[0]));
           if (!guards.length) continue;
@@ -4966,9 +4967,10 @@ export async function run(ctx) {
           parent.kids.push(frame);
         };
         let m;
-        const src = xml.replace(/<!--[\s\S]*?-->/g, '');
+        // The comment strip that used to live here is now in rawSections() (task 313), which
+        // every census reads through — this scanner was the only one that ever knew it needed one.
         TAG266.lastIndex = 0;
-        while ((m = TAG266.exec(src))) {
+        while ((m = TAG266.exec(xml))) {
           const [, close, name] = m;
           const t = name.toLowerCase();
           if (close) { if (stack.length > 1 && stack[stack.length - 1].tag === t) shut(); continue; }
@@ -4999,7 +5001,7 @@ export async function run(ctx) {
       };
       const all266 = [], deep266 = [];
       for (const b of data.availableBooks()) {
-        const raw = await data.loadBook(b);
+        const raw = await rawSections(b);
         for (const key of Object.keys(raw)) {
           const r = scan266(raw[key]);
           if (r.branches) all266.push(b + '/' + key + ':' + r.branches);
@@ -5179,7 +5181,7 @@ export async function run(ctx) {
       // fails here rather than changing silently.
       const none267 = [], buy267 = [];
       for (const b of data.availableBooks()) {
-        const raw = await data.loadBook(b);
+        const raw = await rawSections(b);
         for (const key of Object.keys(raw)) {
           if (/initialCrew="none"/.test(raw[key])) none267.push(b + '/' + key);
           if (/<buy[^>]*\bcrew="poor"/.test(raw[key])) buy267.push(b + '/' + key);
@@ -5238,7 +5240,7 @@ export async function run(ctx) {
       const bare268 = [], by268 = new Map();
       let total268 = 0;
       for (const b of data.availableBooks()) {
-        const raw = await data.loadBook(b);
+        const raw = await rawSections(b);
         for (const key of Object.keys(raw)) {
           if (!/<adjust[^>]*\bcrew=/.test(raw[key])) continue;
           const el = await data.getSection(b, key);
@@ -5312,7 +5314,7 @@ export async function run(ctx) {
       const bare269 = [], by269 = new Map();
       let total269 = 0;
       for (const b of data.availableBooks()) {
-        const raw = await data.loadBook(b);
+        const raw = await rawSections(b);
         for (const key of Object.keys(raw)) {
           if (!/<adjust\b/.test(raw[key])) continue;
           const el = await data.getSection(b, key);
@@ -5394,7 +5396,7 @@ export async function run(ctx) {
       const SEL272 = /\b(item|weapon|armour|tool)\s*=\s*"([^"]*)"/i;
       const fromPlayer272 = [], generic272 = [];
       for (const b of data.availableBooks()) {
-        const raw = await data.loadBook(b);
+        const raw = await rawSections(b);
         for (const key of Object.keys(raw)) {
           for (const m of raw[key].matchAll(XFER272)) {
             if (/\bfrom\s*=/i.test(m[0])) continue;
@@ -5517,7 +5519,7 @@ export async function run(ctx) {
         const GRANT285 = /<(gain|tick)\b[^>]*\bblessing\s*=\s*"\?"/gi;
         const open285 = [], grants285 = [];
         for (const b of data.availableBooks()) {
-          const raw = await data.loadBook(b);
+          const raw = await rawSections(b);
           for (const key of Object.keys(raw)) {
             [...raw[key].matchAll(LOSE285)].forEach(() => open285.push(b + '/' + key));
             [...raw[key].matchAll(GRANT285)].forEach(() => grants285.push(b + '/' + key));
@@ -5679,7 +5681,7 @@ export async function run(ctx) {
         const ABSEL286 = /<(?:lose|gain|tick)\b[^>]*\bability\s*=\s*"(?:\s*\?\s*|[a-z]+\|[a-z|]+)"/i;
         const fixed286 = [], ability286 = [];
         for (const b of data.availableBooks()) {
-          const raw = await data.loadBook(b);
+          const raw = await rawSections(b);
           for (const key of Object.keys(raw)) {
             for (const g of raw[key].match(GRP286) || []) {
               if ((g.match(FIXED286) || []).some((n) => OPENSEL286.test(n))) fixed286.push(b + '/' + key);

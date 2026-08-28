@@ -10,6 +10,7 @@ import * as data from '../js/data.js';
 import { GameState } from '../js/state.js';
 import { Story } from '../js/render.js';
 import * as gates from '../js/render-gates.js';
+import { rawSections } from './corpus-text.js';
 
 export async function run(ctx) {
   const { ok, parse } = ctx;
@@ -24,7 +25,7 @@ export async function run(ctx) {
     ok('the scan is driven by the published edition ('+books.join(',')+')', books.length > 0);
     const empty = [];
     for (const b of books) {
-      const raw = await data.loadBook(b);
+      const raw = await rawSections(b);
       const keys = Object.keys(raw);
       if (!keys.length) empty.push(b);
       for (const key of keys) {
@@ -54,7 +55,7 @@ export async function run(ctx) {
     const bad300 = [];
     let sites300 = 0;
     for (const b of books) {
-      const raw = await data.loadBook(b);
+      const raw = await rawSections(b);
       for (const key of Object.keys(raw)) {
         for (const m of raw[key].matchAll(/\bmodifiers?="([^"]*)"/g)) {
           sites300++;
@@ -85,7 +86,7 @@ export async function run(ctx) {
     const withGoto273 = [], proseOnly273 = [];
     let guards273 = 0;
     for (const b of books) {
-      const raw = await data.loadBook(b);
+      const raw = await rawSections(b);
       for (const key of Object.keys(raw)) {
         const xml = raw[key];
         if (!/<lose\b[^>]*\bcodeword=/i.test(xml)) continue;
@@ -169,7 +170,7 @@ export async function run(ctx) {
        `bare=${ctl295bare.stranded.length} barred=${ctl295bar.stranded.join(' ')}`);
     const xmls295 = [];
     for (const b of books) {
-      const raw = await data.loadBook(b);
+      const raw = await rawSections(b);
       for (const key of Object.keys(raw)) xmls295.push([b + '/' + key, raw[key]]);
     }
     const res295 = strand295(xmls295);
@@ -192,7 +193,7 @@ export async function run(ctx) {
     const R290 = /<(?:if|elseif|while|outcomes|outcome|success|failure)\b[^>]*\bvar="([^"]+)"/g;
     const unwritten290 = [];
     for (const b of books) {
-      const raw = await data.loadBook(b);
+      const raw = await rawSections(b);
       for (const key of Object.keys(raw)) {
         const xml = raw[key];
         const written = new Set(); let m;
@@ -268,7 +269,7 @@ export async function run(ctx) {
     };
     const open291 = [];
     for (const b of books) {
-      const raw = await data.loadBook(b);
+      const raw = await rawSections(b);
       for (const key of Object.keys(raw)) scan291(raw[key]).forEach((v) => open291.push(b + '/' + key + ' ' + v));
     }
     ok('task291: no guard in the corpus can match a roll var still reading its unrolled 0',
@@ -339,13 +340,36 @@ export async function run(ctx) {
     // §4.257, §5.343 and §5.432 are the sharper kind, where an `<if>` arm's own <goto> was live
     // and reachable on entry. A section LEAVING this list has had its gate taken over by an
     // earlier seed (or lost it); a section joining it is a page that gained one.
-    // Task 294's census rides along in this pass rather than opening a third one over all 4,369
-    // sections: both need the parsed element, and each await here spends virtual-time budget.
-    const gained292 = [], multi292 = [], dead294 = [];
+    // Tasks 294 and 313 ride along in this pass rather than opening more of their own over all
+    // 4,369 sections: all three need the parsed element, and each await here spends virtual-time
+    // budget.
+    //
+    // Task 313 asks the question every OTHER census here depends on and none of them can ask of
+    // itself: does the text they match over hold the tags the document really has? They match with
+    // regexes, and the bundle keeps the source's XML comments, so a commented-out node reads to a
+    // regex exactly as a live one does. The parser is the independent second opinion — comment
+    // nodes are not elements, so `querySelectorAll('*')` never returns them — and rawSections()'s
+    // strip is what makes the two agree. Point this loop's `raw` back at `data.loadBook(b)` and it
+    // fails on the two sections whose comments quote whole tags (book1/605's `<choice>`,
+    // book2/726's commented-out `<lose codeword=>`), which is the defect stated as a measurement.
+    // It stays true when a FUTURE comment quotes markup — that is the point of fixing it here
+    // rather than pinning today's two sections, since an explanatory comment that quotes the
+    // markup it explains is a practice this repository is growing, not one it is retiring. The
+    // commented-section count is asserted non-zero for the opposite failure: a corpus with nothing
+    // to strip would let this pass while proving nothing.
+    const OPEN313 = /<([a-zA-Z][\w-]*)(?:"[^"]*"|[^">])*>/g;
+    const gained292 = [], multi292 = [], dead294 = [], phantom313 = [];
+    let commented313 = 0;
     for (const b of books) {
-      const raw = await data.loadBook(b);
+      const raw = await rawSections(b);
+      const bundled = await data.loadBook(b);
       for (const key of Object.keys(raw)) {
         const el = await data.getSection(b, key);
+        if (/<!--/.test(bundled[key])) commented313++;
+        let tags313 = 0; OPEN313.lastIndex = 0;
+        while (OPEN313.exec(raw[key])) tags313++;
+        const elems313 = el.querySelectorAll('*').length + 1;
+        if (tags313 !== elems313) phantom313.push(`${b}/${key} tags=${tags313} elements=${elems313}`);
         deadElse294(el).forEach((v) => dead294.push(b + '/' + key + ' ' + v));
         const g = gates.computeRollGate(el);
         if (!g) continue;
@@ -355,6 +379,10 @@ export async function run(ctx) {
     }
     ok('task294: no shipped chain over one var leaves its <else> unreachable',
        dead294.length === 0, dead294.join(', '));
+    ok('task313: every census counts the tags the PARSER sees, over a corpus that comments '
+       + commented313 + ' of its sections',
+       phantom313.length === 0 && commented313 > 0,
+       phantom313.length ? phantom313.join(', ') : 'no commented section in the corpus to strip');
     ok('task292: the condition seed holds 28 sections, and only these',
        gained292.join(' ') === '1/313 2/345 2/378 2/389 2/529 2/536 2/563 2/584 2/614 2/637 2/654 2/683 2/752 '
          + '3/267 3/379 3/412 3/455 3/492 3/559 3/583 4/257 5/245 5/343 5/432 6/17 6/344 6/402 6/738',

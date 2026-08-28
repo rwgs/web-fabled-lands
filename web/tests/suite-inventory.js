@@ -7,6 +7,7 @@ import { makeFight } from '../js/combat.js';
 import { goodsFrom, buyTrade, applyInlineBuy } from '../js/market.js';
 import { Story } from '../js/render.js';
 import { renderSheet } from '../js/ui.js';
+import { rawSections } from './corpus-text.js';
 
 export async function run(ctx) {
   const { ok, parse } = ctx;
@@ -2067,7 +2068,7 @@ export async function run(ctx) {
       const CACHE271 = /<itemcache\b[^>]*?(?:\/>|>[\s\S]*?<\/itemcache>)/gi;
       const all271 = [], filtered271 = [];
       for (const b of data.availableBooks()) {
-        const raw = await data.loadBook(b);
+        const raw = await rawSections(b);
         for (const key of Object.keys(raw)) {
           for (const m of raw[key].matchAll(CACHE271)) {
             all271.push(b + '/' + key);

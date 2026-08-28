@@ -36,7 +36,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 313. eighteen of the nineteen corpus censuses read the raw bundled section text, which KEEPS XML comments, so a commented-out node is counted as a real one — latent today, and the nineteenth already strips them
+- [x] 313. eighteen of the nineteen corpus censuses read the raw bundled section text, which KEEPS XML comments, so a commented-out node is counted as a real one — latent today, and the nineteenth already strips them
 
 - [x] 312. task 311 lifted the effective-ability ceiling and left `ability()`'s own doc comment reading "clamped 1..12" — while the comment 311 wrote six lines below it says "Floor of 1, no ceiling", and the one it wrote on `abilityNoWeapon` says "Floored, not capped, for the same reason `ability()` is", citing the stale line as its authority
 
@@ -2329,6 +2329,32 @@ and not a fixture, because the input is the corpus.
 the build gate is unaffected — this is a test-tree defect only. And the reverse direction is
 already known and unrelated: a *prose* census over section text must strip comments too, which is a
 note about ad-hoc `grep`s rather than about the suite.
+
+**Done (option 1, the recommended one).** `web/tests/corpus-text.js` exports `rawSections(b)` —
+`loadBook` with every XML comment removed from each section's text, cached per book — and all
+nineteen call sites (`suite-actions.js` 11, `suite-corpus.js` 7, `suite-inventory.js` 1) read
+through it. `scan266`'s own `replace` is gone as redundant, with a line saying where the strip
+moved to. The bundle is untouched: `web/data`, `web/assets` and `version.js` are byte-identical
+(the test tree is outside `stamp-version.ps1`'s digest by design), so this is a four-file change
+under `web/tests` and nothing else.
+
+**The assertion, and why it is that one.** The filing's first form — "no shipped comment contains
+markup" — is a pin on today's corpus that fails on book1/605 and book2/726 and would fail again on
+the next explanatory comment that quotes its own markup. So the census rides the task 292/294 pass
+(all three want the parsed element, and an extra await over 4,369 sections costs virtual-time
+budget) and asks the parser instead: for every section, the count of tag opens in the text the
+censuses read must equal `querySelectorAll('*').length + 1`. Comment nodes are not elements, so the
+two mechanisms are independent, and the equality is what "the censuses see the same tag count with
+and without comments" means operationally. It also asserts the corpus still HAS comments to strip
+(61 sections today), because a census with no input is a census that proves nothing.
+
+**Measured both ways.** Restored: `RESULT ALL PASS pass=3016 fail=0` — 3015 plus this one
+assertion, and every other census's figure and label unmoved, which is the filing's own
+measurement re-confirmed from the other side. Negative control, the census pointed back at
+`data.loadBook`: `RESULT FAILURES pass=15 fail=1` naming
+`1/605 tags=12 elements=11, 2/726 tags=13 elements=12` — exactly the two sections predicted, one
+phantom tag each. A green run with the fix in is not evidence on its own here (the defect was
+latent); the failing control is.
 
 ## 312. task 311 lifted the effective-ability ceiling and left `ability()`'s doc comment reading "clamped 1..12" — which `abilityNoWeapon`'s new comment then cites as its authority
 
