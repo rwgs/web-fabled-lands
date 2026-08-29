@@ -519,6 +519,29 @@ export async function run(ctx) {
       ok('§92 modifier="current" reads the wounded value (5)', adj92('<lose><adjust ability="stamina" modifier="current"/></lose>', g92s) === 5);
       ok('§92 a bare stamina adjust still reads the effective max (22)', adj92('<lose><adjust ability="stamina"/></lose>', g92s) === 22);
 
+      // --- task 315: <adjust>'s SECOND reader of ability=/modifier= -----------------------
+      // The four assertions above go through adjustAmount, which reads all six mode words.
+      // With a greaterthan=/lessthan= present the ability= stops being the contribution and
+      // becomes the CONDITION (task 92), and that arm — adjustApplies — folded modifier= to a
+      // boolean `natural`, so every other mode was dropped and the comparison ran against the
+      // full affected score. Task 314 removed the same fold from <set> and <if> but did not
+      // reach here, because its table listed one reader per tag. Pitch each threshold exactly
+      // between the two scores, so only the fold can move the verdict.
+      const nw315 = g92w.abilityNoWeapon('combat');
+      ok('task315: <adjust modifier="noweapon" greaterthan=> gates on the UNARMED score, not the boosted one',
+         adj92('<random><adjust ability="combat" modifier="noweapon" greaterthan="' + nw315 + '" value="1"/></random>', g92w) === 0
+         && g92w.ability('combat') === nw315 + 2,
+         'full=' + g92w.ability('combat') + ' noweapon=' + nw315);
+      ok('task315: control — the same gate pitched below the unarmed score still fires',
+         adj92('<random><adjust ability="combat" modifier="noweapon" greaterthan="' + (nw315 - 1) + '" value="1"/></random>', g92w) === 1);
+      ok('task315: control — with no modifier the boosted score opens the gate, as it always did',
+         adj92('<random><adjust ability="combat" greaterthan="' + nw315 + '" value="1"/></random>', g92w) === 1);
+      ok('task315: <adjust ability="stamina" modifier="natural" greaterthan=> reads the written max (20), not the wound (5)',
+         adj92('<random><adjust ability="stamina" modifier="natural" greaterthan="10" value="1"/></random>', g92s) === 1);
+      ok('task315: control — a bare stamina condition still reads the WOUNDED value, as <if ability="stamina"> does',
+         adj92('<random><adjust ability="stamina" greaterthan="10" value="1"/></random>', g92s) === 0
+         && adj92('<random><adjust ability="stamina" lessthan="10" value="1"/></random>', g92s) === 1);
+
       // §6.736: item="?" tags="light" — any light source adds the +2.
       const g92l = GameState.create({ name:'AJ92l', gender:'m', profession:'Warrior', book:6, adv });
       const n736 = (await data.getSection(6, '736')).querySelector('difficulty');

@@ -36,7 +36,9 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 315. `adjustApplies` folds `modifier=` to a boolean `natural` on the `<adjust greaterthan|lessthan>` CONDITION, so the third mode-dropping site survives task 314 — the same tag's `adjustAmount` reads all six two lines away
+- [ ] 316. `adjustAmount` has no `defence` arm, so `<adjust ability="defence"/>` contributes 0 — the gate allows `defence` in `ability=`, and the same tag's `adjustApplies` reads it correctly through `abilityForMode`
+
+- [x] 315. `adjustApplies` folds `modifier=` to a boolean `natural` on the `<adjust greaterthan|lessthan>` CONDITION, so the third mode-dropping site survives task 314 — the same tag's `adjustAmount` reads all six two lines away
 
 - [x] 314. three of the six values `modifier=` may take are silently DROPPED on `<set>` and two of them on `<if>` — the source gate allows all six on both tags, so `<set value="defence" modifier="noarmour">` validates clean and hands back the ARMOURED score, which is task 300's failure shape and what the gate's own comment carves out for `current`
 
@@ -2255,7 +2257,57 @@ fight against a cursed player reads the reduced Defence.
 
 ---
 
+## 316. `adjustAmount` has no `defence` arm, so an `<adjust ability="defence"/>` contribution reads 0
+
+**Priority: LOW — latent, and censused to be latent.** Filed 2026-08-28 while fixing task 315,
+whose census covers it: **zero** `<adjust ability="defence">` nodes over the 4,369-file shipped
+corpus, so nothing contributes a wrong number today.
+
+**What the code does.** `build/validate-source.ps1`'s `FL_ENUMS['ability']` is
+`charisma combat magic sanctity scouting thievery rank stamina defence` — nine words, and it is
+not tag-restricted, so `<adjust ability="defence"/>` validates clean. `engine.js adjustAmount`
+then tests `rank`, `stamina` and `ABILITIES.includes(key)`, and **`rules.js` `ABILITIES` is the
+six CORE abilities** — `defence` is a derived stat and is not in it. So the `ability=` branch
+falls out of every arm, `adjustAmount` runs on to `name=` (absent) and returns **0**: the
+modifier contributes nothing and the roll is that many points short, silently.
+
+This is the shape tasks 68/302/303 closed one reader at a time — `firstAbility()` returning null
+for a derived stat and the caller scoring 0 — and `defence` is the stat it keeps happening to.
+It survives here because `adjustApplies`, the *condition* reader on the same tag six lines below,
+routes its else-arm through `abilityForMode`, which composes `defence` properly (task 304's
+`defenceForMode`). So `<adjust ability="defence" greaterthan="12" value="1"/>` gates correctly
+while `<adjust ability="defence"/>` contributes 0 — the two readers of one attribute disagree,
+which is what task 315 found in the other direction.
+
+**Fix.** One arm beside `rank`, mode-aware like the rest: `if (key === 'defence') return
+state.abilityForMode('defence', mode);` — `abilityForMode` already dispatches `defence`, so this
+is a routing line, not a new rule. `rollDifficulty` has exactly this arm already (task 302), which
+is the precedent for where it goes and what it returns.
+
+**Test.** One assertion in `suite-combat.js`'s task-92 block, next to task 315's: the §5.79-style
+fixture (weapon + armour) with `<lose><adjust ability="defence"/></lose>` asserting the
+contribution equals `defence()`, plus a `modifier="noarmour"` arm asserting it drops by
+`armourBonus()`. Both read 0 today.
+
 ## 315. `adjustApplies` folds `modifier=` to a boolean on the `<adjust greaterthan|lessthan>` condition, which is the third mode-dropping site
+
+**DONE.** `adjustApplies`'s comparator arm now resolves the mode WORD instead of folding it:
+ordinary abilities (and `defence`, which is not in `ABILITIES` and so falls through to the same
+call) go to `state.abilityForMode(key, mode)`; `stamina` keeps the condition convention
+`<if ability="stamina">` uses — bare and `current` read the wounded score, any other modifier the
+unwounded one — with `natural` picking the written maximum as `adjustAmount` does. The two
+readers of `<adjust>`'s `ability=`/`modifier=` now agree.
+
+Nothing shipped moves, as filed: the corpus's two `<adjust modifier=>` sites (§2.579, §5.79) carry
+no comparator, and there are **zero** `<adjust ability="stamina">` nodes with one. Five assertions
+added to `suite-combat.js`'s task-92 block, each pitched exactly between the two scores so only the
+fold can move the verdict. Verified by reverting the engine change alone: `FAIL … full=8
+noweapon=6` and the `modifier="natural"` stamina arm both fail without it (the three controls pass
+either way, which is the point of them). `RESULT ALL PASS pass=3025 fail=0`.
+
+Censusing this turned up a third disagreement on the same tag, in the reader task 315 left alone:
+`adjustAmount` has no `defence` arm at all. Filed as task 316.
+
 
 **Priority: LOW — latent, and censused to be latent.** Filed 2026-08-28 while fixing task 314,
 whose census covers it: the corpus's two `<adjust modifier=>` sites are §2.579

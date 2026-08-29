@@ -1747,9 +1747,21 @@ function adjustApplies(el, state) {
     const ab = get('ability');
     if (ab != null) {
       const key = ab.split('|')[0].trim().toLowerCase();
+      // <adjust> has TWO readers of ability=/modifier=, and this is the one task 314's table
+      // did not cover: with a comparator present the ability= is the CONDITION, and it used to
+      // fold modifier= to a boolean `natural` — so a mode the gate allows here was dropped and
+      // the comparison ran against the full affected score, while adjustAmount above read the
+      // same words correctly. `defence` needs no arm of its own: it is not in ABILITIES, so it
+      // falls to abilityForMode, which composes it. Stamina keeps the CONDITION convention
+      // <if ability="stamina"> uses — bare (and `current`) means the wounded score, a modifier
+      // means the unwounded one — with `natural` picking the written maximum as it does in
+      // adjustAmount. (tasks 92, 314, 315)
+      const mode = String(get('modifier') || '').trim().toLowerCase() || null;
       v = key === 'rank' ? state.rankValue()
-        : key === 'stamina' ? state.data.stamina
-        : state.abilityForCheck(key, normalize(get('modifier') || '') === 'natural');
+        : key === 'stamina' ? (!mode || mode === 'current' ? state.data.stamina
+          : mode === 'natural' ? state.data.staminaMax
+          : state.effectiveStaminaMax())
+        : state.abilityForMode(key, mode);
     } else if (get('name') != null) v = state.codewordValue(get('name'));
     return (gt == null || v > resolveValue(state, gt)) && (lt == null || v < resolveValue(state, lt));
   }
