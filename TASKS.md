@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 312 is complete (listed under **Done** below or in the buckets), apart from 207,
-withdrawn as a misdiagnosis (see the Review log); **313 is open**. File new
+withdrawn as a misdiagnosis (see the Review log); **313 and 314 are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -35,6 +35,8 @@ there once the buckets below are clear.
 - [x] 296. `rewardWasteReason` refuses a new resurrection deal to anyone already holding one, where `addResurrection` implements the replacement the books print — so book1/597's third reward is dead to a deal-holder
 
 **LOW**
+
+- [ ] 314. three of the six values `modifier=` may take are silently DROPPED on `<set>` and two of them on `<if>` — the source gate allows all six on both tags, so `<set value="defence" modifier="noarmour">` validates clean and hands back the ARMOURED score, which is task 300's failure shape and what the gate's own comment carves out for `current`
 
 - [x] 313. eighteen of the nineteen corpus censuses read the raw bundled section text, which KEEPS XML comments, so a commented-out node is counted as a real one — latent today, and the nineteenth already strips them
 
@@ -2251,6 +2253,72 @@ fight against a cursed player reads the reduced Defence.
 
 ---
 
+## 314. three of `modifier=`'s six values have no reader on `<set>` and two none on `<if>`, and the gate allows all six on both
+
+**Priority: LOW — latent, and censused to be latent.** No shipped section writes one of the
+affected pairs, so nothing is mis-read today. It is filed because the failure mode is the one
+task 300 was filed for and the one this gate's own comment already names: an allowlisted
+`modifier=` with no reader on the tag it is written on falls through to the FULL affected score
+— **the very score the mode exists to exclude** — so the page's rule is silently made easier than
+it is printed, and both the gate and the suite stay green.
+
+*(Found during conversion work on an unpublished book, by an author who wanted `<set value="defence" modifier="noarmour">`, read the comment below as a guarantee that it
+would work, and measured the opposite.)*
+
+**What the code does.** `FL_ENUMS['modifier']` in `build/validate-source.ps1` is
+`affected current natural noarmour notool noweapon`, and exactly one value is restricted by tag:
+`current` is refused outside `<adjust>`/`<difficulty>` because "on `<set>`/`<if>` nothing reads
+it and it would fall through to the default silently - task 300's failure shape" (task 302's
+own comment). The same sentence is true of three more values, and the check stops one short:
+
+| tag | reader | honours |
+| --- | --- | --- |
+| `<difficulty>` | `rollDifficulty` -> `abilityForMode` | all six |
+| `<adjust>` | `adjustAmount` -> `abilityForMode` | all six |
+| `<if ability="defence">` | `abilityForMode('defence', mode)` | all six |
+| `<if ability="combat">` (and the other five) | `abilityForCheck(ab, natural)` | `natural` only |
+| `<set value=…>` | `setValueMode` -> `natural`/`affected` or **null** | `natural`, `affected` |
+
+So `<set value="defence" modifier="noarmour"/>` resolves `defenceForMode(null)`, which *is*
+`defence()` — the armoured score — and `<if ability="combat" modifier="noweapon" greaterthan="8">`
+compares the weapon-boosted score. (`noarmour` on a non-defence ability is a documented no-op and
+is not part of this: `state.js` says so, and it is correct — armour reaches no other score.)
+
+**A comment asserts the opposite, which is how it was believed.** `engine.js`'s expression
+resolver reads
+
+```js
+// defenceForMode(null) IS defence(), so an unmodified read is unchanged; what this
+// buys is that `<set value="defence" modifier="noarmour">` cannot validate clean
+// and then hand back the armoured score. (task 302)
+if (w === 'defence') return state.defenceForMode(mode);
+```
+
+The line is right and the claim above it is exactly wrong: `applySet` passes
+`setValueMode(modifier)`, which returns null for `noarmour`, so `mode` never reaches this branch
+as anything but null. **A comment naming the failure it prevents is worth re-reading against the
+call site that supplies its argument** — this one names the right defect at the wrong layer.
+
+**Censused, so the latency is measured and not assumed.** Over books 1-6: `<set modifier=>` is
+written 33 times (32 `natural`, 1 `affected`) and `<if modifier=>` twice (both `natural`) — every
+one honoured. The corpus's only "no-" modes are `<difficulty modifier="noweapon">` (4) and
+`<adjust modifier="noweapon">` (1), and both tags read it correctly. **The two tags that would
+drop a mode are precisely the two the corpus has never given one**, which is why five audits have
+walked past it.
+
+**The fix, and it should widen the readers rather than narrow the gate.** Both mode-aware readers
+already exist and are already called from the two correct tags: route `evalExpression`'s ability
+branch through `abilityForMode` (it hand-rolls `natural` today) and let `setValueMode` keep the
+three `no-` modes; do the same for `evaluateCondition`'s ordinary-ability branch, which folds the
+mode to a boolean before it gets there. That makes all four tags agree with the gate and with the
+JaFL spec, which lists `modifier=` on `<if>`/`<difficulty>`/`<set>`/`<adjust>` without
+per-tag exceptions. Narrowing the gate instead would keep the spec and the port apart and would
+have to be re-argued the first time a section needs the mode.
+
+**A suite assertion is what makes it stay fixed**, and it is cheap: a fixture wearing armour with
+a Defence bonus, one `<set value="defence" modifier="noarmour">` and one plain `<set
+value="defence">`, asserting the two differ by exactly `armourBonus()`. Today they are equal.
+
 ## 313. eighteen of the nineteen corpus censuses read raw bundled text that keeps XML comments, so a commented-out node counts as a real one
 
 **Priority: LOW — latent, and measured to be latent.** Nothing is mis-measured today: stripping
@@ -2932,6 +3000,35 @@ save/load round-trip un-clamped, and takes current Stamina down with it when ren
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-28 (filing pass, no code): filed **314** — three of the six values `modifier=` may
+take have no reader on `<set>` and two none on `<if>`, while `validate-source.ps1` allows all six
+on both, so a mode word that is dropped falls through to the FULL affected score: the page's rule
+silently becomes easier than it is printed. Found during conversion work on an unpublished book,
+by an author who wanted `<set value="defence" modifier="noarmour">` and had to spell it
+`value="defence-armour"` instead.
+
+**What makes it worth a number rather than a workaround is that a comment in the code asserts the
+opposite.** `evalExpression`'s `defence` branch carries "what this buys is that `<set
+value="defence" modifier="noarmour">` cannot validate clean and then hand back the armoured
+score" (task 302) — and it does exactly that, because `applySet` filters the word through
+`setValueMode` before this branch ever sees it. The comment names the right defect one layer above
+where the argument is supplied. **Re-read a comment that claims to PREVENT something against the
+call site that feeds it**; this one has been quoted as a guarantee since 302.
+
+**And task 302's own gate comment is the precedent, one value short.** It restricts `current` to
+`<adjust>`/`<difficulty>` because "on `<set>`/`<if>` nothing reads it and it would fall through to
+the default silently — task 300's failure shape". That sentence is true of `noarmour`, `notool`
+and `noweapon` on the same two tags, and the check stops at the one value the author had in hand.
+**A tag-restriction written for one enum value is a census question about the whole enum**, and it
+costs one table to answer.
+
+Censused rather than inspected: over the six shipped books `<set modifier=>` is written 33 times
+(32 `natural`, 1 `affected`) and `<if modifier=>` twice (both `natural`), every one honoured, while
+the corpus's only `no-` modes are `<difficulty modifier="noweapon">` (4) and `<adjust
+modifier="noweapon">` (1) — both on tags that read them correctly. **The two tags that would drop
+a mode are exactly the two the corpus has never given one**, which is why the suite is green and
+five audits have walked past it. Filed LOW and latent on that measurement.
 
 Worked 2026-08-28 (filing pass, no code): filed **313** — the corpus censuses read raw bundled
 text that keeps XML comments, so a commented-out node counts as a real one. Found while writing an
