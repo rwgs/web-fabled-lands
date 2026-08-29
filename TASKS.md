@@ -36,7 +36,9 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 314. three of the six values `modifier=` may take are silently DROPPED on `<set>` and two of them on `<if>` — the source gate allows all six on both tags, so `<set value="defence" modifier="noarmour">` validates clean and hands back the ARMOURED score, which is task 300's failure shape and what the gate's own comment carves out for `current`
+- [ ] 315. `adjustApplies` folds `modifier=` to a boolean `natural` on the `<adjust greaterthan|lessthan>` CONDITION, so the third mode-dropping site survives task 314 — the same tag's `adjustAmount` reads all six two lines away
+
+- [x] 314. three of the six values `modifier=` may take are silently DROPPED on `<set>` and two of them on `<if>` — the source gate allows all six on both tags, so `<set value="defence" modifier="noarmour">` validates clean and hands back the ARMOURED score, which is task 300's failure shape and what the gate's own comment carves out for `current`
 
 - [x] 313. eighteen of the nineteen corpus censuses read the raw bundled section text, which KEEPS XML comments, so a commented-out node is counted as a real one — latent today, and the nineteenth already strips them
 
@@ -2253,7 +2255,60 @@ fight against a cursed player reads the reduced Defence.
 
 ---
 
+## 315. `adjustApplies` folds `modifier=` to a boolean on the `<adjust greaterthan|lessthan>` condition, which is the third mode-dropping site
+
+**Priority: LOW — latent, and censused to be latent.** Filed 2026-08-28 while fixing task 314,
+whose census covers it: the corpus's two `<adjust modifier=>` sites are §2.579
+(`ability="stamina" modifier="natural"`) and §5.79 (`ability="combat" modifier="noweapon"`), and
+**neither carries a `greaterthan=`/`lessthan=`**, so no shipped section reaches the folding line.
+
+**What the code does.** Task 314 routed `<set>` and `<if>` through `state.abilityForMode`, so all
+four `modifier=` tags now honour all six words — *through the reader each tag's VALUE goes to*.
+`<adjust>` has two readers, not one, and only one was in 314's table. `engine.js adjustAmount`
+reads the contribution and calls `abilityForMode(key, mode)` — all six. But when the node carries
+`greaterthan=`/`lessthan=` the `ability=` stops being the contribution and becomes the
+**condition** (the contribution then comes from `value=`/`amount=`, per task 92), and that arm is
+`engine.js adjustApplies`:
+
+```js
+v = key === 'rank' ? state.rankValue()
+  : key === 'stamina' ? state.data.stamina
+  : state.abilityForCheck(key, normalize(get('modifier') || '') === 'natural');
+```
+
+which is exactly the boolean fold task 314 removed from `evaluateCondition`, one tag over. So
+`<adjust ability="combat" modifier="noweapon" greaterthan="8" amount="2"/>` would gate on the
+**weapon-boosted** COMBAT — the score the mode exists to exclude — while the identical
+`<adjust ability="combat" modifier="noweapon" amount="…">` two lines away reads it correctly.
+`abilityForCheck` is now just `abilityForMode(ab, natural ? 'natural' : null)`, so the fix is the
+same one-line substitution, and the `stamina` arm should take `modifier="current"` at the same
+time (that value IS legal on `<adjust>`, and here it silently already reads the wounded score,
+which is right for `current` and wrong for `natural`).
+
+**Test.** One suite assertion in the shape task 314's used: a fixture with a wielded weapon, one
+`<adjust ability="combat" modifier="noweapon" greaterthan="N">` pitched between the unarmed and
+the boosted score, asserting the modifier does not fire. It fails today.
+
 ## 314. three of `modifier=`'s six values have no reader on `<set>` and two none on `<if>`, and the gate allows all six on both
+
+**DONE.** Fixed by widening the readers, as the analysis below argues, not by narrowing the gate.
+`state.abilityForValue` now takes the mode WORD instead of a boolean (its `natural` flag was the
+fold); `engine.js setValueMode` keeps the three `no-` words (new `SET_VALUE_MODES` list — `current`
+stays out, and the gate still refuses it on `<set>`); `evalExpression`'s ability branch passes the
+word to `abilityForValue`; and `evaluateCondition`'s ordinary-ability arm calls `abilityForMode`
+instead of folding to `abilityForCheck`. All four `modifier=` tags now agree with the gate and the
+JaFL spec. The comment quoted below — which named the right defect one layer above the code that
+fixes it — is rewritten to say which call site makes its claim true.
+
+Nothing shipped moves: the census was re-run over the 4,369-file corpus and reproduces exactly
+(`<set>` 33 = 32 `natural` + 1 `affected`, `<if>` 2 both `natural`, `<adjust>` 1 `natural` +
+1 `noweapon`, `<difficulty>` 4 `noweapon`). Four assertions added to `suite-engine.js`, going
+through `applyEffect(parse('<set …/>'))` rather than `evalExpression` directly — which is the whole
+point, since the old task-302 assertion tested the branch and not the path. Verified by reverting
+the engine fix alone: `FAIL … plain=12 noarmour=12 armour=3`, `FAIL … noweapon=8 plain=8`, and the
+`<if>` arm. `RESULT ALL PASS pass=3020 fail=0`. `adjustApplies` is the same fold on a reader 314's
+table did not cover — filed as task 315.
+
 
 **Priority: LOW — latent, and censused to be latent.** No shipped section writes one of the
 affected pairs, so nothing is mis-read today. It is filed because the failure mode is the one

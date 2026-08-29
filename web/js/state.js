@@ -497,10 +497,12 @@ export class GameState {
   }
 
   /** Ability score for a <set value=> arithmetic read (JaFL SetVarNode.resolveIdentifier):
-   *  same modifier handling as abilityForCheck, but a cursed ability reads as 0 — the
-   *  -1000 check-sentinel forces roll failure and must never enter arithmetic. (task 136.4) */
-  abilityForValue(ability, natural = false) {
-    const v = this.abilityForCheck(ability, natural);
+   *  same modifier handling as abilityForMode — all six mode words, not just `natural` —
+   *  but a cursed ability reads as 0, since the -1000 check-sentinel forces roll failure and
+   *  must never enter arithmetic. Took a boolean until task 314, which is what confined a
+   *  <set value=> read to natural/affected. (tasks 136.4, 314) */
+  abilityForValue(ability, mode = null) {
+    const v = this.abilityForMode(ability, mode);
     return v === CURSED_ABILITY ? 0 : v;
   }
 

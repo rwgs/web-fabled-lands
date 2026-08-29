@@ -283,12 +283,16 @@ export function evaluateCondition(el, state, opts = {}) {
     // §1.313's `lessthan="x"` compared 0 < the 2-dice total — true for every roll of 2-12,
     // so the daggers always hit and the printed "the daggers all miss" was unreachable.
     const spec = get('ability').split('|')[0].trim().toLowerCase();
-    const natural = normalize(get('modifier') || '') === 'natural';
     let v;
     if (spec === 'rank') v = state.rankValue();
     else if (spec === 'defence') v = state.abilityForMode('defence', get('modifier'));
     else if (spec === 'stamina') v = get('modifier') ? state.effectiveStaminaMax() : state.data.stamina;
-    else { const ab = firstAbility(get('ability')); v = ab ? state.abilityForCheck(ab, natural) : 0; }
+    // The ordinary-ability arm folded modifier= to a boolean `natural` and passed
+    // abilityForCheck, so `<if ability="combat" modifier="noweapon" greaterthan="8">` compared
+    // the WEAPON-BOOSTED score — the mode the gate allowed here silently dropped, exactly as
+    // on <set>. The `defence` arm above already routed the word through; this now does the
+    // same, which is what makes all four modifier= tags agree with the gate. (task 314)
+    else { const ab = firstAbility(get('ability')); v = ab ? state.abilityForMode(ab, get('modifier')) : 0; }
     const cmp = compare(v);
     return cmp == null ? false : cmp; // no comparator ⇒ never matches (JaFL)
   });
@@ -1317,15 +1321,24 @@ function applyTransfer(el, state, opts = {}) {
   return '';
 }
 
-// A <set modifier="natural|affected"> is NOT an additive amount — it is a
-// resolution mode for the ability/stamina identifiers inside value= (JaFL
-// SetVarNode). Treating it as an addend (the old bug) discarded the computed
-// value: `resolveValue(state,'natural')` looked up a non-existent var → 0, so
-// e.g. every book-2 rank ceremony's `<set var="r" value="rank" modifier="natural"/>`
-// stored r=0 and the "roll 2d > r to gain a Rank" check auto-succeeded (task 46).
+// A <set modifier=…> is NOT an additive amount — it is a resolution mode for the
+// ability/stamina identifiers inside value= (JaFL SetVarNode). Treating it as an
+// addend (the old bug) discarded the computed value: `resolveValue(state,'natural')`
+// looked up a non-existent var → 0, so e.g. every book-2 rank ceremony's
+// `<set var="r" value="rank" modifier="natural"/>` stored r=0 and the "roll 2d > r to
+// gain a Rank" check auto-succeeded (task 46).
+//
+// This list is the mode words such a read HONOURS. It kept only natural/affected until task 314,
+// which is what made `<set value="defence" modifier="noarmour">` validate clean (the gate
+// allows all six here) and then hand back the ARMOURED score — the mode silently dropped, the
+// rule made easier than the page prints it. The three `no-` words are in the JaFL spec's list
+// for <set>, both mode-aware readers already existed, so widening this is what makes the tag
+// agree with the gate. `current` stays out (and the gate refuses it on <set>): it means "the
+// WOUNDED Stamina", and a <set> reads that by writing no modifier at all. (tasks 46, 302, 314)
+const SET_VALUE_MODES = ['natural', 'affected', 'noarmour', 'notool', 'noweapon'];
 function setValueMode(mod) {
   const m = String(mod || '').trim().toLowerCase();
-  return (m === 'natural' || m === 'affected') ? m : null;
+  return SET_VALUE_MODES.includes(m) ? m : null;
 }
 
 // A <set item|weapon|armour|tool … tags=… cache=…> node selects a possession (or a
@@ -1585,18 +1598,23 @@ export function evalExpression(expr, state, mode = null, sel = null) {
     // ultimate power's +2 aura. §2.270 sets `var rank = rank modifier="natural"` and then
     // compares against it, so a ring-holder must be judged by natural Rank. (task 136.4)
     if (w === 'rank') return mode === 'natural' ? state.data.rank : state.rankValue();
-    // defenceForMode(null) IS defence(), so an unmodified read is unchanged; what this
-    // buys is that `<set value="defence" modifier="noarmour">` cannot validate clean
-    // and then hand back the armoured score. (task 302)
+    // defenceForMode(null) IS defence(), so an unmodified read is unchanged. This branch is
+    // what STOPS `<set value="defence" modifier="noarmour">` handing back the armoured score —
+    // but only since task 314 taught setValueMode to keep the `no-` modes: before it, applySet
+    // passed null for `noarmour` and the mode never reached here, so the comment that used to
+    // claim the guarantee named the right defect one layer above the code that fixes it. Read
+    // a comment like that against the CALL SITE that supplies its argument. (tasks 302, 314)
     if (w === 'defence') return state.defenceForMode(mode);
     if (w === 'armour') return state.armourBonus();
     if (w === 'weapon') return state.wieldedWeapon()?.bonus || 0;
     if (w === 'crew') return CREW_LEVELS.indexOf(state.currentShip()?.crew) + 1 || 0;
     if (ABILITIES.includes(w)) {
       // abilityForValue honours the modifier but maps a cursed ability to 0, not the
-      // -1000 check-sentinel (§6.332 value="12-charisma"). No modifier is unchanged. (task 136.4)
-      if (mode === 'natural') return state.abilityForValue(w, true);  // written score
-      if (mode === 'affected') return state.abilityForValue(w, false); // item-boosted
+      // -1000 check-sentinel (§6.332 value="12-charisma"). It used to be handed a BOOLEAN,
+      // which folded the five legal modes to natural-or-not and dropped noweapon/notool on the
+      // floor; passing the word routes them to abilityNoWeapon like <difficulty> already did.
+      // No modifier stays a plain ability() read — unchanged. (tasks 136.4, 314)
+      if (mode) return state.abilityForValue(w, mode);
       return state.ability(w); // no modifier — unchanged
     }
     return state.getVar(word); // stored variable; 0 when undefined

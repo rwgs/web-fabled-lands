@@ -155,6 +155,11 @@ $script:FL_ENUMS = @{
     # spelling of the default, and the corpus uses it once.
     # `current` stays tag-restricted below, because it means "the wounded Stamina" and only the
     # two tags that roll or read a stat have somewhere to put it.
+    # Task 314 made the OTHER five true on every tag this row allows: <set> honoured only
+    # natural/affected and <if>'s ordinary-ability arm only natural, so three `no-` words
+    # validated here and were then dropped by the reader - the same silent fall-through to the
+    # full score this comment warns about, arriving from the engine side instead. Both now route
+    # through state.js abilityForMode, which is the one reader that knows all six.
     'modifier'       = 'affected current natural noarmour notool noweapon'
     'profession'     = 'mage priest rogue troubadour warrior wayfarer'
     'ship'           = 'barque brigantine galleon brig gall galley t'  # 't' = "any ship"

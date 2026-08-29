@@ -130,6 +130,29 @@ export async function run(ctx) {
     ok('task302: control — a core ability still resolves the way it always did',
        eng.rollDifficulty(g302, 'combat', 10, 0, null).abilityScore === g302.ability('combat'));
 
+    // --- task 314: the modes <set>/<if> allowed and then dropped --------------------------------
+    // The task-302 assertion just above hands evalExpression the mode DIRECTLY, so it proved the
+    // BRANCH and not the PATH: applySet passed setValueMode(modifier), which returned null for
+    // every `no-` word, and the armoured score came back through the very line whose comment
+    // promised it could not. Go through the real <set> node, which is the only thing a book can
+    // write. These four fail before the fix and are the reason it stays fixed.
+    eng.applyEffect(parse('<set var="d314na" value="defence" modifier="noarmour"/>'), g302, {});
+    eng.applyEffect(parse('<set var="d314pl" value="defence"/>'), g302, {});
+    ok('task314: <set value="defence" modifier="noarmour"> differs from the plain read by exactly armourBonus()',
+       g302.armourBonus() > 0 && g302.getVar('d314pl') - g302.getVar('d314na') === g302.armourBonus(),
+       'plain=' + g302.getVar('d314pl') + ' noarmour=' + g302.getVar('d314na') + ' armour=' + g302.armourBonus());
+    eng.applyEffect(parse('<set var="c314nw" value="combat" modifier="noweapon"/>'), g302, {});
+    eng.applyEffect(parse('<set var="c314pl" value="combat"/>'), g302, {});
+    ok('task314: <set value="combat" modifier="noweapon"> drops the wielded weapon bonus',
+       g302.getVar('c314nw') === g302.abilityNoWeapon('combat') && g302.getVar('c314nw') < g302.getVar('c314pl'),
+       'noweapon=' + g302.getVar('c314nw') + ' plain=' + g302.getVar('c314pl'));
+    ok('task314: <if ability="combat" modifier="noweapon"> compares the unarmed score, not the boosted one',
+       eng.evaluateCondition(parse('<if ability="combat" modifier="noweapon" greaterthan="' + (g302.abilityNoWeapon('combat') - 1) + '"/>'), g302) === true
+       && eng.evaluateCondition(parse('<if ability="combat" modifier="noweapon" greaterthan="' + (g302.ability('combat') - 1) + '"/>'), g302) === false);
+    ok('task314: control — <if ability="combat"> with no modifier still compares the full score',
+       eng.evaluateCondition(parse('<if ability="combat" greaterthan="' + (g302.ability('combat') - 1) + '"/>'), g302) === true
+       && g302.getVar('c314pl') === g302.ability('combat'));
+
     // --- task 304: the affliction term Defence never had ---------------------------------------
     // defence() summed COMBAT, Rank, armour and auras and stopped there, so the corpus's ONE
     // affliction naming Defence — §5.638's Curse of Vulnerability — had its −3 computed by
