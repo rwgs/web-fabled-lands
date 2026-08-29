@@ -36,7 +36,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 317. `rank` ignores `modifier=` on every tag but `<set>`, so `<adjust ability="rank" modifier="natural"/>` and `<difficulty ability="rank" modifier="natural">` read the ring of ultimate power's +2 back in — the last stat left out of the 314–316 family
+- [x] 317. `rank` ignores `modifier=` on every tag but `<set>`, so `<adjust ability="rank" modifier="natural"/>` and `<difficulty ability="rank" modifier="natural">` read the ring of ultimate power's +2 back in — the last stat left out of the 314–316 family
 
 - [x] 316. `adjustAmount` has no `defence` arm, so `<adjust ability="defence"/>` contributes 0 — the gate allows `defence` in `ability=`, and the same tag's `adjustApplies` reads it correctly through `abilityForMode`
 
@@ -2260,6 +2260,30 @@ fight against a cursed player reads the reduced Defence.
 ---
 
 ## 317. `rank` ignores `modifier=` on every tag but `<set>`, so `natural` reads the ring's +2 back in
+
+**DONE.** `GameState.rankForMode(mode)` added beside `rankValue()` — `natural` gives `data.rank`,
+every other word the full Rank — and all five readers now call it: `evaluateCondition`,
+`rollDifficulty`, `adjustAmount`, `adjustApplies`, and `evalExpression`, whose inline ternary was
+the one honoured site and is deleted as its first caller. `<rankcheck>` is deliberately untouched:
+`FL_TAG_ATTRS['rankcheck']` is `add dice`, so it cannot carry a `modifier=` to honour.
+
+Seven assertions — four in `suite-engine.js` beside the §2.270 fixture that already held a +2 ring
+(the `<if>` and `<difficulty>` arms, plus the control that `affected`/`noarmour`/`noweapon`/none all
+mean the full Rank), three in `suite-combat.js`'s task-92 block (both `<adjust>` readers). Verified
+by reverting `engine.js` and `state.js` together: four fail (`natural=5` where 3 is wanted, twice
+over) and the control throws `rankForMode is not a function`, which is the method itself being the
+fix. `RESULT ALL PASS pass=3032 fail=0`. Nothing shipped moves, as filed.
+
+**This closes the family 314–317 opened.** Every reader of `modifier=` in the port — `<if>`,
+`<set>`, `<difficulty>` and both of `<adjust>`'s — now resolves all six mode words for all nine
+words `FL_ENUMS['ability']` allows, through exactly three deciders: `abilityForMode` (the six core
+abilities and `defence`), `rankForMode` (`rank`), and the per-reader stamina arms, which differ on
+purpose — a `<set>`/`<if>`/`<adjust>` *condition* reads the wounded score bare, an `<adjust>`
+*contribution* the unwounded one. Four separate audits reached one reader each; what they had in
+common was a stat the widened helper did not compose, which is the thing to check first if a sixth
+reader ever appears.
+
+**The original filing.**
 
 **Priority: LOW — latent, and censused to be latent.** Filed 2026-08-28 by the census that closed
 task 316. Over the 4,369-file shipped corpus, `rank` is written with a `modifier=` on **`<set>`

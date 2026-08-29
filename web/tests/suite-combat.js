@@ -558,6 +558,21 @@ export async function run(ctx) {
          && g316.defence() - adj92('<lose><adjust ability="defence" modifier="noarmour"/></lose>', g316) === g316.armourBonus(),
          'noarmour=' + adj92('<lose><adjust ability="defence" modifier="noarmour"/></lose>', g316));
 
+      // --- task 317: the last stat that ignored modifier= --------------------------------
+      // Both of <adjust>'s readers hard-coded rankValue(), so `natural` read the ring of
+      // ultimate power's +2 back in — on the contribution and on the condition alike.
+      const g317 = GameState.create({ name:'AJ317', gender:'m', profession:'Warrior', book:5, adv });
+      g317.data.rank = 3;
+      g317.addItem(makeItem('item', 'ring of ultimate power', 0, null, [], eng.readItemEffects(parse('<item name="ring of ultimate power"><effect type="aura" ability="rank" bonus="2"/></item>'))));
+      ok('task317: <adjust ability="rank" modifier="natural"/> contributes the WRITTEN Rank (3), not the boosted 5',
+         g317.rankValue() === 5
+         && adj92('<lose><adjust ability="rank" modifier="natural"/></lose>', g317) === 3
+         && adj92('<lose><adjust ability="rank"/></lose>', g317) === 5,
+         'natural=' + adj92('<lose><adjust ability="rank" modifier="natural"/></lose>', g317) + ' bare=' + adj92('<lose><adjust ability="rank"/></lose>', g317));
+      ok('task317: and the same on the CONDITION arm — greaterthan="3" no longer fires on the ring alone',
+         adj92('<random><adjust ability="rank" modifier="natural" greaterthan="3" value="1"/></random>', g317) === 0
+         && adj92('<random><adjust ability="rank" greaterthan="3" value="1"/></random>', g317) === 1);
+
       // §6.736: item="?" tags="light" — any light source adds the +2.
       const g92l = GameState.create({ name:'AJ92l', gender:'m', profession:'Warrior', book:6, adv });
       const n736 = (await data.getSection(6, '736')).querySelector('difficulty');

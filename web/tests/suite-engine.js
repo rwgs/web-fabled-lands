@@ -1070,6 +1070,22 @@ export async function run(ctx) {
       ok('task136.4: value="rank" modifier="natural" reads natural Rank (3, not 5)', eng.evalExpression('rank', gRank, 'natural') === 3);
       ok('task136.4: value="rank" with no modifier reads effective Rank (5)', eng.evalExpression('rank', gRank, null) === 5);
 
+      // task 317: the two lines above were the ONLY reader that made this distinction. The other
+      // four hard-coded rankValue(), so a `natural` written on <if>/<difficulty>/<adjust> read the
+      // ring's +2 straight back in — the exact bonus §2.270 writes the word to strip. Each of
+      // tasks 314–316 widened its reader through abilityForMode, which does not compose `rank`,
+      // so all three walked past this. state.rankForMode is now the single place that decides.
+      ok('task317: <if ability="rank" modifier="natural"> compares the WRITTEN Rank (3), not the ring-boosted 5',
+         eng.evaluateCondition(parse('<if ability="rank" modifier="natural" greaterthan="3"/>'), gRank) === false
+         && eng.evaluateCondition(parse('<if ability="rank" greaterthan="3"/>'), gRank) === true);
+      ok('task317: <difficulty ability="rank" modifier="natural"> rolls against 3, a bare one still against 5',
+         eng.rollDifficulty(gRank, 'rank', 5, 0, 'natural').abilityScore === 3
+         && eng.rollDifficulty(gRank, 'rank', 5, 0, null).abilityScore === 5,
+         'natural=' + eng.rollDifficulty(gRank, 'rank', 5, 0, 'natural').abilityScore);
+      ok('task317: control — every other mode word means the full Rank, since nothing worn or wielded reaches it',
+         gRank.rankForMode('affected') === 5 && gRank.rankForMode('noarmour') === 5
+         && gRank.rankForMode('noweapon') === 5 && gRank.rankForMode(null) === 5);
+
       // 136.4 — a cursed ability reads as 0 in a value expression (§6.332 12-charisma → 12), not the -1000 sentinel.
       const gCur = GameState.create({ name:'X', gender:'m', profession:'Warrior', book:6, adv });
       gCur.setAbilityFlag('charisma', 'cursed', true);

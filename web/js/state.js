@@ -365,6 +365,19 @@ export class GameState {
    *  ultimate power's +2 Rank — book5/564). Feeds Defence and rank checks. (task 44) */
   rankValue() { return this.data.rank + this.auraBonus('rank'); }
 
+  /** rankValue() under a `modifier=` keyword. `natural` gives the WRITTEN Rank, which strips
+   *  the ring of ultimate power's +2 — the one unwritten bonus Rank carries, and the whole
+   *  reason §2.270 stores `value="rank" modifier="natural"` before comparing against it.
+   *  Every other word means the full Rank: no weapon, tool or armour reaches this score, so
+   *  `affected` and the three `no-` modes are the default by agreement, not by fall-through.
+   *  Here on GameState rather than inlined at a call site because five readers want it and
+   *  `rank` is the one stat abilityForMode does not compose — which is how tasks 314–316 each
+   *  widened their reader and walked straight past it. defence() delegating to defenceForMode
+   *  is the same move for the same reason (task 304). (tasks 44, 136.4, 317) */
+  rankForMode(mode) {
+    return String(mode || '').trim().toLowerCase() === 'natural' ? this.data.rank : this.rankValue();
+  }
+
   /** Passive item-effect bonus for an ability key (task 41): a `type="aura"` effect
    *  counts while the item is carried; `type="wielded"` only while it is the
    *  wielded weapon / worn armour. `ability="*"` boosts every core ability. Used for

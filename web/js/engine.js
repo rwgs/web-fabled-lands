@@ -284,7 +284,7 @@ export function evaluateCondition(el, state, opts = {}) {
     // so the daggers always hit and the printed "the daggers all miss" was unreachable.
     const spec = get('ability').split('|')[0].trim().toLowerCase();
     let v;
-    if (spec === 'rank') v = state.rankValue();
+    if (spec === 'rank') v = state.rankForMode(get('modifier'));
     else if (spec === 'defence') v = state.abilityForMode('defence', get('modifier'));
     else if (spec === 'stamina') v = get('modifier') ? state.effectiveStaminaMax() : state.data.stamina;
     // The ordinary-ability arm folded modifier= to a boolean `natural` and passed
@@ -1596,8 +1596,10 @@ export function evalExpression(expr, state, mode = null, sel = null) {
     if (w === 'shards') return state.data.shards;
     // rank: natural → the WRITTEN Rank; affected/none → rankValue() incl. the ring of
     // ultimate power's +2 aura. §2.270 sets `var rank = rank modifier="natural"` and then
-    // compares against it, so a ring-holder must be judged by natural Rank. (task 136.4)
-    if (w === 'rank') return mode === 'natural' ? state.data.rank : state.rankValue();
+    // compares against it, so a ring-holder must be judged by natural Rank. This was the ONLY
+    // reader that made the distinction until task 317 moved it onto GameState and gave the
+    // other four the same call — the argument was never specific to <set>. (tasks 136.4, 317)
+    if (w === 'rank') return state.rankForMode(mode);
     // defenceForMode(null) IS defence(), so an unmodified read is unchanged. This branch is
     // what STOPS `<set value="defence" modifier="noarmour">` handing back the armoured score —
     // but only since task 314 taught setValueMode to keep the `no-` modes: before it, applySet
@@ -1719,7 +1721,7 @@ function adjustAmount(el, state) {
   if (ab != null) {
     const key = ab.split('|')[0].trim().toLowerCase();
     const mode = String(el.getAttribute('modifier') || '').trim().toLowerCase() || null;
-    if (key === 'rank') return state.rankValue(); // ring of ultimate power +2 (task 44)
+    if (key === 'rank') return state.rankForMode(mode); // ring of ultimate power +2, unless natural (tasks 44, 317)
     // `defence` is the third derived stat and the gate allows it in ability=, but ABILITIES is
     // the six CORE abilities, so it matched no arm below and this whole branch fell through to
     // return 0 — the modifier contributed nothing and the roll came up that many points short.
@@ -1766,7 +1768,7 @@ function adjustApplies(el, state) {
       // means the unwounded one — with `natural` picking the written maximum as it does in
       // adjustAmount. (tasks 92, 314, 315)
       const mode = String(get('modifier') || '').trim().toLowerCase() || null;
-      v = key === 'rank' ? state.rankValue()
+      v = key === 'rank' ? state.rankForMode(mode)
         : key === 'stamina' ? (!mode || mode === 'current' ? state.data.stamina
           : mode === 'natural' ? state.data.staminaMax
           : state.effectiveStaminaMax())
@@ -1807,7 +1809,7 @@ export function rollDifficulty(state, ability, level, modifier = 0, mode = null)
   const m = String(mode || '').toLowerCase();
   let abilityScore, rolled = ab;
   if (ab) abilityScore = state.abilityForMode(ab, mode);
-  else if (key === 'rank') { abilityScore = state.rankValue(); rolled = key; }
+  else if (key === 'rank') { abilityScore = state.rankForMode(mode); rolled = key; }
   else if (key === 'defence') { abilityScore = state.abilityForMode('defence', mode); rolled = key; }
   else if (key === 'stamina') {
     abilityScore = (m === 'current') ? state.data.stamina
