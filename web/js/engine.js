@@ -1720,6 +1720,15 @@ function adjustAmount(el, state) {
     const key = ab.split('|')[0].trim().toLowerCase();
     const mode = String(el.getAttribute('modifier') || '').trim().toLowerCase() || null;
     if (key === 'rank') return state.rankValue(); // ring of ultimate power +2 (task 44)
+    // `defence` is the third derived stat and the gate allows it in ability=, but ABILITIES is
+    // the six CORE abilities, so it matched no arm below and this whole branch fell through to
+    // return 0 — the modifier contributed nothing and the roll came up that many points short.
+    // Same shape tasks 68/302/303 closed one reader at a time, and it survived here because
+    // adjustApplies (the CONDITION reader six lines down) routes `defence` through
+    // abilityForMode and gets it right, so the two readers of one attribute disagreed.
+    // abilityForMode already dispatches it, so this is a routing line, not a new rule; the
+    // identical arm in rollDifficulty is the precedent. (tasks 302, 316)
+    if (key === 'defence') return state.abilityForMode('defence', mode);
     if (key === 'stamina') {
       if (mode === 'natural') return state.data.staminaMax; // the written score, no aura/affliction
       if (mode === 'current') return state.data.stamina;

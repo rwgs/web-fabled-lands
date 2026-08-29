@@ -542,6 +542,22 @@ export async function run(ctx) {
          adj92('<random><adjust ability="stamina" greaterthan="10" value="1"/></random>', g92s) === 0
          && adj92('<random><adjust ability="stamina" lessthan="10" value="1"/></random>', g92s) === 1);
 
+      // --- task 316: the arm adjustAmount never had for the third derived stat ------------
+      // ABILITIES is the six CORE abilities, so `defence` matched nothing and the whole
+      // ability= branch fell through to 0 — while adjustApplies, tested just above, read the
+      // same attribute correctly. Give the fixture an armour so the two modes differ.
+      const g316 = GameState.create({ name:'AJ316', gender:'m', profession:'Warrior', book:5, adv });
+      g316.data.items = [];
+      g316.addItem(makeItem('weapon', 'iron sword', 2));
+      g316.addItem(makeItem('armour', 'plate', 3));
+      ok('task316: <adjust ability="defence"/> contributes the Defence, not 0',
+         adj92('<lose><adjust ability="defence"/></lose>', g316) === g316.defence() && g316.defence() > 0,
+         'got=' + adj92('<lose><adjust ability="defence"/></lose>', g316) + ' defence=' + g316.defence());
+      ok('task316: and it is mode-aware, so modifier="noarmour" drops exactly armourBonus()',
+         g316.armourBonus() === 3
+         && g316.defence() - adj92('<lose><adjust ability="defence" modifier="noarmour"/></lose>', g316) === g316.armourBonus(),
+         'noarmour=' + adj92('<lose><adjust ability="defence" modifier="noarmour"/></lose>', g316));
+
       // §6.736: item="?" tags="light" — any light source adds the +2.
       const g92l = GameState.create({ name:'AJ92l', gender:'m', profession:'Warrior', book:6, adv });
       const n736 = (await data.getSection(6, '736')).querySelector('difficulty');

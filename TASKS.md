@@ -36,7 +36,9 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 316. `adjustAmount` has no `defence` arm, so `<adjust ability="defence"/>` contributes 0 — the gate allows `defence` in `ability=`, and the same tag's `adjustApplies` reads it correctly through `abilityForMode`
+- [ ] 317. `rank` ignores `modifier=` on every tag but `<set>`, so `<adjust ability="rank" modifier="natural"/>` and `<difficulty ability="rank" modifier="natural">` read the ring of ultimate power's +2 back in — the last stat left out of the 314–316 family
+
+- [x] 316. `adjustAmount` has no `defence` arm, so `<adjust ability="defence"/>` contributes 0 — the gate allows `defence` in `ability=`, and the same tag's `adjustApplies` reads it correctly through `abilityForMode`
 
 - [x] 315. `adjustApplies` folds `modifier=` to a boolean `natural` on the `<adjust greaterthan|lessthan>` CONDITION, so the third mode-dropping site survives task 314 — the same tag's `adjustAmount` reads all six two lines away
 
@@ -2257,7 +2259,69 @@ fight against a cursed player reads the reduced Defence.
 
 ---
 
+## 317. `rank` ignores `modifier=` on every tag but `<set>`, so `natural` reads the ring's +2 back in
+
+**Priority: LOW — latent, and censused to be latent.** Filed 2026-08-28 by the census that closed
+task 316. Over the 4,369-file shipped corpus, `rank` is written with a `modifier=` on **`<set>`
+only** — 23 sites, all `natural`, all honoured — so nothing is mis-read today.
+
+**What the code does.** Every reader has a `rank` arm, and four of the five hard-code
+`state.rankValue()`:
+
+| reader | tag | rank arm |
+| --- | --- | --- |
+| `evalExpression` | `<set value="rank">` | `mode === 'natural' ? state.data.rank : state.rankValue()` |
+| `evaluateCondition` | `<if ability="rank">` | `state.rankValue()` |
+| `rollDifficulty` | `<difficulty ability="rank">` | `state.rankValue()` |
+| `adjustAmount` | `<adjust ability="rank"/>` | `state.rankValue()` |
+| `adjustApplies` | `<adjust ability="rank" greaterthan=>` | `state.rankValue()` |
+
+`rankValue()` adds the **ring of ultimate power's +2**, which is precisely the unwritten bonus
+`natural` exists to strip — task 136.4 added the `<set>` arm for exactly that reason (§2.270 stores
+`rank modifier="natural"` and then compares against it, "so a ring-holder must be judged by natural
+Rank"). The argument is not specific to `<set>`: a `<difficulty ability="rank" modifier="natural">`
+would roll against the ring-boosted Rank, and a `<adjust ability="rank" modifier="natural"/>` would
+contribute it, both silently two points easier than the page prints — the family's failure shape
+with a different stat in it.
+
+This is the last member. Tasks 302/303 gave the derived stats their arms, 314 widened `<set>`/`<if>`
+to all six mode words, 315 did `<adjust>`'s condition reader and 316 its value reader — but each of
+those routed through `abilityForMode`, and `rank` is the one stat that reader does not compose
+(`data.abilities` has no `rank` key and `rankValue()` is not one of its branches), so every fix
+walked straight past it.
+
+**Fix.** The narrow form is one shared helper — `rankForMode(mode)` on `GameState`, returning
+`data.rank` for `natural` and `rankValue()` otherwise — with the five arms above calling it and
+`evalExpression`'s inline ternary deleted as its first caller. Putting it on `GameState` beside
+`defenceForMode` is what stops the sixth reader repeating this; `defence()` delegating to
+`defenceForMode` is the precedent (task 304's note on drift). Only `natural` is distinguishable:
+the three `no-` words and `affected` all mean the full Rank, since no weapon, tool or armour
+touches it.
+
+**Test.** A fixture holding the ring (Rank N written, `rankValue()` N+2), asserting
+`<difficulty ability="rank" modifier="natural">` scores N and a bare one scores N+2, plus the
+`<adjust>` pair. All three read N+2 today. Keep the existing §2.270 `<set>` assertion as the
+control that the one honoured site stays honoured.
+
 ## 316. `adjustAmount` has no `defence` arm, so an `<adjust ability="defence"/>` contribution reads 0
+
+**DONE.** One routing arm added beside `rank`, mode-aware like the rest —
+`if (key === 'defence') return state.abilityForMode('defence', mode);` — so the two readers of
+`<adjust>`'s `ability=` finally agree on all nine words the gate allows. Two assertions in
+`suite-combat.js`'s task-92 block, on a fixture wearing a +3 armour: the contribution equals
+`defence()`, and `modifier="noarmour"` drops it by exactly `armourBonus()`. Verified by reverting
+the engine change alone — `FAIL … got=0 defence=12` and `FAIL … noarmour=0`, which is the defect
+stated as a number. `RESULT ALL PASS pass=3027 fail=0`. Nothing shipped moves: zero corpus sites,
+as filed.
+
+With this, all four `modifier=` tags accept all three derived stats, and every reader resolves the
+six mode words **for the six core abilities, `defence` and `stamina`**. One stat is still short and
+the census that closed 316 found it: `rank` ignores `modifier=` everywhere except `<set>`, so
+`<adjust ability="rank" modifier="natural"/>` returns `rankValue()` — the ring of ultimate power's
++2 included — where the word asks for the written Rank. Filed as task 317; the corpus writes
+`rank` with a modifier on `<set>` only (23 sites, all `natural`, all honoured).
+
+**The original filing.**
 
 **Priority: LOW — latent, and censused to be latent.** Filed 2026-08-28 while fixing task 315,
 whose census covers it: **zero** `<adjust ability="defence">` nodes over the 4,369-file shipped
