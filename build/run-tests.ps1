@@ -33,6 +33,13 @@
   while a working interpreter sits further along PATH. Find-Python probes candidates instead of
   trusting names. (task 237)
 
+  A sixth never ends. Every wait on the browser here used to be unbounded, so a browser that
+  HANGS rather than exits produces no dump, no exit code and no message - the runner simply sat
+  in -Wait, and a CI job would burn to the platform's own limit. --virtual-time-budget cannot
+  close that (see its .PARAMETER below): it bounds what the PAGE spends, so a browser that never
+  reaches the page never spends it. Only a wall clock can, which is -BrowserTimeoutSeconds.
+  (task 332)
+
   The verdict is taken from the FIRST RESULT line in the dump. --dump-dom includes
   _test.html's inline script SOURCE, which carries the literal "RESULT FATAL pass=0 fail=1";
   the live verdict lives in <pre id="results"> at the top of <body> and is therefore always
@@ -63,6 +70,13 @@
   and started cutting runs short at ~2,400. The default therefore carries deliberate headroom;
   raise it if a run is still cut short.
 
+.PARAMETER BrowserTimeoutSeconds
+  The wall-clock bound -VirtualTimeBudget is not: how long the browser may run before this
+  script kills it and fails the run naming the hang. A healthy full suite takes ~13s of real
+  time, so the default is minutes rather than seconds - a slow CI runner or a cold profile must
+  never be the reason this trips, and a hang must never be the reason a run reports nothing.
+  The failure-path probe in Test-BrowserWritesOutput keeps its own much shorter bound.
+
 .EXAMPLE
   pwsh -ExecutionPolicy Bypass -File build/run-tests.ps1
 .EXAMPLE
@@ -74,7 +88,8 @@ param(
     [int]$Port = 8848,
     [string]$Browser,
     [switch]$KeepDump,
-    [int]$VirtualTimeBudget = 300000
+    [int]$VirtualTimeBudget = 300000,
+    [int]$BrowserTimeoutSeconds = 300
 )
 
 Set-StrictMode -Version Latest
@@ -182,7 +197,7 @@ function Test-BrowserWritesOutput([string]$Path) {
     try {
         # Only the launch is guarded, for the reason Get-PythonRejection gives above.
         try {
-            Start-Process -FilePath $Path -ArgumentList @(
+            $p = Start-Process -FilePath $Path -ArgumentList @(
                 '--headless=new', '--disable-gpu', '--no-sandbox',
                 '--no-first-run', '--no-default-browser-check',
                 "--screenshot=$shot", "--user-data-dir=$dir",
@@ -190,8 +205,14 @@ function Test-BrowserWritesOutput([string]$Path) {
                 # unquoted, so a `<p>` would reach cmd.exe as a redirection when the self-test
                 # drives this through a .cmd shim. "x" renders as well as markup does.
                 'data:text/html,x'
-            ) -NoNewWindow -Wait | Out-Null
+            ) -NoNewWindow -PassThru
         } catch { return $false }
+        # Bounded like the main launch and for the same reason (task 332), but far shorter: this
+        # renders one data: URL with no server and no suite behind it, so a browser still running
+        # after 30s is not slow, it is stuck - and the caller is already reporting a failure. A
+        # browser killed here answers the question honestly: it wrote no screenshot.
+        Wait-Process -InputObject $p -Timeout 30 -ErrorAction SilentlyContinue
+        if (-not $p.HasExited) { Stop-Process -InputObject $p -Force -ErrorAction SilentlyContinue }
         return (Test-Path $shot) -and ((Get-Item $shot).Length -gt 0)
     } finally {
         Remove-Item $shot -Force -ErrorAction SilentlyContinue
@@ -320,12 +341,23 @@ try {
     if (-not $ready) { throw "The server never answered $url." }
 
     Write-Host "Running $(Split-Path -Leaf $browser) headless against $url"
-    Start-Process -FilePath $browser -ArgumentList @(
+    # -PassThru and a bounded wait, never -Wait: -Wait has no timeout, so a browser that hangs
+    # instead of exiting takes the run with it - no dump, no verdict, no message, and nothing a
+    # caller branching on the exit code can do. (task 332)
+    $launched = Start-Process -FilePath $browser -ArgumentList @(
         '--headless=new', '--disable-gpu', '--no-sandbox',
         '--no-first-run', '--no-default-browser-check',
         '--dump-dom', "--virtual-time-budget=$VirtualTimeBudget",
         "--user-data-dir=$profileDir", $url
-    ) -RedirectStandardOutput $dump -NoNewWindow -Wait
+    ) -RedirectStandardOutput $dump -NoNewWindow -PassThru
+    # -ErrorAction SilentlyContinue: an expired -Timeout is a non-terminating error, which this
+    # script's 'Stop' preference would otherwise raise in place of the message below. HasExited
+    # answers either way.
+    Wait-Process -InputObject $launched -Timeout $BrowserTimeoutSeconds -ErrorAction SilentlyContinue
+    if (-not $launched.HasExited) {
+        Stop-Process -InputObject $launched -Force -ErrorAction SilentlyContinue
+        throw "The browser HUNG: $browser was still running $BrowserTimeoutSeconds seconds after launch and has been killed. That is neither an empty dump nor a budget expiry - --virtual-time-budget bounds what the page spends, so a browser that never gets that far never spends it. Try -Browser <path to another Chromium>, or raise -BrowserTimeoutSeconds if this machine is simply slow."
+    }
 
     # An absent or empty dump is an ENVIRONMENT failure, not a page failure - never a pass.
     if (-not (Test-Path $dump)) { throw "The browser wrote no dump to $dump." }

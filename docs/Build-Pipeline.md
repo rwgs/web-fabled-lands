@@ -77,7 +77,7 @@ Then run the tests - see [Testing](Testing.md).
 | `stamp-version.ps1` | Writes the build stamp into `version.js` and `sw.js`. |
 | `run-tests.ps1` | The test loop. See [Testing](Testing.md). |
 | `serve.py` | A no-cache static server. The one non-PowerShell script here. |
-| `run-tests-selftest.ps1` | Drives the runner's Python discovery over shim fixtures. **Windows-only; CI does not run it** - run it by hand after touching discovery. |
+| `run-tests-selftest.ps1` | Drives the runner's environment probes over shim fixtures - Python discovery, the empty-dump diagnosis, and the browser's wall-clock bound. **Windows-only; CI does not run it** - run it by hand after touching any of them. |
 
 Neither self-test touches anything under `books/` or `web/`.
 

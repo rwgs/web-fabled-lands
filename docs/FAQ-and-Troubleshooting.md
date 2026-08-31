@@ -112,6 +112,13 @@ the browser launched and did no work at all, which writes the same empty file an
 redirection will fix. `--version` is silent under both; the runner probes with `--screenshot`
 and names whichever it is. What an absent `RESULT` never means is that a suite failed quietly.
 
+**The runner printed "Running chrome.exe headless against ..." and never came back.**
+The browser hung rather than exited, which is the one shape `--virtual-time-budget` cannot
+catch - it bounds what the page spends, and a browser stuck before the page never spends it.
+The runner kills the browser after `-BrowserTimeoutSeconds` (default 300) and fails naming
+the hang, so a wait longer than that is something else. Try `-Browser <path to another
+Chromium>`; raise the bound only if the machine is genuinely that slow.
+
 **The verdict has not changed since I edited a suite.**
 Check who owns port 8848. Python's `allow_reuse_address` lets a second server bind while an
 older process keeps answering from a different directory. `build/serve.py` turns that off,

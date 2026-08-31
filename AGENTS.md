@@ -104,8 +104,9 @@ combat, markets, ships, live adventure sheet). Plain HTML/CSS/ES modules —
   resolves, since a WindowsApps execution alias resolves like an interpreter and may not
   launch — is driven over shim fixtures by `run-tests-selftest.ps1`, which also drives the
   empty-dump diagnosis below over a pair of browser shims that exit 0 without writing a DOM
-  (task 330). That one is Windows-only (Chrome under Program Files, `.cmd` shims), so **CI
-  does not run it**; run it by hand after touching either probe (task 237).
+  (task 330) and the wall-clock bound over a third that never exits at all (task 332). That one
+  is Windows-only (Chrome under Program Files, `.cmd` shims), so **CI does not run it**; run it
+  by hand after touching any of the three (task 237).
   **`TASKS.md`** — the backlog (see workflow below).
 
 ## Architecture invariant — keep the rules out of the view
@@ -265,6 +266,14 @@ Notes:
   `running: <suite in flight> | done: engine(213/213), …` where before every unfinished run left
   the same placeholder whether it died in the first suite or the last assertion. The stall behind
   such a run is still unexplained; that line is the evidence for the next one. (task 240)
+- **The wall clock that budget is not is `-BrowserTimeoutSeconds` (default 300).** A browser
+  that *hangs* instead of exiting never reaches the page, so it never spends the budget: before
+  task 332 the runner sat in `Start-Process -Wait` with nothing to time it out, printing nothing
+  after "Running chrome.exe headless against …", and a CI job would have burned GitHub's
+  360-minute default. It now kills the browser at the bound and fails naming the hang — a
+  message distinct from either empty-dump cause, because a hang is neither. Raise it on a slow
+  machine; a healthy full run takes ~13s. The `smoke` job carries `timeout-minutes` for the
+  same reason, and `run-tests-selftest.ps1` covers the case with a shim that never exits.
 - Pure-logic modules (`engine.js`, `combat.js`, `market.js`, `state.js`) can also
   be imported and unit-checked directly in Node for fast feedback. That seam is itself
   tested — `node web/tests/node-import.mjs` (no dependencies, exit 0 = pass) walks each

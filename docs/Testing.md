@@ -173,6 +173,12 @@ suite".
 A fixed budget of 90000 set at about 1,700 assertions began cutting runs short at about
 2,400, so the default is now **300000**, raisable with `-VirtualTimeBudget`.
 
+The wall clock it is not is `-BrowserTimeoutSeconds`, default 300. A browser that *hangs*
+rather than exits never reaches the page and so never spends the budget; every wait on it
+here used to be unbounded, so such a run returned nothing at all rather than failing. The
+runner now kills the browser at that bound and fails naming the hang, which is neither of
+the two empty-dump causes above. The CI job carries `timeout-minutes` for the same reason.
+
 Inside the page, an expiry and a real network failure are identical. The runner asks the
 question the page cannot: a fetch failure against a server that is **still answering** is
 reported as `CUT SHORT, not broken`. A cut-short run also reports how far it got, because

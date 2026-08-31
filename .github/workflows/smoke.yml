@@ -79,6 +79,13 @@ jobs:
   # itself — the shipped web/ is still dependency-free.
   smoke:
     runs-on: ubuntu-latest
+    # A wall clock on the browser, which nothing else here provides (task 332).
+    # --virtual-time-budget below is explicitly not one, and the chrome invocation is a bare
+    # `run:` step, so a browser that hangs rather than exits would sit until GitHub's own
+    # 360-minute default killed the job with no verdict and no message. A full rebuild plus the
+    # suite is a couple of minutes; this is generous headroom over that and still fails the same
+    # day. (run-tests.ps1 bounds its own launch with -BrowserTimeoutSeconds.)
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 

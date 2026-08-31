@@ -2,8 +2,9 @@
 <#
   run-tests-selftest.ps1
   ----------------------
-  Drives the two environment probes in run-tests.ps1 over fixture shims, so each is tested
-  instead of trusted: Python discovery (task 237) and the empty-dump diagnosis (task 330).
+  Drives the environment probes in run-tests.ps1 over fixture shims, so each is tested instead
+  of trusted: Python discovery (task 237), the empty-dump diagnosis (task 330) and the
+  wall-clock bound on the browser (task 332).
 
   The failure the first exists to prevent is silent in the worst way: Get-Command resolves a zero-byte
   WindowsApps execution alias exactly like a real interpreter, so the runner used to hand
@@ -33,9 +34,17 @@
        that is the real capture failure - and a probe that had quietly stopped finding the
        screenshot would otherwise report case 3's cause for every empty dump forever.
 
+  The third is the one failure that reports nothing at all, because it never finishes: a browser
+  that HANGS rather than exits used to sit in Start-Process -Wait forever. So the case has to be
+  timed as well as asserted - a bound that silently stopped working would still "pass" every text
+  assertion below, whenever the browser eventually gave up:
+
+    5. A browser that never exits. The run must fail naming the hang and the wall clock, must
+       not read as an empty dump, and must come back in seconds rather than in the shim's time.
+
   Windows-only, like run-tests.ps1 itself (Chrome under Program Files, .cmd shims); CI drives the
   browser suite directly instead, so this is not part of the CI matrix. Run it after touching
-  discovery or the empty-dump branch:
+  discovery, the empty-dump branch or the browser's wall-clock bound:
 
   Run: pwsh -ExecutionPolicy Bypass -File build/run-tests-selftest.ps1   (exit 0 = pass)
 
@@ -93,6 +102,16 @@ $shotBrowser = Join-Path $shimDir 'browser-shot.cmd'
     'if defined shot echo x>"%shot%"'
     'exit /b 0'
 ) -join "`r`n")
+
+# The hung browser: launches and never comes back. It spins in cmd itself rather than sleeping,
+# because the batch sleep (`ping -n 60`) is a CHILD PROCESS and the runner kills only the browser
+# it started. The orphan then outlives it holding an inherited copy of this script's capture pipe
+# - so Invoke-Runner sat reading for the shim's full minute while the runner had returned in
+# under four seconds, which reads exactly like the bound not working. Two seconds of one core is
+# the cheaper answer, and it leaves nothing behind. (`timeout /t` is no help either: it refuses
+# to run when stdin is not a console, which is how the runner launches it.)
+$hangBrowser = Join-Path $shimDir 'browser-hang.cmd'
+[System.IO.File]::WriteAllText($hangBrowser, "@echo off`r`n:loop`r`ngoto loop`r`n")
 
 $realPath = $env:PATH
 function Invoke-Runner([string]$Path, [string[]]$RunnerArgs) {
@@ -158,6 +177,22 @@ try {
     Assert 'a browser that writes only a screenshot fails the run' ($r.Code -ne 0) "exit=$($r.Code)"
     Assert 'it is diagnosed as a lost stdout handle' ($r.Text -match 'no stdout handle') $r.Text
     Assert 'it does NOT blame the browser' ($r.Text -notmatch 'produced no output at all') $r.Text
+
+    # ---- 5. A browser that hangs instead of exiting -------------------------------------
+    # -BrowserTimeoutSeconds is what makes this case fast: the shim never exits on its own, the
+    # bound is two seconds, and the run has to come back inside them plus the server it starts.
+    # Without the bound this assertion block is unreachable - the runner would still be in -Wait.
+    $started = Get-Date
+    $r = Invoke-Runner $realPath @('-Browser', $hangBrowser, '-Port', "$port", '-BrowserTimeoutSeconds', '2')
+    $took = [int]((Get-Date) - $started).TotalSeconds
+    Assert 'a browser that hangs fails the run' ($r.Code -ne 0) "exit=$($r.Code)"
+    Assert 'the runner gives up rather than waiting the browser out' ($took -lt 30) "took ${took}s"
+    Assert 'it is diagnosed as a hang, naming the wall clock' `
+        ($r.Text -match 'still running 2 seconds after launch') $r.Text
+    Assert 'it does NOT read as an empty dump' `
+        ($r.Text -notmatch 'no stdout handle|produced no output at all') $r.Text
+    Assert 'it says what to try instead of hanging again' `
+        ($r.Text -match 'raise -BrowserTimeoutSeconds') $r.Text
 }
 finally {
     $env:PATH = $realPath

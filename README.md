@@ -365,7 +365,10 @@ A run that Chrome's `--virtual-time-budget` cuts short fails in *another* compon
 suite error, or as the bootstrap abort that "`RESULT FATAL pass=0 fail=1`" otherwise denotes), so
 the runner recognises both shapes and says it was the clock, with `-VirtualTimeBudget` to raise
 it. That budget is not a wall-clock timeout — virtual time leaps ahead whenever the page is idle,
-so the default carries headroom for free.
+so the default carries headroom for free. The wall clock is `-BrowserTimeoutSeconds` (default
+300): a browser that *hangs* rather than exits never reaches the page and never spends the
+budget, so the runner bounds the launch itself and fails naming the hang instead of waiting
+forever.
 
 The first line of the dumped `#results` reads
 `RESULT ALL PASS …` when healthy (page title

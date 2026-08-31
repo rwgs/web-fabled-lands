@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–331), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326), task 327 (ID 327), task 328 (ID 328), task 329 (ID 329), task 330 (ID 330) and task 331 (ID 331). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for completed tasks (stable IDs 1–332), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326), task 327 (ID 327), task 328 (ID 328), task 329 (ID 329), task 330 (ID 330), task 331 (ID 331) and task 332 (ID 332). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–331). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
+The completed tasks archived in this file (stable IDs 1–332). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -340,6 +340,7 @@ The completed tasks archived in this file (stable IDs 1–331). Detail sections 
 - [x] 329. `PLAN.md`'s status header names one open backlog item, and that item is closed
 - [x] 330. An empty dump is diagnosed as a capture failure, when the browser may simply have done nothing
 - [x] 331. `PLAN.md` counts 97 sections as setting the player's location, where 94 do
+- [x] 332. Nothing bounds the browser launch by wall clock, so a hung browser hangs the run
 
 ---
 
@@ -15419,5 +15420,102 @@ census should print the lists, not the counts.
 Documentation only: `git status` showed four `.md` files and nothing else, and
 `stamp-version.ps1` reported "already at" its current stamp (`26.08.31.2f83845`), so no
 generated file moved.
+
+---
+
+## 332. Nothing bounds the browser launch by wall clock, so a hung browser hangs the run
+
+**Priority: LOW.** No wrong answer ships — a hang never reports a pass. What it costs is the
+one thing the test loop is otherwise good at: failing quickly and saying why.
+
+### What is wrong
+
+Every wait on the browser in this repo is unbounded:
+
+- `run-tests.ps1` launches it with `Start-Process … -Wait`, which waits for exit with no
+  timeout, and again — since task 330 — in `Test-BrowserWritesOutput` on the failure path.
+- `.github/workflows/smoke.yml` runs `chrome … --dump-dom` inline in a `run:` step, and the
+  job declares no `timeout-minutes`, so GitHub's 360-minute default applies.
+- `run-tests-selftest.ps1`'s `Invoke-Runner` calls the runner with `&`, inheriting whatever
+  the runner does.
+
+`--virtual-time-budget` does not close this, and both `AGENTS.md` and the runner's own
+`.PARAMETER VirtualTimeBudget` block say so in as many words: it is **not** a wall-clock
+timeout, it is a budget the page spends on awaits while virtual time leaps over idle. A
+browser that never gets as far as running the page never spends it.
+
+Task 330's evidence makes the case concrete. That machine's Edge exited 0 from every headless
+launch, which is the *lucky* shape — the run failed in seconds and (after 330) names the cause.
+A browser wedged one step earlier, holding the process open instead of exiting, produces no
+dump and no exit: the runner sits in `-Wait` forever, printing nothing after "Running
+chrome.exe headless against …", and a CI job burns six hours before the platform kills it.
+
+### Why it matters
+
+The whole point of the runner is that it exits 0 only on `RESULT ALL PASS` and otherwise says
+why (tasks 235, 236, 330). A hang answers neither question, and it is the one failure mode a
+caller branching on the exit code can do nothing with. It is also the last unbounded wait
+left: `Find-Python`'s probes are `-Wait` too, but on `--version` against a candidate that
+either launches or does not.
+
+### Steps
+
+1. In `run-tests.ps1`, replace `-Wait` on the main browser launch with `-PassThru` plus
+   `Wait-Process -Timeout`, and on timeout stop the process and throw a message naming the
+   wall-clock limit and the browser — distinct from every existing message, since a hang is
+   not an empty dump. Do the same for `Test-BrowserWritesOutput`'s probe with a much shorter
+   bound (it renders a `data:` URL).
+2. Expose the limit as a parameter beside `-VirtualTimeBudget`, documented as the wall-clock
+   bound the budget is not, and default it well clear of a healthy run (~13s real today, so
+   minutes not seconds — a slow CI runner must not trip it).
+3. Add `timeout-minutes` to the browser job in `.github/workflows/smoke.yml`.
+4. Cover it in `run-tests-selftest.ps1` with a browser shim that sleeps far past the bound
+   (`timeout /t`, or a `ping -n` loop) and assert the run fails with the new message rather
+   than waiting it out — so the case is the fast one, not a test that takes minutes.
+
+### Validation
+
+`build/run-tests.ps1` changes, so the suite must still reach `RESULT ALL PASS` and exit 0
+unchanged, and a normal run must not come near the new bound. The self-test (Windows-only, not
+in CI) must pass with its new case, and its total wall time must stay in the same ballpark.
+
+### Pass note (2026-08-31)
+
+`run-tests.ps1` launches the browser with `-PassThru` and waits with `Wait-Process -Timeout
+$BrowserTimeoutSeconds`; on expiry it kills the process and throws a message naming both the
+browser and the bound, and saying it is neither an empty dump nor a budget expiry. The default
+is **300 seconds** against a ~13s healthy run, so a slow CI runner or a cold profile cannot trip
+it. `Test-BrowserWritesOutput`'s probe is bounded the same way at a flat 30s: it renders one
+`data:` URL with no server and no suite behind it, so a browser still running after that is
+stuck, and the probe reports what is true either way — it wrote no screenshot.
+`.github/workflows/smoke.yml`'s `smoke` job carries `timeout-minutes: 20`, the same bound at the
+only level a `run:` step has.
+
+`-ErrorAction SilentlyContinue` on the `Wait-Process` is load-bearing: an expired `-Timeout` is
+a *non-terminating* error, which the script's `'Stop'` preference would otherwise raise in place
+of the message that explains it.
+
+**The self-test's new case cost more than the fix did.** Case 5 gives the runner
+`-BrowserTimeoutSeconds 2` against a shim that never exits, and asserts the run comes back
+inside 30 seconds as well as asserting what it says — a bound that silently stopped working
+would still satisfy every text assertion, just later. The first shim slept with `ping -n 60`,
+and the case took **61 seconds** while reporting exactly the right message: `ping` is a CHILD
+process, `Stop-Process` kills only the browser it was handed, and the orphan outlived the runner
+holding an inherited copy of this script's capture pipe — so `Invoke-Runner` read on long after
+the runner had exited. Measured both ways: through a pipe **60.7s**, with the runner's output
+redirected to a file **3.7s**. Sending the shim's child output to `nul` did not help, because
+handle inheritance is not the std-handle assignment. The shim now spins in `cmd` itself, with no
+child at all, and the case takes seconds.
+
+**That trap is the shim's, not the browser's** — checked rather than assumed, since left
+unchecked it reads as a hole in the fix. A real Chrome killed at the bound (`-Suite engine
+-BrowserTimeoutSeconds 1`, captured through the same pipe) came back in **3.1 seconds** and left
+no `chrome` process behind: its children exit with the browser process. Nothing filed.
+
+Verification: `run-tests.ps1` reports `RESULT ALL PASS pass=3035 fail=0` and exits 0, with a
+normal run nowhere near the bound; `run-tests-selftest.ps1` reports `RESULT ALL PASS pass=25
+fail=0` (20 before) in 14s of wall time, the same ballpark as before the case existed. Both
+build scripts stay ASCII-only. `stamp-version.ps1` reports "already at" `26.08.31.2f83845` —
+`build/`, `.github/` and `docs/` are not app source, so no generated file moved.
 
 ---

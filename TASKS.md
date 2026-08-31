@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 332 is complete (listed under **Done** below), apart from 207 and 326, both
-withdrawn as misdiagnoses (see the Review log); **332 (LOW) is open**. File new
+withdrawn as misdiagnoses (see the Review log); **nothing is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -24,7 +24,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 332. nothing bounds the browser launch by wall clock — `run-tests.ps1` uses `Start-Process -Wait` and CI a bare `chrome … &&`, while `--virtual-time-budget` is explicitly *not* a timeout — so the wedged browser task 330 is about fails the run only because it exits 0: one that hangs instead takes the run (and a CI job with no `timeout-minutes`) with it, and task 330 added a second unbounded wait on the failure path
+*(none open — file new LOW work here)*
 
 **Done**
 
@@ -366,68 +366,11 @@ this order.*
 - [x] 329. `PLAN.md`'s status header says "the backlog carries one open item (task 320)" and dates itself today, but 320 is closed and the backlog carries four — a stale *status* rather than a stale citation, in the file task 323 had just swept for citations, and a count `PLAN.md` cannot help rotting because it restates a figure another file owns
 - [x] 330. `run-tests.ps1` diagnoses an empty dump as a CAPTURE failure ("no stdout handle?"), but a browser that launches and does no work at all writes the same empty file — an Edge mid-update wrote no DOM, no `--screenshot` and no `--version` while still creating its profile, and `AGENTS.md`'s one-second discriminator ("`--version` printing nothing confirms the missing handle") reads that evidence as exactly the wrong cause
 - [x] 331. `PLAN.md` says `state.data.location` covers "25 named ports across **97** sections" and that three `<set dock=>` sections "set a dock", but `<set dock=>` berths a *ship* — only the **94** `<section dock=>` sections move the player, which is the figure `ROADMAP.md` already prints after task 320; the two planning files disagree on phase 1's own census, and `ROADMAP.md`'s "97 sections carry at least one of the four attributes" is itself the union of only two (all four: **102**)
+- [x] 332. nothing bounds the browser launch by wall clock — `run-tests.ps1` uses `Start-Process -Wait` and CI a bare `chrome … &&`, while `--virtual-time-budget` is explicitly *not* a timeout — so the wedged browser task 330 is about fails the run only because it exits 0: one that hangs instead takes the run (and a CI job with no `timeout-minutes`) with it, and task 330 added a second unbounded wait on the failure path
 
 ---
 
-## 332. Nothing bounds the browser launch by wall clock, so a hung browser hangs the run
-
-**Priority: LOW.** No wrong answer ships — a hang never reports a pass. What it costs is the
-one thing the test loop is otherwise good at: failing quickly and saying why.
-
-### What is wrong
-
-Every wait on the browser in this repo is unbounded:
-
-- `run-tests.ps1` launches it with `Start-Process … -Wait`, which waits for exit with no
-  timeout, and again — since task 330 — in `Test-BrowserWritesOutput` on the failure path.
-- `.github/workflows/smoke.yml` runs `chrome … --dump-dom` inline in a `run:` step, and the
-  job declares no `timeout-minutes`, so GitHub's 360-minute default applies.
-- `run-tests-selftest.ps1`'s `Invoke-Runner` calls the runner with `&`, inheriting whatever
-  the runner does.
-
-`--virtual-time-budget` does not close this, and both `AGENTS.md` and the runner's own
-`.PARAMETER VirtualTimeBudget` block say so in as many words: it is **not** a wall-clock
-timeout, it is a budget the page spends on awaits while virtual time leaps over idle. A
-browser that never gets as far as running the page never spends it.
-
-Task 330's evidence makes the case concrete. That machine's Edge exited 0 from every headless
-launch, which is the *lucky* shape — the run failed in seconds and (after 330) names the cause.
-A browser wedged one step earlier, holding the process open instead of exiting, produces no
-dump and no exit: the runner sits in `-Wait` forever, printing nothing after "Running
-chrome.exe headless against …", and a CI job burns six hours before the platform kills it.
-
-### Why it matters
-
-The whole point of the runner is that it exits 0 only on `RESULT ALL PASS` and otherwise says
-why (tasks 235, 236, 330). A hang answers neither question, and it is the one failure mode a
-caller branching on the exit code can do nothing with. It is also the last unbounded wait
-left: `Find-Python`'s probes are `-Wait` too, but on `--version` against a candidate that
-either launches or does not.
-
-### Steps
-
-1. In `run-tests.ps1`, replace `-Wait` on the main browser launch with `-PassThru` plus
-   `Wait-Process -Timeout`, and on timeout stop the process and throw a message naming the
-   wall-clock limit and the browser — distinct from every existing message, since a hang is
-   not an empty dump. Do the same for `Test-BrowserWritesOutput`'s probe with a much shorter
-   bound (it renders a `data:` URL).
-2. Expose the limit as a parameter beside `-VirtualTimeBudget`, documented as the wall-clock
-   bound the budget is not, and default it well clear of a healthy run (~13s real today, so
-   minutes not seconds — a slow CI runner must not trip it).
-3. Add `timeout-minutes` to the browser job in `.github/workflows/smoke.yml`.
-4. Cover it in `run-tests-selftest.ps1` with a browser shim that sleeps far past the bound
-   (`timeout /t`, or a `ping -n` loop) and assert the run fails with the new message rather
-   than waiting it out — so the case is the fast one, not a test that takes minutes.
-
-### Validation
-
-`build/run-tests.ps1` changes, so the suite must still reach `RESULT ALL PASS` and exit 0
-unchanged, and a normal run must not come near the new bound. The self-test (Windows-only, not
-in CI) must pass with its new case, and its total wall time must stay in the same ballpark.
-
----
-
-> **Completed task details (tasks 1–331) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
+> **Completed task details (tasks 1–332) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -436,6 +379,31 @@ in CI) must pass with its new case, and its total wall time must stay in the sam
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (task 332): closed **332**, filed nothing. Every wait on the browser is now
+bounded by a wall clock: `run-tests.ps1` launches with `-PassThru` and waits with
+`Wait-Process -Timeout`, killing the browser at `-BrowserTimeoutSeconds` (default 300, against a
+~13s healthy run) and throwing a message distinct from either empty-dump cause, because a hang
+is neither. `Test-BrowserWritesOutput`'s probe on the failure path — the second unbounded wait,
+which task 330's pass added — carries a flat 30s, and `.github/workflows/smoke.yml`'s `smoke`
+job carries `timeout-minutes: 20`.
+
+**The self-test case is where the pass spent its time, and it is the reason to trust the
+bound.** Case 5 asserts the run's *duration* as well as its message, since a bound that quietly
+stopped working satisfies every text assertion and only arrives late. Its first shim slept with
+`ping -n 60` and the case took 61 seconds while printing the correct message: `Stop-Process`
+kills one process, not a tree, and the orphaned `ping` held an inherited copy of the self-test's
+capture pipe, so `Invoke-Runner` kept reading after the runner had exited (60.7s through a pipe,
+3.7s with the same run redirected to a file). The shim now spins in `cmd` with no child. That
+was checked against a **real** browser before being dismissed: Chrome killed at
+`-BrowserTimeoutSeconds 1` returned the piped capture in 3.1s and left no process behind, so the
+orphan is the shim's problem and not the runner's — nothing filed.
+
+The four documents repeating "the budget is not a wall-clock timeout" now say what the wall
+clock is (`AGENTS.md`, `README.md`, `docs/Testing.md`, `docs/FAQ-and-Troubleshooting.md`), and
+`docs/Build-Pipeline.md`'s self-test row, still describing Python discovery alone, now names all
+three probes it drives. `run-tests.ps1` `RESULT ALL PASS pass=3035 fail=0`, exit 0; the
+self-test `RESULT ALL PASS pass=25 fail=0` in 14s; `stamp-version.ps1` "already at".
 
 Worked 2026-08-31 (task 331): closed **331**, filed nothing. `PLAN.md` and `ROADMAP.md` now
 print the same figure for the same census, and each says which attribute set it measured: 94
