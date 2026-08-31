@@ -406,13 +406,15 @@ subset in the same harness — handy for iterating on one area.
 > 3. **A mistyped `?suite=`.** No suite matches, none runs, and the reporter prints
 >    `RESULT ALL PASS pass=0 fail=0`. The runner fails any `pass=0` run.
 
-> **An empty dump means the capture failed, not that the tests did.** `chrome.exe` and
-> `msedge.exe` are Windows GUI-subsystem binaries: launched directly from PowerShell they
-> inherit no stdout handle, so `$dump = & chrome.exe … --dump-dom …` comes back empty even
-> though the suites ran and passed. Confirm it in a second with `chrome.exe --version` from
-> the same prompt — that prints nothing either. The runner uses
-> `Start-Process -RedirectStandardOutput`, which hands the process a real handle, and treats a
-> missing or empty dump as a failure. Either browser works; both fail the same way without it.
+> **An empty dump means the environment failed, not that the tests did — and it has two
+> causes.** Usually the capture was lost: `chrome.exe` and `msedge.exe` are Windows
+> GUI-subsystem binaries, so launched directly from PowerShell they inherit no stdout handle
+> and `$dump = & chrome.exe … --dump-dom …` comes back empty even though the suites ran and
+> passed. The runner uses `Start-Process -RedirectStandardOutput`, which hands the process a
+> real handle. But a browser that launches and does no work at all — one mid-update, say —
+> writes the same empty file, and no redirection fixes that. `--version` is silent under both,
+> so the runner tells them apart with `--screenshot`, the one output that never travels over
+> stdout, and names the cause the probe supports.
 
 ### The DOM-free seam, checked in Node
 

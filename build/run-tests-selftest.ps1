@@ -2,10 +2,10 @@
 <#
   run-tests-selftest.ps1
   ----------------------
-  Drives run-tests.ps1's Python discovery over fixture shims, so the discovery is tested
-  instead of trusted (task 237).
+  Drives the two environment probes in run-tests.ps1 over fixture shims, so each is tested
+  instead of trusted: Python discovery (task 237) and the empty-dump diagnosis (task 330).
 
-  The failure it exists to prevent is silent in the worst way: Get-Command resolves a zero-byte
+  The failure the first exists to prevent is silent in the worst way: Get-Command resolves a zero-byte
   WindowsApps execution alias exactly like a real interpreter, so the runner used to hand
   Start-Process a file no process can launch and die before the server started - on a machine
   with a working Python further along PATH that it never looked at. Discovery now probes each
@@ -21,9 +21,21 @@
        The runner must skip the shim, serve from the real one, pass a focused suite, and leave
        neither a profile nor a listening server behind.
 
+  The second probe answers a question with two indistinguishable causes: an empty dump means
+  either the stdout handle was lost (the browser ran the suite and the output went nowhere) or the
+  browser launched and did no work at all. run-tests.ps1 tells them apart with --screenshot, and
+  the direction that matters here is the one it used to get WRONG - a browser writing nothing
+  anywhere, which the old message blamed on the handle and sent the reader to redirect stdout six
+  ways. Both shims exit 0 and write no DOM, so only the screenshot separates them:
+
+    3. A browser that writes nothing at all. The message must NOT say "no stdout handle".
+    4. A browser that writes a screenshot but no DOM. The message must say the handle, because
+       that is the real capture failure - and a probe that had quietly stopped finding the
+       screenshot would otherwise report case 3's cause for every empty dump forever.
+
   Windows-only, like run-tests.ps1 itself (Chrome under Program Files, .cmd shims); CI drives the
   browser suite directly instead, so this is not part of the CI matrix. Run it after touching
-  discovery:
+  discovery or the empty-dump branch:
 
   Run: pwsh -ExecutionPolicy Bypass -File build/run-tests-selftest.ps1   (exit 0 = pass)
 
@@ -57,6 +69,30 @@ New-Item -ItemType Directory -Force -Path $shimDir | Out-Null
 [System.IO.File]::WriteAllText((Join-Path $shimDir 'py.cmd'), "@echo off`r`necho Perl 5.38`r`nexit /b 0`r`n")
 # Succeeds and says nothing at all, which is the emptiest way a shim can pass for working.
 [System.IO.File]::WriteAllText((Join-Path $shimDir 'python.bat'), "@echo off`r`nexit /b 0`r`n")
+
+# Two browsers, one per cause of an empty dump. Neither writes a DOM, so the runner reaches its
+# empty-dump branch both times and only the screenshot can tell them apart. Passed with -Browser,
+# so their names never matter to Find-Python above.
+$muteBrowser = Join-Path $shimDir 'browser-mute.cmd'
+$shotBrowser = Join-Path $shimDir 'browser-shot.cmd'
+# The wedged browser: launches, exits 0, writes nothing anywhere.
+[System.IO.File]::WriteAllText($muteBrowser, "@echo off`r`nexit /b 0`r`n")
+# The lost handle: no DOM on stdout, but --screenshot lands. Args are walked with shift rather
+# than matched out of %*, because cmd splits a batch argument on '=' as well as on space - so the
+# runner's "--screenshot=<path>" arrives as the two tokens this loop pairs up.
+[System.IO.File]::WriteAllText($shotBrowser, @(
+    '@echo off'
+    'setlocal'
+    'set "shot="'
+    ':loop'
+    'if "%~1"=="" goto done'
+    'if /i "%~1"=="--screenshot" set "shot=%~2"'
+    'shift'
+    'goto loop'
+    ':done'
+    'if defined shot echo x>"%shot%"'
+    'exit /b 0'
+) -join "`r`n")
 
 $realPath = $env:PATH
 function Invoke-Runner([string]$Path, [string[]]$RunnerArgs) {
@@ -107,6 +143,21 @@ try {
     try { Invoke-WebRequest -Uri "http://127.0.0.1:$port/" -UseBasicParsing -TimeoutSec 2 | Out-Null }
     catch { $listening = $false }
     Assert 'the run left no server listening' (-not $listening) "something still answers on $port"
+
+    # ---- 3. A browser that writes nothing at all ----------------------------------------
+    $r = Invoke-Runner $realPath @('-Browser', $muteBrowser, '-Port', "$port")
+    Assert 'a browser that writes nothing fails the run' ($r.Code -ne 0) "exit=$($r.Code)"
+    Assert 'it is diagnosed as no output at all' `
+        ($r.Text -match 'produced no output at all') $r.Text
+    Assert 'it does NOT blame the stdout handle' `
+        ($r.Text -notmatch 'no stdout handle') $r.Text
+    Assert 'it says what to try instead' ($r.Text -match '-Browser <path to another Chromium>') $r.Text
+
+    # ---- 4. A browser that writes a screenshot but no DOM -------------------------------
+    $r = Invoke-Runner $realPath @('-Browser', $shotBrowser, '-Port', "$port")
+    Assert 'a browser that writes only a screenshot fails the run' ($r.Code -ne 0) "exit=$($r.Code)"
+    Assert 'it is diagnosed as a lost stdout handle' ($r.Text -match 'no stdout handle') $r.Text
+    Assert 'it does NOT blame the browser' ($r.Text -notmatch 'produced no output at all') $r.Text
 }
 finally {
     $env:PATH = $realPath

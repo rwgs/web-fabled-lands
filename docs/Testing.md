@@ -133,19 +133,26 @@ loudly (exit 2) instead of shadowing.
 
 ## Two more, when running by hand
 
-### An empty dump is a capture failure, not a page-load failure
+### An empty dump is an environment failure, not a page-load failure - and it has two causes
 
-`chrome.exe` and `msedge.exe` are Windows GUI-subsystem binaries. Launched directly from
-PowerShell they inherit no stdout handle, so a direct `--dump-dom` invocation yields an
-**empty string** while the suites run and pass perfectly well.
-
-Running `chrome.exe --version` from the same prompt and getting nothing confirms the
-missing handle in one second, and isolates it from the page, the server and the suite. This
-is **not** a browser difference - Chrome and Edge behave identically both ways.
+**The capture was lost.** `chrome.exe` and `msedge.exe` are Windows GUI-subsystem binaries.
+Launched directly from PowerShell they inherit no stdout handle, so a direct `--dump-dom`
+invocation yields an **empty string** while the suites run and pass perfectly well. This is
+**not** a browser difference - Chrome and Edge behave identically both ways.
 
 *Fix:* `Start-Process ... -RedirectStandardOutput`, which the runner uses. Either way,
 **delete the target first and check its write time after** - a missing file is unambiguous
 where a stale one is not.
+
+**The browser did no work.** A Chromium mid-update - a staged installer binary sitting beside
+the running one - can exit 0 from every headless launch, create a complete `--user-data-dir`
+profile, and write nothing at all. No redirection fix reaches it; use another browser with
+`-Browser <path>`.
+
+`chrome.exe --version` printing nothing does **not** separate the two - it is silent under
+both. The discriminator is `--screenshot`, the one output that never travels over stdout: a
+screenshot written beside an empty dump is the lost capture, and no screenshot means the
+browser did nothing. `run-tests.ps1` runs exactly that probe before it names a cause.
 
 A Git-Bash caller has it worse: MSYS argument conversion rewrites the `cmd` switch into a
 path, so `cmd` opens interactively, **exits 0**, and writes no file - leaving whichever

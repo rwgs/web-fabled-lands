@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–329), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326), task 327 (ID 327), task 328 (ID 328) and task 329 (ID 329). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for completed tasks (stable IDs 1–330), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326), task 327 (ID 327), task 328 (ID 328), task 329 (ID 329) and task 330 (ID 330). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–329). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
+The completed tasks archived in this file (stable IDs 1–330). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -338,6 +338,7 @@ The completed tasks archived in this file (stable IDs 1–329). Detail sections 
 - [x] 327. The unused-codeword note counts a `<lose>` as use, so the missed-`<gain>` case it exists for goes unreported
 - [x] 328. Two sections carry a no-op `<tick>`/`<lose>` codeword pair, one of which invents a codeword
 - [x] 329. `PLAN.md`'s status header names one open backlog item, and that item is closed
+- [x] 330. An empty dump is diagnosed as a capture failure, when the browser may simply have done nothing
 
 ---
 
@@ -15204,5 +15205,109 @@ One more index gap turned up while archiving: **task 328's detail was moved here
 Contents row**, and this file's header still read "stable IDs 1–327". Both are corrected in the
 same pass, since 329's own row goes in the same list. Documentation only —
 `stamp-version.ps1` reports "already at" its current stamp and no generated file moved.
+
+---
+
+## 330. An empty dump is diagnosed as a capture failure, when the browser may simply have done nothing
+
+**Priority: LOW.** The runner already fails the run — nothing unsound ships. What is wrong is
+the *diagnosis*: it names one cause with confidence, and the other cause reads identically.
+
+### What is wrong
+
+`run-tests.ps1` throws `The browser wrote an EMPTY dump to <path> (no stdout handle?).` when the
+dump is zero bytes, and `AGENTS.md`'s "An empty dump is a capture failure, not a page-load
+failure" note backs it with a one-second check: "`chrome.exe --version` printing nothing from the
+same prompt confirms the missing handle". Both assume the browser ran and its output was lost.
+
+A browser that **launches and does no work** produces the same zero-byte dump. Task 324's pass hit
+it: the only browser on the machine was Edge 151.0.4129.107 with 152.0.4191.53 staged for restart
+(`new_msedge.exe` beside `msedge.exe` in `Application/`) and a session 3 days old holding 28 live
+processes. Every headless launch **exited 0**, created a complete `--user-data-dir` profile, and
+wrote nothing — no DOM, no `--version` text, and no `--screenshot` file. Not the handle: the same
+nothing came back through `Start-Process -RedirectStandardOutput`, through `cmd >`, from
+`--headless=old` and from the version-directory binaries. `AGENTS.md`'s discriminator fires
+positive here and sends the reader to the `cmd`/handle fix, which cannot help.
+
+The check that *does* separate them is the one flag that never touches stdout: `--screenshot=<file>`.
+A screenshot written with an empty dump is the capture failure the note describes; no screenshot
+either means the browser did no work, and no redirection fix will change that.
+
+`Find-Browser` compounds it by returning the first browser path that exists — Chrome, else Edge —
+with no check that it can produce output, so a machine with a working Chrome and a wedged Edge is
+fine while the reverse looks like a repo failure.
+
+### Why it matters
+
+Every other trap in the test-loop notes is now closed mechanically (task 235), and this one is the
+same shape: a run that fails for an environmental reason, wearing the label of a different fix.
+The cost is a session spent redirecting stdout six ways.
+
+### Steps
+
+1. In `run-tests.ps1`'s empty-dump branch, before throwing, re-launch the browser once with
+   `--screenshot` to a temp file over `data:text/html,<p>x</p>` (no server, no suite) and let the
+   result choose the message: a screenshot written → the existing "no stdout handle?" text; none
+   → "the browser produced no output at all — it may be mid-update or blocked by policy; try
+   `-Browser <path to another Chromium>`". Keep it to the failure path so a passing run pays
+   nothing.
+2. Correct `AGENTS.md`'s note: `--version` printing nothing is consistent with **both** causes, and
+   the screenshot probe is what tells them apart. Keep the `cmd`/handle account — it was real —
+   and add the second cause beside it, with the Edge observation as its evidence.
+3. Do **not** make `Find-Browser` prefer or reject a browser by probing it on every run: that
+   spends a launch per run to catch a rare state, and step 1 already names the state when it
+   happens.
+
+### Validation
+
+`build/run-tests.ps1` changes, so the suite must still reach `RESULT ALL PASS` and exit 0
+unchanged. Drive the new branch by pointing `-Browser` at a binary that exits 0 without writing
+(a two-line `.cmd` shim, the shape `run-tests-selftest.ps1` already uses for Python discovery) and
+confirm the message names the right cause. That self-test is Windows-only and CI does not run it,
+so run it by hand.
+
+### Outcome (worked 2026-08-31)
+
+Closed as filed. `run-tests.ps1`'s empty-dump branch now asks the browser which cause it is
+instead of asserting one: `Test-BrowserWritesOutput` re-launches it once with `--screenshot` to a
+temp file over `data:text/html,x` — no server, no suite — and the result picks the message. A
+screenshot written keeps the original "no stdout handle?" text (with "it rendered a probe page
+fine, so its output was lost on the way here" added, so the reader knows the probe ran); none
+gives "The browser produced no output at all", says the empty dump is *not* a lost handle, names
+the binary, offers mid-update or policy as the likely reasons and points at `-Browser`. The probe
+is on the failure path only, so a passing run pays nothing for it.
+
+**Step 3 was honoured: `Find-Browser` still returns the first browser that exists and probes
+nothing.** A launch per run to catch a rare state is the wrong trade when the failure path can
+name the state for free. That it does not probe is now recorded in `AGENTS.md`, since it is why a
+working Chrome hides a wedged Edge while the reverse looks like a repo failure.
+
+The self-test grew two cases (13 assertions to 20, `RESULT ALL PASS pass=20 fail=0`), each a
+browser shim that exits 0 and writes no DOM so the runner always reaches the branch: one writes
+nothing at all and must **not** be blamed on the handle, one writes only the screenshot and must
+be. The second direction is the one that keeps the probe honest — a probe that quietly stopped
+finding its screenshot would report "no output at all" for every empty dump forever, which is the
+mirror of the bug just fixed. Writing that shim turned up a cmd detail worth keeping: `cmd`
+splits a batch argument on `=` as well as on space, so `--screenshot=<path>` arrives as two
+tokens and the shim pairs them with `shift` rather than matching over `%*`. The probe's page is
+`x` rather than `<p>x</p>` for the neighbouring reason — `Start-Process` leaves a space-free
+argument unquoted, so angle brackets would reach `cmd.exe` as redirection.
+
+**The claim had spread to three more documents, all corrected in the same pass** (`AGENTS.md`'s
+"fix the claim everywhere it appears"): `README.md`'s troubleshooting blockquote, the "An empty
+dump is a capture failure" section in `docs/Testing.md`, and the "No `RESULT` line at all" entry
+in `docs/FAQ-and-Troubleshooting.md`. All four repeated the `--version` discriminator, which is
+silent under *both* causes — the sentence that made task 324's session spend itself redirecting
+stdout six ways. `run-tests.ps1`'s own comment ("An absent or empty dump is a CAPTURE failure")
+said it too and now says ENVIRONMENT.
+
+Build + test loop: `stamp-version.ps1` reported "already at" its current stamp (no `web/` or
+`books/` change), and the suite reached `RESULT ALL PASS pass=3035 fail=0`, exit 0.
+
+**Filed 332 from this pass.** Neither `run-tests.ps1` nor CI puts a wall-clock bound on the
+browser launch — `Start-Process -Wait` waits forever and `--virtual-time-budget` is explicitly
+not a timeout — so the wedged browser this task is about hangs the run instead of failing it if
+it hangs rather than exits 0. This pass added a second unbounded `-Wait` on the failure path,
+which is the same shape and reason to write it down.
 
 ---

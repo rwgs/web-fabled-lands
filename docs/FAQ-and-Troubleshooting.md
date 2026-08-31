@@ -106,9 +106,11 @@ still answering, and says `CUT SHORT, not broken`. Raise `-VirtualTimeBudget` if
 
 **No `RESULT` line at all.**
 Either the dump never reached you or the page never loaded. **Check the dump's size first** -
-a capture failure is silent. On Windows, launching Chrome directly from PowerShell gives it
-no stdout handle, so the dump is empty while the suite passes fine. What it never means is
-that a suite failed quietly.
+a capture failure is silent. An empty dump has two causes: launching Chrome directly from
+PowerShell gives it no stdout handle, so the dump is empty while the suite passes fine - or
+the browser launched and did no work at all, which writes the same empty file and no
+redirection will fix. `--version` is silent under both; the runner probes with `--screenshot`
+and names whichever it is. What an absent `RESULT` never means is that a suite failed quietly.
 
 **The verdict has not changed since I edited a suite.**
 Check who owns port 8848. Python's `allow_reuse_address` lets a second server bind while an

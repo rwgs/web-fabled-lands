@@ -102,9 +102,10 @@ combat, markets, ships, live adventure sheet). Plain HTML/CSS/ES modules —
   browser's own HTTP cache is what made a stale bundle report a false pass (task 235).
   Its Python discovery — which probes each candidate instead of trusting the first name that
   resolves, since a WindowsApps execution alias resolves like an interpreter and may not
-  launch — is driven over shim fixtures by `run-tests-selftest.ps1`. That one is Windows-only
-  (Chrome under Program Files, `.cmd` shims), so **CI does not run it**; run it by hand after
-  touching discovery (task 237).
+  launch — is driven over shim fixtures by `run-tests-selftest.ps1`, which also drives the
+  empty-dump diagnosis below over a pair of browser shims that exit 0 without writing a DOM
+  (task 330). That one is Windows-only (Chrome under Program Files, `.cmd` shims), so **CI
+  does not run it**; run it by hand after touching either probe (task 237).
   **`TASKS.md`** — the backlog (see workflow below).
 
 ## Architecture invariant — keep the rules out of the view
@@ -186,18 +187,37 @@ Notes:
   an `fl-*` file that is neither. Sweeping on entry means a run killed mid-flight is collected
   by the next one. 266 such leftovers had accumulated before this existed, and a 22-hour-old
   one is what served the day-old bundle. (task 235)
-- **An empty dump is a capture failure, not a page-load failure.** `chrome.exe` and
-  `msedge.exe` are Windows GUI-subsystem binaries: launched directly from PowerShell they
-  inherit no stdout handle, so `$dump = & chrome.exe … --dump-dom …` yields an empty string
-  and any `Select-String 'RESULT'` over it finds nothing — while the suites run and pass
-  perfectly well (the static server logs the full request set). `chrome.exe --version`
-  printing nothing from the same prompt confirms the missing handle in one second, and
-  isolates it from the page, the server and the suite. Redirecting through `cmd` as in
-  step 2 gives the process a real handle. This is **not** a browser difference: Chrome and
-  Edge behave identically both ways — direct from PowerShell both print nothing, and
-  through `cmd` both produce the same dump and the same verdict (task 208's run: a
-  135,029-byte dump reading `RESULT ALL PASS pass=2100 fail=0`; both numbers move as suites
-  grow, so treat them as that run's figures and not as today's expected output). (task 208)
+- **An empty dump is never a page-load failure — but it has *two* environmental causes, and
+  the fix for one cannot help the other.** Either the capture was lost or the browser did no
+  work, so `run-tests.ps1` asks before it answers: its empty-dump branch re-launches the
+  browser once with `--screenshot` over a `data:` URL — no server, no suite — and lets the
+  result choose the message (`Test-BrowserWritesOutput`). (task 330)
+  - **The capture was lost.** `chrome.exe` and `msedge.exe` are Windows GUI-subsystem
+    binaries: launched directly from PowerShell they inherit no stdout handle, so
+    `$dump = & chrome.exe … --dump-dom …` yields an empty string and any
+    `Select-String 'RESULT'` over it finds nothing — while the suites run and pass perfectly
+    well (the static server logs the full request set). Redirecting through `cmd` as in
+    step 2 gives the process a real handle. This is **not** a browser difference: Chrome and
+    Edge behave identically both ways — direct from PowerShell both print nothing, and
+    through `cmd` both produce the same dump and the same verdict (task 208's run: a
+    135,029-byte dump reading `RESULT ALL PASS pass=2100 fail=0`; both numbers move as suites
+    grow, so treat them as that run's figures and not as today's expected output). (task 208)
+  - **The browser did no work.** Task 324's machine carried only Edge 151.0.4129.107 with
+    152.0.4191.53 staged for restart (`new_msedge.exe` beside `msedge.exe` in `Application/`)
+    and a 3-day-old session holding 28 live processes. Every headless launch **exited 0**,
+    created a complete `--user-data-dir` profile, and wrote nothing at all — no DOM, no
+    `--version` text, no `--screenshot` file. Not the handle: the same nothing came back
+    through `Start-Process -RedirectStandardOutput`, through `cmd >`, from `--headless=old`
+    and from the version-directory binaries. No redirection fix reaches this; point
+    `-Browser` at another Chromium. `Find-Browser` returns the first browser that *exists*
+    (Chrome, then Edge) and does not probe it, so a working Chrome hides a wedged Edge while
+    the reverse looks like a repo failure.
+  - **`--version` printing nothing does not tell the two apart.** It is silent under both, so
+    the one-second check this note used to offer as proof of a missing handle fires positive
+    for the wedged browser as well, and sends the reader to the `cmd`/handle fix that cannot
+    help. `--screenshot` is the discriminator because it is the one output that never travels
+    over stdout: a screenshot written beside an empty dump is the capture failure above; no
+    screenshot either means the browser did nothing.
 - **Step 2's `cmd /c` line is written for a POSIX shell that does not mangle it — from an
   MSYS/Git-Bash prompt it silently runs nothing and leaves an OLD dump in place.** Two
   independent hazards, and the first is the dangerous one. (a) MSYS argument conversion

@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-331 is complete (listed under **Done** below), apart from 207 and 326, both
-withdrawn as misdiagnoses (see the Review log); **330 and 331 (both
+332 is complete (listed under **Done** below), apart from 207 and 326, both
+withdrawn as misdiagnoses (see the Review log); **331 and 332 (both
 LOW) are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
@@ -25,8 +25,8 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 330. `run-tests.ps1` diagnoses an empty dump as a CAPTURE failure ("no stdout handle?"), but a browser that launches and does no work at all writes the same empty file — an Edge mid-update wrote no DOM, no `--screenshot` and no `--version` while still creating its profile, and `AGENTS.md`'s one-second discriminator ("`--version` printing nothing confirms the missing handle") reads that evidence as exactly the wrong cause
 - [ ] 331. `PLAN.md` says `state.data.location` covers "25 named ports across **97** sections" and that three `<set dock=>` sections "set a dock", but `<set dock=>` berths a *ship* — only the **94** `<section dock=>` sections move the player, which is the figure `ROADMAP.md` already prints after task 320; the two planning files disagree on phase 1's own census, and `ROADMAP.md`'s "97 sections carry at least one of the four attributes" is itself the union of only two (all four: **102**)
+- [ ] 332. nothing bounds the browser launch by wall clock — `run-tests.ps1` uses `Start-Process -Wait` and CI a bare `chrome … &&`, while `--virtual-time-budget` is explicitly *not* a timeout — so the wedged browser task 330 is about fails the run only because it exits 0: one that hangs instead takes the run (and a CI job with no `timeout-minutes`) with it, and task 330 added a second unbounded wait on the failure path
 
 **Done**
 
@@ -366,66 +366,7 @@ this order.*
 - [x] 328. two sections carry a no-op `<tick codeword="X"/>` (book 2 sections 579 and 633), and one of them invents a codeword — `Bogus` — that exists nowhere else in the corpus and in no `Codewords=` list, so task 325 had to add it to the gate's port-flag allowlist to keep the build green: an allowlist entry whose only job is to keep scaffolding alive
   — filed as a `<tick>`/`<lose>` **pair**; §579's `<lose>` is the first entry of a complete 20-codeword sweep, so only three of the four nodes were dead (see the Review log)
 - [x] 329. `PLAN.md`'s status header says "the backlog carries one open item (task 320)" and dates itself today, but 320 is closed and the backlog carries four — a stale *status* rather than a stale citation, in the file task 323 had just swept for citations, and a count `PLAN.md` cannot help rotting because it restates a figure another file owns
-
----
-
-## 330. An empty dump is diagnosed as a capture failure, when the browser may simply have done nothing
-
-**Priority: LOW.** The runner already fails the run — nothing unsound ships. What is wrong is
-the *diagnosis*: it names one cause with confidence, and the other cause reads identically.
-
-### What is wrong
-
-`run-tests.ps1` throws `The browser wrote an EMPTY dump to <path> (no stdout handle?).` when the
-dump is zero bytes, and `AGENTS.md`'s "An empty dump is a capture failure, not a page-load
-failure" note backs it with a one-second check: "`chrome.exe --version` printing nothing from the
-same prompt confirms the missing handle". Both assume the browser ran and its output was lost.
-
-A browser that **launches and does no work** produces the same zero-byte dump. Task 324's pass hit
-it: the only browser on the machine was Edge 151.0.4129.107 with 152.0.4191.53 staged for restart
-(`new_msedge.exe` beside `msedge.exe` in `Application/`) and a session 3 days old holding 28 live
-processes. Every headless launch **exited 0**, created a complete `--user-data-dir` profile, and
-wrote nothing — no DOM, no `--version` text, and no `--screenshot` file. Not the handle: the same
-nothing came back through `Start-Process -RedirectStandardOutput`, through `cmd >`, from
-`--headless=old` and from the version-directory binaries. `AGENTS.md`'s discriminator fires
-positive here and sends the reader to the `cmd`/handle fix, which cannot help.
-
-The check that *does* separate them is the one flag that never touches stdout: `--screenshot=<file>`.
-A screenshot written with an empty dump is the capture failure the note describes; no screenshot
-either means the browser did no work, and no redirection fix will change that.
-
-`Find-Browser` compounds it by returning the first browser path that exists — Chrome, else Edge —
-with no check that it can produce output, so a machine with a working Chrome and a wedged Edge is
-fine while the reverse looks like a repo failure.
-
-### Why it matters
-
-Every other trap in the test-loop notes is now closed mechanically (task 235), and this one is the
-same shape: a run that fails for an environmental reason, wearing the label of a different fix.
-The cost is a session spent redirecting stdout six ways.
-
-### Steps
-
-1. In `run-tests.ps1`'s empty-dump branch, before throwing, re-launch the browser once with
-   `--screenshot` to a temp file over `data:text/html,<p>x</p>` (no server, no suite) and let the
-   result choose the message: a screenshot written → the existing "no stdout handle?" text; none
-   → "the browser produced no output at all — it may be mid-update or blocked by policy; try
-   `-Browser <path to another Chromium>`". Keep it to the failure path so a passing run pays
-   nothing.
-2. Correct `AGENTS.md`'s note: `--version` printing nothing is consistent with **both** causes, and
-   the screenshot probe is what tells them apart. Keep the `cmd`/handle account — it was real —
-   and add the second cause beside it, with the Edge observation as its evidence.
-3. Do **not** make `Find-Browser` prefer or reject a browser by probing it on every run: that
-   spends a launch per run to catch a rare state, and step 1 already names the state when it
-   happens.
-
-### Validation
-
-`build/run-tests.ps1` changes, so the suite must still reach `RESULT ALL PASS` and exit 0
-unchanged. Drive the new branch by pointing `-Browser` at a binary that exits 0 without writing
-(a two-line `.cmd` shim, the shape `run-tests-selftest.ps1` already uses for Python discovery) and
-confirm the message names the right cause. That self-test is Windows-only and CI does not run it,
-so run it by hand.
+- [x] 330. `run-tests.ps1` diagnoses an empty dump as a CAPTURE failure ("no stdout handle?"), but a browser that launches and does no work at all writes the same empty file — an Edge mid-update wrote no DOM, no `--screenshot` and no `--version` while still creating its profile, and `AGENTS.md`'s one-second discriminator ("`--version` printing nothing confirms the missing handle") reads that evidence as exactly the wrong cause
 
 ---
 
@@ -488,7 +429,65 @@ same census, and each figure must say which attribute set it measured.
 
 ---
 
-> **Completed task details (tasks 1–329) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
+## 332. Nothing bounds the browser launch by wall clock, so a hung browser hangs the run
+
+**Priority: LOW.** No wrong answer ships — a hang never reports a pass. What it costs is the
+one thing the test loop is otherwise good at: failing quickly and saying why.
+
+### What is wrong
+
+Every wait on the browser in this repo is unbounded:
+
+- `run-tests.ps1` launches it with `Start-Process … -Wait`, which waits for exit with no
+  timeout, and again — since task 330 — in `Test-BrowserWritesOutput` on the failure path.
+- `.github/workflows/smoke.yml` runs `chrome … --dump-dom` inline in a `run:` step, and the
+  job declares no `timeout-minutes`, so GitHub's 360-minute default applies.
+- `run-tests-selftest.ps1`'s `Invoke-Runner` calls the runner with `&`, inheriting whatever
+  the runner does.
+
+`--virtual-time-budget` does not close this, and both `AGENTS.md` and the runner's own
+`.PARAMETER VirtualTimeBudget` block say so in as many words: it is **not** a wall-clock
+timeout, it is a budget the page spends on awaits while virtual time leaps over idle. A
+browser that never gets as far as running the page never spends it.
+
+Task 330's evidence makes the case concrete. That machine's Edge exited 0 from every headless
+launch, which is the *lucky* shape — the run failed in seconds and (after 330) names the cause.
+A browser wedged one step earlier, holding the process open instead of exiting, produces no
+dump and no exit: the runner sits in `-Wait` forever, printing nothing after "Running
+chrome.exe headless against …", and a CI job burns six hours before the platform kills it.
+
+### Why it matters
+
+The whole point of the runner is that it exits 0 only on `RESULT ALL PASS` and otherwise says
+why (tasks 235, 236, 330). A hang answers neither question, and it is the one failure mode a
+caller branching on the exit code can do nothing with. It is also the last unbounded wait
+left: `Find-Python`'s probes are `-Wait` too, but on `--version` against a candidate that
+either launches or does not.
+
+### Steps
+
+1. In `run-tests.ps1`, replace `-Wait` on the main browser launch with `-PassThru` plus
+   `Wait-Process -Timeout`, and on timeout stop the process and throw a message naming the
+   wall-clock limit and the browser — distinct from every existing message, since a hang is
+   not an empty dump. Do the same for `Test-BrowserWritesOutput`'s probe with a much shorter
+   bound (it renders a `data:` URL).
+2. Expose the limit as a parameter beside `-VirtualTimeBudget`, documented as the wall-clock
+   bound the budget is not, and default it well clear of a healthy run (~13s real today, so
+   minutes not seconds — a slow CI runner must not trip it).
+3. Add `timeout-minutes` to the browser job in `.github/workflows/smoke.yml`.
+4. Cover it in `run-tests-selftest.ps1` with a browser shim that sleeps far past the bound
+   (`timeout /t`, or a `ping -n` loop) and assert the run fails with the new message rather
+   than waiting it out — so the case is the fast one, not a test that takes minutes.
+
+### Validation
+
+`build/run-tests.ps1` changes, so the suite must still reach `RESULT ALL PASS` and exit 0
+unchanged, and a normal run must not come near the new bound. The self-test (Windows-only, not
+in CI) must pass with its new case, and its total wall time must stay in the same ballpark.
+
+---
+
+> **Completed task details (tasks 1–330) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -497,6 +496,29 @@ same census, and each figure must say which attribute set it measured.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (task 330): closed **330** and filed **332**. `run-tests.ps1`'s empty-dump
+branch no longer asserts a cause — `Test-BrowserWritesOutput` re-launches the browser once with
+`--screenshot` over a `data:` URL (no server, no suite) and the result picks the message: a
+screenshot written keeps "no stdout handle?", none gives "The browser produced no output at all"
+with `-Browser` as the way out. Failure path only, so a passing run pays nothing. Step 3 was
+honoured: `Find-Browser` still returns the first browser that exists and probes nothing.
+
+The self-test grew two cases (20 assertions, `RESULT ALL PASS pass=20 fail=0`), one shim per
+cause, both exiting 0 with no DOM so the branch is always reached. The screenshot-writing
+direction is what keeps the probe honest: a probe that stopped finding its screenshot would
+report "no output at all" for every empty dump forever, which is the mirror of the bug fixed.
+
+**The wrong claim had spread to three more documents**, all corrected in the same pass:
+`README.md`'s troubleshooting blockquote, `docs/Testing.md`'s "An empty dump is a capture
+failure" section and `docs/FAQ-and-Troubleshooting.md`'s "No `RESULT` line at all" entry. Each
+repeated the `--version` discriminator, which is silent under *both* causes and is the sentence
+that cost task 324's session six ways of redirecting stdout.
+
+**Filed 332:** nothing puts a wall-clock bound on the browser launch, here or in CI —
+`Start-Process -Wait` waits forever and `--virtual-time-budget` is explicitly not a timeout — so
+a browser that hangs rather than exits 0 hangs the run instead of failing it. This pass added a
+second unbounded wait on the failure path, which is why it is worth writing down.
 
 Worked 2026-08-31 (task 329): closed **329** and filed **331**. `PLAN.md`'s status paragraph
 now states only what it owns — not started, next feature is `ROADMAP.md`'s phase 1 — and sends

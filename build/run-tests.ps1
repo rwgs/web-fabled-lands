@@ -20,7 +20,9 @@
       from PowerShell, so `& chrome --dump-dom` yields nothing while the suite passes
       perfectly well. Start-Process -RedirectStandardOutput hands it a real handle, and the
       dump is deleted first and size-checked after, so a missing capture cannot be read as a
-      missing failure.
+      missing failure. A browser that launches and does no work writes the same empty file,
+      though, so the size check probes with --screenshot before naming a cause rather than
+      asserting the handle (task 330).
 
   A fourth mode fails loudly but names the wrong culprit: a run cut short by the virtual-time
   budget reports as a suite failure, with nothing saying it was the clock. Get-CutShortDiagnosis
@@ -161,6 +163,42 @@ function Find-Browser {
     throw 'No Chrome or Edge found - pass -Browser <path to chrome.exe>.'
 }
 
+# An empty dump has TWO causes and they look identical from here (task 330). The known one is a
+# lost stdout handle - the browser ran the suite perfectly and its output went nowhere. The other
+# is a browser that LAUNCHES AND DOES NO WORK: an Edge mid-update (a staged new_msedge.exe beside
+# the running one) exited 0 from every headless launch, wrote a complete --user-data-dir, and
+# produced no DOM, no --version text and no screenshot. Redirecting stdout six different ways
+# cannot fix that, so the runner must not send the reader after the handle.
+#
+# --screenshot is the discriminator because it is the one output flag that never touches stdout:
+# a screenshot written alongside an empty dump means the browser worked and only the capture was
+# lost; no screenshot means it did nothing. Probed over a data: URL so neither the server nor the
+# suite is involved - if this page cannot be rendered, nothing in this repo is at fault. Called
+# only from the failure path, so a passing run never pays for the extra launch.
+function Test-BrowserWritesOutput([string]$Path) {
+    $tmpDir = [System.IO.Path]::GetTempPath()
+    $shot = Join-Path $tmpDir ('fl-probe-' + [guid]::NewGuid().ToString('N') + '.png')
+    $dir  = Join-Path $tmpDir ('fl-probe-' + [guid]::NewGuid().ToString('N'))
+    try {
+        # Only the launch is guarded, for the reason Get-PythonRejection gives above.
+        try {
+            Start-Process -FilePath $Path -ArgumentList @(
+                '--headless=new', '--disable-gpu', '--no-sandbox',
+                '--no-first-run', '--no-default-browser-check',
+                "--screenshot=$shot", "--user-data-dir=$dir",
+                # No angle brackets in the page: Start-Process leaves a space-free argument
+                # unquoted, so a `<p>` would reach cmd.exe as a redirection when the self-test
+                # drives this through a .cmd shim. "x" renders as well as markup does.
+                'data:text/html,x'
+            ) -NoNewWindow -Wait | Out-Null
+        } catch { return $false }
+        return (Test-Path $shot) -and ((Get-Item $shot).Length -gt 0)
+    } finally {
+        Remove-Item $shot -Force -ErrorAction SilentlyContinue
+        Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 # A failing verdict says WHAT broke but not WHY, and both ways a run gets cut short read as
 # something else entirely (task 236):
 #
@@ -289,10 +327,16 @@ try {
         "--user-data-dir=$profileDir", $url
     ) -RedirectStandardOutput $dump -NoNewWindow -Wait
 
-    # An absent or empty dump is a CAPTURE failure, not a page failure - never a pass.
+    # An absent or empty dump is an ENVIRONMENT failure, not a page failure - never a pass.
     if (-not (Test-Path $dump)) { throw "The browser wrote no dump to $dump." }
     $size = (Get-Item $dump).Length
-    if ($size -eq 0) { throw "The browser wrote an EMPTY dump to $dump (no stdout handle?)." }
+    if ($size -eq 0) {
+        # Which of the two empty-dump causes it is (task 330). Ask the browser, don't guess.
+        if (Test-BrowserWritesOutput $browser) {
+            throw "The browser wrote an EMPTY dump to $dump (no stdout handle?) - it rendered a probe page fine, so its output was lost on the way here."
+        }
+        throw "The browser produced no output at all - it rendered nothing even to --screenshot, so the empty dump at $dump is not a lost stdout handle. $browser may be mid-update (a staged installer beside the running binary) or blocked by policy; try -Browser <path to another Chromium>."
+    }
 
     $result = Select-String -Path $dump -Pattern 'RESULT (ALL PASS|FAILURES|FATAL) pass=\d+ fail=\d+' |
         Select-Object -First 1
