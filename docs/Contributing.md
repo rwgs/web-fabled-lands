@@ -10,36 +10,56 @@
 
 ## The loop
 
-1. Read [`TASKS.md`](../TASKS.md) and take the **first open (`- [ ]`) task**.
-2. Follow its steps exactly. Each task is self-contained - do not skip steps, and do not
-   combine tasks unless told to.
-3. Run the build and test loop and confirm `RESULT ALL PASS` **before** marking the task
-   `- [x]`. Update `README.md` if the task says to.
-4. If you find a model error, missing assumption or undocumented simplification, **file it
-   as a new `- [ ]` task at the bottom of `TASKS.md`** before continuing. Do not leave
-   findings only in conversation.
-5. Commit after every completed task.
+Work here is tracked in **[GitHub Issues](https://github.com/rwgs/web-fabled-lands/issues)**
+and lands through **[pull requests](https://github.com/rwgs/web-fabled-lands/pulls)**.
 
-The build and test commands are in [Build Pipeline](Build-Pipeline.md) and
-[Testing](Testing.md).
+1. **Open an issue first.** Describe the defect or the change and wait for a reply before
+   writing code. For a defect, say which section or book reproduces it, what you expected
+   and what happened - a section number is worth more than a paragraph.
+2. **Branch off `main`.** One branch per issue; keep it small enough to review in one
+   sitting.
+3. **Make the change.** Every changed line should trace to the issue - see
+   [Change discipline](#change-discipline) below and, for the corpus, the rule in
+   [Editing the corpus](#editing-the-corpus).
+4. **Run the build and test loop and confirm `RESULT ALL PASS`** before you push. The
+   commands are under [Before you commit](#before-you-commit); the detail is in
+   [Build Pipeline](Build-Pipeline.md) and [Testing](Testing.md).
+5. **Open a pull request** referencing the issue (`Fixes #123`). Say what you changed, how
+   you verified it, and anything you deliberately left alone. CI must be green to merge.
+
+Found something unrelated on the way through? **Open a separate issue for it** rather than
+folding it into the change in flight.
+
+> `TASKS.md`, `TASKS-archive.md` and the review log are the maintainer's internal backlog.
+> They are kept in the repository for the history they carry, but they are **not** the
+> contribution channel - please do not add entries to them in a pull request.
 
 ---
 
-## Which document takes a change
+## Where a change goes
 
-| It is | It goes in |
-|---|---|
-| A defect | [`TASKS.md`](../TASKS.md), under the HIGH / MEDIUM / LOW bucket that fits. |
-| A feature | [`ROADMAP.md`](../ROADMAP.md), as an ordered phase that leaves the project working. |
-| A closed decision that constrains future work | [`DECISIONS.md`](../DECISIONS.md), appended and never rewritten. A reversal is a new entry marking the old one superseded. |
-| A requirement or boundary | [`SPEC.md`](../SPEC.md). |
-| The approach for the change in flight | [`PLAN.md`](../PLAN.md), replaced when the next non-trivial change begins. |
-| A durable convention | [`AGENTS.md`](../AGENTS.md). |
+**If you are contributing, it goes in an issue or a pull request** - the table below is the
+maintainer's routing for what a merged change then updates in the repository.
 
-Closed task detail is archived in [`TASKS-archive.md`](../TASKS-archive.md); the Review log
-at the end of `TASKS.md` records each audit pass and is where new work is filed. That file
-is the only place that knows what is open - read its `- [ ]` lines rather than a count copied
-to here, and when the buckets are clear the next pickup is a phase from `ROADMAP.md`.
+| It is | Raise it as | It is recorded in |
+|---|---|---|
+| A defect | An issue, labelled `bug` | [`TASKS.md`](../TASKS.md) *(internal)*, under the HIGH / MEDIUM / LOW bucket that fits. |
+| A feature | An issue, labelled `enhancement` | [`ROADMAP.md`](../ROADMAP.md), as an ordered phase that leaves the project working. |
+| A question, or an idea not yet a proposal | An issue, labelled `question` | Nothing until it is settled. |
+| A closed decision that constrains future work | - | [`DECISIONS.md`](../DECISIONS.md), appended and never rewritten. A reversal is a new entry marking the old one superseded. |
+| A requirement or boundary | - | [`SPEC.md`](../SPEC.md). |
+| The approach for the change in flight | - | [`PLAN.md`](../PLAN.md), replaced when the next non-trivial change begins. |
+| A durable convention | - | [`AGENTS.md`](../AGENTS.md). |
+
+The four documents with no "raise it as" row are written as a change is merged, not
+proposed in a pull request. Say what you think belongs there in the issue and the
+maintainer will fold it in.
+
+`TASKS.md`, its archive [`TASKS-archive.md`](../TASKS-archive.md) and the Review log at the
+end of `TASKS.md` are **internal**: they record what the maintainer has worked, what each
+audit pass found, and why. They are readable history, not a queue to pick from - the open
+work a contributor can take is
+[the issue list](https://github.com/rwgs/web-fabled-lands/issues).
 
 ---
 

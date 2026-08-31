@@ -15519,3 +15519,52 @@ build scripts stay ASCII-only. `stamp-version.ps1` reports "already at" `26.08.3
 `build/`, `.github/` and `docs/` are not app source, so no generated file moved.
 
 ---
+
+## 333. The release self-test's fixture has no `book.ini`, so task 325's codeword gate fails every CI run
+
+**Priority: HIGH.** CI was red on `main` for four consecutive commits (329, 330, 331, 332),
+and the failure was in the one job that proves the edition manifest still works.
+
+### What is wrong
+
+Task 325 taught `validate-source.ps1` to read each published book's `book.ini` `Codewords=`
+list and check every `codeword=` VALUE in the corpus against the union. A book that declares
+no list is an **error in its own right**, deliberately, because the lists are checked as a
+union: an incomplete authority would report valid codewords from the missing volume as
+unknown, so failing loudly once beats 1,207 wrong errors.
+
+`release-selftest.ps1`'s `New-E2EFixture` builds a miniature repo — two books, each with a
+section, an `Adventurers.xml`, a regional map and one illustration — and runs the **real**
+`build-data.ps1` against it with `-Root`. It never wrote a `book.ini`, because nothing read one
+when the fixture was written. Task 325 made that omission fatal:
+
+```
+XML validation FAILED - 2 problem(s) in 7 file(s) checked:
+  book1/book.ini : no Codewords= list, so no codeword VALUE can be checked in any book
+  book2/book.ini : no Codewords= list, so no codeword VALUE can be checked in any book
+```
+
+The gate is right and the corpus is clean — `validate-source.ps1` over the real tree exits 0.
+**The fixture was the defect**, and a fixture that is not a valid miniature repo stops being a
+test of anything.
+
+### Why it read as a Linux-only failure
+
+It did not fail on Linux only; it failed identically on Windows from the first commit after
+325. It *looked* CI-specific because nobody ran `release-selftest.ps1` by hand — the file
+touches nothing under `books/` or `web/`, so the ordinary build-and-test loop
+(`build-data.ps1` + `run-tests.ps1`) stays green while this job is red. Both of those pass on
+a tree in this exact state.
+
+**Done (2026-08-31).** `New-E2EFixture` writes a `book.ini` per book (`Codewords=Basefix` and
+`Codewords=Addedfix<N>`), as a real book folder has, and the comment above it now says why the
+file is not optional. `release-selftest.ps1` reports `RESULT ALL PASS pass=47 fail=0` and exits
+0; `validate-selftest.ps1` (51), `node-import.mjs` (35) and the browser suite (3,035) are
+unaffected, and `build-data.ps1` over the real corpus leaves the tree clean. The fixture's
+declared codewords are used by no fixture section, which the gate reports as a **note** — its
+information channel, not its verdict — so the build does not abort.
+
+**Filed 334:** the reason this took a reproduction to diagnose rather than a glance at the CI
+log — `Invoke-FixtureBuild` discards the build's own error listing.
+
+---

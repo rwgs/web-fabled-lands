@@ -134,9 +134,11 @@ just use `build/run-tests.ps1`.
 
 ## Contributing
 
-**Where does this change go - `TASKS.md` or `ROADMAP.md`?**
-Defects go in `TASKS.md` under a priority bucket. Features go in `ROADMAP.md` as ordered
-phases. A defect found *while working a roadmap phase* gets a task number.
+**How do I report a defect or propose a change?**
+Open an [issue](https://github.com/rwgs/web-fabled-lands/issues), then send a pull request
+against `main` once it has been discussed. `TASKS.md` and `ROADMAP.md` are the maintainer's
+internal records of what was worked and what is planned - a merged change updates them, but
+they are not where a contribution starts. See [Contributing](Contributing.md).
 
 **Can I reword an awkward sentence in a section?**
 No. The section text is the author's, and the port reproduces the printed book as-is.

@@ -448,8 +448,7 @@ that project — hence GPL-2.0 here too (JaFL is v2-only, incompatible with v3).
 **Content** — *not* covered by the GPL; copyright of the respective owners:
 
 - Book text © 1996 **Dave Morris & Jamie Thomson** (Books 1–6); rights held by **Fabled Lands LLP**.
-- Book 7, *The Serpent King's Domain*, text © 2017 **Paul Gresty** (Megara Entertainment / Fabled Lands LLP).
-- Illustrations & Maps © **Russ Nicholson**; Book 7 cover © 2017 **Kevin Jenkins**.
+- Illustrations & Maps © **Russ Nicholson**.
 
 *Fabled Lands* and its text and artwork remain the property of their respective rights
 holders. This is an unofficial, non-commercial fan project — please support the official

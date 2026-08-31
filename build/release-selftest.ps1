@@ -188,11 +188,16 @@ Assert 'a missing generated-inventory marker throws instead of passing silently'
 # =========================================================================================
 # 3. A real build: both directions of an added-book transition
 # =========================================================================================
-# A miniature repo - a base book plus ONE added book (each with a regional map and one
-# illustration), the rules, and just enough of web/ for the stamp step. build-data.ps1 runs
-# against it with -Root, so this exercises the actual validation, bundling, copy, reconcile
-# and inventory steps rather than a re-implementation of them. The tree is regenerated, and
-# the whole transition run, once per number in $ADDED.
+# A miniature repo - a base book plus ONE added book (each with a regional map, one
+# illustration and a book.ini), the rules, and just enough of web/ for the stamp step.
+# build-data.ps1 runs against it with -Root, so this exercises the actual validation,
+# bundling, copy, reconcile and inventory steps rather than a re-implementation of them. The
+# tree is regenerated, and the whole transition run, once per number in $ADDED.
+#
+# Each book needs its book.ini for the same reason a real one does: the codeword gate reads
+# Codewords= as a UNION over the published books, so a book that declares none is an error
+# that disarms the value check for every book (task 325). A fixture without it fails the
+# build before any assertion below can run - which is what it did until task 333.
 function New-E2EFixture([int]$n) {
     Reset-Tmp
     $files = @{
@@ -201,10 +206,12 @@ function New-E2EFixture([int]$n) {
         'books/book1/Adventurers.xml' = '<adventurers><starting><adventurer name="Ona Fixture" profession="warrior" gender="f">A fixture warrior.</adventurer></starting></adventurers>'
         'books/book1/Region-Map.jpg'  = 'MAP1'
         'books/book1/Art 1.jpg'       = 'ART1'
+        'books/book1/book.ini'        = 'Codewords=Basefix'
         "books/book$n/1.xml"           = '<section name="1"><p>Added book.</p><return/></section>'
         "books/book$n/Adventurers.xml" = '<adventurers><starting><adventurer name="Sev Fixture" profession="mage" gender="m">A fixture mage.</adventurer></starting></adventurers>'
         "books/book$n/Region-Map.jpg"  = "MAP$n"
         "books/book$n/Art $n.jpg"      = "ART$n"
+        "books/book$n/book.ini"        = "Codewords=Addedfix$n"
         'rules/Rules.xml'             = '<section name="rules"><p>Roll two dice.</p></section>'
         'rules/QuickRules.xml'        = '<section name="quick"><p>Quick.</p></section>'
         'web/css/style.css'           = 'body{}'

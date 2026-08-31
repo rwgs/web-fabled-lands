@@ -22,7 +22,7 @@ Play it at **[webfl.rwgs.net](https://webfl.rwgs.net/)**.
 - [Architecture](Architecture.md) - the module map and the DOM-free rules seam.
 - [Build Pipeline](Build-Pipeline.md) - how `books/` becomes `web/data/`, and what is generated.
 - [Testing](Testing.md) - the headless suite, the runner, CI, and the false-pass traps.
-- [Contributing](Contributing.md) - the task workflow and the rules for editing the corpus.
+- [Contributing](Contributing.md) - the issue and pull-request workflow, and the rules for editing the corpus.
 
 **Corpus and markup**
 
