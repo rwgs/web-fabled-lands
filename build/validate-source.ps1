@@ -204,11 +204,11 @@ $script:FL_SCOPED_FLAG = '^\d+[./]\S+$'
 #    codeword ever did: damage carried out of a fight (HydraDamage, SpiderPoison), a counter
 #    <adjust name=> reads (CharismaBonus), a standing latch (StillInYellowport). Listed rather
 #    than pattern-matched because nothing in their spelling tells them apart from a codeword -
-#    which is the point, since a typo among THEM must fail too. Bogus is the odd one out and
-#    names nothing: it is ticked and immediately lost in book 2 section 633 and appears nowhere
-#    else, so it is scaffolding kept alive by this entry - filed for removal as task 328.
+#    which is the point, since a typo among THEM must fail too. Every entry names something the
+#    engine reads: the list held a seventeenth, Bogus, purely to keep a no-op
+#    <tick>/<lose> pair in book 2 section 633 legal, and task 328 deleted the pair instead.
 $script:FL_PORT_FLAGS = @(
-    'BladeSeven', 'Bogus', 'CharismaBonus', 'GhoulBitten', 'GoddessMirror', 'HydraDamage',
+    'BladeSeven', 'CharismaBonus', 'GhoulBitten', 'GoddessMirror', 'HydraDamage',
     'LitCandle', 'ScorpionSting', 'SnakeDemonFight', 'SpiderDamage', 'SpiderPoison',
     'StillInYellowport', 'StolenTyrnaiMail', 'UndeadDamage', 'YarimuraProtection',
     'YellowportUprising')

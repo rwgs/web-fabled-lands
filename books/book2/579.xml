@@ -12,7 +12,6 @@
 			</lose>.
 			<group force="t">
 				<text>Lose all codewords in this book</text>
-				<tick codeword="Bait"/>
 				<lose codeword="Bait"/>
 				<lose codeword="Barnacle"/>
 				<lose codeword="Bastion"/>

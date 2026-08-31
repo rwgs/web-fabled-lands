@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-327 is complete (listed under **Done** below), apart from 207 and 326, both
-withdrawn as misdiagnoses (see the Review log); **328, 329 and 330 (all
+328 is complete (listed under **Done** below), apart from 207 and 326, both
+withdrawn as misdiagnoses (see the Review log); **329 and 330 (both
 LOW) are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
@@ -25,7 +25,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 328. two sections carry a `<tick codeword="X"/><lose codeword="X"/>` no-op pair (book 2 sections 579 and 633), and one of them invents a codeword — `Bogus` — that exists nowhere else in the corpus and in no `Codewords=` list, so task 325 had to add it to the gate's port-flag allowlist to keep the build green: an allowlist entry whose only job is to keep scaffolding alive
 - [ ] 329. `PLAN.md`'s status header says "the backlog carries one open item (task 320)" and dates itself today, but 320 is closed and the backlog carries four — a stale *status* rather than a stale citation, in the file task 323 had just swept for citations, and a count `PLAN.md` cannot help rotting because it restates a figure another file owns
 - [ ] 330. `run-tests.ps1` diagnoses an empty dump as a CAPTURE failure ("no stdout handle?"), but a browser that launches and does no work at all writes the same empty file — an Edge mid-update wrote no DOM, no `--screenshot` and no `--version` while still creating its profile, and `AGENTS.md`'s one-second discriminator ("`--version` printing nothing confirms the missing handle") reads that evidence as exactly the wrong cause
 
@@ -364,66 +363,8 @@ this order.*
 - [~] 326. Task 207 is indexed nowhere, so a completed task survives only as an orphan detail section
   — **withdrawn, not a defect** (see the Review log)
 - [x] 327. task 325's unused-codeword note counts a `<lose>` or an `<if>` as "used", so the case it exists to surface — a codeword the port never **awards** — is not reported: book 2's `Beach` and `Bilge` are tested and swept but reachable by no `<gain>`/`<tick>`, which is exactly what that book's `# Unnecessary codewords: Bait,Beach,Bilge` comment records, and the third name is masked by a no-op `<tick>`
-
----
-
-## 328. Two sections carry a no-op `<tick>`/`<lose>` codeword pair, one of which invents a codeword
-
-**Priority: LOW.** Dead markup. It costs an allowlist entry in the build gate and it hides a
-codeword from the check filed as task 327, but nothing a player can see depends on it.
-
-### What is wrong
-
-Book 2 has two `<group force="t">` bodies that tick a codeword and immediately lose it again:
-
-- **Section 579** — `<tick codeword="Bait"/><lose codeword="Bait"/>` at the head of the
-  twenty-one-codeword "lose all codewords in this book" sweep.
-- **Section 633** — `<tick codeword="Bogus"/><lose codeword="Bogus"/>` at the head of a
-  four-codeword sweep.
-
-Neither pair can change the sheet: the second node undoes the first within the same forced
-group. They read as scaffolding — something that gave the `<text>` above them a node to hang
-on during transcription, and was never removed once the real `<lose>`s were written. Both
-groups already carry real effects, so neither needs a carrier.
-
-`Bogus` is the sharper half. It appears **nowhere else in the corpus** and in **no**
-`Codewords=` list — it is not a printed codeword at all, just a deliberately meaningless name.
-Task 325's value check therefore rejected it, and the only way to keep the build green without
-touching the corpus was to add `'Bogus'` to `$script:FL_PORT_FLAGS` in `validate-source.ps1`,
-alongside sixteen genuine engine state flags. It is the one entry in that list that names
-nothing.
-
-### Why it matters
-
-An allowlist entry is a standing claim that a value is legitimate. `Bogus` is not, and a later
-reader of `FL_PORT_FLAGS` has no way to tell it apart from `StillInYellowport`. Separately,
-the `Bait` pair is what hides book 2's third never-awarded codeword from task 327's proposed
-check — an award-aware reverse report would still see `Bait` as awarded, by a `<tick>` that
-cannot award anything.
-
-### Steps
-
-1. Confirm the pairs are inert by reading them, not by reasoning: render book 2 sections 579
-   and 633 and check the adventure sheet's codeword list before and after. A `<group
-   force="t">` applies its children in document order, so `<tick>` then `<lose>` of the same
-   name is a no-op — but confirm it against the engine rather than against this write-up.
-2. Delete both pairs (four nodes). This is a **markup** deletion, not a rewording: no printed
-   text is touched, and the `<text>` nodes above them stay exactly as they are. Re-run the
-   strip-tags prose diff on both files to prove it.
-3. Remove `'Bogus'` from `$script:FL_PORT_FLAGS` in the same change, and trim the comment
-   sentence that explains it. The gate must then reject `Bogus` if it ever reappears, which is
-   the point.
-4. Do **not** touch `Bait` in `books/book2/book.ini`'s `Codewords=` line. It is a printed
-   codeword of that book whether or not the port ever awards it; task 327 is where its status
-   gets reported.
-
-### Validation
-
-`books/book2/579.xml` and `633.xml` change, so this **does** carry a generated diff — expect
-`web/data/book2.json` to move and nothing else under `web/data`. Run `validate-selftest.ps1`,
-the full build, and the headless suite to `RESULT ALL PASS`. Then re-run the build and confirm
-it is a byte-for-byte no-op, and that the two sections still render (the every-section scan
-covers this).
+- [x] 328. two sections carry a no-op `<tick codeword="X"/>` (book 2 sections 579 and 633), and one of them invents a codeword — `Bogus` — that exists nowhere else in the corpus and in no `Codewords=` list, so task 325 had to add it to the gate's port-flag allowlist to keep the build green: an allowlist entry whose only job is to keep scaffolding alive
+  — filed as a `<tick>`/`<lose>` **pair**; §579's `<lose>` is the first entry of a complete 20-codeword sweep, so only three of the four nodes were dead (see the Review log)
 
 ---
 
@@ -538,7 +479,7 @@ so run it by hand.
 
 ---
 
-> **Completed task details (tasks 1–327) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
+> **Completed task details (tasks 1–328) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -547,6 +488,40 @@ so run it by hand.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (task 328): closed **328** — but **three nodes, not four**. Both no-op
+`<tick codeword=>` carriers are gone (book 2 sections 579 and 633) along with section 633's
+`<lose codeword="Bogus"/>`, and `'Bogus'` is out of `$script:FL_PORT_FLAGS`, which now holds
+sixteen entries that each name engine state. Section 579's `<lose codeword="Bait"/>` was
+**kept**, against step 2: it is not the tick's pair partner but the first entry of a complete
+sweep — `book.ini` declares 24 codewords, the printed text excepts four, and the group holds
+exactly the other 20 in alphabetical order, `Bait` at the head. The `<tick>` had been bolted on
+above a `<lose>` that was already there, reusing the name it found; deleting both would have
+left the "lose all codewords in this book" group covering 19 of the 20 the printed instruction
+names. Unreachable today, and latent only once a missing `<gain codeword="Bait">` is restored,
+which is precisely when it would matter and precisely when nobody would be looking.
+
+The task's own rationale is what settles it. "Why it matters" wanted `Bait` surfaced as book 2's
+**third never-awarded** codeword, and only the kept `<lose>` produces that grade — the build now
+notes it beside `Beach` and `Bilge` as *"tested or cleared but no section awards it"*. Deleting
+the `<lose>` too demoted it to *"declared but no section awards or tests it"*, the grade for a
+name the book never uses at all, which task 327 had just gone to some trouble to separate.
+Task 327's archived detail had already read it correctly — "a no-op `<tick codeword="Bait"/>`
+immediately before **its** `<lose codeword="Bait"/>`" — and 328 generalised that one sentence
+into a symmetric "pair" that section 633 has and section 579 does not.
+
+Step 1's instruction to confirm against the engine rather than against the write-up earned its
+keep twice. It corrected the write-up (a `<group force="t">` does not apply on render; it renders
+a `button.group-action` the player clicks, and a first pass that measured the sheet without
+clicking saw *nothing* removed, sweep included), and only then confirmed the pairs inert: with
+the codewords pre-held and the button clicked, both groups leave the sheet identical whether or
+not the ticked name was held beforehand, `codewordValues` empty and no trace in the rendered
+text. The lesson generalises past this task — **a "no-op" argued from document order is a claim
+about the walk, and the walk here has a click in it.**
+
+`web/data/book2.json` was the only generated file to move, as the task predicted;
+`validate-selftest.ps1` passes 51, the suite passes 3,035, and the re-run build is a
+byte-for-byte no-op.
 
 Worked 2026-08-31 (task 327): closed **327** — the reverse codeword report now grades what it
 finds. `validate-source.ps1` keeps a second set, `FL_CODEWORD_AWARDED`, filled only from the

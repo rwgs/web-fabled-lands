@@ -15028,3 +15028,95 @@ full build, and confirm the build prints **four** notes: `Avert`, `Dark`, and th
 never-awarded ones for book 2. Then the headless suite to `RESULT ALL PASS`.
 
 ---
+
+## 328. Two sections carry a no-op `<tick>`/`<lose>` codeword pair, one of which invents a codeword
+
+**Priority: LOW.** Dead markup. It costs an allowlist entry in the build gate and it hides a
+codeword from the check filed as task 327, but nothing a player can see depends on it.
+
+### What is wrong
+
+Book 2 has two `<group force="t">` bodies that tick a codeword and immediately lose it again:
+
+- **Section 579** — `<tick codeword="Bait"/><lose codeword="Bait"/>` at the head of the
+  twenty-one-codeword "lose all codewords in this book" sweep.
+- **Section 633** — `<tick codeword="Bogus"/><lose codeword="Bogus"/>` at the head of a
+  four-codeword sweep.
+
+Neither pair can change the sheet: the second node undoes the first within the same forced
+group. They read as scaffolding — something that gave the `<text>` above them a node to hang
+on during transcription, and was never removed once the real `<lose>`s were written. Both
+groups already carry real effects, so neither needs a carrier.
+
+`Bogus` is the sharper half. It appears **nowhere else in the corpus** and in **no**
+`Codewords=` list — it is not a printed codeword at all, just a deliberately meaningless name.
+Task 325's value check therefore rejected it, and the only way to keep the build green without
+touching the corpus was to add `'Bogus'` to `$script:FL_PORT_FLAGS` in `validate-source.ps1`,
+alongside sixteen genuine engine state flags. It is the one entry in that list that names
+nothing.
+
+### Why it matters
+
+An allowlist entry is a standing claim that a value is legitimate. `Bogus` is not, and a later
+reader of `FL_PORT_FLAGS` has no way to tell it apart from `StillInYellowport`. Separately,
+the `Bait` pair is what hides book 2's third never-awarded codeword from task 327's proposed
+check — an award-aware reverse report would still see `Bait` as awarded, by a `<tick>` that
+cannot award anything.
+
+### Steps
+
+1. Confirm the pairs are inert by reading them, not by reasoning: render book 2 sections 579
+   and 633 and check the adventure sheet's codeword list before and after. A `<group
+   force="t">` applies its children in document order, so `<tick>` then `<lose>` of the same
+   name is a no-op — but confirm it against the engine rather than against this write-up.
+2. Delete both pairs (four nodes). This is a **markup** deletion, not a rewording: no printed
+   text is touched, and the `<text>` nodes above them stay exactly as they are. Re-run the
+   strip-tags prose diff on both files to prove it.
+3. Remove `'Bogus'` from `$script:FL_PORT_FLAGS` in the same change, and trim the comment
+   sentence that explains it. The gate must then reject `Bogus` if it ever reappears, which is
+   the point.
+4. Do **not** touch `Bait` in `books/book2/book.ini`'s `Codewords=` line. It is a printed
+   codeword of that book whether or not the port ever awards it; task 327 is where its status
+   gets reported.
+
+### Validation
+
+`books/book2/579.xml` and `633.xml` change, so this **does** carry a generated diff — expect
+`web/data/book2.json` to move and nothing else under `web/data`. Run `validate-selftest.ps1`,
+the full build, and the headless suite to `RESULT ALL PASS`. Then re-run the build and confirm
+it is a byte-for-byte no-op, and that the two sections still render (the every-section scan
+covers this).
+
+### Outcome (worked 2026-08-31)
+
+**Three of the four nodes were dead, not four.** The `<tick>`s were scaffolding as filed and
+both are gone, along with section 633's `<lose codeword="Bogus"/>` — but section 579's
+`<lose codeword="Bait"/>` is **not** the tick's pair partner. It is the first entry of a
+complete sweep: `books/book2/book.ini` declares 24 codewords, the printed text excepts four
+(*Baluster*, *Bosky*, *Bullion*, *Bashful*), and the group held exactly the other 20, in
+alphabetical order with `Bait` at its head. The `<tick>` was bolted on immediately above a
+`<lose>` that was already there, reusing the name it found. Deleting it would have dropped the
+sweep to 19 of the 20 the printed instruction covers — unreachable today, but latent the moment
+a missing `<gain codeword="Bait">` is ever restored. Step 2's "four nodes" is therefore the one
+instruction here not followed; task 327's own archived note had it right, calling the tick a
+no-op before "**its** `<lose>`".
+
+Keeping the `<lose>` is also what this task's stated aim wanted. With the tick gone the gate
+grades `Bait` as *"tested or cleared but no section awards it - a missing `<gain>`?"* — the same
+grade as `Beach` and `Bilge`, making it book 2's **third never-awarded codeword** exactly as
+"Why it matters" predicted. Deleting the `<lose>` as well graded it *"declared but no section
+awards or tests it"*, filing it beside `Avert` and `Dark` as a name the book never uses, which
+is the softer and wrong answer.
+
+Step 1 was confirmed against the engine rather than by reasoning, and corrected a detail of the
+write-up: a `<group force="t">` does **not** apply on render, it renders a `button.group-action`
+the player clicks. Driven headless with the codewords pre-held, both groups leave the sheet
+identical whether or not the ticked name was held beforehand, and `codewordValues` stays empty —
+the pairs were inert.
+
+`'Bogus'` is out of `$script:FL_PORT_FLAGS`, which now holds sixteen entries that each name
+something the engine reads. `books/book2/book.ini` was not touched. `web/data/book2.json` was the
+only generated file to move; `validate-selftest.ps1` passes 51, the browser suite passes 3,035,
+and the re-run build is a byte-for-byte no-op.
+
+---

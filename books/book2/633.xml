@@ -4,8 +4,6 @@
 		If you have the codewords Bastion or Brush,
 		<group force="t">
 			<text>delete them and the codeword <i>Boysen</i></text>
-			<tick codeword="Bogus"/>
-			<lose codeword="Bogus"/>
 			<lose codeword="Bastion"/>
 			<lose codeword="Brush"/>
 			<lose codeword="Boysen"/>
