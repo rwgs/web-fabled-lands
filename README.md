@@ -12,6 +12,9 @@ the browser, on any device, with progress saved locally.
 
 <p align="center"><em>Play it like the printed book — the rules are handled for you.</em></p>
 
+**[Documentation wiki](docs/Home.md)** — player guide, implemented rules, architecture,
+build pipeline, testing, the XML tag reference and a corpus census.
+
 ---
 
 ## Highlights
