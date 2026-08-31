@@ -4,7 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 319 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **nothing is open** in any bucket. File new
+misdiagnosis (see the Review log); **320 (MEDIUM) and 321 (LOW) are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,11 +20,11 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-*(none open — file new MEDIUM work here)*
+- [ ] 320. `ROADMAP.md`'s phase 1 cites two source locations that have moved and undercounts the dock sites its gazetteer is sized against — `showMaps` is at `app.js:1152` not 1142, `state.js:995` is affliction code rather than the `data.location` write (`arriveAtDock`, `state.js:1118`), and "25 named ports across 96 sections" misses that `<set dock=>` sets the location too, so the real figure is 25 across 97 (94 via `<section dock=>`, 3 via `<set dock=>`)
 
 **LOW**
 
-*(none open — file new LOW work here)*
+- [ ] 321. `TASKS.md` and `TASKS-archive.md` are the only two tracked files whose **committed blobs** are CRLF — every other tracked `.md` blob is LF — so any edit staged through a tool that normalises rewrites the whole file (6,348 changed lines for an 84-line edit), which is the opposite of what task 319 recorded when it concluded "`core.autocrlf=true` makes the committed bytes LF either way"
 
 **Done**
 
@@ -355,6 +355,123 @@ this order.*
 
 ---
 
+## 320. `ROADMAP.md` phase 1 cites two moved locations and undercounts its own dock sites
+
+**Priority: MEDIUM.** The backlog is otherwise clear, so phase 1 is the next thing anyone
+picks up — and these are the three facts they would start from.
+
+### What is wrong
+
+Phase 1 ("A pin at the port you are docked at") states the blocker is data, not code, and
+sizes the work against three cited facts. Two of the citations have drifted and the third
+is an undercount:
+
+| `ROADMAP.md` says | Actually |
+|---|---|
+| the Maps modal at `app.js:1142` | `app.js:1142` is the **Narration** modal's closing line; `showMaps` begins at `app.js:1152` |
+| `state.data.location` set at `state.js:995` | `state.js:995` is affliction/Stamina-cap code. `location` is declared at `state.js:120` and written by `arriveAtDock` at `state.js:1118` |
+| "25 named ports across **96** sections" | 25 names is right. The site count is **97**: 94 sections carry `<section dock=>`, and three more set the location through `<set dock=>` alone — book3/367, book3/405, book5/634 |
+
+`app.js:250` (the Maps button on the title screen) is still correct, and the surrounding
+argument — that the modal is reachable before any book is loaded, so coordinates must ride
+in `meta.json` rather than a per-book file — is unaffected.
+
+### Why it matters
+
+The third row is the one with consequences. Phase 1's deliverable is a gazetteer keyed by
+dock name, and its validation is "a `suite-corpus` assertion that **every** `dock=` value in
+the corpus resolves". An author who reads "a section's `dock=`" as meaning `<section dock=>`
+writes a census that misses the `<set dock=>` arm, and the assertion then passes over a
+corpus it did not fully walk — the same shape as task 313, where eighteen censuses read text
+that still contained the nodes they were meant to exclude.
+
+The two stale line numbers cost only the time it takes to discover them, but they are cited
+as evidence for the phase's central claim, so a reader checking that claim finds unrelated
+code and has to rebuild the argument from scratch.
+
+### This is task 309's shape, one file later
+
+Task 309 corrected `ROADMAP.md` for quoting the 4,437-file glob count instead of the
+shipped 4,369. Same document, same failure: a planning file carries verified-looking
+figures that no test or build re-checks, so they rot silently while the code moves under
+them. Nothing here is a defect in the port.
+
+### Steps
+
+1. Correct the three rows above in `ROADMAP.md`'s phase 1 — the two line references and the
+   site count.
+2. Where phase 1 says the location is set "from a section's `dock=`", say that **both**
+   `<section dock=>` and `<set dock=>` write it, and name the three `<set>`-only sections so
+   the gazetteer's census cannot silently skip them.
+3. Re-read phases 2 and 3 for the same class of citation and correct any that have drifted.
+4. Consider whether a line-number citation earns its keep in a planning document at all, or
+   whether naming the function (`showMaps`, `arriveAtDock`) is the durable form. Record the
+   answer in the phase, since this is the second time this file has needed it.
+
+### Validation
+
+Documentation only — no rebuild and no suite run is required, and none of the generated
+outputs may change. Verify each corrected citation by opening it, and re-run the two census
+commands in the table so the 94 / 3 / 97 split is confirmed against the tree at the time of
+the fix rather than copied from here.
+
+## 321. The two task files are the repo's only CRLF blobs, so a tool edit rewrites them whole
+
+**Priority: LOW.** Nothing is broken and nothing ships differently. It costs review time, on
+the two files this project edits most.
+
+### The fact
+
+Measured over every tracked `.md` blob (`git cat-file blob` on the raw bytes — **not**
+`git show`, which applies eol conversion and reports the opposite):
+
+| | Committed blob |
+|---|---|
+| `TASKS.md` | **CRLF** (3,136 CR) |
+| `TASKS-archive.md` | **CRLF** (14,409 CR) |
+| every other tracked `.md` | LF (0 CR) |
+
+Worktree copies are CRLF across the board, which is what `core.autocrlf=true` intends and is
+not the issue.
+
+### The cost
+
+An edit to either file that gets staged through the normalising path stores an LF blob
+against a CRLF parent, so **every line reads as changed**: filing task 320 produced 84 lines
+of real change and a **6,348-line diff**. The change is unreviewable, and the file silently
+migrates to LF as a side effect of an unrelated edit.
+
+It is avoidable once known - staging with conversion disabled preserves the CRLF blob and
+the diff collapses to the real 84 lines - but it is invisible until someone measures raw
+bytes, and the obvious check (`git show HEAD:TASKS.md | grep $'\r$'`) reports the wrong
+answer because `git show` converts.
+
+### Why this is filed rather than fixed
+
+Task 319 surveyed line endings and concluded the situation was harmless, on the grounds that
+"`core.autocrlf=true` makes the committed bytes LF either way". That holds for 4,630-odd
+tracked files and **not** for these two. 319 also explicitly warned against a drive-by
+`.gitattributes`, and it was right to - which is exactly why this is a filed decision rather
+than something to do while passing.
+
+### Steps
+
+1. Decide between: (a) normalise both files to LF in **one deliberate commit** that changes
+   nothing else and says so in its message; (b) add a `.gitattributes` pinning the
+   convention repo-wide; or (c) leave them and record the staging workaround in `AGENTS.md`
+   beside task 319's note.
+2. Whichever is chosen, correct 319's claim where it is recorded, since it is the sentence
+   that would stop the next person from looking.
+3. If (a) or (b): confirm afterwards that `git cat-file blob` reports 0 CR for both files,
+   and that no other tracked file changed.
+
+### Validation
+
+Repository hygiene only — no rebuild, no suite run, and no generated output may change.
+Verify by raw blob inspection, never by `git show`.
+
+---
+
 > **Completed task details (tasks 1–319) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
@@ -364,6 +481,32 @@ this order.*
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Filed 2026-08-31 (planning-docs pass, no code): filed **320** while filling the four
+baseline templates left unwritten since they were added on 2026-08-02 — `SPEC.md`,
+`DECISIONS.md`, `CHANGELOG.md` and `PLAN.md` — and adding a `docs/` wiki.
+
+**The finding came out of writing `PLAN.md`, which is the only one of the four that had to
+be checked against the code rather than assembled from it.** `SPEC.md` and `DECISIONS.md`
+are statements about what the project already is, and `CHANGELOG.md` reconstructs from git
+history; `PLAN.md` names the next change, so its three cited facts got opened — and two had
+moved while a third was never right. Nothing else in the four needed a task: every other
+figure written into them was re-measured against the tree first.
+
+**Carry forward: a planning document's citations rot silently, because nothing re-checks
+them.** This is the second time `ROADMAP.md` has needed exactly this correction (task 309
+was the first, for a corpus count), which is why 320's step 4 asks whether a line number
+belongs in a planning file at all rather than just fixing these three.
+
+Also filed **321**, found while committing 320: this file and `TASKS-archive.md` are the
+only two tracked blobs that are CRLF, so staging an edit through the normalising path
+rewrote the whole file — 6,348 lines for 84 lines of change. Task 319 concluded the
+opposite ("the committed bytes are LF either way"), which is true everywhere except here.
+
+**Carry forward: `git show` is the wrong tool for this question.** It applies eol conversion,
+so `git show HEAD:TASKS.md` reports CRLF where the blob is LF and vice versa; three
+measurements in a row disagreed with each other before `git cat-file blob` settled it. Any
+future line-ending claim in this log should say which of the two it used.
 
 Worked 2026-08-31 (docs pass, task 319): closed **319** — the CRLF trap 318 found is now a
 paragraph in [`AGENTS.md`](AGENTS.md)'s **Command execution** notes, beside the "prefer direct file
@@ -415,7 +558,7 @@ verify against the checkboxes.
 the CR from these CRLF files, so the 2,814-line block landed LF-only inside a CRLF file — and the
 diff still read 2,814 insertions / 2,814 deletions with no line-ending noise, because
 `core.autocrlf=true` normalises both sides to LF in the index. The tells were git's own "LF will be
-replaced by CRLF" warning and a terminator count. **Count `
+replaced by CRLF" warning and a terminator count. **Count `
 ` against `
 `, not diff lines**,
 after any move done with a text-mode tool.

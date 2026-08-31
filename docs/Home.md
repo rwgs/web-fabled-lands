@@ -5,7 +5,7 @@ section text and automates the game rules - dice, ability checks, combat, market
 ships and a live Adventure Sheet - as plain HTML, CSS and ES modules with **no npm, no
 build toolchain and no runtime dependencies**.
 
-Play it at **[webfl.rwgs.net](http://webfl.rwgs.net/)**.
+Play it at **[webfl.rwgs.net](https://webfl.rwgs.net/)**.
 
 ---
 

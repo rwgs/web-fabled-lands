@@ -9,7 +9,7 @@ progress lives in your own browser's storage.
 
 ## Getting in
 
-**On the web** - open [webfl.rwgs.net](http://webfl.rwgs.net/). This is the recommended
+**On the web** - open [webfl.rwgs.net](https://webfl.rwgs.net/). This is the recommended
 route on a phone or tablet, because it can be installed to the home screen and then works
 with no connection at all.
 
