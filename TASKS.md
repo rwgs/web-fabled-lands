@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-319 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **320 (MEDIUM) and 321 (LOW) are open**. File new
+320 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **321 (LOW) and 322 (LOW) are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,11 +20,12 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 320. `ROADMAP.md`'s phase 1 cites two source locations that have moved and undercounts the dock sites its gazetteer is sized against — `showMaps` is at `app.js:1152` not 1142, `state.js:995` is affliction code rather than the `data.location` write (`arriveAtDock`, `state.js:1118`), and "25 named ports across 96 sections" misses that `<set dock=>` sets the location too, so the real figure is 25 across 97 (94 via `<section dock=>`, 3 via `<set dock=>`)
+*(none open — file new MEDIUM work here)*
 
 **LOW**
 
 - [ ] 321. `TASKS.md` and `TASKS-archive.md` are the only two tracked files whose **committed blobs** are CRLF — every other tracked `.md` blob is LF — so any edit staged through a tool that normalises rewrites the whole file (6,348 changed lines for an 84-line edit), which is the opposite of what task 319 recorded when it concluded "`core.autocrlf=true` makes the committed bytes LF either way"
+- [ ] 322. every book's `book.ini` is read by **nothing** — no script under `build/` opens it — so its `Map=` key reads as the live declaration of which image is that book's map while the build actually selects by the `-Map$` basename pattern, and book 3 proves it inert: `Map=Violet Ocean.JPG` names a file that does not exist, yet `VioletOcean-Map.JPG` ships correctly as `book3.jpg`
 
 **Done**
 
@@ -352,68 +353,9 @@ this order.*
 - [x] 317. `rank` ignores `modifier=` on every tag but `<set>`, so `<adjust ability="rank" modifier="natural"/>` and `<difficulty ability="rank" modifier="natural">` read the ring of ultimate power's +2 back in — the last stat left out of the 314–316 family
 - [x] 318. Re-archive completed task details 275–317 and clear them out of the priority buckets
 - [x] 319. The line-ending trap task 318 hit was recorded only in the Review log, where a trap that changes how you run a bulk edit belongs in `AGENTS.md` — and the sharper half of it, a broken shell assertion, turned out not to exist
+- [x] 320. `ROADMAP.md`'s phase 1 cites two source locations that have moved and miscounts the dock sites its gazetteer is sized against — `showMaps` is at `app.js:1152` not 1142, `state.js:995` is affliction code rather than the `data.location` write (`arriveAtDock`, `state.js:1118`), and "25 named ports across 96 sections" is 94: `<set dock=>` moves a SHIP, not the player, so the 97 sections carrying a `dock=`-family attribute are not the sites that set the location
 
 ---
-
-## 320. `ROADMAP.md` phase 1 cites two moved locations and undercounts its own dock sites
-
-**Priority: MEDIUM.** The backlog is otherwise clear, so phase 1 is the next thing anyone
-picks up — and these are the three facts they would start from.
-
-### What is wrong
-
-Phase 1 ("A pin at the port you are docked at") states the blocker is data, not code, and
-sizes the work against three cited facts. Two of the citations have drifted and the third
-is an undercount:
-
-| `ROADMAP.md` says | Actually |
-|---|---|
-| the Maps modal at `app.js:1142` | `app.js:1142` is the **Narration** modal's closing line; `showMaps` begins at `app.js:1152` |
-| `state.data.location` set at `state.js:995` | `state.js:995` is affliction/Stamina-cap code. `location` is declared at `state.js:120` and written by `arriveAtDock` at `state.js:1118` |
-| "25 named ports across **96** sections" | 25 names is right. The site count is **97**: 94 sections carry `<section dock=>`, and three more set the location through `<set dock=>` alone — book3/367, book3/405, book5/634 |
-
-`app.js:250` (the Maps button on the title screen) is still correct, and the surrounding
-argument — that the modal is reachable before any book is loaded, so coordinates must ride
-in `meta.json` rather than a per-book file — is unaffected.
-
-### Why it matters
-
-The third row is the one with consequences. Phase 1's deliverable is a gazetteer keyed by
-dock name, and its validation is "a `suite-corpus` assertion that **every** `dock=` value in
-the corpus resolves". An author who reads "a section's `dock=`" as meaning `<section dock=>`
-writes a census that misses the `<set dock=>` arm, and the assertion then passes over a
-corpus it did not fully walk — the same shape as task 313, where eighteen censuses read text
-that still contained the nodes they were meant to exclude.
-
-The two stale line numbers cost only the time it takes to discover them, but they are cited
-as evidence for the phase's central claim, so a reader checking that claim finds unrelated
-code and has to rebuild the argument from scratch.
-
-### This is task 309's shape, one file later
-
-Task 309 corrected `ROADMAP.md` for quoting the 4,437-file glob count instead of the
-shipped 4,369. Same document, same failure: a planning file carries verified-looking
-figures that no test or build re-checks, so they rot silently while the code moves under
-them. Nothing here is a defect in the port.
-
-### Steps
-
-1. Correct the three rows above in `ROADMAP.md`'s phase 1 — the two line references and the
-   site count.
-2. Where phase 1 says the location is set "from a section's `dock=`", say that **both**
-   `<section dock=>` and `<set dock=>` write it, and name the three `<set>`-only sections so
-   the gazetteer's census cannot silently skip them.
-3. Re-read phases 2 and 3 for the same class of citation and correct any that have drifted.
-4. Consider whether a line-number citation earns its keep in a planning document at all, or
-   whether naming the function (`showMaps`, `arriveAtDock`) is the durable form. Record the
-   answer in the phase, since this is the second time this file has needed it.
-
-### Validation
-
-Documentation only — no rebuild and no suite run is required, and none of the generated
-outputs may change. Verify each corrected citation by opening it, and re-run the two census
-commands in the table so the 94 / 3 / 97 split is confirmed against the tree at the time of
-the fix rather than copied from here.
 
 ## 321. The two task files are the repo's only CRLF blobs, so a tool edit rewrites them whole
 
@@ -470,9 +412,82 @@ than something to do while passing.
 Repository hygiene only — no rebuild, no suite run, and no generated output may change.
 Verify by raw blob inspection, never by `git show`.
 
+## 322. `book.ini` is read by nothing, so its `Map=` key reads as live configuration while the build ignores it
+
+**Priority: LOW.** Nothing ships wrong today — every book's regional map is copied correctly,
+including book 3's. The cost is that a source file in `books/` states a fact about the build
+that is not true, and one book's value is already stale enough to prove it.
+
+### What is wrong
+
+Each `books/book<N>/book.ini` declares a `Map=` key:
+
+| Book | `Map=` | File on disk | Ships as |
+|---|---|---|---|
+| 1 | `Sokara.JPG` | `Sokara-Map.JPG` | `book1.jpg` |
+| 2 | `Golnir.JPG` | `Golnir-Map.JPG` | `book2.jpg` |
+| 3 | `Violet Ocean.JPG` | `VioletOcean-Map.JPG` | `book3.jpg` |
+| 4 | `Great Steppes.JPG` | `GreatSteppes-Map.JPG` | `book4.jpg` |
+| 5 | `Uttaku.JPG` | `Uttaku-Map.JPG` | `book5.jpg` |
+| 6 | `Akatsurai.JPG` | `Akatsurai-Map.JPG` | `book6.jpg` |
+
+**No value in that column names a file that exists**, and the build does not care: it picks
+the regional map with `Where-Object { $_.BaseName -match '-Map$' }` in `build-data.ps1` and
+copies the match to `web/assets/maps/book<N>.jpg`. Nor is `Map=` read anywhere else —
+`grep` for `book.ini` across `build/*.ps1` and `web/js/*.js` returns nothing, so the whole
+file is inert in this port. It is inherited from the reference `java-engine/` data format.
+
+Book 3 is the one that shows it. Books 1, 2, 5 and 6 differ from their real filename only by
+the `-Map` suffix, so `Map=Sokara.JPG` reads like a shorthand a reader might assume the build
+expands. `Map=Violet Ocean.JPG` versus `VioletOcean-Map.JPG` cannot be reconciled by any rule
+— the space moves — which is what makes the key demonstrably unread rather than merely
+abbreviated.
+
+### Why it matters
+
+This is the shape task 320 found in `ROADMAP.md`, one directory over: a file that looks like
+configuration, is treated as evidence, and is checked by nothing. Phase 1 of `ROADMAP.md`
+originally proposed `places.ini` "alongside the existing `book.ini` that already declares
+`Map=`" — reading the inert key as an established precedent for a build-read `.ini` per book.
+That citation is now corrected, but the source of the confusion is still in the tree, and the
+next reader of `books/book3/book.ini` has no way to tell the key is dead.
+
+`validate-source.ps1` gates the section XML and never looks at `book.ini`, so nothing fails
+when a value rots. That is correct — it is not a section file — but it does mean the staleness
+is unbounded.
+
+### Steps
+
+1. Decide which of the two this is, and it is a genuine choice rather than an obvious one:
+   - **Make it live** — have `build-data.ps1` resolve the regional map through `Map=` instead
+     of the `-Map$` pattern, and fix the six values to name real files. Turns an inherited
+     file into the declaration it appears to be, and matches how `books.ini`'s `Published=`
+     already drives the build (task 209). Costs a build-script change and a `release.ps1`
+     look, since the map copy is part of what a withdrawn book reconciles.
+   - **Mark it dead** — leave the build alone and record in `AGENTS.md`'s repository map that
+     `book.ini` is inherited reference data read by nothing, so `Map=` is not the source of
+     truth for the regional map (the `-Map$` filename is). Cheapest, and honest, but leaves
+     six wrong values in the tree.
+2. Whichever is chosen, say it where a reader of `books/` will meet it — the repository map in
+   `AGENTS.md` currently describes `books/books.ini` and the section XML but not `book.ini`.
+3. Do **not** rename any `.JPG` to satisfy the ini. The `-Map$` pattern is what the build
+   depends on today, and a rename would break the copy for every book at once.
+
+### Validation
+
+If step 1 takes the "mark it dead" arm: documentation only, no rebuild, no suite run, and no
+generated output may change.
+
+If it takes the "make it live" arm: `build-data.ps1` and `release.ps1` change, so run
+`pwsh -File build/build-data.ps1` and confirm `web/assets/maps/book<N>.jpg` is byte-identical
+to before for all six books (hash each), then `release-selftest.ps1`, `validate-selftest.ps1`
+and the headless suite to `RESULT ALL PASS`. A build that silently stops copying a map leaves
+the Maps modal showing the "not installed" note, which no assertion currently covers — so
+check the six hashes explicitly rather than trusting a green suite.
+
 ---
 
-> **Completed task details (tasks 1–319) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
+> **Completed task details (tasks 1–320) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -481,6 +496,42 @@ Verify by raw blob inspection, never by `git show`.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (docs pass, task 320): closed **320** — `ROADMAP.md`'s three phases now cite
+functions instead of line numbers, and its dock census says which set it measured. `ROADMAP.md`
+only, so no rebuild; `stamp-version.ps1` confirmed "already at 26.08.28.ba963ea" and
+`git status` showed the one file. Filed **322**.
+
+**The task's own third row was wrong, and following its step 2 would have written a fresh error
+into the file.** 320 said `<set dock=>` "sets the location too", making the site count 97. It does
+not: `applySet` in `engine.js` berths a **ship** (`s.docked = get('dock')`) and never touches
+`data.location`, which has exactly one writer — `arriveAtDock(sectionEl.getAttribute('dock'))` on
+every section entry in `render.js`. The sites that set the player's location are **94**. The 97 is
+real but is the count of sections carrying any `dock=`-family attribute, and the original 96 was
+never reproduced from either definition. Row 1's replacement was also three lines out
+(`app.js:1142` is `showRules`, not the Narration modal's closing brace at 1139); only row 2 was
+exact.
+
+**Carry forward: an attribute census is not a behaviour census, and only the second one can be
+cited for what the code does.** 320 was filed against `ROADMAP.md` for quoting figures nothing
+re-checks, and was itself filed on a `grep` of `dock=` without opening the handler — the same
+failure one level up. The census also missed two further readers of the same names
+(`<section todock=>`, `<if docked=>`), found only by asking the *allowlist* which attributes exist
+rather than the corpus which ones appear. **Read the consumer before quoting the count**: for a
+tag, that is the `applyX` in `engine.js` or the `getAttribute` in `render.js`, and it is one grep.
+
+Step 3 turned up two more drifted citations in the same file, so the class is not confined to the
+rows a task happens to name: `book.ini`'s `Map=` was offered as an existing build-read precedent
+when nothing under `build/` opens the file (filed as **322** — book 3's `Map=Violet Ocean.JPG`
+names no file on disk, while `VioletOcean-Map.JPG` ships fine), and phase 2 called the shipped
+maps "downscales" of the source `.JPG`s when they are hash-identical copies of 500px originals,
+so the repo holds no higher resolution at all.
+
+Step 4 is answered in the file rather than left to the next pass: **cite the function, not the
+line.** Every `#L` anchor is gone from `ROADMAP.md`, including `app.js:250`, which was still
+correct — a rule that only applies to the citations already broken does not survive the next edit.
+A line number fails quietly by pointing at plausible wrong code; a function name fails loudly with
+no match.
 
 Filed 2026-08-31 (planning-docs pass, no code): filed **320** while filling the four
 baseline templates left unwritten since they were added on 2026-08-02 — `SPEC.md`,

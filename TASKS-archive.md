@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–319), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318) and task 319 (ID 319). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for completed tasks (stable IDs 1–320), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319) and task 320 (ID 320). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–319). Detail sections follow below in their original filed order; find one by its `## <N>.` heading.
+The completed tasks archived in this file (stable IDs 1–320). Detail sections follow below in their original filed order; find one by its `## <N>.` heading.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -328,6 +328,7 @@ The completed tasks archived in this file (stable IDs 1–319). Detail sections 
 - [x] 317. `rank` ignores `modifier=` on every tag but `<set>`, so `<adjust ability="rank" modifier="natural"/>` and `<difficulty ability="rank" modifier="natural">` read the ring of ultimate power's +2 back in — the last stat left out of the 314–316 family
 - [x] 318. Re-archive completed task details 275–317 and clear them out of the priority buckets
 - [x] 319. The line-ending trap task 318 hit was recorded only in the Review log, where a trap that changes how you run a bulk edit belongs in `AGENTS.md` — and the sharper half of it, a broken shell assertion, turned out not to exist
+- [x] 320. `ROADMAP.md` phase 1 cites two moved locations and undercounts its own dock sites
 
 ---
 
@@ -14346,7 +14347,7 @@ in the working copy, and MSYS `sed -n` strips the CR, so the 2,814-line block la
 a CRLF file. The diff read a perfectly balanced 2,814 insertions / 2,814 deletions with no
 line-ending noise at all, because `core.autocrlf=true` normalises both sides to LF in the index —
 the only tells were git's own "LF will be replaced by CRLF" warning and a byte count
-(`d.count(b'
+(`d.count(b'
 ')` against `d.count(b'
 ')`). **Count the terminators, not the diff lines**, on
 any move done with a text-mode tool; the file was renormalised to uniform CRLF before commit.
@@ -14403,5 +14404,118 @@ with a terminator count rather than with the diff. `AGENTS.md` only; the heading
 "(Bitdefender on Windows)" parenthetical, which is now slightly narrower than the section's
 contents and was left alone as out of scope. No code, data, build or test files touched, so no
 rebuild or stamp change is implied.
+
+---
+
+## 320. `ROADMAP.md` phase 1 cites two moved locations and undercounts its own dock sites — MEDIUM (docs)
+
+**Priority: MEDIUM.** The backlog is otherwise clear, so phase 1 is the next thing anyone
+picks up — and these are the three facts they would start from.
+
+### What is wrong
+
+Phase 1 ("A pin at the port you are docked at") states the blocker is data, not code, and
+sizes the work against three cited facts. Two of the citations have drifted and the third
+is an undercount:
+
+| `ROADMAP.md` says | Actually |
+|---|---|
+| the Maps modal at `app.js:1142` | `app.js:1142` is the **Narration** modal's closing line; `showMaps` begins at `app.js:1152` |
+| `state.data.location` set at `state.js:995` | `state.js:995` is affliction/Stamina-cap code. `location` is declared at `state.js:120` and written by `arriveAtDock` at `state.js:1118` |
+| "25 named ports across **96** sections" | 25 names is right. The site count is **97**: 94 sections carry `<section dock=>`, and three more set the location through `<set dock=>` alone — book3/367, book3/405, book5/634 |
+
+`app.js:250` (the Maps button on the title screen) is still correct, and the surrounding
+argument — that the modal is reachable before any book is loaded, so coordinates must ride
+in `meta.json` rather than a per-book file — is unaffected.
+
+### Why it matters
+
+The third row is the one with consequences. Phase 1's deliverable is a gazetteer keyed by
+dock name, and its validation is "a `suite-corpus` assertion that **every** `dock=` value in
+the corpus resolves". An author who reads "a section's `dock=`" as meaning `<section dock=>`
+writes a census that misses the `<set dock=>` arm, and the assertion then passes over a
+corpus it did not fully walk — the same shape as task 313, where eighteen censuses read text
+that still contained the nodes they were meant to exclude.
+
+The two stale line numbers cost only the time it takes to discover them, but they are cited
+as evidence for the phase's central claim, so a reader checking that claim finds unrelated
+code and has to rebuild the argument from scratch.
+
+### This is task 309's shape, one file later
+
+Task 309 corrected `ROADMAP.md` for quoting the 4,437-file glob count instead of the
+shipped 4,369. Same document, same failure: a planning file carries verified-looking
+figures that no test or build re-checks, so they rot silently while the code moves under
+them. Nothing here is a defect in the port.
+
+### Steps
+
+1. Correct the three rows above in `ROADMAP.md`'s phase 1 — the two line references and the
+   site count.
+2. Where phase 1 says the location is set "from a section's `dock=`", say that **both**
+   `<section dock=>` and `<set dock=>` write it, and name the three `<set>`-only sections so
+   the gazetteer's census cannot silently skip them.
+3. Re-read phases 2 and 3 for the same class of citation and correct any that have drifted.
+4. Consider whether a line-number citation earns its keep in a planning document at all, or
+   whether naming the function (`showMaps`, `arriveAtDock`) is the durable form. Record the
+   answer in the phase, since this is the second time this file has needed it.
+
+### Validation
+
+Documentation only — no rebuild and no suite run is required, and none of the generated
+outputs may change. Verify each corrected citation by opening it, and re-run the two census
+commands in the table so the 94 / 3 / 97 split is confirmed against the tree at the time of
+the fix rather than copied from here.
+
+### Done 2026-08-31
+
+`ROADMAP.md` only. **Two of the three rows above were themselves wrong, and step 2 asked for a
+change that would have written a new error into the file** — the filing pass measured attribute
+counts without reading the code that consumes them.
+
+- **Row 3 is refuted.** `<set dock="X">` does **not** set the player's location. `applySet` in
+  `engine.js` handles it as `const s = state.currentShip(); if (s) { s.docked = get('dock'); }`
+  — it berths a **ship** and never touches `data.location`, which is written from exactly one
+  place: `arriveAtDock(sectionEl.getAttribute('dock'))` on every section entry in `render.js`.
+  So the count of sections that set the player's location is **94**, not 97. The 97 is a real
+  figure but of a different set — sections carrying any `dock=`-family attribute — and 96 was
+  never reproduced from either definition. Step 2 would have committed "both `<section dock=>`
+  and `<set dock=>` write it", so the task's instruction was honoured by contradicting it.
+- **Row 1's "actually" is also off by three lines.** `app.js:1142` is `function showRules(…) {`;
+  the Narration modal's closing brace is 1139. `showMaps` at 1152 was correct, which is the half
+  that mattered.
+- **Row 2 checked out exactly:** `state.js:995` closes the Stamina-cap branch, `location` is
+  declared at 120, `arriveAtDock` begins at 1118.
+
+The census also found **two more** dock-name readers the filing missed, so the file now carries
+all four in a table: `<section todock="X">` (2 sections — berths at-large ships on *leaving*) and
+`<if docked="X">` (3 sections — reads a ship's berth). All four draw from the **same closed set
+of 25 names** (verified: distinct values over `<section dock=>` alone is 25, and adding the other
+three arms leaves it 25), so phase 1's gazetteer is complete either way — but the validation
+bullet now says the assertion must walk all four, because today a one-arm census passes for the
+wrong reason and would stop catching a typo the moment a name lands elsewhere.
+
+Step 3 found two further drifted citations, both corrected:
+
+- Phase 1 offered `book.ini` as the precedent `places.ini` would sit beside, "that already
+  declares `Map=`". **Nothing under `build/` reads `book.ini` at all**, and `Map=` is inert: the
+  build selects each regional map by the `-Map$` basename pattern, which is why book 3's
+  `Map=Violet Ocean.JPG` names a nonexistent file while `VioletOcean-Map.JPG` ships correctly.
+  Filed as **322**.
+- Phase 2 called the shipped maps "500px-wide **downscales** of the source `.JPG`s". They are
+  byte-for-byte copies (hash-verified) of sources that are themselves 500px wide, so 500px is the
+  only resolution in the repo and percentages are the whole insurance policy rather than a way to
+  survive a downscale that never happened. Per-book heights differ (627/584/619/612/665/674), now
+  stated, since a percentage `y` is not portable between maps.
+
+Step 4's answer, recorded in the file: **cite the function, not the line.** Every `#L` anchor in
+`ROADMAP.md` is gone — references now name a function and link the file. A line number rots on
+any edit above it, nothing re-checks it, and it fails *quietly* by pointing at plausible wrong
+code; a function name fails loudly with no match. `app.js:250` was still correct and was converted
+anyway, so the rule holds for the whole file rather than only for the rows that had already broken.
+
+Verified: every link target in the file resolves, `git status` shows `ROADMAP.md` alone, and
+`stamp-version.ps1` reports "already at 26.08.28.ba963ea" — no generated output moved, as the
+validation required.
 
 ---

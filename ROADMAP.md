@@ -15,19 +15,50 @@ task number.
 
 # Player position on the map
 
-Today the Maps modal ([app.js:1142](web/js/app.js#L1142)) shows six regional maps
-and the world map as flat images — the player has to work out where they are from
-the prose. The three phases below put a marker on the map, each one shipping
+Today the Maps modal (`showMaps` in [app.js](web/js/app.js)) shows six regional
+maps and the world map as flat images — the player has to work out where they are
+from the prose. The three phases below put a marker on the map, each one shipping
 something usable on its own.
 
 The blocker is data, not code. Nothing in the corpus carries a position: the
 maps are hand-drawn label illustrations with no grid or section numbers, the
 4,369 shipped section files have no location attribute, and the reference `java-engine/`
 has no map data either. The only positional state that exists is
-`state.data.location` — the current dock, set from a section's `dock=`
-([state.js:995](web/js/state.js#L995)) — covering 25 named ports across 96
+`state.data.location` — the current dock, written on every section entry by
+`arriveAtDock` ([state.js](web/js/state.js)) from that section's `dock=`
+attribute, and cleared when it has none — covering 25 named ports across 94
 sections. Phase 1 spends that for free; phases 2 and 3 build the datasets that
 are missing.
+
+**`dock=` is not the same set as "sets the player's location", and the gazetteer's
+census has to know the difference** (task 320). Four attributes carry a dock name,
+and 97 shipped sections carry at least one of them, but only the first moves the
+player:
+
+| Attribute | Sections | What it does |
+|---|---|---|
+| `<section dock="X">` | 94 | sets `data.location` — the player is at X |
+| `<section todock="X">` | 2 | on *leaving*, berths at-large ships at X; player unaffected |
+| `<set dock="X">` | 3 (14 nodes: book3/367, book3/405 ×12, book5/634) | berths the current ship at X; player unaffected |
+| `<if docked="X">` | 3 | reads a ship's berth |
+
+All four draw from the **same closed set of 25 names**, so a gazetteer keyed by
+dock name is complete either way — but a census written as "every section with
+`dock=`" counts 97 and measures ship movement, while one written as "every section
+that sets the location" counts 94. Say which you mean.
+
+**Cite the function, not the line.** Every code reference in this file now names a
+function and links the file — `showMaps` in `app.js`, `arriveAtDock` in `state.js` —
+with no `#L` anchor. A line number is stale the moment anything above it is edited,
+and it rots invisibly: nothing in the build or the suite re-checks a number in a
+planning document, so it reads as verified evidence long after it points at
+unrelated code. Task 320 found `app.js:1142` pointing at `showRules` and
+`state.js:995` at the Stamina-cap branch of an affliction, both cited as proof of
+the phase's central claim. A function name costs one search to resolve, survives
+every edit that does not rename it, and fails loudly (no match) rather than
+quietly (a plausible wrong line) when it does go stale. This is the second pass
+this file has needed for rotted figures — task 309 corrected a file count here —
+so the rule is recorded rather than re-derived.
 
 ## Phase 1: A pin at the port you are docked at
 
@@ -40,13 +71,18 @@ as they do now.
 
 ### Included work
 
-- A gazetteer source file per book — `books/book<N>/places.ini`, alongside the
-  existing `book.ini` that already declares `Map=` — mapping a place name to `x,y`
-  as **percentages** of the map image. Phase 1 only needs the entries for that
-  book's dock names.
+- A gazetteer source file per book — `books/book<N>/places.ini`, sitting beside the
+  book's existing `book.ini` — mapping a place name to `x,y` as **percentages** of
+  the map image. Phase 1 only needs the entries for that book's dock names.
+  **`book.ini` is not a precedent to copy:** nothing under `build/` reads it, and
+  its `Map=` key is inert — the build picks each regional map by the `-Map$`
+  basename pattern instead, which is why book 3's `Map=Violet Ocean.JPG` names a
+  file that does not exist while `VioletOcean-Map.JPG` is what ships. So
+  `places.ini` needs a reader written for it, and adding one does not make `Map=`
+  live.
 - Build pass-through into **`meta.json`**, not the per-book JSON: the Maps modal is
-  reachable from the title screen before any book is loaded
-  ([app.js:250](web/js/app.js#L250)), so the coordinates must be in the payload that
+  reachable from the title screen before any book is loaded (`showTitle`'s Maps
+  button, [app.js](web/js/app.js)), so the coordinates must be in the payload that
   is always present.
 - A `.map-frame` wrapper (`position: relative; display: inline-block`) around the
   `<img>` only, with the caption left outside it, so the marker positions against
@@ -77,9 +113,14 @@ as they do now.
 ### Validation
 
 - `pwsh -File build/build-data.ps1`, then the headless suite to `RESULT ALL PASS`.
-- A `suite-corpus` assertion that **every** `dock=` value in the corpus resolves to a
-  gazetteer entry — the 25 dock names are a closed set, so this is checkable rather
-  than sampled.
+- A `suite-corpus` assertion that **every** dock name in the corpus resolves to a
+  gazetteer entry — the 25 names are a closed set, so this is checkable rather than
+  sampled. It must walk **all four** attributes in the table above
+  (`<section dock=>`, `<section todock=>`, `<set dock=>`, `<if docked=>`), not just
+  `<section dock=>`: today all four land inside the same 25, so a census of one arm
+  passes for the wrong reason and would stop catching a typo the moment a name is
+  added to another. This is task 313's shape — eighteen censuses that read text
+  still containing the nodes they meant to exclude.
 
 ## Phase 2: Every named place on the six maps has coordinates
 
@@ -102,9 +143,14 @@ phase 3 needs, and it is independently checkable.
 
 ### Dependencies and risks
 
-- The shipped maps are 500px-wide downscales of the source `.JPG`s. Storing
-  coordinates as percentages keeps them valid if a higher-resolution scan is
-  substituted later; storing pixels would not.
+- The shipped maps are **not** downscales: `books/book<N>/<Region>-Map.JPG` is itself
+  500px wide, and the build copies it byte-for-byte to `web/assets/maps/book<N>.jpg`
+  (verified by hash), so 500px is the only resolution the repo holds. Storing
+  coordinates as percentages is therefore the whole insurance policy — it is what
+  keeps them valid if a real high-resolution scan is ever substituted, and there is
+  no larger original to fall back on if pixels are stored instead. Heights differ per
+  book (627, 584, 619, 612, 665, 674), so a percentage `y` is not interchangeable
+  between maps either.
 - Book 3 ships two images — `VioletOcean-Map.JPG` is the regional map, while
   `Map of Bazalek Isle.JPG` is a section illustration surfaced by an item's Use
   effect (task 62). Only the former is the Book 3 map; decide explicitly whether
