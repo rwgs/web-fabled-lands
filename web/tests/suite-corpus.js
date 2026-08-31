@@ -37,6 +37,21 @@ export async function run(ctx) {
     ok('every published book has bundled section data', empty.length === 0, 'no sections for book(s) '+empty.join(','));
     ok('all sections render w/o throw ('+total+')', renderErrors===0, renderErrors+' errors; first='+firstErr);
 
+    // --- task 324: the Maps modal captions each map with book.ini's Map.Title ------------------
+    // The caption (and the image's alt text) comes from meta.json's per-book mapTitle, which the
+    // build reads from book.ini. Every published book carries the key today, and it is a caption
+    // rather than a rule, so a book without one falls back to the volume title instead of failing.
+    {
+      const noMapTitle = books.filter((b) => !data.bookInfo(b)?.mapTitle);
+      ok('every published book bundles its map caption (book.ini Map.Title)',
+         noMapTitle.length === 0, 'no mapTitle for book(s) ' + noMapTitle.join(','));
+      ok('the map caption is the map’s title, not the volume’s',
+         books.some((b) => data.bookMapTitle(b) !== data.bookTitle(b)),
+         books.map((b) => b + ':' + data.bookMapTitle(b)).join(' | '));
+      ok('a book with no Map.Title falls back to the book title',
+         data.bookMapTitle(999) === data.bookTitle(999));
+    }
+
     // --- task 300: every modifier=/modifiers= value is one the engine acts on -----------------
     // Pinned to the WORD SET, not to a section list, so a book joining the edition is checked
     // rather than re-pinning the assertion. modifier= is the ability-resolution mode read by

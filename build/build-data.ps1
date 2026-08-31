@@ -14,6 +14,7 @@
   Source of truth is left untouched:
     books/book<n>/<s>.xml         -> web/data/book<n>.json  ( { "<section>": "<xml>" } )
     books/book<n>/Adventurers.xml -> folded into web/data/meta.json
+    books/book<n>/book.ini        -> Map.Title, the regional map's own caption, in meta.json
     rules/*.xml                   -> folded into web/data/meta.json
     books/books.ini               -> book titles in meta.json, and the Published= list
                                      of book numbers this build bundles (which also drives
@@ -97,6 +98,31 @@ function Get-Pregens([string]$dir, [string]$advXml) {
     return $list
 }
 
+# ---- The regional map's own caption (book.ini Map.Title) --------------------
+# Map.Title is a caption written for the MAP rather than for the volume - book 3's is
+# "The Ports & Anchorages of the Violet Ocean" where its Title= is "Over the Blood-Dark Sea" -
+# and the Maps modal uses it as both the caption and the image's alt text. It holds something
+# no other file in the repo knows, which is the test AGENTS.md sets for reading a book.ini key
+# at all; contrast Map=, left dead in task 322 because the filesystem already answers it.
+# Deliberately a targeted match for this one key rather than a Properties parser: book.ini is
+# Java Properties and Codewords= needs the continuation and \uXXXX handling that
+# validate-source.ps1's Get-IniCodewords carries, but every Map.Title is one plain line.
+# A missing key returns $null and the app falls back to the book title - a caption is
+# decoration and must never fail a build. (task 324)
+function Get-IniMapTitle([string]$dir) {
+    $path = Join-Path $dir 'book.ini'
+    if (-not (Test-Path $path)) { return $null }
+    foreach ($line in [System.IO.File]::ReadAllLines($path)) {
+        $t = $line.Trim()
+        if ($t -eq '' -or $t.StartsWith('#') -or $t.StartsWith('!')) { continue }
+        $eq = $t.IndexOf('=')
+        if ($eq -lt 0 -or $t.Substring(0, $eq).Trim() -ne 'Map.Title') { continue }
+        $value = $t.Substring($eq + 1).Trim()
+        if ($value -ne '') { return $value }
+    }
+    return $null
+}
+
 # ---- The publish set (books.ini) --------------------------------------------
 # Published= is the set of books this build bundles: source validation, all three copy loops
 # below, the service worker's offline inventory and the reconciliation of withdrawn outputs
@@ -169,6 +195,7 @@ foreach ($b in $bundled) {
     $bookMeta += [ordered]@{
         number      = $b
         title       = $titles[$b]
+        mapTitle    = Get-IniMapTitle $dir
         sections    = $map.Count
         adventurers = $advXml
         pregens     = $pregens

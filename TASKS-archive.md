@@ -333,6 +333,7 @@ The completed tasks archived in this file (stable IDs 1–325). Detail sections 
 - [x] 322. `book.ini` is read by nothing, so its `Map=` key reads as live configuration while the build ignores it
 - [x] 325. The gate validates codeword attribute *names* but never codeword *values*, so a typo'd codeword fails silently in play
 - [x] 323. `REVIEW.md`/`PLAN.md` cite source by line, and all four of `REVIEW.md`'s had drifted onto unrelated code
+- [x] 324. The Maps modal captions each regional map with the book title, when `book.ini` holds a title written for the map
 
 ---
 
@@ -14866,5 +14867,66 @@ Documentation only: no rebuild, no suite run, and no generated output may change
 (`git status` should show only `.md` files, and `stamp-version.ps1` should report "already
 at" its current stamp). Verify each replaced citation by opening the named symbol — a
 function name that does not exist fails loudly, which is the whole point of the change.
+
+---
+
+## 324. The Maps modal captions each regional map with the book title, when `book.ini` holds a title written for the map — LOW (quality)
+
+**Priority: LOW.** A visible-quality improvement, not a defect — every map shows *a* caption
+today, just the less apt one.
+
+### What is wrong
+
+`showMaps` in `web/js/app.js` builds one tab target per published book and captions it with
+`data.bookTitle(n)`, the `<N>.Title` from `books.ini`. That is the title of the *volume*. Each
+`books/book<N>/book.ini` also carries a `Map.Title` written for the *map*, and for four of the
+six books they are materially different things:
+
+| Book | Caption shown now (`books.ini` `Title=`) | `book.ini` `Map.Title=` |
+|---|---|---|
+| 1 | The War-Torn Kingdom | Sokara |
+| 2 | Cities of Gold and Glory | The Merchant Kingdom of Golnir |
+| 3 | Over the Blood-Dark Sea | The Ports & Anchorages of the Violet Ocean |
+| 4 | Devils & Howling Darkness | The Howling Wasteland of the Great Steppes |
+| 5 | The Court of Hidden Faces | Uttaku: The Land of Hidden Faces |
+| 6 | Lords of the Rising Sun | Akatsurai: The Land Below the Sunrise |
+
+Book 3 is the clearest: the map is a chart of ports and anchorages, and "Over the Blood-Dark
+Sea" tells a reader nothing about what they are looking at. The caption is also the image's
+`alt` text (`img.alt = t.title`), so this is an accessibility improvement as well as a
+cosmetic one — a screen-reader user currently hears the book title where the map's own
+subject would be more use.
+
+### Why it matters
+
+The information is already in the tree, hand-written per book, and nothing reads it. Task 322
+settled that `book.ini`'s `Map=` should stay dead because it duplicates a fact the filesystem
+already answers; `Map.Title` is the opposite case and the reason that task's conclusion was
+scoped to `Map=` only. It holds something **no other file in the repo knows**, which is the
+stated test in `AGENTS.md` for whether an `.ini` key deserves to be live.
+
+### Steps
+
+1. Read `Map.Title` per book in `build/build-data.ps1` and pass it through into `meta.json`
+   beside the existing book titles. It must be in `meta.json` and not a per-book JSON: the
+   Maps modal is reachable before any book loads (`PLAN.md` records this constraint for the
+   gazetteer, and it applies identically here).
+   `book.ini` is **Java Properties**, not simple INI — `Codewords=` uses backslash line
+   continuations and `\u00c9`-style escapes — so read the single `Map.Title` key with a
+   targeted match rather than writing a general parser for a file this task does not
+   otherwise need. Note task 325 will want the continuation handling; do not build it here
+   speculatively.
+2. Caption with `Map.Title` where present, falling back to `data.bookTitle(n)` where it is
+   missing, so a book folder without the key still renders. The world map's hard-coded
+   "The Fabled Lands" is unaffected.
+3. A missing `Map.Title` must **not** be a build error — unlike `Published=`, this is
+   decoration, and failing a build over a caption would be out of proportion.
+
+### Validation
+
+`build-data.ps1` changes, so rebuild and confirm the diff is confined to `meta.json` (plus the
+stamp) — no per-book JSON, no map or art copy may move. Then the headless suite to
+`RESULT ALL PASS`. Open the Maps modal and read the six captions; the `alt` text changes with
+them, so check one with the image path broken to confirm the missing-map note still wins.
 
 ---

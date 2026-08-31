@@ -49,9 +49,10 @@ currently prints, which is what task 320 is filed to fix.
   and declares `Map=`, but that key is inert - the build picks each regional map by the
   `-Map$` basename pattern, which is why book 3's `Map=Violet Ocean.JPG` names no file that
   exists. The file is not wholly unread: `validate-source.ps1` parses its `Codewords=` list
-  (task 325), so a Java Properties reader with continuation and `\uXXXX` handling already
-  exists under `build/` and `places.ini` can follow its shape. Reusing that reader still does
-  not make `Map=` live.
+  (task 325) and `build-data.ps1` its `Map.Title=` caption (task 324), so a Java Properties
+  reader with continuation and `\uXXXX` handling already exists under `build/` and
+  `places.ini` can follow its shape. Two live keys still do not make `Map=` live - each was
+  read because it holds something the filesystem cannot answer, which is the test `Map=` fails.
 
 ## Approach
 

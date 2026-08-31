@@ -1165,8 +1165,11 @@ function showMaps(activeBook) {
   view.tabIndex = -1;
 
   const targets = [{ key: 'world', label: 'World', src: 'assets/world-map.jpg', title: 'The Fabled Lands', missing: 'World map not available.' }];
+  // Captioned (and alt-texted) with the MAP's own title from book.ini, not the volume's: a
+  // reader looking at book 3's chart is better served by "The Ports & Anchorages of the Violet
+  // Ocean" than by "Over the Blood-Dark Sea". Falls back to the book title. (task 324)
   data.availableBooks().forEach((n) => {
-    targets.push({ key: 'b' + n, label: 'Book ' + n, src: `assets/maps/book${n}.jpg`, title: data.bookTitle(n), missing: `Regional map for Book ${n} not installed.\nAdd it as web/assets/maps/book${n}.jpg` });
+    targets.push({ key: 'b' + n, label: 'Book ' + n, src: `assets/maps/book${n}.jpg`, title: data.bookMapTitle(n), missing: `Regional map for Book ${n} not installed.\nAdd it as web/assets/maps/book${n}.jpg` });
   });
 
   let current = null;

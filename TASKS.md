@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-323 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **325** is complete out of order; **324,
-326, 327, 328 and 329 (all LOW) are open**. File new
+325 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **326, 327, 328, 329 and 330 (all LOW) are
+open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -25,11 +25,11 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 324. the Maps modal captions every regional map with the **book** title from `books.ini` (book 3's map reads "Over the Blood-Dark Sea") when `book.ini` holds a `Map.Title` written for the map itself ("The Ports & Anchorages of the Violet Ocean") — a better caption for all six, sitting unread in the tree
 - [ ] 326. task **207** is missing from **both** indexes — no `- [x] 207.` line in this file's Done checklist and no entry in `TASKS-archive.md`'s Contents — so a completed task exists only as an orphan `## 207.` detail section, breaking the stated invariant that "the checklist above still carries every task's stable ID and status"
 - [ ] 327. task 325's unused-codeword note counts a `<lose>` or an `<if>` as "used", so the case it exists to surface — a codeword the port never **awards** — is not reported: book 2's `Beach` and `Bilge` are tested and swept but reachable by no `<gain>`/`<tick>`, which is exactly what that book's `# Unnecessary codewords: Bait,Beach,Bilge` comment records, and the third name is masked by a no-op `<tick>`
 - [ ] 328. two sections carry a `<tick codeword="X"/><lose codeword="X"/>` no-op pair (book 2 sections 579 and 633), and one of them invents a codeword — `Bogus` — that exists nowhere else in the corpus and in no `Codewords=` list, so task 325 had to add it to the gate's port-flag allowlist to keep the build green: an allowlist entry whose only job is to keep scaffolding alive
 - [ ] 329. `PLAN.md`'s status header says "the backlog carries one open item (task 320)" and dates itself today, but 320 is closed and the backlog carries four — a stale *status* rather than a stale citation, in the file task 323 had just swept for citations, and a count `PLAN.md` cannot help rotting because it restates a figure another file owns
+- [ ] 330. `run-tests.ps1` diagnoses an empty dump as a CAPTURE failure ("no stdout handle?"), but a browser that launches and does no work at all writes the same empty file — an Edge mid-update wrote no DOM, no `--screenshot` and no `--version` while still creating its profile, and `AGENTS.md`'s one-second discriminator ("`--version` printing nothing confirms the missing handle") reads that evidence as exactly the wrong cause
 
 **Done**
 
@@ -362,67 +362,7 @@ this order.*
 - [x] 322. every book's `book.ini` is read by **nothing** — no script under `build/` opens it — so its `Map=` key reads as the live declaration of which image is that book's map while the build actually selects by the `-Map$` basename pattern, and book 3 proves it inert: `Map=Violet Ocean.JPG` names a file that does not exist, yet `VioletOcean-Map.JPG` ships correctly as `book3.jpg`
 - [x] 325. `validate-source.ps1` validates codeword **attribute names** but never codeword **values**, so a typo'd `<gain codeword="Anchr">` passes the gate and silently never matches its `<if codeword="Anchor">` — the player just cannot progress, and `book.ini`'s `Codewords=` already holds the authoritative per-book list to check against
 - [x] 323. `REVIEW.md` cites `renderStatic` at `app.js:775`/`:781` for a defect that task 65 already fixed and a function that has since moved to `ui.js` — the same fragile-citation class task 320 fixed in `ROADMAP.md` only, leaving `PLAN.md`'s six `#L` citations (all still exact) and `REVIEW.md`'s four (all drifted) carrying the form that pass banned
-
----
-
-## 324. The Maps modal captions each regional map with the book title, when `book.ini` holds a title written for the map
-
-**Priority: LOW.** A visible-quality improvement, not a defect — every map shows *a* caption
-today, just the less apt one.
-
-### What is wrong
-
-`showMaps` in `web/js/app.js` builds one tab target per published book and captions it with
-`data.bookTitle(n)`, the `<N>.Title` from `books.ini`. That is the title of the *volume*. Each
-`books/book<N>/book.ini` also carries a `Map.Title` written for the *map*, and for four of the
-six books they are materially different things:
-
-| Book | Caption shown now (`books.ini` `Title=`) | `book.ini` `Map.Title=` |
-|---|---|---|
-| 1 | The War-Torn Kingdom | Sokara |
-| 2 | Cities of Gold and Glory | The Merchant Kingdom of Golnir |
-| 3 | Over the Blood-Dark Sea | The Ports & Anchorages of the Violet Ocean |
-| 4 | Devils & Howling Darkness | The Howling Wasteland of the Great Steppes |
-| 5 | The Court of Hidden Faces | Uttaku: The Land of Hidden Faces |
-| 6 | Lords of the Rising Sun | Akatsurai: The Land Below the Sunrise |
-
-Book 3 is the clearest: the map is a chart of ports and anchorages, and "Over the Blood-Dark
-Sea" tells a reader nothing about what they are looking at. The caption is also the image's
-`alt` text (`img.alt = t.title`), so this is an accessibility improvement as well as a
-cosmetic one — a screen-reader user currently hears the book title where the map's own
-subject would be more use.
-
-### Why it matters
-
-The information is already in the tree, hand-written per book, and nothing reads it. Task 322
-settled that `book.ini`'s `Map=` should stay dead because it duplicates a fact the filesystem
-already answers; `Map.Title` is the opposite case and the reason that task's conclusion was
-scoped to `Map=` only. It holds something **no other file in the repo knows**, which is the
-stated test in `AGENTS.md` for whether an `.ini` key deserves to be live.
-
-### Steps
-
-1. Read `Map.Title` per book in `build/build-data.ps1` and pass it through into `meta.json`
-   beside the existing book titles. It must be in `meta.json` and not a per-book JSON: the
-   Maps modal is reachable before any book loads (`PLAN.md` records this constraint for the
-   gazetteer, and it applies identically here).
-   `book.ini` is **Java Properties**, not simple INI — `Codewords=` uses backslash line
-   continuations and `\u00c9`-style escapes — so read the single `Map.Title` key with a
-   targeted match rather than writing a general parser for a file this task does not
-   otherwise need. Note task 325 will want the continuation handling; do not build it here
-   speculatively.
-2. Caption with `Map.Title` where present, falling back to `data.bookTitle(n)` where it is
-   missing, so a book folder without the key still renders. The world map's hard-coded
-   "The Fabled Lands" is unaffected.
-3. A missing `Map.Title` must **not** be a build error — unlike `Published=`, this is
-   decoration, and failing a build over a caption would be out of proportion.
-
-### Validation
-
-`build-data.ps1` changes, so rebuild and confirm the diff is confined to `meta.json` (plus the
-stamp) — no per-book JSON, no map or art copy may move. Then the headless suite to
-`RESULT ALL PASS`. Open the Maps modal and read the six captions; the `alt` text changes with
-them, so check one with the image path broken to confirm the missing-map note still wins.
+- [x] 324. the Maps modal captions every regional map with the **book** title from `books.ini` (book 3's map reads "Over the Blood-Dark Sea") when `book.ini` holds a `Map.Title` written for the map itself ("The Ports & Anchorages of the Violet Ocean") — a better caption for all six, sitting unread in the tree
 
 ---
 
@@ -649,7 +589,67 @@ Documentation only: `git status` shows only `.md` files and `stamp-version.ps1` 
 
 ---
 
-> **Completed task details (tasks 1–325) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 325) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
+## 330. An empty dump is diagnosed as a capture failure, when the browser may simply have done nothing
+
+**Priority: LOW.** The runner already fails the run — nothing unsound ships. What is wrong is
+the *diagnosis*: it names one cause with confidence, and the other cause reads identically.
+
+### What is wrong
+
+`run-tests.ps1` throws `The browser wrote an EMPTY dump to <path> (no stdout handle?).` when the
+dump is zero bytes, and `AGENTS.md`'s "An empty dump is a capture failure, not a page-load
+failure" note backs it with a one-second check: "`chrome.exe --version` printing nothing from the
+same prompt confirms the missing handle". Both assume the browser ran and its output was lost.
+
+A browser that **launches and does no work** produces the same zero-byte dump. Task 324's pass hit
+it: the only browser on the machine was Edge 151.0.4129.107 with 152.0.4191.53 staged for restart
+(`new_msedge.exe` beside `msedge.exe` in `Application/`) and a session 3 days old holding 28 live
+processes. Every headless launch **exited 0**, created a complete `--user-data-dir` profile, and
+wrote nothing — no DOM, no `--version` text, and no `--screenshot` file. Not the handle: the same
+nothing came back through `Start-Process -RedirectStandardOutput`, through `cmd >`, from
+`--headless=old` and from the version-directory binaries. `AGENTS.md`'s discriminator fires
+positive here and sends the reader to the `cmd`/handle fix, which cannot help.
+
+The check that *does* separate them is the one flag that never touches stdout: `--screenshot=<file>`.
+A screenshot written with an empty dump is the capture failure the note describes; no screenshot
+either means the browser did no work, and no redirection fix will change that.
+
+`Find-Browser` compounds it by returning the first browser path that exists — Chrome, else Edge —
+with no check that it can produce output, so a machine with a working Chrome and a wedged Edge is
+fine while the reverse looks like a repo failure.
+
+### Why it matters
+
+Every other trap in the test-loop notes is now closed mechanically (task 235), and this one is the
+same shape: a run that fails for an environmental reason, wearing the label of a different fix.
+The cost is a session spent redirecting stdout six ways.
+
+### Steps
+
+1. In `run-tests.ps1`'s empty-dump branch, before throwing, re-launch the browser once with
+   `--screenshot` to a temp file over `data:text/html,<p>x</p>` (no server, no suite) and let the
+   result choose the message: a screenshot written → the existing "no stdout handle?" text; none
+   → "the browser produced no output at all — it may be mid-update or blocked by policy; try
+   `-Browser <path to another Chromium>`". Keep it to the failure path so a passing run pays
+   nothing.
+2. Correct `AGENTS.md`'s note: `--version` printing nothing is consistent with **both** causes, and
+   the screenshot probe is what tells them apart. Keep the `cmd`/handle account — it was real —
+   and add the second cause beside it, with the Edge observation as its evidence.
+3. Do **not** make `Find-Browser` prefer or reject a browser by probing it on every run: that
+   spends a launch per run to catch a rare state, and step 1 already names the state when it
+   happens.
+
+### Validation
+
+`build/run-tests.ps1` changes, so the suite must still reach `RESULT ALL PASS` and exit 0
+unchanged. Drive the new branch by pointing `-Browser` at a binary that exits 0 without writing
+(a two-line `.cmd` shim, the shape `run-tests-selftest.ps1` already uses for Python discovery) and
+confirm the message names the right cause. That self-test is Windows-only and CI does not run it,
+so run it by hand.
+
+---
+
+> **Completed task details (tasks 1–325) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -658,6 +658,35 @@ Documentation only: `git status` shows only `.md` files and `stamp-version.ps1` 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (task 324): closed **324** — every regional map is now captioned, and
+alt-texted, with `book.ini`'s `Map.Title` (the map's own subject: "The Ports & Anchorages of the
+Violet Ocean") instead of the volume title from `books.ini` ("Over the Blood-Dark Sea"). The build
+reads the one key with a targeted match (`Get-IniMapTitle` in `build-data.ps1`) and passes it
+through `meta.json`'s per-book entry, since the Maps modal opens before any book loads;
+`data.bookMapTitle` falls back to the book title, so a book folder without the key still captions
+its map and no build fails over decoration. Generated diff confined to `meta.json` plus the stamp
+and `sw.js`'s `VERSION` — no book JSON, no map or art copy moved.
+
+**`Map.Title` is the counter-example task 322 predicted.** That pass left `Map=` dead because the
+filesystem already answers it, and scoped its conclusion to that key precisely because the file
+holds something else no other file knows. This is that something: six hand-written captions,
+read by nothing until now, and the second `book.ini` key to go live after `Codewords=` (task 325).
+Three keys have now been weighed against `AGENTS.md`'s test — two read, one deliberately not.
+
+**Validation ran the modal, not just the data.** Three assertions went into `suite-corpus`
+(every published book bundles a `mapTitle`; at least one differs from its book title; an unknown
+book falls back), and the task's own step — read the six captions, then break the image — was done
+by serving the tree and driving the real `showMaps` headlessly from a throwaway page, since a
+caption is a view concern the DOM-free suites cannot reach. All six read as the map title, the
+world map still reads "The Fabled Lands", and a broken image still replaces the caption with the
+missing-map note. `RESULT ALL PASS pass=3035 fail=0`.
+
+Filed **330**. The suite could not run at first: the machine's only browser was an Edge with an
+update staged and a 3-day-old session, and it answered every headless launch by exiting 0 having
+done nothing — no DOM, no screenshot, no `--version`. The runner reported that as
+"EMPTY dump … (no stdout handle?)" and `AGENTS.md`'s one-second discriminator agreed, which is
+the wrong cause and a fix that cannot work. (Unblocked by installing Chrome.)
 
 Worked 2026-08-31 (task 323): every code line citation is gone from `REVIEW.md` and
 `PLAN.md`, replaced by the function, selector or key. Documentation only — `git status`

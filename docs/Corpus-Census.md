@@ -154,8 +154,10 @@ and the wrong one for "how many nodes does the engine build".
 | `web/data/book6.json` | 460 KB |
 
 `meta.json` carries what the title screen needs before any book is loaded - the book list,
-titles, section counts and each book's `Adventurers.xml`. Anything a rule needs before a
-book is chosen belongs there, not in a per-book file.
+titles, map captions, section counts and each book's `Adventurers.xml`. Anything a rule or a
+pre-game screen needs before a book is chosen belongs there, not in a per-book file: the Maps
+modal opens straight off the title screen, which is why `book.ini`'s `Map.Title` is folded in
+here (task 324).
 
 Section text is bundled **verbatim as text**, not transformed into JSON structure, which
 is why these files are large and why there is no lossy conversion step to debug. See

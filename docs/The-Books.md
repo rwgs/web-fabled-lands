@@ -77,10 +77,11 @@ numbers.
 its own filename **fails the build gate** if it sits in the book folder itself, because
 such a file reads as a second copy of a live section.
 
-`book.ini` is inherited from the reference `java-engine/` data format. **One key of it is
-live: `Codewords=`**, which `validate-source.ps1` reads as the authority for every `codeword=`
+`book.ini` is inherited from the reference `java-engine/` data format. **Two keys of it are
+live.** `Codewords=` is what `validate-source.ps1` reads as the authority for every `codeword=`
 value in the corpus (task 325 - see [Build Pipeline](Build-Pipeline.md#the-source-xml-gate)).
-`Map`, `Map.Title`, `Death` and `Icon` reach neither the build nor the app.
+`Map.Title=` is the caption the build folds into `meta.json` for the Maps modal (task 324, below).
+`Map`, `Death` and `Icon` reach neither the build nor the app.
 
 Do not read `Map=` as the declaration of that book's regional map: the build picks the map by
 the **`-Map$` basename pattern** instead, which is why book 3's `Map=Violet Ocean.JPG` names
@@ -89,11 +90,11 @@ pattern-driven on purpose (task 322) - a pattern is re-checked against the direc
 build, so it cannot drift the way that value did.
 
 The rest of the file is a different matter, because unread is not the same as worthless.
-That is how `Codewords=` came to be read at all: it holds the authoritative per-book codeword
-list, which task 325 turned into a build check. `Map.Title` is the one still on the table - a
-written-for-the-map caption the Maps modal does not use (book 3's is "The Ports & Anchorages
-of the Violet Ocean", where the modal shows the book title "Over the Blood-Dark Sea"), filed
-as task 324.
+That is how both live keys came to be read at all. `Codewords=` holds the authoritative per-book
+codeword list, which task 325 turned into a build check. `Map.Title` is a caption written for
+the map rather than the volume - book 3's is "The Ports & Anchorages of the Violet Ocean" where
+its book title is "Over the Blood-Dark Sea" - which task 324 gave to the Maps modal as both the
+caption and the image's alt text, falling back to the book title where the key is absent.
 
 ---
 

@@ -41,30 +41,34 @@ combat, markets, ships, live adventure sheet). Plain HTML/CSS/ES modules —
   art, `sw.js`'s offline inventory and the every-section scan. Publishing/withdrawing a
   book is a content change to this line, never a build-script edit (task 209).
 - **`books/book<N>/book.ini`** — inherited from the reference `java-engine/` data format, and
-  **one key of it is live: `Codewords=`.** `validate-source.ps1` parses it (Java Properties —
-  backslash line continuations and `\uXXXX` escapes, both of which the six books use) and
-  checks every `codeword=` VALUE in the corpus against the union of the six lists, because a
-  misspelled codeword is invisible to every other check: the engine cannot tell one the player
-  never earned from one the port never awards, so the `<if>` it guards simply stays shut
-  (task 325). Three things are legitimately absent from those lists and are exempted in the
-  gate, not in the `.ini`: section-scoped bookkeeping flags (`2.567.1a`, `5/520` — matched by
-  shape), the port's own named state flags (`StillInYellowport`, `HydraDamage` — an explicit
-  list), and codewords printed in the unpublished books 7–12 (`Hill`, `Judas`). The reverse
-  direction — a declared codeword no section uses — is reported as a **note**, never a
-  failure. `Map.Title` remains unread and is filed as task 324; `Map`, `Death` and `Icon`
-  reach neither the build nor the app. What is settled (task 322) is
-  the one key that looks most like configuration: `Map=` is **not** the source of truth for
-  that book's regional map. The build selects it by the **`-Map$` basename pattern**, and book
-  3 proves the key dead — `Map=Violet Ocean.JPG` names no file on disk, while
-  `VioletOcean-Map.JPG` ships correctly as `book3.jpg`. That stays pattern-driven on purpose:
-  a pattern is re-checked against the directory on every build and so cannot drift, where a
-  declaration of the same fact can and did. Contrast `books.ini` above, which is read
-  *because* `Published=` carries an editorial decision the filesystem cannot answer — **the
-  test for a live `.ini` key here is whether it holds something you cannot derive.** That is
-  the same test `Codewords=` passes and `Map=` fails, which is why one is now read and the
-  other is not. So **do not cite `Map=` as build configuration or as a precedent for one**,
-  and do not rename a `.JPG` to satisfy it — but do read the file before assuming a fact
-  about a book is unrecorded.
+  **two keys of it are live: `Codewords=` and `Map.Title=`.** `validate-source.ps1` parses the
+  first (Java Properties — backslash line continuations and `\uXXXX` escapes, both of which
+  the six books use) and checks every `codeword=` VALUE in the corpus against the union
+  of the six lists, because a misspelled codeword is invisible to every other check: the engine
+  cannot tell one the player never earned from one the port never awards, so the `<if>` it
+  guards simply stays shut (task 325). Three things are legitimately absent from those lists
+  and are exempted in the gate, not in the `.ini`: section-scoped bookkeeping flags
+  (`2.567.1a`, `5/520` — matched by shape), the port's own named state flags
+  (`StillInYellowport`, `HydraDamage` — an explicit list), and codewords printed in the
+  unpublished books 7–12 (`Hill`, `Judas`). The reverse direction — a declared codeword no
+  section uses — is reported as a **note**, never a failure. `Map.Title=` is the second, read
+  by `Get-IniMapTitle` in `build-data.ps1` and passed through `meta.json` so the Maps modal can
+  caption — and alt-text — each regional map with the map's own subject ("The Ports &
+  Anchorages of the Violet Ocean") rather than the volume title ("Over the Blood-Dark Sea");
+  a book without the key falls back to the book title, because a caption is decoration and must
+  never fail a build (task 324). `Map`, `Death` and `Icon` reach neither the build nor the app.
+  What is settled (task 322) is the one key that looks most like configuration: `Map=` is
+  **not** the source of truth for that book's regional map. The build selects it by the
+  **`-Map$` basename pattern**, and book 3 proves the key dead — `Map=Violet Ocean.JPG` names
+  no file on disk, while `VioletOcean-Map.JPG` ships correctly as `book3.jpg`. That stays
+  pattern-driven on purpose: a pattern is re-checked against the directory on every build and so
+  cannot drift, where a declaration of the same fact can and did. Contrast `books.ini` above,
+  which is read *because* `Published=` carries an editorial decision the filesystem cannot
+  answer — **the test for a live `.ini` key here is whether it holds something you cannot
+  derive.** That is the same test `Codewords=` and `Map.Title=` pass and `Map=` fails, which is
+  why two are now read and the third is not. So **do not cite `Map=` as build configuration or as
+  a precedent for one**, and do not rename a `.JPG` to satisfy it — but do read the file before
+  assuming a fact about a book is unrecorded.
 - **`web/data/*.json` and `web/js/version.js`** — **GENERATED** from `books/` +
   `rules/` by the build. **Never hand-edit them;** change the XML and rebuild.
 - **`web/sw.js`** — hand-written, *except* the `BOOK_DATA`/`BOOK_MAPS`/`BOOK_ILLUS` lists

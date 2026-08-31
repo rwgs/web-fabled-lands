@@ -36,6 +36,14 @@ export function bookInfo(n) {
   return (_meta?.books || []).find((b) => b.number === Number(n)) || null;
 }
 
+/** The caption for a book's regional map: book.ini's Map.Title, which describes the MAP
+ *  ("The Ports & Anchorages of the Violet Ocean") where bookTitle describes the volume
+ *  ("Over the Blood-Dark Sea"). Falls back to the book title for a book whose book.ini
+ *  carries no Map.Title, so an incomplete book folder still captions its map. (task 324) */
+export function bookMapTitle(n) {
+  return bookInfo(n)?.mapTitle || bookTitle(n);
+}
+
 export async function loadBook(n) {
   n = Number(n);
   if (_rawBooks[n]) return _rawBooks[n];
