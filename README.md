@@ -150,6 +150,12 @@ only misbehave when the browser renders that section:
 - Every **explicit jump target resolves**: a `section=` (or `<extrachoice atsection=`) in a
   bundled book 1–6 must name a section that book actually contains. Links into the
   unbundled books 7–12 are intentional and left alone, as are non-literal ids.
+- Every **`codeword=` value is a codeword some book declares**, checked against the union of
+  the six `books/book<N>/book.ini` `Codewords=` lists. A misspelling is invisible otherwise —
+  `<gain codeword="Anchr">` against `<if codeword="Anchor">` builds and renders clean, and the
+  branch simply never opens. Section-scoped bookkeeping flags (`2.567.1a`, `5/520`), the
+  port's own named state flags and codewords printed in books 7–12 are exempt. The reverse —
+  a declared codeword no section uses — prints as a **note** and never fails the build.
 - Each pregen's **biography is readable** — inline prose, or the `<FirstName>.xml` whose
   first `<p>` the build folds in.
 

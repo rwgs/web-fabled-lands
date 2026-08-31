@@ -104,6 +104,18 @@ misspelling therefore makes the check *easier* than the page prints it, silently
 
 The full vocabulary is in [XML Tag Reference](XML-Tag-Reference.md).
 
+One attribute is checked by **value** as well as by name: `codeword=`. The authority is the
+`Codewords=` list in each `books/book<N>/book.ini` - the printed list from that volume's
+inside front cover - and the check is against the **union** of the six, because the
+alphabetical rule (book 1's codewords all begin with A) says where a codeword is *earned*,
+not where it may be tested. The same invisible failure applies as above: an unknown codeword
+is indistinguishable from one the player has not earned, so a typo'd `<gain codeword="Anchr">`
+leaves its `<if codeword="Anchor">` shut for the whole game. Three shapes are legitimately
+absent from those lists and exempt: section-scoped bookkeeping flags (`2.567.1a`, `5/520`),
+the port's own named state flags (`StillInYellowport`), and codewords printed in the
+unpublished books 7-12 (`Hill`, `Judas`). The reverse direction is reported as a **note**
+rather than a failure - the printed books really do list a codeword they never use.
+
 ---
 
 ## `books.ini` and the edition

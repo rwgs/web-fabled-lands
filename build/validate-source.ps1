@@ -172,6 +172,91 @@ $script:FL_CARGO = @('grain', 'furs', 'metals', 'minerals', 'spices', 'textiles'
 # not an enum, so it gets its own check in Test-AttrValue rather than an FL_ENUMS row. Keep it
 # in step with combat.js makeFight, which parses the same tokens. (task 300)
 $script:FL_FIGHT_MODIFIERS = @('noarmour')
+# ---- The codeword authority (task 325) --------------------------------------------------
+# codeword= was allowlisted as an attribute NAME on nine tags and never looked inside, so
+# <gain codeword="Anchr"/> against <if codeword="Anchor"> built, rendered and asserted clean
+# while the branch it guards simply never opened. Nothing else in the repo can see that: the
+# two sites are usually in different files and often different books, and to the engine an
+# unknown codeword is indistinguishable from one the player has not earned yet - so the defect
+# lands on the player as a section that cannot be completed. The authority to check against is
+# books/book<N>/book.ini's Codewords=, the printed list from that volume's inside front cover.
+# That is the one key in book.ini worth reading, and the reason task 322's "nothing reads it,
+# leave it dead" finding was scoped to Map= alone: this list holds something the filesystem
+# cannot answer.
+#
+# The check is against the UNION of the six lists, not the file's own book. The alphabetical
+# rule (book 1's codewords all begin with A, book 2's with B) describes where a codeword is
+# EARNED, not where it may be tested: book 1 alone tests Barnacle, Crag, Defend and Eldritch,
+# and Almanac reaches all six books. A per-book check would fail 60-odd valid sites.
+
+# Values that are not printed codewords at all, and so appear in no Codewords= list.
+#
+# 1. Section-scoped bookkeeping flags. The transcription reuses the codeword store as general
+#    per-playthrough memory - "2.567.1a", "5/520", "3.318.sold", "5.Aku.leaving" - so a value
+#    opening with a number and a '.' or '/' is machinery, and no list could authorise it. The
+#    separator is required rather than a bare leading digit so that a fat-fingered flag still
+#    fails: book 4 section 345 cleared "4457" where section 457 sets "4.457", which is this
+#    check's own first catch and exactly the one-character defect it exists for.
+$script:FL_SCOPED_FLAG = '^\d+[./]\S+$'
+
+# 2. The port's own named state flags. They live in the codeword store because it is the one
+#    per-playthrough set the engine already persists, but each records engine state no printed
+#    codeword ever did: damage carried out of a fight (HydraDamage, SpiderPoison), a counter
+#    <adjust name=> reads (CharismaBonus), a standing latch (StillInYellowport). Listed rather
+#    than pattern-matched because nothing in their spelling tells them apart from a codeword -
+#    which is the point, since a typo among THEM must fail too. Bogus is the odd one out and
+#    names nothing: it is ticked and immediately lost in book 2 section 633 and appears nowhere
+#    else, so it is scaffolding kept alive by this entry - filed for removal as task 328.
+$script:FL_PORT_FLAGS = @(
+    'BladeSeven', 'Bogus', 'CharismaBonus', 'GhoulBitten', 'GoddessMirror', 'HydraDamage',
+    'LitCandle', 'ScorpionSting', 'SnakeDemonFight', 'SpiderDamage', 'SpiderPoison',
+    'StillInYellowport', 'StolenTyrnaiMail', 'UndeadDamage', 'YarimuraProtection',
+    'YellowportUprising')
+
+# 3. Codewords printed in books 7-12, which the published six reference forward on purpose:
+#    book 5 tests Hill (book 8), book 6 tests Ink and Iota (9) and Kink (11), books 3 and 6
+#    test Judas (10). Those volumes have no folder here and so no Codewords= line - the same
+#    deliberate leniency as the dangling-link check, which never reports a jump into an
+#    unbundled book.
+$script:FL_FORWARD_CODEWORDS = @('Hill', 'Ink', 'Iota', 'Judas', 'Kink')
+
+# Set per Test-SourceTree run: lowercased codeword -> the book that declares it, or 0 for the
+# two exemption lists above. $null means the authority could not be read and the value check
+# stands down (Test-SourceTree has reported that separately) rather than failing every site.
+$script:FL_CODEWORDS = $null
+$script:FL_CODEWORD_SEEN = @{}
+
+# book.ini is Java Properties, and Codewords= leans on two features of that format: a trailing
+# backslash CONTINUES the value onto the next line (all six books wrap it across three or more),
+# and \uXXXX is a literal escape (book 5 declares its two accented codewords as \u00c9lan and
+# \u00c9lite, which its sections spell as the numeric character references &#201;lan and
+# &#201;lite - one codeword each in two notations, so both have to decode before they can be
+# compared). Reading only the first line would truncate book 1 to 11 of its 35 codewords and
+# fire the new check on two dozen valid ones - the shape that gets a check switched off instead
+# of fixed. Deliberately a narrow reader for this one file and this one key: these .ini files
+# use no ':' separator, no indented keys and no escaped '='. Returns an empty list when the key
+# is absent, which the caller treats as fatal rather than as a clean book.
+function Get-IniCodewords([string]$path) {
+    $lines = [System.IO.File]::ReadAllLines($path)
+    $i = 0
+    while ($i -lt $lines.Count) {
+        $line = $lines[$i].Trim()
+        $i++
+        if ($line -eq '' -or $line.StartsWith('#') -or $line.StartsWith('!')) { continue }
+        while ($line.EndsWith('\') -and $i -lt $lines.Count) {
+            $line = $line.Substring(0, $line.Length - 1) + $lines[$i].Trim()
+            $i++
+        }
+        $eq = $line.IndexOf('=')
+        if ($eq -lt 0) { continue }
+        if ($line.Substring(0, $eq).Trim() -ne 'Codewords') { continue }
+        $value = [regex]::Replace($line.Substring($eq + 1), '\\u([0-9A-Fa-f]{4})',
+            { param($m) [string][char][Convert]::ToInt32($m.Groups[1].Value, 16) })
+        return @($value -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
+    }
+    return @()
+}
+
 # The tags that READ an <adjust> child: the three roll nodes (engine.js childAdjustment, via
 # walkEffectBody and the roll widgets) plus <gain>/<lose>, whose amount= and stamina= take the
 # same conditional modifiers ("subtract your armour from the wound"). Used by the structural
@@ -250,6 +335,25 @@ function Test-AttrValue([string]$tag, [string]$attr, [string]$value) {
             if ($script:FL_FIGHT_MODIFIERS -notcontains $w) {
                 return "modifiers=`"$word`" is not a known fight modifier ($($script:FL_FIGHT_MODIFIERS -join ' '))"
             }
+        }
+        return $null
+    }
+    # codeword= is checked by VALUE and not only by name, because a misspelling is invisible
+    # everywhere else: the engine cannot tell an unknown codeword from one the player has not
+    # earned, so the <if> it guards just stays shut. Unions split on '|' like an enum, and the
+    # two exemption shapes above are skipped. $FL_CODEWORDS is $null when the authority could
+    # not be read, in which case Test-SourceTree has said so and this stands down rather than
+    # failing all 1,207 sites over a missing .ini. (task 325)
+    if ($attr -eq 'codeword' -and $null -ne $script:FL_CODEWORDS) {
+        foreach ($part in ($value -split '\|')) {
+            $p = $part.Trim()
+            if ($p -eq '' -or $p -eq '?' -or $p -eq '*') { continue }
+            if ($p -match $script:FL_SCOPED_FLAG) { continue }
+            $k = $p.ToLowerInvariant()
+            if (-not $script:FL_CODEWORDS.ContainsKey($k)) {
+                return "codeword=`"$part`" is not declared in any book.ini Codewords= list"
+            }
+            $script:FL_CODEWORD_SEEN[$k] = $true
         }
         return $null
     }
@@ -348,8 +452,35 @@ function Get-ExplicitTargets($el, [int]$ownBook, [System.Collections.ArrayList]$
 # 7-12) is intentional and never reported as dangling.
 function Test-SourceTree([string]$rulesDir, [hashtable]$bookDirs) {
     $errors = [System.Collections.ArrayList]::new()
+    $notes = [System.Collections.ArrayList]::new()
     $checked = 0
     $bookNumbers = @($bookDirs.Keys | Sort-Object)
+
+    # 0. The codeword authority, read fresh each call so a second run in one session (the
+    #    self-test drives dozens) cannot inherit the last tree's list. A book that declares no
+    #    Codewords= is an error in its own right AND disarms the value check for every book: the
+    #    lists are checked as a union, so an incomplete authority would report valid codewords
+    #    from the missing volume as unknown. Failing loudly once beats 1,207 wrong errors, and
+    #    beats the other direction - a silently empty set that passes everything. (task 325)
+    $script:FL_CODEWORDS = $null
+    $script:FL_CODEWORD_SEEN = @{}
+    $declared = @{}
+    $spelling = @{}   # lowercased key -> the casing the .ini declares, for the report in 5
+    $authority = $true
+    foreach ($b in $bookNumbers) {
+        $iniPath = Join-Path $bookDirs[$b] 'book.ini'
+        $list = if (Test-Path $iniPath) { @(Get-IniCodewords $iniPath) } else { @() }
+        if ($list.Count -eq 0) {
+            [void]$errors.Add(("{0}/book.ini : no Codewords= list, so no codeword VALUE can be checked in any book" -f (Split-Path -Leaf $bookDirs[$b])))
+            $authority = $false
+            continue
+        }
+        foreach ($c in $list) { $declared[$c.ToLowerInvariant()] = $b; $spelling[$c.ToLowerInvariant()] = $c }
+    }
+    if ($authority) {
+        foreach ($c in ($script:FL_PORT_FLAGS + $script:FL_FORWARD_CODEWORDS)) { $declared[$c.ToLowerInvariant()] = 0 }
+        $script:FL_CODEWORDS = $declared
+    }
 
     # 1. Index the section ids each bundled book really contains, so a link can be resolved.
     $known = @{}
@@ -458,5 +589,23 @@ function Test-SourceTree([string]$rulesDir, [hashtable]$bookDirs) {
         Test-XmlVocabulary (Get-XmlDoc $xml).DocumentElement $label $errors
     }
 
-    return @{ Errors = @($errors); Checked = $checked }
+    # 5. The reverse direction, reported as INFORMATION and never as a failure: a codeword the
+    #    inside front cover lists that no section ever awards or tests. It usually means a missed
+    #    <gain> - the branch exists, nothing opens it - but the printed books really do list a
+    #    codeword they never use, so it cannot abort a build. The transcriber did this pass by
+    #    eye and wrote the answer into the .ini comments ("# Unused codewords: Avert" in book 1,
+    #    "# Unnecessary codewords: Dark" in book 4); this reproduces it mechanically, and today
+    #    it agrees with those two notes exactly. (task 325)
+    if ($null -ne $script:FL_CODEWORDS) {
+        foreach ($b in $bookNumbers) {
+            $dirName = Split-Path -Leaf $bookDirs[$b]
+            foreach ($k in @($script:FL_CODEWORDS.Keys | Where-Object { $script:FL_CODEWORDS[$_] -eq $b } | Sort-Object)) {
+                if (-not $script:FL_CODEWORD_SEEN.ContainsKey($k)) {
+                    [void]$notes.Add("$dirName/book.ini : codeword `"$($spelling[$k])`" is declared but no section awards or tests it")
+                }
+            }
+        }
+    }
+
+    return @{ Errors = @($errors); Checked = $checked; Notes = @($notes) }
 }

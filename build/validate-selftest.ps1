@@ -40,6 +40,13 @@ $FIXTURE = @{
     # An absent-by-default slot: the same working copy left loose in the book folder, which
     # only the two task 260 cases below fill in.
     'books/book1/1temp.xml'       = $null
+    # The codeword authority (task 325). Book 1's list is deliberately written in the awkward
+    # shape the real books use - a trailing-backslash continuation and a \uXXXX escape - so a
+    # reader that only took the first line, or that compared the escape literally, would fail
+    # the CLEAN fixture below rather than passing quietly. "Relic" is declared and never used,
+    # which is what the Notes channel reports.
+    'books/book1/book.ini' = "Map=Sokara.JPG`nDeath=680`nCodewords=Ready,Relic,\`n`tRune,\u00c9clat`n# a trailing comment, as books 1, 2 and 4 carry`n"
+    'books/book2/book.ini' = "Map=Golnir.JPG`nDeath=560`nCodewords=Bounty`n"
     'books/book2/1.xml'    = '<section name="1"><trade ship="brig" cargo="timb" buy="10"/><if crew="excellent"><p>Fine crew.</p></if></section>'
     'books/book2/Adventurers.xml' = '<adventurers><starting><adventurer name="Shen Darkeye" profession="Mage" gender="f">Born to the violet ocean.</adventurer></starting></adventurers>'
     'rules/Rules.xml'      = '<section name="rules"><h3>Rules</h3><p>Roll two dice.</p><table><tr><td>1</td></tr></table></section>'
@@ -70,6 +77,16 @@ function Build-Fixture([hashtable]$overrides) {
 $clean = Build-Fixture $null
 Assert 'a valid fixture tree reports no errors' ($clean.Errors.Count -eq 0) ($clean.Errors -join ' | ')
 Assert 'every fixture file is actually checked (sections + adventurers + bio + rules)' ($clean.Checked -eq 9) "checked=$($clean.Checked)"
+# The Notes channel: information, never a verdict. Book 1 declares four codewords and its
+# sections use one, book 2 declares one and uses none, so four are reported - and reaching
+# "Rune" at all proves the continuation line was followed, while reaching Eclat proves the
+# \u00c9 escape decoded. Asserting the COUNT is what stops a reader that quietly returned an
+# empty list from passing here: with no codewords parsed there is nothing to call unused.
+# (task 325)
+Assert 'a codeword declared and never used is a note, not an error (task 325)' ($clean.Notes.Count -eq 4) ($clean.Notes -join ' | ')
+Assert 'the continuation line of a Codewords= list is parsed (task 325)' (@($clean.Notes | Where-Object { $_ -like '*"Rune"*' }).Count -eq 1) ($clean.Notes -join ' | ')
+Assert 'a \u00c9 escape in Codewords= is decoded (task 325)' (@($clean.Notes | Where-Object { $_ -like "*`"$([char]0x00C9)clat`"*" }).Count -eq 1) ($clean.Notes -join ' | ')
+Assert 'an unused codeword is reported against the book that declares it (task 325)' (@($clean.Notes | Where-Object { $_ -like 'book2/book.ini*"Bounty"*' }).Count -eq 1) ($clean.Notes -join ' | ')
 
 # ---- 2. One mutation per class of mistake ----------------------------------------------
 # Each case: a label, the file it breaks, its replacement text, and a fragment the error must
@@ -199,13 +216,42 @@ $CASES = @(
 
     @{ label = 'a bare <adjust codeword=>, which reads as the counter bump it is not (task 269)'
        file  = 'books/book2/1.xml'
-       text  = '<section name="1"><adjust codeword="Eldritch" value="3"/></section>'
+       text  = '<section name="1"><adjust codeword="Bounty" value="3"/></section>'
        want  = 'an <adjust> modifies the node above it' }
 
     @{ label = 'an <adjust> under a wrapper that does not read it (task 269)'
        file  = 'books/book2/1.xml'
        text  = '<section name="1"><if crew="good"><adjust title="Nightstalker" value="1"/></if></section>'
        want  = '<adjust> under <if>' }
+
+    # task 325: the value check on codeword=. The first is the whole defect - the award is
+    # misspelled, the test is not, and every other check in the repo passes.
+    @{ label = 'a misspelled codeword value (task 325)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><gain codeword="Redy"/><if codeword="Ready"><p>Marked.</p></if></section>'
+       want  = 'codeword="Redy" is not declared' }
+
+    # A union is split like an enum, so a good first word may not carry a bad second.
+    @{ label = 'a misspelled codeword inside a | union (task 325)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><if codeword="Ready|Runes"><p>Marked.</p></if></section>'
+       want  = 'codeword="Runes" is not declared' }
+
+    # A section-scoped flag that lost its separator - book 4 section 345 cleared "4457" where
+    # section 457 sets "4.457". This is why the exemption needs the '.' or '/' and not just a
+    # leading digit: "4457" would otherwise read as machinery and pass.
+    @{ label = 'a section-scoped flag missing its separator (task 325)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><lose codeword="2345" hidden="t"/></section>'
+       want  = 'codeword="2345" is not declared' }
+
+    # The vacuity guard. A list that fails to parse yields an empty set, which would accept
+    # every value in the corpus while looking exactly like a clean run - so a book that
+    # declares nothing is itself the error, and the value check stands down (asserted below).
+    @{ label = 'a book.ini with no Codewords= list at all (task 325)'
+       file  = 'books/book1/book.ini'
+       text  = "Map=Sokara.JPG`nDeath=680`n"
+       want  = 'no Codewords= list' }
 
     @{ label = 'a dangling link inside a bundled book'
        file  = 'books/book1/1.xml'
@@ -270,8 +316,28 @@ $ok300 = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2">' +
     '<if ability="combat" greaterthan="5" modifier="natural"><p>Strong.</p></if>' +
     '<fight name="Water Drake" combat="9" defence="15" stamina="12" modifiers="noarmour"/></section>' }
 Assert 'every resolution mode the engine acts on, and the one fight mode, are accepted (tasks 300, 302)' ($ok300.Errors.Count -eq 0) ($ok300.Errors -join ' | ')
-$ok5 = Build-Fixture @{ 'books/book2/1.xml' = '<section name="1"><random dice="2"><adjust crew="good" amount="1"/><adjust codeword="Eldritch" value="3"/></random><difficulty ability="scouting" level="9"><adjust crew="poor" value="-1"/><adjust title="Nightstalker" value="1"/></difficulty><rankcheck dice="1"><adjust titleVal="bokh" default="-1"/></rankcheck><gain ability="stamina" amount="2"><adjust name="CharismaBonus"/></gain><lose stamina="4"><adjust crew="excellent" amount="-1"/></lose></section>' }
+$ok5 = Build-Fixture @{ 'books/book2/1.xml' = '<section name="1"><random dice="2"><adjust crew="good" amount="1"/><adjust codeword="Bounty" value="3"/></random><difficulty ability="scouting" level="9"><adjust crew="poor" value="-1"/><adjust title="Nightstalker" value="1"/></difficulty><rankcheck dice="1"><adjust titleVal="bokh" default="-1"/></rankcheck><gain ability="stamina" amount="2"><adjust name="CharismaBonus"/></gain><lose stamina="4"><adjust crew="excellent" amount="-1"/></lose></section>' }
 Assert 'an <adjust> under each of the five readers is left alone' ($ok5.Errors.Count -eq 0) ($ok5.Errors -join ' | ')
+# The other half of task 325's check: every shape the corpus really writes must stay legal, or
+# the gate rejects 1,207 working sites. Book 2's codeword tested from book 1 (the alphabetical
+# rule says where a codeword is EARNED, not where it may be read); a value only reachable past
+# the .ini's continuation line; the \u00c9 escape against the section's &#201; character
+# reference; the port's own named state flags; a forward reference to a book with no folder
+# here; and the three spellings of a section-scoped bookkeeping flag.
+$ok325 = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2">' +
+    '<if codeword="Bounty"><p>Book 2''s codeword, read in book 1.</p></if>' +
+    '<lose codeword="Rune|&#201;clat"/>' +
+    '<tick codeword="StillInYellowport" hidden="t"/><lose codeword="HydraDamage"/>' +
+    '<if codeword="Judas"><p>A codeword from book 10.</p></if>' +
+    '<tick codeword="1.10.1" hidden="t"/><lose codeword="5/520"/><set codeword="3.318.sold" value="t"/>' +
+    '</section>' }
+Assert 'the codeword shapes the corpus really writes are left alone (task 325)' ($ok325.Errors.Count -eq 0) ($ok325.Errors -join ' | ')
+# ...and with the authority unreadable the check stands down rather than failing every value:
+# one error naming the .ini, and no value errors behind it.
+$novac = Build-Fixture @{ 'books/book1/book.ini' = "Map=Sokara.JPG`nDeath=680`n" }
+Assert 'an unreadable Codewords= list disarms the value check instead of failing all of them (task 325)' (
+    @($novac.Errors | Where-Object { $_ -like '*is not declared*' }).Count -eq 0 -and
+    $novac.Notes.Count -eq 0) ($novac.Errors -join ' | ')
 
 if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
 

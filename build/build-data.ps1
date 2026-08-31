@@ -138,6 +138,11 @@ if ($v.Errors.Count -gt 0) {
     throw "Build aborted: fix the source XML above and re-run."
 }
 Write-Host ("XML OK: {0} files validated." -f $v.Checked)
+# Notes are the gate's information channel, not its verdict: today the only entries are the
+# codewords a book.ini declares that no section awards or tests (task 325). That usually means
+# a missed <gain>, but the printed books really do list a codeword they never use, so it is
+# printed for a human to weigh rather than allowed to abort the build.
+$v.Notes | ForEach-Object { Write-Host "  note: $_" }
 
 # ---- Bundle each book -------------------------------------------------------
 $bookMeta = @()

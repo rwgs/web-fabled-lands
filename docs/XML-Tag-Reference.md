@@ -170,6 +170,7 @@ A value may be a `|`-separated union, and `?` / `*` are JaFL's match-any wildcar
 | `ship` | `barque brigantine galleon brig gall galley t` (`t` means "any ship") |
 | `special` | `armourlock attack defence difficultyCurse difficultyRestore godless lock unlock weaponlock` |
 | cargo values | `grain furs metals minerals spices textiles timber slaves`, or an unambiguous prefix |
+| `codeword` | any codeword declared in a `books/book<N>/book.ini` `Codewords=` list (all six, unioned) - plus a section-scoped bookkeeping flag (`^\d+[./]...`, e.g. `2.567.1a`, `5/520`), one of the port's own named state flags, or a codeword printed in the unpublished books 7-12. See [Build Pipeline](Build-Pipeline.md#the-source-xml-gate). |
 
 **Truth-flag attributes** - `force hidden dead not using sail start revisit cumulative once
 permanent supplemental unique visit playerFirst fatal` - take `t`, `f`, `true` or `false`.

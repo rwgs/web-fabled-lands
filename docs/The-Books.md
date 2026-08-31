@@ -62,7 +62,7 @@ books/book1/
   New.xml                     new-character text
   Andriel.xml, Astariel.xml,  the six pregen biographies (names vary per book)
     Chalor.xml, ...
-  book.ini                    inherited metadata - read by NOTHING (see below)
+  book.ini                    inherited metadata - only Codewords= is read (see below)
   Sokara-Map.JPG              the regional map
   book1-cover-large.jpg       cover art
   temp/                       superseded working copies - nothing walks this
@@ -77,9 +77,10 @@ numbers.
 its own filename **fails the build gate** if it sits in the book folder itself, because
 such a file reads as a second copy of a live section.
 
-`book.ini` is inherited from the reference `java-engine/` data format and **nothing in this
-port reads it yet** - no script under `build/` opens the file, so `Map`, `Map.Title`, `Death`,
-`Codewords` and `Icon` currently reach neither the build nor the app.
+`book.ini` is inherited from the reference `java-engine/` data format. **One key of it is
+live: `Codewords=`**, which `validate-source.ps1` reads as the authority for every `codeword=`
+value in the corpus (task 325 - see [Build Pipeline](Build-Pipeline.md#the-source-xml-gate)).
+`Map`, `Map.Title`, `Death` and `Icon` reach neither the build nor the app.
 
 Do not read `Map=` as the declaration of that book's regional map: the build picks the map by
 the **`-Map$` basename pattern** instead, which is why book 3's `Map=Violet Ocean.JPG` names
@@ -87,11 +88,12 @@ no file on disk while `VioletOcean-Map.JPG` ships as `book3.jpg`. That one stays
 pattern-driven on purpose (task 322) - a pattern is re-checked against the directory on every
 build, so it cannot drift the way that value did.
 
-The rest of the file is a different matter, because unread is not the same as worthless:
-`Map.Title` holds a written-for-the-map caption the Maps modal does not use (book 3's is "The
-Ports & Anchorages of the Violet Ocean", where the modal shows the book title "Over the
-Blood-Dark Sea"), and `Codewords=` holds the authoritative per-book codeword list that no
-build check consults. Both are filed - tasks 324 and 325.
+The rest of the file is a different matter, because unread is not the same as worthless.
+That is how `Codewords=` came to be read at all: it holds the authoritative per-book codeword
+list, which task 325 turned into a build check. `Map.Title` is the one still on the table - a
+written-for-the-map caption the Maps modal does not use (book 3's is "The Ports & Anchorages
+of the Violet Ocean", where the modal shows the book title "Over the Blood-Dark Sea"), filed
+as task 324.
 
 ---
 

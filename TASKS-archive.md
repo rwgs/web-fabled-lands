@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–322), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321) and task 322 (ID 322). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for completed tasks (stable IDs 1–325), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322) and task 325 (ID 325). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326, which are still open. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–322). Detail sections follow below in their original filed order; find one by its `## <N>.` heading.
+The completed tasks archived in this file (stable IDs 1–325). Detail sections follow below in their original filed order; find one by its `## <N>.` heading.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -331,6 +331,7 @@ The completed tasks archived in this file (stable IDs 1–322). Detail sections 
 - [x] 320. `ROADMAP.md` phase 1 cites two moved locations and undercounts its own dock sites
 - [x] 321. The two task files are the repo's only CRLF blobs, so a tool edit rewrites them whole
 - [x] 322. `book.ini` is read by nothing, so its `Map=` key reads as live configuration while the build ignores it
+- [x] 325. The gate validates codeword attribute *names* but never codeword *values*, so a typo'd codeword fails silently in play
 
 ---
 
@@ -14715,5 +14716,78 @@ to before for all six books (hash each), then `release-selftest.ps1`, `validate-
 and the headless suite to `RESULT ALL PASS`. A build that silently stops copying a map leaves
 the Maps modal showing the "not installed" note, which no assertion currently covers — so
 check the six hashes explicitly rather than trusting a green suite.
+
+---
+
+## 325. The gate validates codeword attribute *names* but never codeword *values*, so a typo'd codeword fails silently in play
+
+**Priority: MEDIUM.** This is the only one of the `book.ini` findings that is a latent
+correctness bug rather than a documentation or polish issue: the failure is invisible to
+every check the repo has, and lands on the player as an unwinnable section.
+
+### What is wrong
+
+`build/validate-source.ps1` allows `codeword` as an attribute on `<if>`, `<elseif>`,
+`<gain>`, `<lose>`, `<tick>`, `<adjust>`, `<outcome>` and others. Every one of those entries
+is an **attribute-name** allowlist — it asserts that `codeword=` may appear on the tag, and
+never looks at the string inside it. There is no value-level codeword check anywhere in
+`build/`.
+
+So a misspelling passes the gate silently:
+
+```xml
+<gain codeword="Anchr"/>     <!-- the award, misspelled -->
+...
+<if codeword="Anchor">        <!-- the test, spelled correctly -->
+```
+
+The build succeeds, the section renders, no assertion fires, and the branch simply never
+opens. The player has no way to tell a codeword they were never awarded from one the port
+dropped, and neither does a reviewer reading either section on its own — the two sites are
+usually in different files, often different books.
+
+The corpus already holds the authority to check against: each `books/book<N>/book.ini`
+declares `Codewords=` for that book, and the transcriber annotated the gaps by hand —
+book 1 ends `# Extra, unlisted codewords: Aloft,Altitude` and `# Unused codewords: Avert`,
+book 2 `# Unnecessary codewords: Bait,Beach,Bilge`, book 4 both kinds, and books 3 and 5
+record that everything reconciles ("all present and accounted for"). Those comments are a
+previous pass of exactly this check, done by eye.
+
+### Why it matters
+
+Book 1's list is alphabetically constrained — every codeword in book 1 begins with A, book 2
+with B, and so on through book 6 — so a cross-book leak is mechanically detectable too, not
+just a typo. This is the highest-value thing in `book.ini` and the reason task 322's
+"nothing reads it, leave it dead" conclusion was deliberately scoped to `Map=` alone.
+
+### Steps
+
+1. Read `Codewords=` per book in `validate-source.ps1`. It is **Java Properties**: the value
+   uses backslash **line continuations** (all six books wrap it across three or more lines)
+   and `\uXXXX` escapes (book 5 has `\u00c9lan` and `\u00c9lite`). Both must be handled or the
+   list silently truncates at the first line — which would make the new check fire on dozens
+   of valid codewords and get switched off.
+2. Cross-check every `codeword=` value in that book's sections against the list, and report
+   an unknown value as a gate failure with the file and tag that carries it. Decide
+   explicitly what to do about the transcriber's own annotated exceptions — the "extra,
+   unlisted" codewords are in the sections but *not* in `Codewords=`, so a naive check fails
+   the build on book 1 immediately. Either add them to the `.ini` or carry an allowlist, but
+   do not weaken the check to a warning.
+3. Report the reverse direction too, as information rather than failure: a codeword declared
+   in `Codewords=` that no section ever awards is what book 1's `# Unused codewords: Avert`
+   note is recording, and it usually means a missed `<gain>` rather than a spare word.
+4. Add fixtures to `build/validate-selftest.ps1` in the same change, per the standing rule
+   that a new gate check ships with its self-test: one misspelled value that must fail, one
+   continuation-wrapped list that must parse whole, and one `\u00c9` escape that must match.
+
+### Validation
+
+`validate-source.ps1` and `validate-selftest.ps1` change but no source XML does, so
+`build-data.ps1` must produce **no** generated diff — that is the check that the new gate is
+inspecting rather than rewriting. Run `validate-selftest.ps1`, then the full build, then the
+headless suite to `RESULT ALL PASS`. Confirm the gate actually bites by misspelling one
+codeword in a scratch copy and watching the build fail with that file named; a check this
+class can pass vacuously if the list parse yields an empty set, so also assert a non-empty
+list per book.
 
 ---

@@ -44,11 +44,13 @@ currently prints, which is what task 320 is filed to fix.
   against the image, not against `.map-view`, which is a plain `text-align: center` wrapper
   (`style.css:506`).
 - **`data.location` is `null` inland and at sea**, which is most of the game.
-- **`book.ini` is not a precedent for a build-read `.ini`.** It sits in each book folder and
-  declares `Map=`, but nothing under `build/` opens it, so that key is inert - the build picks
-  each regional map by the `-Map$` basename pattern, which is why book 3's
-  `Map=Violet Ocean.JPG` names no file that exists. `places.ini` needs a reader written for
-  it, and writing one does not make `Map=` live.
+- **`book.ini`'s `Map=` is not a precedent for a build-read key.** It sits in each book folder
+  and declares `Map=`, but that key is inert - the build picks each regional map by the
+  `-Map$` basename pattern, which is why book 3's `Map=Violet Ocean.JPG` names no file that
+  exists. The file is not wholly unread: `validate-source.ps1` parses its `Codewords=` list
+  (task 325), so a Java Properties reader with continuation and `\uXXXX` handling already
+  exists under `build/` and `places.ini` can follow its shape. Reusing that reader still does
+  not make `Map=` live.
 
 ## Approach
 
