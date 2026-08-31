@@ -285,9 +285,10 @@ than with the diff, which cannot answer the question.
 
 **"The committed bytes are LF either way" is true today only because task 321 made
 it true, and autocrlf has two documented ways to keep CRLF that are worth knowing
-before you trust it.** When 319 wrote that sentence it held for 4,630 tracked
-files and failed on the two this project edits most — `TASKS.md` (`i/crlf`) and
-`TASKS-archive.md` (`i/-text`) — for two different reasons:
+before you trust it.** When 319 wrote that sentence it held for 4,649 of the
+4,651 tracked **text** files (of 4,683 tracked in all) and failed on the two this
+project edits most — `TASKS.md` (`i/crlf`) and `TASKS-archive.md` (`i/-text`) —
+for two different reasons:
 - **One lone CR** (a CR not followed by LF) anywhere in a file makes git classify
   the whole file binary, and a binary file is never converted in either direction.
   `TASKS-archive.md` had exactly one, inside a code span in 319's own note about
