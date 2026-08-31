@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-334 is complete (listed under **Done** below), apart from 207 and 326, both
+336 is complete (listed under **Done** below), apart from 207 and 326, both
 withdrawn as misdiagnoses (see the Review log); **nothing is open.** File new
 work under the priority bucket that fits, and record the pass in
 the Review log. Completed detail sections are archived in
@@ -369,10 +369,12 @@ this order.*
 - [x] 332. nothing bounds the browser launch by wall clock — `run-tests.ps1` uses `Start-Process -Wait` and CI a bare `chrome … &&`, while `--virtual-time-budget` is explicitly *not* a timeout — so the wedged browser task 330 is about fails the run only because it exits 0: one that hangs instead takes the run (and a CI job with no `timeout-minutes`) with it, and task 330 added a second unbounded wait on the failure path
 - [x] 333. `release-selftest.ps1`'s miniature fixture writes no `book.ini`, so task 325's codeword gate — which treats a book declaring no `Codewords=` as an error in its own right, because the lists are checked as a union — aborts the real build the self-test drives, failing the `build-scripts` job on every commit since 325 while the ordinary build-and-test loop stays green
 - [x] 334. `release-selftest.ps1`'s `Invoke-FixtureBuild` runs the real build with `6>$null` to keep its progress lines out of the assertions, but that stream also carries the build's *diagnosis* — so when task 333's fixture failed the codeword gate, CI printed a bare `throw` from `build-data.ps1:164` with the two lines naming the offending files discarded, and the log said only "fix the source XML above" above nothing at all
+- [x] 335. `books/book1/book.ini` declares **35** of the **36** codewords printed on book 1's own codeword list, omitting `Auric` — and annotates the two it carries out of alphabetical order, `Aloft` and `Altitude`, as "printed on no inside front cover" when both are printed, in alphabetical position; task 325 made that list the authority every book's `codeword=` **value** is checked against, and the check is a union because a codeword may be *tested* in any of the six, so a name the volume prints and its own sections never use still has to be declared
+- [x] 336. the `codeword=` value check splits on `|` alone, but `matchCodewords` in `engine.js` documents and implements "comma => AND, pipe => OR" — and `<gain>`/`<tick>`/`<lose>` split on `[|,]` as well — so the AND form the engine supports reads as one long name and is reported undeclared; no shipped section writes it, which is why a gate that rejects valid markup went unnoticed
 
 ---
 
-> **Completed task details (tasks 1–334) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
+> **Completed task details (tasks 1–336) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
 
 ---
 

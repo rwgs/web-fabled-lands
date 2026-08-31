@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–334), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326), task 327 (ID 327), task 328 (ID 328), task 329 (ID 329), task 330 (ID 330), task 331 (ID 331), task 332 (ID 332), task 333 (ID 333) and task 334 (ID 334). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for completed tasks (stable IDs 1–336), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326), task 327 (ID 327), task 328 (ID 328), task 329 (ID 329), task 330 (ID 330), task 331 (ID 331), task 332 (ID 332), task 333 (ID 333), task 334 (ID 334), task 335 (ID 335) and task 336 (ID 336). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–334). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
+The completed tasks archived in this file (stable IDs 1–336). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -343,6 +343,8 @@ The completed tasks archived in this file (stable IDs 1–334). Detail sections 
 - [x] 332. Nothing bounds the browser launch by wall clock, so a hung browser hangs the run
 - [x] 333. The release self-test's fixture has no `book.ini`, so task 325's codeword gate fails every CI run
 - [x] 334. The release self-test discards the build's diagnosis, leaving CI a bare `throw`
+- [x] 335. Book 1 declares 35 of its 36 printed codewords, and mislabels two of the 35
+- [x] 336. The codeword value check splits on `|` alone, rejecting the engine's comma AND-form
 
 ---
 
@@ -15635,5 +15637,72 @@ and checks that the run both threw and named `book1/book.ini` under `XML validat
 `validate-selftest.ps1` (51), `node-import.mjs` (35) and the browser suite (3,035) are
 unaffected. Only `build/release-selftest.ps1` changed, so no rebuild or version stamp is
 needed: `stamp-version.ps1` hashes `web/`, not the build scripts.
+
+---
+
+## 335. Book 1 declares 35 of its 36 printed codewords, and mislabels two of the 35
+
+**Priority: LOW.** Nothing ships wrong and no run fails today. What is wrong is the *authority*
+task 325 checks every `codeword=` value against, and it is wrong in the direction that only
+shows up when some other book uses the missing name.
+
+### What is wrong
+
+Task 325 made `books/book<N>/book.ini`'s `Codewords=` the authority for the `codeword=` value
+check, and checks against the **union** of the six lists rather than each file's own book,
+because the alphabetical rule says where a codeword is EARNED and not where it may be TESTED —
+that comment's own examples are book 1 testing `Barnacle`, `Crag`, `Defend` and `Eldritch`, and
+`Almanac` reaching all six books.
+
+Book 1's printed codeword list holds **36** names. `book1/book.ini` declares **35**, omitting
+`Auric` — printed between `Attar` and `Avenge`. Measured against the printed list for all six
+books, it is the only omission: every name every other `Codewords=` declares is printed, and
+the only printed words the six lists do not carry are the sheet's own furniture (the volume
+title, a credit line, and the `SHIP`/`CARGO`/`WHERE DOCKED` labels of the Ship's Manifest
+beside it).
+
+The same file annotates the two names it carries out of alphabetical order:
+
+```
+	Aloft,Altitude
+# Aloft,Altitude are used by sections but printed on no inside front cover, and are appended
+# to Codewords= above out of alphabetical order for that reason - no longer "unlisted".
+```
+
+Both are in fact printed, in alphabetical position, between `Almanac` and `Altruist`. So the
+reason given for holding them out of order does not hold, and the note reads as evidence that
+the list had been reconciled against the printed page when it had not — which is how the
+neighbouring `Auric` stayed missing.
+
+### Why it matters even though nothing fails
+
+`Auric` is named by no section of any bundled book, so the value check never asks about it and
+the gate is green either way. But the union is the whole point of the check: a codeword printed
+in one volume is testable from any of them, so a name the volume prints and its own sections
+never use still has to be declared. Until it is, a section that tests `Auric` fails the gate
+with `codeword="Auric" is not declared in any book.ini Codewords= list` — a correct section
+reported as a defect, with the fix in a file the author was not editing.
+
+The list already carries a name in exactly that position: `Avert` is declared and used by no
+section, recorded in the file's own `# Unused codewords:` line. `Auric` belongs beside it.
+
+### Fix
+
+Transcribe the printed list faithfully: 36 names in printed order, which folds `Aloft` and
+`Altitude` back into alphabetical position and adds `Auric`. Delete the note explaining the
+out-of-order tail, since there is no longer a tail and its premise was wrong, and extend the
+`# Unused codewords:` line to `Auric, Avert`.
+
+`Get-IniCodewords` lower-cases into a hashtable, so neither order nor the re-wrap can matter to
+the check; the only behavioural change is that one more name is declared.
+
+### Validation
+
+`build-data.ps1` is byte-for-byte clean (no generated diff — `book.ini` is read by the gate and
+by `Get-IniMapTitle`, and `Map.Title=` is untouched), and the gate prints one more note,
+`book1/book.ini : codeword "Auric" is declared but no section awards or tests it`, beside the
+`Avert` line that was already there — a **note** and not a failure, by design. The four suites:
+`validate-selftest.ps1` `pass=51 fail=0`, `release-selftest.ps1` `pass=48 fail=0`,
+`node-import.mjs` `pass=35 fail=0`, browser `RESULT ALL PASS pass=3035 fail=0`.
 
 ---
