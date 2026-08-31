@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–274), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255) and task 274 (IDs 256–274). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for completed tasks (stable IDs 1–318), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274) and task 318 (IDs 275–318). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–274). Detail sections follow below in their original filed order; find one by its `## <N>.` heading.
+The completed tasks archived in this file (stable IDs 1–318). Detail sections follow below in their original filed order; find one by its `## <N>.` heading.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -283,6 +283,50 @@ The completed tasks archived in this file (stable IDs 1–274). Detail sections 
 - [x] 272. `<transfer>` honours the keep rule for `item="*"` only, where `<lose>` honours every generic selector, so §2.105's pickpocket steals the white sword off a sheet carrying nothing else
 - [x] 273. The walk-position ledger tracks the purse and the pack but not codewords, so a block that spends the codeword gating it retracts its own exit on the next draw — §2.143 deletes *Bounty* and grays the →601 it deleted it for
 - [x] 274. Re-archive completed task details 256–273 and clear them out of the priority buckets
+- [x] 275. `applyTick`'s equipment branch is the one recognised attribute that does not set `did` when it matches nothing, so §5.386's enchant and §6.731's shrine boon tick a section box and toast "box ticked" at a player carrying no weapon
+- [x] 276. `applyTick`'s profession branch drops a pipe-list on the floor without setting `did`, so a hidden or effect-body `<tick profession="a|b">` ticks a section box instead of doing nothing — the second half of task 275's guard, with 0 corpus nodes today
+- [x] 277. `renderRankcheck`/`renderTraining` never render their node's own words, so 45 shipped sections silently drop the printed roll instruction
+- [x] 278. `renderTraining` reads its `var=` to hold a `<while>` pass but never writes it, so §2.554's "lose 1 MAGIC if you roll a two" can never fire
+- [x] 279. Sweep the remaining tag families for task 277's shape — a shared helper only some of a sibling set calls *(five gaps found, every one unreachable — documented in place)*
+- [x] 280. The market header row renders `header1=` and drops `header2=`/`header3=`, so 23 authored column headings ("To buy", "To sell") never reach the page *(adjudicated a deliberate simplification — documented, not changed)*
+- [x] 281. Sweep for renderers whose click handler no assertion ever fires — `renderTraining`'s never was, which is why task 172's parity pass could not see 278 *(9 of 71 cold; 3 covered, 6 filed as 282)*
+- [x] 282. Six click handlers still fire for no assertion — three modal-opening renderers and the Adventure Sheet's Wield/Move-down/Drop *(all six now driven; the probe reports cold 6 → 0)*
+- [x] 283. The click-coverage probe keys a site by the frame that *registers* the listener, so `rollButton`'s seven callers collapse into one warm frame — the very shape of gap (task 278's cold `<training>` roll) that started the 281/282 sweep is invisible to it *(re-keyed by caller: 78 controls, 74 warm, 3 cold-by-construction; the 71=71 count was a coincidence, and the one real gap is filed as 284)*
+- [x] 284. `renderPayment`'s open-forfeit branch is the one in-scope click handler that never registers in the whole suite, so the picker a forced "give up which?" payment opens has never been rendered — and task 279's reachability sweep left it out *(censused UNREACHABLE — the corpus's one candidate, §6.496, is group-bundled; 279's note extended to a fourth case)*
+- [x] 285. A `<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes whichever blessing was acquired first *(a fifth player-choice verdict; 20 assertions, and a census pinning the three shipped sections)*
+- [x] 286. A `<group>` never asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page states *(one control, one question — an ability arm and a fixed-count forfeit arm; both census-pinned at 0 for the shipped corpus)*
+- [x] 287. The Rules dialog opens scrolled to its last line, and a dialog long enough to scroll has no exit in view *(`preventScroll` on the initial focus, plus a sticky `.modal-head` carrying a ✕ on every dismissable dialog)*
+- [x] 288. Task 191's narrow-header block measures an iframe whose stylesheet may not have applied, and fails intermittently *(the fetched `style.css` inlined into each `srcdoc`, so the frame's `load` is an exact barrier and no subresource is left to race)*
+- [x] 289. `<lose staminato="N">` can only ever lower Stamina, so book1/297's padded tournament never heals its winner and kills its loser at book1/370 *(a signed delta, plus a narrow freeze on the `<set value=>` nodes that read the live Stamina a fight moves under them)*
+- [x] 290. book5/315's `<if var="exp">` reads a variable no node in the section ever writes, so the training courtyard's crippling injury can never fire *(a writer, a natural-score snapshot to compare against, and a not-yet-rolled sentinel — the third of which the filing could not see)*
+- [x] 291. book2/270 and book2/362 hand out the god Nagil on entry, because a `lessthan=` guard over a roll var not yet filled matches at 0 *(a two-line sentinel, `x = rank`, on both sections — nine of thirteen assertions fail without it)*
+- [x] 292. book4/257 puts its "both rolls failed" exit on the page before either roll is made, because no roll-gate seed reads a condition *(a fourth roll-gate seed — the mandatory roll a CONDITION reads — and the first that awaits a SET of rolls; 28 shipped sections gain the gate)*
+- [x] 293. book3/40 shows its editorial reroll note before the roll it describes, and the obvious sentinel would open a live exit
+- [x] 294. book4/257 leaves a mixed pair of rolls with no exit at all, so succeeding one check and failing the other ends the adventure
+- [x] 295. `renderItemCache` draws no money controls without `max=`, so book4/586 confiscates the player's whole purse and book4/528 can never give it back
+- [x] 296. `rewardWasteReason` refuses a new resurrection deal to anyone already holding one, where `addResurrection` implements the replacement the books print — so book1/597's third reward is dead to a deal-holder
+- [x] 297. the resurrection waste guard is a blanket engine rule that only book1/597's printed wording justifies, so the first flag-linked offer on a page printing the replacement rule will be refused an option its own text grants
+- [x] 298. `renderResurrection`'s `hidden="t"` auto-register path ignores `unique="t"`, so the exclusion task 297 gave the markup is honoured on two of the three paths that arrange a deal
+- [x] 299. nothing in the port fires on a change of BOOK, so book5/681's golden hair never pays the 20 Shards it promises on every crossing — and the corpus's only two `TODO` comments say so
+- [x] 300. nothing validates a `modifier=`/`modifiers=` value, so one misspelling silently reverts a check to the very score the page says not to use — across 42 shipped sites, and it is task 46's defect from the source side
+- [x] 301. closing `modifier=`'s value set also closed the numeric/var addend `renderDifficulty` implements, so a shape the view supports is now a build error — deliberate, and recorded here because nothing else would say so
+- [x] 302. the port acts on neither `modifier="noarmour"` nor `modifier="current"` off `<adjust>`, though the JaFL spec defines both — so two spec-legal spellings are build errors this port cannot honour
+- [x] 303. `<if ability="defence">` compares against 0, not the player's Defence, so book5/361's §160 route is unreachable at any Defence and book1/313's daggers always hit — task 68's fix for `rank`/`stamina`, never extended to the third stat
+- [x] 304. `defence()` sums items, Rank and auras but not afflictions, so book5/638's Curse of Vulnerability subtracts its 3 points from nothing and the curse is inert
+- [x] 305. a `<tick god=>` shares `readEffects` with the afflictions, so it accepts `ability="defence"` (task 304) and `ability="stamina"` (task 185) — and `data.effects` is read only by the core-ability paths, so both parse, store and move nothing
+- [x] 306. the fight widget's "Your Defence" row re-derives the score instead of asking the resolver, so a `modifiers="noarmour"` fight shows the armoured number the enemy is not rolling against — book5/689 reads 12 while the drake rolls against 7
+- [x] 307. a `<group>` that pays for a flag-linked award grants it and leaves the award's own Take button on the page, disabled and captioned "Pay first to choose this." — so book1/342 offers to sell you a potion you are already carrying
+- [x] 308. `groupPlan.linkedAwards` grants EVERY item-family award sharing the price flag, where the Take path it stands in for grants one — so a `<group>` paying for a "choose one" menu would hand over the whole item half of it and kill the rest
+- [x] 309. `ROADMAP.md` sizes the map-position work against "the 4,437 section files", which is the glob count task 270 was filed to stop anyone quoting — the shipped corpus is 4,369
+- [x] 310. `reconcileEquipment` writes the DEFAULT weapon/armour back into `data.equipped`, so an implicit default is stored as an explicit choice and "else the strongest of that kind" can never fire again — a pregen Warrior who buys a magic sword keeps swinging their battle-axe at COMBAT 8 instead of 10
+- [x] 311. `ability()` clamps the EFFECTIVE score to 12, where the reference engine pegs only the minimum at 1, so book4/103's white sword is worth +5 to a book4 Warrior and +4 to a book5/6 one — and the attack roll and every `<difficulty>` check read the capped number
+- [x] 312. task 311 lifted the effective-ability ceiling and left `ability()`'s own doc comment reading "clamped 1..12" — while the comment 311 wrote six lines below it says "Floor of 1, no ceiling", and the one it wrote on `abilityNoWeapon` says "Floored, not capped, for the same reason `ability()` is", citing the stale line as its authority
+- [x] 313. eighteen of the nineteen corpus censuses read the raw bundled section text, which KEEPS XML comments, so a commented-out node is counted as a real one — latent today, and the nineteenth already strips them
+- [x] 314. three of the six values `modifier=` may take are silently DROPPED on `<set>` and two of them on `<if>` — the source gate allows all six on both tags, so `<set value="defence" modifier="noarmour">` validates clean and hands back the ARMOURED score, which is task 300's failure shape and what the gate's own comment carves out for `current`
+- [x] 315. `adjustApplies` folds `modifier=` to a boolean `natural` on the `<adjust greaterthan|lessthan>` CONDITION, so the third mode-dropping site survives task 314 — the same tag's `adjustAmount` reads all six two lines away
+- [x] 316. `adjustAmount` has no `defence` arm, so `<adjust ability="defence"/>` contributes 0 — the gate allows `defence` in `ability=`, and the same tag's `adjustApplies` reads it correctly through `abilityForMode`
+- [x] 317. `rank` ignores `modifier=` on every tag but `<set>`, so `<adjust ability="rank" modifier="natural"/>` and `<difficulty ability="rank" modifier="natural">` read the ring of ultimate power's +2 back in — the last stat left out of the 314–316 family
+- [x] 318. Re-archive completed task details 275–317 and clear them out of the priority buckets
 
 ---
 
@@ -11433,5 +11477,2883 @@ files, that the archive's detail IDs are exactly 1–274 with no gaps or duplica
 appears twice in **Done**. The archive's Contents list carries 273 rows, not 274: 207 keeps its
 archived detail but has no checklist row, which is how the withdrawal has been recorded since task
 211. No code, data, build or test files touched, so no rebuild or stamp change is implied.
+
+---
+
+## 275. `applyTick`'s equipment branch is the one recognised attribute that does not set `did` when it matches nothing, so §5.386's enchant and §6.731's shrine boon tick a section box and toast "box ticked" at a player carrying no weapon
+
+**Priority: LOW — no shipped section pairs an equipment `<tick>` with `boxes=` or an
+`<if ticks=>` guard (censused: 0 overlap), so today the whole cost is one spurious write into
+the saved `boxes` map and one wrong toast. It is filed because the write is silent, persistent
+and uncapped, and because the guard that prevents it is already written twice in the same
+function for other attributes.**
+
+*(Filed 2026-08-15, found during conversion work on an unpublished book.)*
+
+`applyTick` (`engine.js:912`) is a cascade of `if (get('attr') != null)` branches over one
+`<tick>`, each setting `did = true`, closed by a fallthrough:
+
+```js
+// Bare <tick> (no meaningful attrs): tick the visit box(es) for this section.
+if (!did) { state.addTick(null, null, count); notes.push('box ticked'); }
+```
+
+The fallthrough is right — a bare `<tick>place a tick in it now</tick>` is how the books write a
+section box. What makes it a defect is that **`did` is meant to mean "a recognised attribute was
+present", not "the effect changed something"**, and the function says so twice in its own
+comments:
+
+* `ability=` (`:948`) — *"mark `did` so a recognized-but-zero effect never falls through to the
+  box tick"*.
+* `crew=`/`cargo=` (`:959`) — *"a recognized attribute with no vessel present is inert but still
+  sets `did` (no bare-tick box fallthrough)"*.
+
+The equipment branch (`:983`) is the exception:
+
+```js
+const eqAttr = ['weapon', 'armour', 'tool', 'item'].find((k) => get(k) != null);
+if (eqAttr != null && (get('addbonus') != null || get('addtag') != null || get('removetag') != null)) {
+  const targets = selectEquipment(el, state, eqAttr, cacheN, opts);
+  …
+  if (targets.length) { …; did = true; }   // <- only when something matched
+}
+```
+
+`selectEquipment` returns `[]` whenever the selector matches nothing — no weapon of that kind
+carried, a `using="t"` narrowing with nothing wielded or worn, a `tags=` filter that misses, or
+an empty `cache=`. Every one of those is an ordinary reachable state, and each falls straight
+through to `addTick`.
+
+**Measured in the browser against a real `GameState`, not inferred.** §5.386 (Targdaz's enchant,
+whose first node is `<tick weapon="?" addtag="Tz">one weapon</tick>`) entered by a player carrying
+no weapon:
+
+| player | `boxes['5.386']` after entry | notification |
+| --- | --- | --- |
+| no weapon | **1** | **"box ticked"** |
+| one sword | absent | none |
+
+**Census of the shape: 12 nodes across 4 sections** — `books/book[1-6]/[0-9]*.xml`, `<tick>`
+carrying `addbonus=`/`addtag=`/`removetag=`: **§2.665** (6, all `item="*" cache="2.617"` — the
+strongroom, empty for a player who left nothing), **§5.386** (4, `weapon="?"`), **§6.135** (1,
+`weapon="?" using="t"` — Mister Dragon snaps "whatever weapon you are using", which a
+bare-handed player is not using), **§6.731** (1, the roll-1 shrine boon
+`<tick weapon="?" addbonus="1">`). None of the four carries `boxes=`, and no section in the
+corpus carries both `boxes=` and an equipment `<tick>` — which is exactly why this is LOW and
+exactly why it should not be left: `addTick` deliberately leaves **a boxless section uncapped**
+(`state.js:778` caps only when `_sectionBoxes > 0`), so the count grows without bound across
+visits, and the first page written with both would read its own `<if ticks="0">` guard wrong.
+
+**The fix is one line** — hoist `did = true` out of the `if (targets.length)` guard, so a
+recognised `eqAttr` + modifier pair marks the node handled whether or not it matched, matching
+the two branches above. `state.reconcileEquipment()`/`state.changed()` should stay inside the
+guard: nothing moved, so nothing needs settling or saving.
+
+---
+
+## 276. `applyTick`'s profession branch drops a pipe-list on the floor without setting `did`, so a hidden or effect-body `<tick profession="a|b">` ticks a section box instead of doing nothing — the second half of task 275's guard, with 0 corpus nodes today
+
+**Priority: LOW — unreachable in the shipped corpus (censused below: the one pipe-list
+profession tick is visible prose, which the view intercepts), so nothing misbehaves today. It is
+filed because it is the *same* defect task 275 just fixed one line above it, left standing in the
+one branch the fix did not cover, and because the shape it needs is a `<tick profession="a|b">`
+written as hidden or inside an effect body — both ordinary things for a new book to write.**
+
+*(Filed 2026-08-15, found while fixing task 275.)*
+
+`applyTick` (`engine.js:996`) closes its cascade with:
+
+```js
+// Change profession (book6/731 "become a Priest"); a pipe-list ("mage|rogue|…") is a
+// player choice handled by the view's picker (book6/118), so apply only a single one here.
+if (get('profession') != null && !get('profession').includes('|')) { state.setProfession(get('profession')); did = true; }
+```
+
+The comment is right about *why* the pipe-list is skipped, but skipping it also skips `did`, so
+the node falls through to the bare-tick box — the exact failure task 275 fixed for `weapon=`/
+`armour=`/`tool=`/`item=`, and the exact thing `ability=` (`:948`) and `crew=`/`cargo=` (`:959`)
+each carry a comment about avoiding. A recognised attribute the engine deliberately declines to
+act on is *inert*, not bare.
+
+**Reachability — two paths, both real, neither exercised by today's corpus.**
+
+* `classifyPassive` gates all three player-choice modes on `!hidden`
+  (`render-rules.js:1041-1043`), so `hidden="t"` skips the picker and falls to `mode: 'apply'`,
+  which calls `applyTick` with the raw node.
+* `applyEffectBody` walks `PASSIVE_BODY_TAGS` — which includes `tick` (`engine.js:484`) — and
+  calls `applyEffect` directly with no view and therefore no picker, so a pipe-list profession
+  tick written inside a `<fightdamage>`/`<success>`/`<outcomes>` body box-ticks regardless of
+  `hidden=`.
+
+**Census (shipped corpus only — `books/book[1-6]/` numeric basenames, per task 270): 2
+`<tick profession=>` nodes total.** §6.731 `profession="priest"` (single, handled) and §6.118
+`profession="mage|rogue|troubadour|warrior|wayfarer"` — the post-dragon Priest disqualification,
+visible prose inside `<if profession="priest">`, so it renders the five-way picker and never
+reaches `applyTick` with the list. **0 hidden pipe-lists, 0 inside an effect body.**
+
+**The fix is the same one line** — set `did = true` whenever `profession` is present, and keep
+`setProfession` behind the single-value test:
+
+```js
+if (get('profession') != null) { if (!get('profession').includes('|')) state.setProfession(get('profession')); did = true; }
+```
+
+Add the assertion beside task 275's in `suite-combat.js`: a hidden pipe-list profession tick
+leaves `tickCount` at 0 and the profession unchanged.
+
+---
+
+## 277. `renderRankcheck`/`renderTraining` never render their node's own words, so 45 shipped sections silently drop the printed roll instruction
+
+**Priority: MEDIUM — a visible prose loss in 45 sections across five books, with no rules
+consequence: the roll itself is correct in every one of them, and the widget's generic label
+("Rank check (roll 1 die)") stands where the author's sentence should be. It is filed MEDIUM
+rather than HIGH because nothing is mis-adjudicated and no exit is mis-gated; it is not LOW
+because the dropped words are load-bearing English — §1.262's paragraph loses its entire roll
+instruction and §5.59's loses a clause from the middle of a sentence, leaving a doubled comma.**
+
+*(Filed 2026-08-16, found while reading the roll renderers for an unrelated question about
+conditional die counts.)*
+
+Every roll renderer in `render-rolls.js` shares one helper for the descriptive text its node
+carries:
+
+```js
+// The descriptive text a <difficulty>/<random> node carries before its widget (task 172):
+// rendered only when it actually has words, so an empty node adds no stray span.
+function appendRollDescription(story, container, node, path) { … }
+```
+
+`renderDifficulty` (`render-rolls.js:235`) and `renderRandom` (`:290`) call it.
+**`renderRankcheck` (`:332`) and `renderTraining` (`:362`) do not** — and neither reaches the
+node's children by any other route: each goes straight to `makeRollWidget`, and the only other
+read of the subtree is `childAdjustment(node, state)`, which collects `<adjust>` elements and no
+text. `renderElement`'s "unknown element: render children so we don't lose prose" fallback
+(`render.js:1397`) cannot help either, because both tags ARE in `TAG_RENDERERS`.
+
+So the words are parsed, walked past, and dropped. The widget's own label is all that renders.
+
+**The clearest instance is §1.262**, whose second paragraph is nothing but the roll:
+
+```xml
+<p>
+    <rankcheck dice="1" add="-1">Roll a die and subtract one from the result</rankcheck>.
+    <success>If you score less than or equal to your Rank, <goto section="546"/>.</success>
+    <failure>Otherwise, <goto section="133"/>.</failure>
+</p>
+```
+
+The player reads `Rank check (roll 1 die).` and is then told "If you score less than or equal to
+your Rank" — with the −1 the printed sentence explains applied invisibly. §1.139 is the same
+shape with the surrounding clause left behind: it renders `Rank check (roll 1 die), and subtract
+one from the score.`, a sentence beginning with a comma.
+
+**§5.59 is the `<training>` half and the more damaging kind**, because the dropped words are
+mid-sentence:
+
+```xml
+As a reward … Choose the ability of your choice (i.e. COMBAT, CHARISMA, and so on),
+<training>roll two dice</training>,
+and if the result is higher than that ability, you can add one to it permanently.
+```
+
+which renders as `…and so on), , and if the result is higher…`.
+
+**Census (shipped corpus only — `books/book[1-6]/` numeric basenames, per task 270).** 54
+`<rankcheck>` nodes, of which **22 carry text**: §1.139, §1.168, §1.260, §1.262, §1.263, §1.284,
+§1.467, §4.5, §4.253, §4.306, §4.329, §4.370, §4.521, §4.529, §4.540, §5.65, §5.92, §5.167,
+§5.308, §5.357, §5.510, §5.606. 62 `<training>` nodes, of which **23 carry text**: §2.89,
+§2.453, §2.631, §2.673, §3.37, §3.316, §3.427, §5.32, §5.59, §5.63, §5.108, §5.187, §5.197,
+§5.283, §5.315, §5.347, §5.408, §5.462, §5.484, §5.507, §5.652, §5.668, §6.235. **45 sections in
+all**; the other 71 nodes are self-closing or hold only `<adjust>` children and lose nothing.
+
+**The fix is one call in each renderer**, placed exactly as the two working ones place it —
+immediately before `makeRollWidget`, so the words precede the widget:
+
+```js
+export function renderRankcheck(story, container, node, path) {
+  const dice = parseInt(node.getAttribute('dice') || '1', 10);
+  const add = parseInt(node.getAttribute('add') || '0', 10);
+  appendRollDescription(story, container, node, path); // its own descriptive text
+  const { key, widget } = makeRollWidget(story, container, node, path);
+  …
+```
+
+and the same line in `renderTraining` before its `makeRollWidget`. `appendRollDescription`
+already appends nothing for an empty node, so the 71 wordless nodes are untouched.
+
+**Two things to check when writing it, both cheap.** `<training ability="a|b">` renders an
+ability picker into the widget when no choice has been made yet — the description belongs
+*above* that, which the placement above gives for free. And `childAdjustment` reads `<adjust>`
+children directly off the node, so walking the same subtree for text does not consume them
+(`renderRandom` has done both since task 172); confirm on §1.324, whose `<random>` carries text
+and three `<adjust>`s together.
+
+Assertions for `suite-render.js`, beside the task-172 description tests: a
+`<rankcheck dice="1">Roll a die</rankcheck>` renders "Roll a die", a self-closing
+`<rankcheck dice="2"/>` adds no stray span, and the same pair for `<training>`.
+
+---
+
+## 278. `renderTraining` reads its `var=` to hold a `<while>` pass but never writes it, so §2.554's "lose 1 MAGIC if you roll a two" can never fire
+
+**Priority: HIGH — this one *is* mis-adjudicated, which is the line task 277's filing drew
+between HIGH and MEDIUM. The player escapes a printed penalty entirely. It is one section, not
+45, and the stake is small (1–2 MAGIC), so a reader who weighted blast radius over correctness
+could argue MEDIUM; the rubric weights correctness, so it is filed HIGH.**
+
+*(Filed 2026-08-16 while closing task 277, from a claim in 277's own filing that turned out to
+be wrong — see the Review log.)*
+
+Task 277's filing asserted that "the other three roll-adjacent helpers (`rollGate`,
+`markWhilePending`, `writeRollVar`) are called by all four" roll renderers, and used that as the
+evidence that `appendRollDescription` was an omission rather than a decision. **Two thirds of
+that is false.** `renderTraining` (`render-rolls.js:362`) calls `markWhilePending` but neither
+`rollGate` (deliberate and documented — "`<training>` has no pay gate — a plain memo lookup")
+nor `writeRollVar`. So the real asymmetry is 3-of-4 twice over, and one of the two is a defect.
+
+`renderTraining` reads its `var=` — once:
+
+```js
+const stored = story.ctx.rolls.get(key);
+markWhilePending(story, stored, path, node.getAttribute('var')); // hold a <while> pass
+…
+story.ctx.rolls.set(key, rollTraining(story.state, ability, dice, add));
+```
+
+It reads the attribute to declare the var *pending*, and then never assigns it. The other three
+renderers all follow their `ctx.rolls.set` with `writeRollVar(story, node.getAttribute('var'), …)`.
+
+**§2.554 is the one shipped node that carries a `var`** (census over the shipped corpus: 62
+`<training>` nodes, exactly 1 with `var=`, 0 with `flag=` — so the missing `rollGate` call is
+unreachable and needs no change):
+
+```xml
+<training ability="magic" var="x"/>. Gain 1 on MAGIC if you get higher than your current score, but
+<if var="x" equals="2">
+    <lose ability="magic" amount="deduct"><i>lose</i> 1 MAGIC</lose> if you roll a two.
+</if>
+```
+
+`x` is never assigned, so the guard reads an unwritten var. That does **not** throw and does not
+warn: `engine.js:262` resolves it through `state.getVar`, which returns `0` for an undefined var
+(`engine.js:1538`), and `0 === 2` is false. The snake-eyes penalty is silently unreachable, and
+the printed sentence "if you roll a two" describes a rule the engine cannot apply.
+
+**The fix is one line**, mirroring the other three renderers, in both places `renderTraining`
+stores a result (the first roll and the Luck reroll). `rollTraining` already returns `total` —
+the 2-dice sum, which is exactly what `equals="2"` tests:
+
+```js
+const res = rollTraining(story.state, ability, dice, add);
+writeRollVar(story, node.getAttribute('var'), res.total);
+story.ctx.rolls.set(key, res);
+```
+
+**Note the value differs from its siblings and that is correct**: `renderDifficulty` and
+`renderRankcheck` write `res.margin` (a success *margin* is what their sections test), where
+`<training>`'s section tests the raw dice total. Do not copy the margin line.
+
+Assertions for `suite-render.js`: a `<training ability="MAGIC" var="x"/>` assigns `x` after the
+roll and memoises it (`wroteVars`/`rolledVars`, as the task-172 gated cases assert for the other
+three), and — driving §2.554 itself with a forced seed — a rolled 2 fires the `<if var="x"
+equals="2">` and takes the MAGIC loss, where a higher roll does not. `suite-render.js` already
+seeds the RNG this way for §6.700.
+
+---
+
+## 279. Sweep the remaining tag families for task 277's shape — a shared helper only some of a sibling set calls
+
+**Priority: LOW — an audit, not a known defect. It is filed rather than left in the Review log
+because the one family that *has* been swept produced a HIGH defect (278) on the first look, so
+"probably nothing" is not a safe assumption to leave unrecorded.**
+
+*(Filed 2026-08-16. Suggested in the Review log by task 277's filing pass, repeated by its
+implementation pass, and filed as a task only on the third mention — see the Review log.)*
+
+Task 277's defect shape: a module-private helper factored out for a family of sibling renderers,
+which only some of the family calls. It is invisible to tests, because every assertion about the
+siblings is about what they *do* rather than what they share, and invisible to reading one
+renderer at a time — it only shows up when the siblings are read side by side.
+
+**The roll family (`render-rolls.js`) is done** — swept while closing 277, which found the
+`appendRollDescription` gap (277) and the `writeRollVar` gap (278), and confirmed the missing
+`rollGate` call in `renderTraining` is deliberate and unreachable (0 `<training flag=>` in the
+corpus). **The other families have not been swept.** In rough order of how much rule they carry:
+
+- **`render-rewards.js`** — the chooser family (`renderAbilityChoice`, `renderEquipmentChoice`,
+  `renderForfeitChoice`, `renderProfessionChoice`) against `atSentenceStart`, `fillDefaultWords`,
+  `showForfeitPicker`, `showAbilityPicker`; and the payment family (`renderPayment`,
+  `renderOptionalPay`, `renderChooseOnePay`, `renderRollPayment`, `renderForcedOptional`).
+- **`render-market.js`** — `renderShopRow` against `runSoldHooks`/`runBoughtHooks`/`hookMatches`.
+- **`render-combat.js`** — `drawFight` against `drawGroupFight`, over `statsRow`,
+  `playerStatsRow`, `logRow`, `makeFleeButton`, `afterAction`.
+- **`render-choices.js`** — `deadGate`/`targetBook` across the goto/choice renderers.
+
+Method that worked, and it is cheap: list each module's `^function ` declarations (one `grep`),
+then for each helper count its call sites against the size of the family it serves. A helper
+called by *all* of its family, or by exactly *one*, is uninteresting. **The 2-of-4 and 3-of-4
+cases are the whole yield.** For each, decide whether the gap is deliberate — say so in a comment
+where it is, as `renderTraining` already does for its pay gate — and, where it is not, census the
+corpus for a node that reaches it *before* filing, since an unreachable gap (the `rollGate` one)
+warrants a comment and nothing more.
+
+---
+
+## 280. The market header row renders `header1=` and drops `header2=`/`header3=`, so 23 authored column headings ("To buy", "To sell") never reach the page
+
+**Priority: MEDIUM — task 277's shape and task 277's rubric: authored words that never reach
+the page, with no rules consequence (every price, buy and sell control works). Smaller than 277
+at 23 nodes rather than 45 sections, but the same call.**
+
+*(Filed 2026-08-16 while closing task 277, from an "allowlisted attribute the app never reads"
+census — a different sweep from task 279, and the only real finding in it. See the Review log.)*
+
+`renderMarket` (`render-market.js:36`) reads one of the three:
+
+```js
+const h1 = child.getAttribute('header1');
+const title = (h1 && h1.trim()) || MARKET_TITLES[child.getAttribute('type')] || 'Goods for sale';
+```
+
+so `<header header1="Item" header2="To buy" header3="To sell"/>` (§1.292) renders the single
+heading `Item` and drops the other two. Census over the shipped corpus: **15 `header2=` and 8
+`header3=`**, always on `<header>` inside a market.
+
+**This may be a defect or an undocumented simplification, and deciding which is most of the
+work.** The three attributes are *column* titles for a three-column price table — item, buy
+price, sell price — where this app renders a market as a list of rows carrying their own
+buy/sell buttons, so there is no column for a column heading to sit over. If that layout stands,
+the right change is a comment at the `header1` read saying the other two are deliberately dropped
+and why (the same courtesy `renderTraining` already pays its missing pay gate). If the headings
+should show, the natural place is the `.market-head` row, and the labels then need to survive a
+narrow screen — check `web/css/` for how `.market-row` wraps on mobile before adding two more
+strings to that line. **Do not add a three-column table for this**; that is a layout change well
+beyond a dropped-heading fix, and belongs in `ROADMAP.md` if it is wanted at all.
+
+Assertion for `suite-economy.js` (which owns the market views), once the decision is made: either
+§1.292's market shows "To buy"/"To sell", or a regression test is not warranted and the comment
+is the whole deliverable — say which in the Review log.
+
+**Two riders from the same census, neither filed as its own task, both cheap to settle while
+here.** `<goto visit="t">` (§4.231, 1 node) is unread, and the JaFL spec says it may stay that
+way — "*whether the section being jumped to is one that will be returned from. At the moment this
+is unnecessary, but is probably good practice*" (`rules/JaFL-XML-Tags.md:87`). `<section start="t">`
+(6 nodes, section 1 of every book) is unread because its spec meaning — "*the first section of a
+new book … whichever character the player has chosen will be finalised*" — describes a JaFL
+character-selection step this app completes on its own creation screen before section 1 is ever
+entered. Both are correctly unread; a one-line comment naming each as deliberate would stop the
+next census re-finding them.
+
+---
+
+## 281. Sweep for renderers whose click handler no assertion ever fires — `renderTraining`'s never was, which is why task 172's parity pass could not see 278
+
+**Priority: LOW — an audit of the suite, not a known defect, filed for the same reason as 279:
+it ends either in defects or in a recorded "checked, clean", and both are worth a task.**
+
+*(Filed 2026-08-16 while closing task 278.)*
+
+Task 172 was explicitly a *parity* pass over the four roll renderers, and it did not find 278.
+The reason is mechanical and confirmed: **before task 278 no assertion in the suite had ever
+clicked a `<training>` roll button**, so `renderTraining`'s click handler — the only place the
+missing `writeRollVar` could have shown — never ran in the browser at all.
+
+Two independent things hid it, and each is worth looking for elsewhere:
+
+- **The shared selector silently does not match.** The task-172 block's helper is
+  `rollBtn = (c) => Array.from(c.querySelectorAll('.roll .btn-roll')).find((b) =>
+  /Roll|Rank check/.test(b.textContent))`. A `<training>` button reads `Train MAGIC (roll two
+  dice)` — lower-case `roll`, so the case-sensitive alternation misses it and `rollBtn` returns
+  `undefined`. Nothing warns; the cases that would have used it simply were not written.
+- **The one parity list `<training>` is absent from is the one that clicks.** `gatedCases` covers
+  `<difficulty>`/`<random>`/`<rankcheck>` and rolls each, and excluding `<training>` is correct
+  and documented (it has no pay gate). But that exclusion removed it from the *only* list in the
+  block whose body calls `.click()` — `descCases`/`bareCases` include `<training>` and assert on
+  static DOM. So the tag was present in the parity block throughout and still never driven.
+
+The rest of the suite does not cover the gap: `suite-engine` exercises `eng.rollTraining` — the
+*rule*, which is correct and was never in question — and `suite-render:130` drives §5.59's bare
+`<training>` only as far as the six-ability picker, stopping before the roll. `suite-corpus`
+renders every section but clicks nothing.
+
+**The sweep**: for each `render*` view module, list the handlers passed to `rollButton`,
+`appendChild`-ed `button`s and `addEventListener('click', …)`, and check whether any assertion
+reaches each one. A cheap first cut is to instrument — set a flag in each handler, run the full
+suite, report the handlers still unset — which needs no static analysis and cannot be fooled by
+a selector that does not match. Record the clean ones so the next pass does not re-derive them.
+
+Two candidate fixes fall out whatever the sweep finds, neither of them urgent: widen `rollBtn`'s
+regex (or match on `.btn-roll` alone, as this task's `trainBtn` does) so a renamed button label
+cannot silently drop a case, and give the parity block a `rollCases` list that every roll tag
+joins, separate from `gatedCases` which only the gated three can join.
+
+---
+
+## 282. Six click handlers still fire for no assertion — three modal-opening renderers and the Adventure Sheet's Wield/Move-down/Drop
+
+**Priority: LOW — the tail of task 281's sweep, filed rather than left in the Review log because
+it is a concrete list with a measurement behind it, not a suspicion. Every one is a control a
+player uses; none is known to be broken.**
+
+*(Filed 2026-08-16 while closing task 281.)*
+
+Task 281 instrumented `addEventListener` and ran the full suite: **71 click-handler sites, 9 of
+which no assertion ever fired.** Three were covered while closing it. These six remain, and they
+fall into two groups that want different work.
+
+**The three that open a modal** — the reason they were skipped is the same for all three, and it
+is the interesting part: each hands off to `ui.js`'s `modal()`, which returns a promise resolved
+by a button in a dialog appended to `document.body`, so an assertion has to drive a control
+*outside* the story container and `await` a result. Nothing in `web/tests/` does that yet, which
+is why the gap is uniform rather than incidental:
+
+- `render-market.js:422` — the inline `<sell cargo>` click (1 registration). Its `cargo="?"` form
+  asks *which* commodity through `modal()`; the single-commodity path resolves without one, so
+  even a partial test is worth more than none.
+- `render.js:999` — the `<image>` inline link (6), which opens the illustration modal (§3.75's
+  map of Bazalek, task 62).
+- `render.js:1574` — the `<sectionview>` oracle link (2). Task 101 records it as pure divination
+  flavour that "arms no controls and never touches the player's section/history/state" — so the
+  assertion worth writing is exactly that: click it and prove the sheet, section and history are
+  untouched.
+
+**The three on the Adventure Sheet** (`ui.js`, outside the `render*` modules 281 scoped itself
+to, which is why they are listed and not fixed): `ui.js:293` Wield/Wear (33 registrations),
+`ui.js:307` Move down (55) and `ui.js:310` Drop (55, also modal-gated). **Move *up* is warm and
+move *down* is cold**, which is the sharpest single result in the sweep — the pair is written as
+one control and covered as half. The order matters to a rule, not just to tidiness: §1.521/§248's
+theft takes "possessions listed first", so the reorder buttons decide what a robbery costs.
+
+Method, unchanged from 281 and cheap to repeat: wrap `EventTarget.prototype.addEventListener` in
+a classic script ahead of the modules, key each `click` registration by the `/web/js/…:line:col`
+frame in `new Error().stack`, wrap the listener to count firings, and report the sites with
+`fired === 0` after the suite. **It has one blind spot worth knowing**: a handler on a branch the
+suite never *renders* registers zero times and so never appears at all — `renderPayment`'s
+forfeit-picker branch is one such, invisible to both this method and the report.
+
+---
+
+## 283. The click-coverage probe collapses a shared registering helper's callers into one frame, so a cold caller reads as warm
+
+**Priority: LOW — an accuracy limit in an audit tool, not in the app. Nothing a player touches is
+known to be broken; what is wrong is a number two tasks have now been steered by.**
+
+*(Filed 2026-08-16 while closing task 282.)*
+
+The probe tasks 281 and 282 both ran keys each `click` registration by **the first `/web/js/…`
+frame in `new Error().stack`** — which is the frame that *called* `addEventListener`, not the
+frame that supplied the listener. Where a module registers a handler on its own line those are
+the same thing, and for 69 of the 71 sites they are. Where a **shared helper** builds the control
+and attaches a handler passed in by its caller, they are not: every caller collapses into the
+helper's single frame, and that frame is warm the moment *any one* caller is clicked.
+
+Two such helpers exist today, and the first is the one that matters:
+
+- **`render-rolls.js:33`, inside `rollButton(story, label, widget, onRoll)` — seven callers**
+  (`renderDifficulty` ×2, `renderRandom` ×2, `renderRankcheck` ×2, `renderTraining`). One frame,
+  one warm/cold bit, seven distinct controls. **This is exactly the gap that started the whole
+  line of work**: task 278 was a `<training>` roll button no assertion had ever clicked, and had
+  the probe existed then it would have reported `render-rolls.js:33` warm and moved on. Task 281
+  found 278 by reading the parity lists, not by measuring — the measurement could not have found
+  it, and 281's write-up does not say so.
+- **`render-combat.js:188`, inside `makeFleeButton(story, fleeNode, markFled)` — two callers**
+  (the section-fight and the standalone-fight control rows). Two controls, one bit.
+
+So the honest figure is **78 controls behind 71 frames**, and `cold=0` means "no frame is cold",
+which is a weaker statement than the one tasks 281 and 282 were read as making. Nothing found by
+either task is retracted by this — every site they covered is genuinely covered, and 282's
+before/after `6 → 0` is a true measurement of the frames it measured. What is wrong is only the
+denominator, and the confidence "0 cold" invites.
+
+Two things this task should settle, in order:
+
+1. **Key by the caller, not the registrar.** Walk the stack past frames belonging to the module
+   that called `addEventListener` and record *both* frames — `render-rolls.js:394 →
+   render-rolls.js:33` — so the seven roll buttons separate. A cheaper variant that needs no
+   stack heuristics: have the probe additionally key on the control's own `className` +
+   `textContent`, which distinguishes `Train MAGIC (roll one die)` from `Roll two dice` without
+   caring where the listener came from.
+2. **Then re-run and re-report the real cold list.** With the seven `rollButton` callers
+   separated, some may well be cold — a cold caller is what 278 was. Whatever it finds is the
+   next task, and if it finds nothing that is the "checked, clean" worth recording.
+
+Also worth confirming while there, since it is one command and settles 282's recorded blind spot
+rather than leaving it a suspicion: the seven view modules hold exactly **71** static
+`addEventListener('click'` sites (`app.js`'s 19 are out of scope — `_test.html` never imports it),
+and the probe saw 71 frames. Those two numbers matching is consistent with every in-scope site
+registering at least once, i.e. with the "a branch the suite never renders never appears at all"
+blind spot **not** biting today — but it is not proof, since two sites sharing a line would
+collapse and a genuinely-never-registered site could be masked by a coincidence in the totals.
+Diff the probe's full frame list against the static line numbers and the point is settled either
+way.
+
+---
+
+## 284. `renderPayment`'s open-forfeit branch is the one in-scope click handler that never registers in the whole suite, so the picker a forced "give up which?" payment opens has never been rendered
+
+**Priority: LOW — an untested branch of shipped code, not a known defect. Whether a player can
+reach it at all is precisely the open question; if none can, the outcome is a comment.**
+
+*(Filed 2026-08-16 while closing task 283.)*
+
+Task 283's re-keyed probe run settled the count question 282 left open, and settled it the other
+way. The seven view modules hold **71** static `addEventListener('click'` sites and the probe
+observed **71** frames — but one of the observed frames is **`app.js:837`** (the Adventure Sheet
+backdrop, registered because `suite-economy.js` imports `installSheetDrawer` from `../js/app.js`),
+so only **70** in-scope sites ever register. The equal totals were a coincidence, and it hid
+exactly the failure they were quoted as ruling out. Diffing the two lists names the missing one:
+
+**`render-rewards.js:445`** — the `plan.needsChoice` arm of `renderPayment`:
+
+```js
+} else if (plan.needsChoice) {
+  btn.addEventListener('click', () => { btn.disabled = true; showForfeitPicker(story, container, plan, commit); });
+} else {
+  btn.addEventListener('click', () => commit(null));   // :447 — covered by task 282
+}
+```
+
+A **forced** economic payment whose cost is an open `"?"` possession/equipment/cargo forfeit with
+more candidates than it takes. Its two siblings are covered — the ineligible arm is asserted
+disabled (task 117, §2.90) and the plain commit was driven by task 282 — and `showForfeitPicker`
+itself is exercised, but only through `renderOptionalPay` (`:515`) and the §2.90 route. Nothing in
+the suite has ever rendered *this* call to it.
+
+Task 281 named this shape as the probe's blind spot ("a handler on a branch the suite never
+renders registers zero times and so is invisible to the probe entirely") and named this very
+branch as its example — but could only assert it, since a registration probe cannot see what does
+not register. The static diff is the proof, and it is now known to be the **only** in-scope
+instance.
+
+Task 279's sweep note lives in `render-rewards.js` immediately above `showForfeitPicker` and
+adjudicates three picker gaps as unreachable. It lists `renderPayment` among the renderers that
+**do** ask, so this branch fell outside the sweep entirely — it is a fourth case, and the sweep's
+own rule (census the corpus *before* filing) has not been applied to it.
+
+What to settle, in order:
+
+1. **Can a shipped section reach it?** Per 279's note the corpus's only open-forfeit costs are
+   **§2.90, §4.456 and §5.152**. For each, check which payment renderer the `dispatch` in
+   `render-rewards.js:269` picks — `isEconomicPayment` routes to `'payment'`, and the optional /
+   choose-one / roll arms take the rest — and whether `losePaymentPlan` can report
+   `needsChoice: true` there (an open selector *and* more candidates than `multiple=` takes).
+2. **Then act on the answer.** Reachable: a fixture in `suite-actions` beside the task 117/226
+   block that renders the forced payment, clicks it, and asserts the picker appears, that the
+   button disables itself first (this branch is the only one that does), and that the chosen
+   candidate — not whatever the engine finds first — is what leaves. Unreachable: extend the 279
+   block's comment to a fourth case naming why, in the same terms as the other three.
+
+Note for whoever runs the probe again: it is throwaway (`web/_coverage.html`, deleted after each
+use) and it must be **caller-keyed** to be worth trusting — see task 283 for the shape, and for
+which of its "cold" results are artifacts rather than gaps.
+
+---
+
+## 285. A `<lose blessing="?">` effect commits with no picker, so book4/641's printed "(your choice)" takes whichever blessing was acquired first
+
+**DONE** — a fifth player-choice verdict, exactly as the filing scoped it. `needsBlessingChoice`
+(`render-rules.js`) reports a `<lose blessing="?">` with two or more blessings held, and
+`classifyPassive` routes it to `blessing-choice` **below the fight gate**, beside `forfeit-choice`
+and for its reason: a blessing charged through a picker on a branch that may never be taken cannot
+be given back. `renderBlessingChoice` (`render-rewards.js`) prints the effect's words through the
+shared `appendFxWords`, then stands a `.ability-choice` row of `blessingLabel`-labelled buttons —
+so §4.641 reads "− COMBAT / − SCOUTING" and §6.159's permanent reads "− Safety from Storms", the
+name the book prints rather than the stored key — and commits `applyEffect(node, state,
+{ chooser: () => [b] })` on the click, on the **same `fx@` memo** the plain path uses. Sharing
+that key is what makes a state which stops needing a choice fall back through `apply` already
+applied, and what stops the loss being voided by the re-render.
+
+The spec is compared **raw** (`getAttribute('blessing') !== '?'`), exactly as `applyLose` compares
+it, so the classifier and the engine can never disagree about which nodes are open. The three
+forms the filing ruled out stay ruled out, each with a rendered assertion of its own: the `"*"`
+sweep, the named spend (task 90's blessing invoked for its protection, 70 nodes), and
+`<if blessing="?">` (task 132's test). Fewer than two held still commits on entry, so §1.333's and
+§1.377's hazard rows grow no pointless button.
+
+20 new assertions in `suite-actions`, and the suite moves `2756 → 2776`. The filing's table is the
+first of them: §4.641 rendered on two blessings held in one order and the other, same answer both
+ways, where before it took whichever was acquired first. The permanent case is asserted too —
+`removeBlessing` splices `permanentBlessings`, so an unasked forfeit destroyed a Safety from Storms
+bought before an ordinary Luck; naming the Luck now keeps it. The census is re-measured over the
+bundled corpus per task 270: **3** open forfeits in `1/333 1/377 4/641`, and **0** open
+`gain`/`tick` blessing selectors, so no grant path needs the same treatment.
+
+`render-rewards.js`'s task-279 sweep note is extended rather than left stale: there are five
+player-choice renderers now, two of which call `appendFxWords`, and the blessing route's own
+default is `''` because `blessingLabel("?")` names nothing to print.
+
+**Priority: MEDIUM — task 231's finding on a different currency, and the same call. Live in three
+published sections (book1/333, book1/377, book4/641), one of which prints the choice in so many
+words. Nothing is over-charged (one blessing leaves either way) and it only bites a player holding
+two or more, but which one leaves is decided by acquisition order and the player is never asked.**
+
+*(Filed 2026-08-16 during conversion work on an unpublished book, whose page prints "you choose
+which" on the same construct. The evidence below is all in the published books.)*
+
+**The engine is already right; the view never asks.** `applyLose`'s open-blessing branch takes a
+chooser and only falls back when it is given none (`engine.js:602-612`):
+
+```js
+} else if (b === '?') {
+  if (state.data.blessings.length) {
+    const pick = opts.chooser ? opts.chooser(state.data.blessings.slice(), 1, 'blessing') : null;
+    const chosen = (pick && pick.length) ? pick[0] : state.data.blessings[0];
+    if (state.removeBlessing(chosen)) notes.push('lost blessing');
+  }
+}
+```
+
+No caller ever supplies one. `classifyPassive` (`render-rules.js`) offers three player-choice
+verdicts — `ability-choice`, `equipment-choice`, `profession-choice` — and a fourth,
+`forfeit-choice`, whose test is `needsForfeitChoice` → `losePaymentPlan(...).kind` ∈
+`ITEM_FAMILY_TAGS`. **`losePaymentPlan` enumerates `item`/`weapon`/`armour`/`tool`/`cargo`/`ship`
+and returns `present: false` for a blessing** (`engine.js:827-861`), so none of the four fires and
+the node falls through to `apply`, which commits it with the chooser explicitly nulled — the same
+line task 231 quotes:
+
+```js
+const note = applyEffect(node, story.state, { chooser: null });
+```
+
+`state.data.blessings[0]` is therefore what leaves, and that array is append-ordered by
+`addBlessing`, so **the blessing the player has held longest is the one taken**.
+
+Measured on a real `GameState` rendering book4/641 through `Story`:
+
+| blessings held at entry | after the render | pickers drawn |
+| --- | --- | --- |
+| `["combat","scouting"]` | `["scouting"]` | `.ability-choice=0 .ability-pick=0` |
+| `["scouting","combat"]` | `["combat"]` | — |
+
+Same page, same two blessings, opposite outcome — decided by which was acquired first.
+
+The three shipped sections:
+
+- **book4/641** — the rejected offering: "Tambu is displeased!
+  `<lose blessing="?">Lose a blessing</lose>` **(your choice)**, if you have one." The printed
+  instruction the app ignores, verbatim.
+- **book1/333** — a travel-encounter row: "A water sprite curses you —
+  `<lose blessing="?">lose a Blessing</lose>`, if you have one".
+- **book1/377** — a hazard row: "Bad omen — `<lose blessing="?">lose one Blessing</lose>`".
+
+The last two print no choice, but they are the same tag on the same path, and the engine's own
+comment above the branch calls all three "punitive robbery" — so whatever the fix does, it should
+do it once for the form rather than once for the sentence.
+
+**One sharper consequence than task 231's.** `removeBlessing` splices the name out of
+`permanentBlessings` as well, so a permanent blessing (task 90's "never used up" Safety from
+Storms) acquired before an ordinary one is what an unasked `?` forfeit destroys. A player who
+bought the permanent early and picked up a Luck later loses the permanent and keeps the Luck,
+which is the exact inverse of what anyone would choose.
+
+**The fix is a fifth verdict, not a new picker widget.** `needsAbilityChoice` is the shape to
+copy: a `needsBlessingChoice(node)` — a non-hidden, unpriced, unflagged `<lose blessing="?">` with
+two or more blessings held — routing to a `blessing-choice` verdict that renders the existing
+`story.appendAbilityPicker` row with `blessingLabel` (`render-util.js`) for the button text and
+commits `applyEffect(node, state, { chooser: () => [b] })` on click, exactly as
+`renderAbilityChoice` does. One held blessing needs no picker and must keep falling through to
+`apply`, or a hazard row grows a pointless button.
+
+What must **not** start asking:
+
+- **`<lose blessing="*">`** — "lose all your blessings" is a sweep, and `applyLose` handles it
+  through `removeAllBlessings`. There is nothing to choose.
+- **A named `<lose blessing="X">`** — task 90's spend, and by far the commonest form (70 nodes):
+  the blessing being *invoked* for its protection. It names itself; a picker would be wrong.
+- **`<if blessing="?">`** — task 132's *test* ("if you already have a blessing of any sort"), not
+  a loss. book5/365 is the only instance and it must stay a condition.
+
+Census for the fixture: `<lose blessing="?">` is **3** nodes in **3** sections corpus-wide, and
+there is no open `gain`/`tick` blessing selector at all (`0`), so no grant path needs the same
+treatment. The assertion to write is the table above — render book4/641 on a state holding two
+blessings in each order and check that the picker appears and that the *named* blessing is the one
+that leaves.
+
+**Why neither task 279 nor task 284 could see this.** Both swept the question "which renderers
+call the pickers that exist" — `showForfeitPicker` and `showAbilityPicker` — and adjudicated four
+gaps as unreachable. A currency with **no picker at all** is invisible to that question: there is
+no call site to find cold, and `render-rewards.js`'s sweep note is complete and correct as written.
+The census that finds this one runs the other way round — over the *engine's* `opts.chooser` hooks,
+asking which of them any view ever supplies.
+
+---
+
+## 286. A `<group>` never asks which ability an open `ability=` spec takes, and its forfeit picker skips a count the page states
+
+**DONE** — `groupForfeitChoice` becomes `groupBundledChoice` (`render-rewards.js`), which answers
+"what must this button ask before it commits?" instead of "which forfeit must it ask about?". Two
+arms, in that order: an open possession/equipment/cargo `<lose>` whose `losePaymentPlan` reports
+`needsChoice` — now including a `multiple=` count that is a **literal integer**, per the new
+`fixedForfeitCount` — and, failing that, an open `needsAbilityChoice` node whose
+`abilityChoiceOptions` leaves more than one eligible ability. `renderGroup`'s click dispatches to
+`showAbilityPicker` or `showForfeitPicker` accordingly; everything else is unchanged, because task
+229 had already moved the group's whole body — effects, awards, buys, rests, `<goto>`/`<return>`/
+revival — behind a `commit(chooser)` the picker calls, and a second kind of picker calls the same
+one.
+
+Exactly **one** question is asked and the forfeit wins where both are present: no corpus group
+carries two open selectors, so chaining pickers would be machinery for a shape nobody has authored.
+A single eligible ability commits straight through, matching the lone-possession case task 229
+already had — `abilityTargets`' own `cands[0]` *is* that option, so a one-button row would decide
+nothing. The printed floor ("you cannot choose an ability that already has a value of 1") needed no
+code here at all: `abilityChoiceOptions`' `forLoss` filter drops those before the picker sees them,
+which is also what makes "more than one eligible" the right test rather than "more than one listed".
+
+`renderGroupWithRoll` is untouched, for task 229's reason unchanged: both var-count groups live
+there and neither asks. The two stale comment references to the old helper name are updated, and
+`render-rewards.js`'s task-279/284 sweep note gains the one line that keeps its caller census
+complete — outside the payment family both pickers have exactly one more caller, and it is
+`renderGroup` for both.
+
+17 new assertions in `suite-actions`, and the suite moves `2776 → 2793`. Task 229's `multiple=`
+assertion is re-pinned rather than deleted: it now drives a `<set var="x" value="2"/>` outside the
+group so the walk writes the count before the group is classified, and asserts the var form is
+still engine-chosen — the fixed form is asserted the other way in the new block. The census is
+re-measured in the suite over `data.availableBooks()` (per task 270) and pinned at **0** groups with
+a fixed-count open forfeit and **0** with an open ability selector, so a section arriving in either
+list lands here and wants measuring.
+
+**Priority: LOW — latent on both arms. Censused over the bundled corpus: no group in the six
+published books carries an open ability selector, and none carries a fixed-count open forfeit. Like
+task 228 this is a shape the renderer cannot serve rather than a page it serves wrongly, and it is
+filed so it is closed before something authors it rather than after.**
+
+*(Filed 2026-08-16 during conversion work on an unpublished book, one of whose pages prices an
+opt-in rite at an ability point the player chooses and bundles two further consequences onto the
+same click, and another of which prices an offer at two possessions of the player's choosing. The
+evidence below is all in the published books.)*
+
+**One control, and more than one chooser hook under it.** `renderGroup` (`render-rewards.js`)
+collapses a `<group>` to a single button and applies the whole body on the click:
+
+```js
+plan.effects.forEach((fx) => applyEffect(fx, story.state, chooser && fx === forfeit.node ? { chooser } : {}));
+```
+
+Task 229 gave that click **one** picker — `groupForfeitChoice`, an open `"?"`/blank
+possession/equipment/cargo `<lose>` with a candidate to spare. Every other effect in the bundle is
+still applied with `{}`, and `applyEffect` reaches more than one place that would have taken an
+answer. Two of them matter, and this is the run of task 285's census (the *engine's* hooks, not the
+view's call sites) over the one control that was never on it.
+
+**(a) The ability hook has no group picker at all.** `abilityTargets` (`engine.js:132`) takes
+`opts.chooser` for a `"?"`/`"a|b"` spec and falls back when it gets none:
+
+```js
+const picked = opts.chooser ? opts.chooser(cands, 1, 'ability') : null;
+const chosen = (picked && picked.length) ? picked[0] : cands[0];
+```
+
+`cands` is `abilityChoiceOptions`, which is `ABILITIES` order — `charisma` first — minus anything
+already at 1 on a loss. So a bundled `<lose ability="?">` takes **CHARISMA** from almost every
+character, and the player is never asked. `classifyPassive`'s `ability-choice` verdict cannot save
+it: `renderGroup` consumes the node as one of `plan.effects` and it never reaches the classifier at
+all — structurally the same reason task 284 gave for `renderPayment`'s branch being unreachable on
+§6.496.
+
+**(b) The forfeit hook skips a count the page states, on evidence about a count it does not.**
+`groupForfeitChoice` reads:
+
+```js
+if (fx.tagName.toLowerCase() !== 'lose' || fx.hasAttribute('multiple')) continue;
+```
+
+Task 229 argued that exclusion from §3.273/§3.629 — `<random dice="1" var="x"/>` bundled with
+`<lose item="?" multiple="x"/>`, "lose **the first** 1-6 of your possessions". That argument is
+sound and still is: the page names no choice, and a **var** count cannot be asked about coherently
+(a roll of 1 would ask and a roll of 6 would not). But it was written as `hasAttribute('multiple')`,
+which also silences a count the page prints as a constant — and that is the *opposite* case, task
+228's priced offer, where the number is the author's and the items are the player's. Task 228 built
+the count-aware picker for exactly it; the group is the one path that then refused to call it.
+The two var groups both live in `renderGroupWithRoll`, which asks nothing at all, so that path needs
+no change now for the same reason it needed none then.
+
+**The census, over the bundled corpus (per task 270).** Both arms are inert for the published
+edition, and the near-misses are worth recording because each looks like a hit:
+
+- **`<lose multiple=>` inside a group: 4 nodes.** book3/273 and book3/629 are the `multiple="x"`
+  rolled sweeps above. book6/191 carries **two** with a literal `multiple="12"` — but on *named*
+  items (`item="dead head"`, `item="ghoul's head"`), so `losePaymentPlan`'s `openForm` is false and
+  `needsChoice` was already false whatever this task does. **0** fixed-count *open* forfeits.
+- **`ability=` inside a group: 36 nodes across 24 sections, all named.** book3/165 and book6/664
+  bundle five apiece. The only *open* spec inside any group is book6/741's
+  `<difficulty ability="combat|sanctity" level="16"/>` — a roll's ability alternation, not an
+  effect, and `needsAbilityChoice` admits only `<lose>`/`<gain>`/`<tick>`, so it is out by
+  construction rather than by luck.
+- The corpus's one open `<lose ability="?">` is **book2/157**, and it is not in a group: it carries
+  `flag=`, so `openAbilityNode` routes it and task 224's picker already asks.
+
+**The fix is two reads of state that already exists, not a new widget.** `losePaymentPlan` already
+reports `count` and `needsChoice` for a `multiple=` forfeit (task 228) and `showForfeitPicker`
+already collects `count` answers; `showAbilityPicker` already exists and already commits
+`applyEffect(node, state, { chooser: () => [ab] })`. So: narrow the `multiple=` skip to a count that
+is **not** a literal integer, and give the group a second arm that finds an open
+`needsAbilityChoice` node with more than one eligible option and opens the ability picker instead.
+Ask **one** question — no corpus group carries two open selectors, so chaining pickers would be
+machinery for a shape nobody has authored — and let a single eligible ability commit straight
+through, because `cands[0]` *is* that option and a one-button row decides nothing.
+
+`suite-actions` beside the task 226/228/229 block, and one edit inside it: task 229's own
+`multiple=` assertion is written with a fixed `multiple="2"`, which reads its rule off the wrong
+half of its evidence, and must be re-pinned to the var form it was actually arguing for.
+
+---
+
+## 287. The Rules dialog opens scrolled to its last line, and a dialog long enough to scroll has no exit in view
+
+**DONE** — two one-line causes in `ui.js`, both in the shared dialog shell, and both only visible
+on a dialog long enough to scroll. Reported from the title screen: **Rules** opens showing the end
+of the rules, and there is nothing at the top to close it.
+
+**The scroll.** `.modal` is its own scroll container (`max-height: 88vh; overflow-y: auto`), and
+`mountDialog` ends with `(initialFocus || box).focus()`. For `modal()` that target is the primary
+button — or, failing one, the first button in `.modal-buttons`, which is the LAST thing in the box.
+The browser then does exactly what focus asks and scrolls it into view, so every dialog taller than
+the viewport mounted at its bottom. `focus({ preventScroll: true })` moves focus without the scroll,
+and a freshly built box is already at `scrollTop` 0. The a11y contract is untouched: focus still
+lands where it did, and the Rules dialog's own Close button is still the first Tab stop after the ✕.
+
+**The exit.** `modal()` put the title in a bare `<h2>` and every control in the bottom bar, so on a
+long body the only ways out were Escape, a backdrop click, and a button below the fold — two of them
+undiscoverable and the third off-screen. The title now sits in a `.modal-head` row that also carries
+a labelled `.modal-close` ✕ **whenever the dialog is dismissable**, i.e. exactly when Escape and the
+backdrop already close it: the ✕ adds no new way out, it makes the existing one visible. A
+non-dismissable dialog (the death screen, `dismissable: false`) keeps the title alone — there the
+buttons ARE the exit, and a ✕ would offer a way past a choice that has to be made.
+
+**The CSS holds one trap worth keeping.** `.modal-head` is `position: sticky` so the ✕ survives
+scrolling, and negative margins pull the row out to the box's padding edges. `top: 0` then rests it
+**1.3rem too low** — a sticky offset positions the *margin* box, and this row's top margin is
+negative — leaving a gap at the top of the dialog that scrolled text slid up into. The offset is
+`top: -1.3rem`, cancelling `.modal`'s `padding-top`; the test pins both numbers together, because
+they are only correct as a pair.
+
+6 new assertions in `suite-render`, and the suite moves `2793 → 2799`. The scroll one is the load-
+bearing one and it is written to be able to fail: the test page loads no stylesheet, so it mounts
+its own inline-styled scroll container (80px tall, 600px of content, the focus target at the bottom)
+through `mountDialog` and asserts `scrollTop === 0`. Reverting `preventScroll` reports it as
+`scrollTop=541`. Task 177's two focus-trap assertions are updated rather than deleted: the wrap
+targets move to the ✕, which is now the box's first focusable, while initial focus stays on the
+primary button. Both states were also confirmed in a real browser against the real stylesheet — the
+dialog at the top on open, and the header still pinned with the ✕ reachable after scrolling.
+
+**Priority: MEDIUM — user-reported, on the title screen, on the one dialog every new player is
+told to read. Nothing is lost or mis-computed, and Escape always worked, but a reader who does not
+know that meets the rules from the wrong end with no visible way back out.**
+
+*(Filed and closed 2026-08-17 in one pass, from a user report rather than an audit.)*
+
+---
+
+## 288. Task 191's narrow-header block measures an iframe whose stylesheet may not have applied, and fails intermittently
+
+**DONE** — a defect in a test, not in the app. Task 191's block in `suite-economy.js` builds each header strip in an iframe of a given
+CSS width, links the real `web/css/style.css` into it, waits for the frame's `load` event, and then
+measures. Observed once in a run that had changed nothing outside `books/`:
+
+```
+FAIL task191: at 360px exactly More / narration / Save / Sheet remain :: ☰ ↩️ 📖 🗺 🌙 🔊 🔁 1× 💾 📜
+FAIL task191: at 360px the remaining touch targets are at least 44px :: min side=21
+```
+
+An identical re-run of the same command against the same tree passed. **Both values are the
+signature of a frame measured before `style.css` applied**, not of a stylesheet rule being wrong:
+all ten controls visible is the DOM with no `@media (max-width: 600px)` narrow-chrome rules, and
+`min side=21` is an unstyled `<button>`'s default height. The 320px call immediately before it, and
+the 601px/900px calls after, were fine in the same run — so it is per-frame, not per-run.
+
+**Two of the block's four assertions at that width pass VACUOUSLY in exactly that state, which is
+why the failure reads like a real regression.** With no stylesheet applied, `.header-actions` is a
+plain block, its buttons wrap in normal flow and nothing overflows, so "does not overflow" passes;
+and no control is hidden, so `hiddenAllNone` is `[].every(…)` — true. The companion assertion also
+confirms `r.vw === 360`, so the iframe width is not what moved. Only the two assertions that
+actually depend on the stylesheet fail, and they fail with values a reader has to know the fix's CSS
+to recognise.
+
+**The seam is `await new Promise((res) => frame.addEventListener('load', res, {once: true}))`.** The
+frame's `load` is the block's only barrier, and it does not guarantee that a linked stylesheet was
+fetched *and applied* — a subresource that errors or is aborted still lets the event fire, and the
+suite issues these seven frame loads back-to-back alongside the rest of its fetching. Nothing here
+is a defect in the app or in the stylesheet: it is a test that measures rendered geometry across an
+unsynchronised subresource boundary.
+
+**Fixed by taking the subresource out of the frame.** `css/style.css` is fetched **once** at the
+top of the block and inlined into each `srcdoc` as a `<style>` element, so the document the `load`
+event announces is already styled and there is nothing left to race. The seven frames now issue
+zero subresource requests between them. That keeps what the block is for — the assertions still
+run against the real shipped stylesheet, fetched from the served tree rather than copied into the
+suite — while making the barrier exact. (The weaker alternative, spinning on a sentinel computed
+style before measuring, trades a silent flake for a timeout and was not taken.)
+
+**Inlining is only safe because this stylesheet has no relative references.** A `<style>` element's
+`url()` and `@import` resolve against the *document's* base URL, not the stylesheet's, and a srcdoc
+frame inherits its parent's base — so a `url(../assets/…)` that resolved correctly through the
+`<link>` would silently 404 once inlined. `style.css` contains no `url(`, no `@import` and no
+`</style>`, checked before the change; a future rule that adds one has to be weighed against this
+block.
+
+The seventh assertion added to the block is the guard the old form did not have: the fetched text
+must contain both `@media (max-width: 600px)` and `.icon-btn.in-menu { display: none; }`. A fetch
+that quietly returned a 404 body would otherwise reproduce the exact unstyled state this task is
+about, and `await (await fetch(…)).text()` does not throw on one. The suite moves `2799 → 2800`.
+
+**Priority: LOW — no player-visible behaviour is involved and the run fails loudly rather than
+falsely passing.** What it cost was a wasted run plus the reading time to work out that the failure
+named a suite the change could not have touched.
+
+*(Filed 2026-08-17 during conversion work on an unpublished book, from a run whose only change was
+section XML. Closed 2026-08-17.)*
+
+---
+
+## 289. `<lose staminato="N">` can only ever lower Stamina, so book1/297's padded tournament never heals its winner and kills its loser at book1/370
+
+`applyEffect`'s `staminato` branch computes the wound as `Math.max(0, state.data.stamina - target)`
+and hands it to `damageStamina` (`engine.js:591`, `:596`), so a target **above** the current score
+resolves to a wound of 0 and the score does not move. `JaFL-XML-Tags.md:416` documents the attribute
+as "The value to **set** the current stamina to. This may be a number or a variable name. **This may
+actually restore stamina, if it is currently lower than the value given.**" The restoring half has
+never been implemented, and the comment above the branch shows why nobody noticed — it describes the
+attribute as "beaten down TO N Stamina", which is what 15 of the corpus's 17 nodes do.
+
+**The other two are book1/297, and they are the whole point of the page.** The Dragon Knights'
+tournament sets `<set var="prestamina" value="stamina"/>` above the fight, prints "Because it is not
+a duel to the death, your weapons are padded, so any Stamina you lose is not permanent - it is
+recovered after the fight", and then puts `<lose staminato="prestamina"/>` inside **each** of the two
+`<group>`s that leave the page — the `<if dead="f">` win group to 19 and the `<else>` group to 370.
+Those are the only `staminato` nodes in the corpus whose target can exceed the current score (the
+other 15 are `staminato="1"` ×14 and `staminato="3"` ×1), so this is the one shipped page the missing
+direction reaches, and it reaches it on both of its exits.
+
+Measured against a real `GameState` (a scratch page under `web/`, deleted after):
+
+* wounded to 3 of 12 with `prestamina` = 12, `<lose staminato="prestamina"/>` leaves **3**;
+* at **0** Stamina it leaves 0, and `isDead()` reads true;
+* controls, so the finding is this branch's arithmetic and nothing else: `staminato="1"` from 9 beats
+  the score down to **1** correctly, and `healStamina(9)` from 3 reaches **12**;
+* end to end on §1.297 — the page saves `prestamina` correctly, the win group renders, and clicking
+  it leaves the wound in place.
+
+**The loser's case is a spurious character death, and the engine's own machinery for avoiding one is
+what makes it reachable.** §1.297's `<else>` prints "If you are reduced to 0 Stamina, you pass out,
+turn to **370**", which is exactly the non-death "if you lose…" branch `hasLosePath` exists for
+(`render.js:914`), so the death is deferred correctly and the player really does get the →370 button.
+§1.370 then opens "You come round, back to your Stamina score before the fight started" — and
+because the restore was a no-op the sheet still reads 0, so `render.js:916` fires `onDeath` on
+arrival. Measured: entering §1.370 on 0 Stamina fires `onDeath` exactly once while that sentence is
+on the page; the control at a restored score fires none. So a tournament the book says is not to the
+death ends the character, or spends a resurrection deal, at the very section that says it does not —
+and the win branch quietly keeps a wound the same paragraph promises is temporary.
+
+**Fix:** honour the documented semantics. `staminato` *sets* the score, so the branch has to move it
+in either direction — compute the signed delta against the target and heal when it is positive
+(`healStamina` already clamps at `effectiveStaminaMax()`, which is the right ceiling for a restore
+that may be read while an aura or a Stamina-cutting affliction is in play). Keep the lowering path
+byte-identical for the 15 nodes that use it, and keep the note text honest in both directions rather
+than always printing `−N Stamina`.
+
+**Tests:** both directions of the tag as unit assertions in `suite-engine.js` beside the existing
+task-71 one (`staminato` down from a healthy score, up from a wound, up from 0, and a no-op when the
+score already equals the target), plus one over the real §1.297/§1.370 pair — wound, take the win
+group, assert the score is back; and enter §1.370 on the restored score and assert no death. The
+second is what makes the regression un-writable again: the unit assertion alone passed for a year
+because it only ever tested the direction the corpus mostly uses.
+
+**Priority: HIGH — a silent, unavoidable character death on a shipped page**, with no diagnostic
+of any kind: the player reads "you pass out" and "You come round", and the app kills them. The
+winner's case is milder but is the same one line.
+
+*(Filed 2026-08-18 during conversion work on an unpublished book, from a census of what `<lose>`
+carries besides `stamina=`.)*
+
+---
+
+## 290. book5/315's `<if var="exp">` reads a variable no node in the section ever writes, so the training courtyard's crippling injury can never fire — task 278's twin from the reader's side
+
+**Priority: HIGH — the player escapes a printed penalty entirely, which is the line task 278 drew
+between HIGH and MEDIUM.** It is one section and the stake is 2 maximum Stamina, so a reader
+weighting blast radius could argue MEDIUM; the rubric weights correctness.
+
+*(Filed 2026-08-23 during conversion work on an unpublished book, from a census of every `var=`
+reference against the writers in its own section.)*
+
+`books/book5/315.xml` in full:
+
+```xml
+<p>
+    <training ability="combat">Roll two dice</training>.
+    If the roll exceeds your current COMBAT score, increase it by 1.
+    <if var="exp" lessthan="0">
+        If the roll is less than your current COMBAT, however, then you take a
+        <lose ability="stamina" amount="2">crippling injury</lose>
+        that permanently reduces your Stamina by 2 points.</if>
+</p>
+```
+
+Nothing in the section writes `exp`. The `<training>` carries no `var=` at all, so
+`renderTraining`'s `writeRollVar` (task 278's fix) has no attribute to write, and
+`evaluateCondition` resolves the guard through `state.getVar('exp')` → `0`. `0 < 0` is false, so
+the branch is suppressed on every render: the printed sentence never appears and the 2-point
+maximum-Stamina loss never applies. Same failure mode as 278 — silent, no warning, no throw.
+
+**Two things are wrong, not one, and fixing only the obvious half leaves the branch just as
+dead.** Adding `var="exp"` to the `<training>` makes the var live, but `rollTraining` writes
+`res.total` — the raw 2-dice sum, as 278's filing says in as many words ("do not copy the margin
+line") — which is never negative, so `lessthan="0"` still never matches. The comparator has to
+name the score the page names.
+
+**`lessthan="combat"` is not it either, and the reason is the one asymmetry the format has here.**
+`resolveValue` is *variable-first* (`engine.js:105`), so a bare `combat` in a comparator reads the
+variable `combat` and gets 0; only the `<set value=>` side is keyword-first (`evalExpression`).
+So the score has to be snapshotted into a var first:
+
+```xml
+<set var="pre" value="combat" modifier="natural" hidden="t"/>
+<training ability="combat" var="exp">Roll two dice</training>.
+…
+<if var="exp" lessthan="pre">
+```
+
+`modifier="natural"` because `rollTraining` already judges success against the *natural* score
+(`engine.js:1719`'s own comment), so the penalty must be judged against the same one or the two
+halves of the printed sentence disagree for anyone wearing a COMBAT-boosting item.
+
+**The re-render hazard that bit task 289 is present here and is harmless, which is worth writing
+down so the implementer does not design around it.** An absolute `<set value=>` is `rerunnable`
+(task 61), so after a successful roll `pre` re-reads a COMBAT that the training just raised. That
+cannot produce a false positive: a success means `exp > pre_old`, i.e. `exp >= pre_old + 1 = pre_new`,
+so `exp < pre_new` is false either way. On a failure the score is unchanged and the test is exactly
+the printed one. Assert both directions rather than reasoning about it a second time.
+
+**Why the task-278 pass could not see this.** That census asked the writer-side question — "how
+many `<training>` nodes carry a `var=`" — and answered 1 of 62. The reader-side question is a
+different set, and it is the one that finds a var with no writer at all. Over the shipped corpus
+it returns exactly one file:
+
+```python
+import re, glob
+R = re.compile(r'<(random|difficulty|rankcheck|training|set)\b[^>]*\bvar="([^"]+)"')
+T = re.compile(r'<(if|elseif|while|outcomes|outcome|success|failure)\b[^>]*\bvar="([^"]+)"')
+for f in sorted(glob.glob('books/book[1-6]/[0-9]*.xml')):
+    s = open(f, encoding='utf-8').read()
+    w = {m.group(2) for m in R.finditer(s)}
+    for m in T.finditer(s):
+        if m.group(2) not in w:
+            print(f, m.group(2))
+```
+
+`books/book5/315.xml exp`, and nothing else. Vars are section-local — `Story.begin` calls
+`clearVars()` (`render.js`) — so "written in this section" is the whole of the question and the
+predicate needs no cross-file pass.
+
+Assertions: a unit case in `suite-render.js` driving §5.315 with a forced seed — a roll under the
+natural COMBAT applies the 2-point maximum-Stamina loss and prints its words, a roll over it
+raises COMBAT and applies neither — and a corpus census in `suite-corpus.js` pinning the predicate
+above at **0** files, so a future section cannot reintroduce a read of a var nothing writes. The
+census is the part that generalises, and one caveat comes with widening it: a version that also
+scans the *expression* attributes (`value=`, `amount=`, `bonus=`, `level=`, `equals=`, …) for bare
+identifiers must exclude `modifier=`, whose keyword values (`natural`/`affected`/`noweapon`) are
+not variables — they account for **38** hits across books 2, 3, 5 and 6, and read as the whole
+finding if they are not filtered out.
+
+---
+
+## 291. book2/270 and book2/362 hand out the god Nagil on entry, because a `lessthan=` guard over a roll var not yet filled matches at 0
+
+**Priority: HIGH — a permanent religious allegiance, awarded with no roll at all**, on two pages
+whose whole point is a trial you can fail. Both books branch on the God box afterwards.
+
+*(Filed 2026-08-23 while implementing task 290, from the census that fix's own pre-roll assertion
+forced into existence. Split from a wider filing — see 292 and 293 — once each of the four hits
+turned out to want a different answer.)*
+
+`render-rules.js`'s `effectPendingVars` comment states the design in as many words:
+
+> A *condition* deliberately does NOT consult the unfilled set — an unwritten var reads as 0 and
+> its branch simply doesn't match, which is the long-standing behaviour — whereas an effect that
+> applies against 0 memoises its own award away. (task 181)
+
+"An unwritten var reads as 0 and its branch simply doesn't match" is true of `equals=` (§2.554's
+`equals="2"`) and of a bare `var=` (which tests `!= 0`). It is **false of `lessthan=`**, where 0 is
+the smallest value there is and matches every positive bar. So a `<random|difficulty|rankcheck|
+training var="V">` with an `<if var="V" lessthan="N">` beneath it has that branch open on entry,
+effects and exits included. Task 290's §5.315 was one; the census over the shipped 4,369 — roll
+writers, readers whose comparator matches at `V == 0`, minus the sections carrying a `<set var="V">`
+sentinel — returns four more, each driven in a real `Story` to see what the open branch does.
+
+**These two.** §2.270 and §2.362 are the same Nagil trial, `<random dice="1" var="x">roll under your
+Rank on one die</random>` under `<if var="x" lessthan="rank">`, and the branch holds
+`<tick god="Nagil">`. Driven on entry, before the roll: `gods=["Nagil"]`. `pendingRollVar` cannot
+help — it inspects only the effect's own **magnitude** attributes (`EFFECT_MAGNITUDE_ATTRS`), and
+`<tick god="Nagil">` names no var at all, so the guard's verdict is the whole of what admits it.
+
+**The fix is the corpus's own idiom, and the engine alternative was measured and rejected.**
+§6.628 puts `<set var="y" value="7"/>` above its `<random var="y">`, out of range of the
+`lessthan="6"` beneath, precisely so an unrolled 0 cannot match; task 290 did the same for §5.315
+with `<set var="exp" value="pre"/>`. Here it is `<set var="x" value="rank" modifier="natural"/>` —
+`x == rank` pre-roll, so `x < rank` is false by construction for any Rank, and `rollOwned`
+(task 61) freezes it the moment the roll takes the var. The engine alternative — let a condition
+consult `unsettledVars` so an `<if var="V">` over an unfilled roll var defers like an effect —
+was censused rather than argued:
+
+- **138** readers over a roll var across **112** sections would change how they resolve pre-roll.
+- **8** of those sit in an if/else chain with an `else`/`elseif`, whose `<else>` activates pre-roll
+  today and would be held instead (a pending condition holds the WHOLE chain, `render.js`).
+- **21** readers have every writer of their var inside a conditional they are outside of, so a
+  branch never taken would leave them pending **forever**. All but one are `<success>`/`<failure>`
+  or `<outcome>`, which already gate on the var being written this visit (`branchResolved`); the
+  exception is book3/149's `<if x>`.
+
+That is a deliberate task-181 decision reversed for a wide blast radius, against a two-line markup
+change for the two sections that actually lose something. Take the markup.
+
+Assertions: both sections driven on entry (no god, and the guard grayed) and in both roll directions
+with a forced seed (a die under Rank writes Nagil, a die at or above it does not), plus the census
+above pinned in `suite-corpus.js` at exactly the sections 292 and 293 own, so it moves when either
+bucket does and a fifth such section lands here. Task 290's §5.315 block is the shape to copy: it
+asserts the pre-roll state *and* both post-roll directions, and the pre-roll one is what found this.
+
+---
+
+## 292. book4/257 puts its "both rolls failed" exit on the page before either roll is made, because no roll-gate seed reads a condition
+
+**Priority: HIGH — a live, clickable route past two mandatory checks**, and it is the route that
+costs the player nothing to take.
+
+*(Filed 2026-08-23, split out of 291's census: the same `lessthan=`-matches-0 trigger, but the only
+one of the four where no sentinel can fix it.)*
+
+§4.257 makes two Difficulty-14 rolls (`var="s"`, `var="m"`) and routes on the pair:
+
+```xml
+<if var="m" greaterthan="0"><if var="s" greaterthan="0">If both rolls were successful, <goto section="216"/>.</if></if>
+<elseif var="m" lessthan="1"><if var="s" lessthan="1">If both rolls failed, <goto section="374"/>.</if></elseif>
+<else>If one roll was successful, <goto section="413"/>.</else>
+```
+
+Driven on entry: `216[OFF] 374[ON] 413[OFF]`. Both margins read 0, so `greaterthan="0"` is false and
+`lessthan="1"` is true — the both-failed arm matches and its →374 is live. The other two are off
+only because they sit in unmatched branches, not because anything gates them.
+
+**A sentinel cannot fix this one, which is what separates it from 291.** A `<difficulty>` var holds
+the margin, where 0 *means* failure — there is no out-of-range "not yet rolled" value. And whatever
+the sentinel makes true, some arm of an if/elseif/else chain always matches, so some exit is always
+live. (A pair chosen to exploit the chain — `m=1`, `s=0`, so the outer `if` matches and its inner
+one does not, closing all three — works, and is an incantation no reviewer could read.)
+
+**The real gap is in the roll gate, and it is the next member of a family already twice extended.**
+`computeRollGate` (`render-gates.js`) seeds from three questions about what a mandatory roll's
+result FEEDS: an outcome table (`tableRoll`), a sheet effect's magnitude (`owedRoll`, task 247, 36
+sections), or a `<success>`/`<failure>` branch (`branchedRoll`, task 249). §4.257 has no table, no
+effect at all, and uses `<if var=>` rather than `<success>` — so all three miss and **none** of its
+gotos is gated. The missing seed is the mandatory roll whose result a **condition** reads: the same
+`provisionalVarClosure` trace the other two use, applied to `if`/`elseif`/`while` `var=` and the
+comparator attributes.
+
+Measure the blast radius the way task 247 did (it reported "36 shipped sections gain the gate,
+measured") before committing: 138 readers over a roll var across 112 sections is the outer bound,
+but most of those sections are already gated by one of the three existing seeds, and a seed that
+holds navigation the player currently reaches is a regression in the other direction.
+
+Assertions: §4.257 driven on entry — all three exits gated — then each pair of roll outcomes routed
+to the right one; the count of sections that gain the gate, pinned; and 291's census, which this
+takes one hit closer to zero.
+
+---
+
+## 293. book3/40 shows its editorial reroll note before the roll it describes, and the obvious sentinel would open a live exit
+
+**Priority: LOW — prose and an inert button**, on the only one of 291's four hits that costs the
+player nothing. It is filed because the fix that works for the other three is *actively unsafe*
+here, and that is worth writing down before someone applies it.
+
+*(Filed 2026-08-23, split out of 291's census.)*
+
+§3/40's `<random type="travel" var="x"/>` feeds an `<outcomes>` table, and above it sits
+`<if var="x" lessthan="5">` wrapping an editor's note — "[*If you roll 2-4 and lack book 9,*
+`<reroll>`*roll again*`</reroll>` *--Ed*]". Pre-roll `x` reads 0, so the note shows and its button is
+armed before the roll it would reroll. The button is inert (`blessingSpendForReroll` finds no storm
+blessing to charge, and there is no stored roll to delete) and the table's own exits are gated by
+`tableRoll`, so nothing is lost — it is a sentence in the wrong place.
+
+**The sentinel that fixes 291 breaks this section, and it was measured, not assumed.** An applied
+`<set>` adds its var to `ctx.wroteVars` (`render-rewards.js`), and `branchResolved`
+(`render-rules.js`) reveals an `<outcome>` row as soon as its var is written this visit. So
+`<set var="x" value="5"/>` above the roll marks `x` written, the `range="5-8"` row resolves, and the
+section renders **`Continue → 59[ON]`** — "A peaceful voyage", live and clickable, before the dice.
+Verified by driving it: the sentinel grays the reroll button (`roll again[OFF]`) and opens a route,
+trading a cosmetic defect for a real one. **Any sentinel on a var an `<outcomes>` table reads does
+this**, which is the general rule to carry out of here; §5.315 and §6.628 are safe only because
+neither has a table.
+
+So this one needs a different answer, and the choice is the task: gate the reroll control on its
+roll having happened, drop the `lessthan="5"` and let the note stand unconditionally (its own words
+already say "if you roll 2-4", so it reads correctly either way), or leave it and pin it as known.
+Whichever, 291's census must stop naming it.
+
+---
+
+## 294. book4/257 leaves a mixed pair of rolls with no exit at all, so succeeding one check and failing the other ends the adventure
+
+**Priority: HIGH — the page offers nothing and the renderer draws "Your tale ends here"**, on two
+of the four outcomes of a mandatory pair of rolls.
+
+*(Filed 2026-08-23 while implementing task 292, from driving all four pairs of that section's roll
+outcomes rather than only the two the filing named.)*
+
+The chain §4.257 routes on branches its OUTER arms on `m` alone:
+
+```xml
+<if var="m" greaterthan="0"><if var="s" greaterthan="0">If both rolls were successful, <goto section="216"/>.</if></if>
+<elseif var="m" lessthan="1"><if var="s" lessthan="1">If both rolls failed, <goto section="374"/>.</if></elseif>
+<else>If one roll was successful, <goto section="413"/>.</else>
+```
+
+`m > 0` and `m < 1` between them cover every value, so the `<else>` is **unreachable** and §413 —
+the destination the section's own comment says it was written for ("last paragraph is my own
+invention, to handle outcomes of two difficulty rolls") — can never be reached. A mixed pair lands
+in whichever outer arm `m` selects and then fails that arm's inner `<if>`, so the paragraph prints
+nothing: measured, with SCOUTING passing and MAGIC failing, the page renders
+`216[OFF] 374[OFF] 413[OFF]` and the renderer's no-way-forward fallback appears
+(`FATE[ON]` — "Your tale ends here — accept your fate"). Both mixed directions do this; the two
+matched pairs route correctly. Task 292's gate is what makes this visible rather than harmless: the
+exits are now held until both dice are thrown, so a player who reaches the mixed case has nothing
+left to click, where before they could have taken the wrongly-live →374.
+
+The fix is a chain whose arms are mutually exclusive *and* exhaustive, without re-splitting or
+duplicating the three printed sentences — each belongs to exactly one arm, and markup wraps the
+author's text rather than rewriting it (AGENTS.md). **What is available was checked, and it rules
+out the two obvious answers:**
+
+* A conjunction cannot be written on one tag. `evaluateCondition` (engine.js) OR-accumulates every
+  recognised attribute (`result = result || cond()`), and there is one `var=` per tag, so
+  `<if var="s" greaterthan="0" …>` can never mean "and `m` too".
+* Nesting the pair the other way round (`s` outside, `m` inside, an `<else>` in each arm) is
+  exhaustive, but it puts the "if one roll was successful" sentence in **both** arms — the printed
+  text twice, which the markup rule forbids.
+
+That leaves a derived flag per roll, tested by a chain over one var, and the arithmetic is
+narrower than it looks: `evalExpression` is `+ - * /` with parens and *truncating* integer division
+(no `min`/`max`, no comparison operators), so "did this margin succeed" has to be expressed as
+something like `(s+999)/1000` — 1 for a margin of 1 or more, 0 for 0 or less. That reads as an
+incantation, which is the objection task 291's notes raised against exactly this kind of trick, so
+weigh it against the alternative: give the engine a readable way to say it (a `<set>` that captures
+a roll's own success, which `rollDifficulty` already computes as `res.success` and throws away).
+Whichever, the three sentences must each stay in one place, and §413 must become reachable.
+
+Assertions: the two mixed pairs route to §413, both matched pairs still route where task 292 pinned
+them (that block's last two assertions invert from "reaches no exit" to `413[ON]`), and a census of
+the corpus for the same shape — an if/elseif chain whose outer comparators are exhaustive over one
+var with an inner `<if>` inside each arm — so a second section written this way is found rather than
+waited for.
+
+---
+
+## 295. `renderItemCache` draws no money controls without `max=`, so book4/586 confiscates the player's whole purse and book4/528 can never give it back
+
+**Priority: HIGH — an unrecoverable loss of every Shard the player is carrying**, on a section
+whose own next page says "You can reclaim your gear."
+
+*(Filed 2026-08-24 from a census of the cache family run in one direction nothing had run it in:
+every printed money loss *from* a cache against every route by which money can *reach* one.)*
+
+`renderItemCache` parses `max=` exactly as the spec asks — absent is −1, "no limit"
+(`render-market.js:598`) — and then gates the widget on `if (moneyMax > 0)`, so a bare
+`<itemcache>` renders no Shards balance, no Deposit and no Withdraw. `renderMoneyCache` gates the
+same value with `if (max >= 0)` and therefore honours the −1. **The parse is right in both
+widgets and only one of them acts on it.**
+
+Task 131 asked for the other reading in as many words — "parse `max` with 0 = barred / absent =
+unlimited **in both cache widgets**" — quoting JaFL `CacheNode`, which "uses −1 as its no-limit
+default and renders a Shards field on item caches". The code comment records the deviation as a
+decision ("Absent `max=` ⇒ item-only (the town-house caches)"), which is why it has survived: it
+reads as settled rather than as unfinished.
+
+**What it costs, measured.** §4.586 is the confiscation task 256 was filed for. Its
+`<transfer to="4.586" item="*" xitem="*key*" shards="*">` moves the purse as well as the gear, and
+§4.528 — the matching unlock, reusing the same cache key — hands back only what the item widget
+can reach. Driven on a real `GameState` (Warrior, 500 Shards, a sword and a pyramid key):
+
+```
+§4.586 moves the whole purse into cache 4.586 :: purse=0 cache=500
+§4.586 renders NO money control on the sealed box (bare <itemcache>) :: n=0
+§4.528 unlocks cache 4.586, and holds the confiscated 500 Shards
+§4.528 renders NO money control either :: n=0
+§4.528 after clicking every live control the purse is still empty :: purse=0 cache=500
+control: §6.512 (max="5000") DOES draw Deposit/Withdraw :: n=2
+```
+
+The control matters: the money half of the widget works, it is simply withheld. So the 500 Shards
+are on no sheet and in no reachable box — they leave the game.
+
+**And the same gate makes 16 printed sentences unable to fire.** A cache's money can only be
+non-zero if something puts it there: a `<moneycache>` of the same name, an `<itemcache max="N">`, a
+`<transfer to=>` carrying `shards=`, an `<adjustmoney name=>`, or a `<tick|gain shards= cache=>`.
+Censused over the `^\d+[a-z]?$` sections of books 1–6, **16 word-carrying
+`<lose shards=… cache=X>` nodes name a cache with none of those**:
+
+| section | cache | printed words that can never apply |
+| --- | --- | --- |
+| book1/177 | 1.177 | "Any money left here has gone" |
+| book1/273, book1/300 | 1.300 | "cross off anything you had stored there", "has gone" |
+| book1/434 (×2) | 1.434 | "All the money you left here has gone", "Lose all possessions you left here" |
+| book2/171 | 2.171 | "gone" |
+| book2/211 | 2.211 | "all the money you left here has gone" |
+| book2/278 | 2.278 | "gone" |
+| book2/348 | 2.348 | "all the money" |
+| book2/641, book2/665 | 2.617 | "Cross them off", "The money has gone" |
+| book3/74 | 3.74 | "taken any money" |
+| book4/509 | 4.509 | "Lose everything you left here" |
+| book6/284 | 6.284 | "all the money" |
+| book6/414 | 6.414 | "all the money" |
+| book6/576 | 6.576 | "cross off any money and possessions" |
+
+Every one of them is a break-in roll on a town house whose own paragraph offers the storage, and
+the family is wider than the losses: **28 of the 30 sections in books 1–6 that carry a bare
+`<itemcache>` mention money or Shards** — book1/177, book1/300, book1/327, book1/434, book2/171,
+book2/211, book2/278, book2/348, book2/617, book2/661, book2/665, book3/74, book3/335, book3/607,
+book4/450, book4/468, book4/509, book4/586, book5/245, book5/560, book5/586, book5/624, book6/238,
+book6/284, book6/414, book6/453, book6/464, book6/576 — against **2 that mention neither**
+(book4/528, book6/276). So the printed offer — "You can leave possessions and money here to save
+having to carry them around with you" — is half implemented in 28 places, and the *risk* the book
+attaches to using it never arrives. Measured on three of them: §1.177, §2.211 and §6.414 each draw
+no way to store money and hold a stash of 0 with 400 Shards in the purse.
+
+**The obvious fix reopens task 256 on the money side, and that was measured too.** `applyCacheLock`
+disables `[data-cachelock]` elements (`render.js:2040`), which is what `renderItemCache` stamps on
+its Take and Store buttons and *not* on its money buttons — deliberately, per the comment above it
+("an `<itemcache max=>`'s Shard controls are deliberately left alone … that bank is the same
+thing"), which is sound for §6.512's cabinet and not for a confiscation. Driven on a fixture section
+that locks a cache and gives it `max=`:
+
+```
+seal probe: the Take/Store buttons ARE sealed :: n=3
+seal probe: the money Withdraw is NOT sealed :: disabled=false
+seal probe: a click on it empties the sealed stash into the purse :: purse=500 stash=0
+```
+
+So today's `moneyMax > 0` is the only thing keeping §4.586 from being undone by a Withdraw the
+moment the controls appear.
+
+The fix is therefore two changes and a decision:
+
+* Gate the controls on `moneyMax !== 0` and apply the deposit cap only when `moneyMax > 0`
+  (`amt = Math.min(amt, moneyMax - cacheMoney)` computes a negative ceiling at −1 and would bar
+  every deposit — copy `renderMoneyCache`'s `if (max >= 0)`).
+* Extend the seal to an item cache's money controls, or §4.586's confiscation is clickable straight
+  back. Task 38's "a plain stash lock leaves a bank editable" is about a `<moneycache>`, which no
+  confiscation uses; an `<itemcache>` whose items are sealed has no case for leaving its money loose.
+* Decide whether the two sections that mention no money (book4/528, book6/276) should carry an
+  explicit `max="0"`. Both are retrieval/storage pages where a Shards field is merely odd, so this
+  is taste, not correctness — but `max="0"` is the vocabulary that says so.
+
+Assertions: §4.586 seals the money controls as it seals the Takes; §4.528 draws a live Withdraw and
+returns the confiscated purse in full; §1.177 stores 400 Shards, and its 10–11 break-in outcome
+empties the stash and leaves the purse alone; §6.512's existing max-cap assertions are unmoved
+(absent and `5000` must not become the same thing); §4.263's `max="0"` still bars deposits; and a
+corpus census pinning **0** word-carrying `<lose shards= cache=X>` nodes whose cache has no deposit
+route, so the next section written this way is found rather than waited for.
+
+## 296. `rewardWasteReason` refuses a new resurrection deal to anyone already holding one, where `addResurrection` implements the replacement the books print — so book1/597's third reward is dead to a deal-holder
+
+**Priority: MEDIUM — a reward the printed page offers, silently withdrawn.** Nothing is lost or
+double-charged; an option the book puts on the page simply cannot be taken.
+
+*(Filed 2026-08-24 from a probe of the two paths that offer a resurrection deal, run because they
+answer the same printed rule differently. Found during conversion work on an unpublished book.)*
+
+`rewardWasteReason` exists so a payment is never taken for a reward the player then cannot pick up
+(task 223), and its first clause is `if (tag === 'resurrection' && state.hasResurrection()) return
+'You already have a resurrection deal.'` (`render-rules.js:237`). **That is the one refusal in the
+list the corpus's own rule contradicts.** A blessing you already hold really is a wasted grant and
+an affliction you do not suffer really cannot be lifted — but a deal is *replaceable*, and this
+engine already implements the replacement: `addResurrection` drops any standard deal when a new
+standard one arrives, "you can only have one resurrection arranged at a time; a new deal cancels the
+old" (task 98, `state.js:981`). **11 of the corpus's 15 offer pages print that rule in so many
+words** ("If you arrange another resurrection elsewhere the original one is cancelled — cross it off
+your Adventure Sheet"), and the deals land in different places, so swapping one for another is a
+real choice and not a no-op. book1/597 — the one page this defect actually reaches — is not one of
+the 11, which is part of why the mismatch has stayed invisible: its own text says nothing, so only
+the sheet rule applies, and the sheet rule is the one `addResurrection` implements.
+
+**Two paths, one rule, opposite answers — which is what makes this a defect rather than a policy.**
+An ordinary `<resurrection section=>` draws its own Arrange button with no waste check at all, so a
+deal-holder arranges freely and the old deal is cancelled exactly as printed. Only the *flag-linked*
+paths consult `rewardWasteReason`: `renderChoosableReward` for the pick, and `menuWasteReason` for
+the cost. Measured on a real `GameState` (a Warrior holding the book1/350 Temple of Nagil deal):
+
+```
+plain offer, no deal held:      Arrange resurrection [dis=false] -> deals=["2.339"]
+plain offer, another deal held: Arrange resurrection [dis=false] -> deals=["2.339"]   (replaced)
+book1/597, no deal held:            picks = Amber Wand [dis=false] | 500 Shards [dis=false] | resurrection deal [dis=false]
+book1/597, another deal held:       picks = Amber Wand [dis=false] | 500 Shards [dis=false] | resurrection deal [dis=true "You already have a resurrection deal."]
+book1/597, supplemental boon only:  picks = Amber Wand [dis=false] | 500 Shards [dis=false] | resurrection deal [dis=true "You already have a resurrection deal."]
+lone priced deal (task 221), no deal held:      Pay 30 Shards [dis=false]  menuWasteReason=null
+lone priced deal (task 221), another deal held: Pay 30 Shards [dis=true "You already have a resurrection deal."]  menuWasteReason="You already have a resurrection deal."
+addResurrection over a held deal -> ["2.339"]              (the swap the guard forbids)
+addResurrection over a boon      -> ["1.350*","2.339"]     (the coexistence the guard forbids)
+```
+
+**The supplemental case has no defence at all.** `rewardWasteReason` asks `state.hasResurrection()`,
+which is true for a player holding only a supplemental boon (§6.355) — and `addResurrection` never
+lets a supplemental displace a standard deal, so the two would simply coexist, as the last line
+above measures. A player carrying a boon and no standard deal is refused a deal they could plainly
+have, and no payment could ever change the answer.
+
+**Reach.** 15 sections across books 1–6 offer a deal and exactly **one** is flag-linked —
+book1/597, where the cost is a hidden `<tick price="x" hidden="t"/>`, so the menu stays live and
+only its third pick dies. That is the whole cost today, and it is why this has gone unnoticed: the
+14 plain offers all behave correctly. The lone-priced shape (task 221) has no instance in books 1–6
+yet, so its refusal of the payment itself is latent rather than live — recorded because it is the
+same clause and fails harder, refusing the page rather than one option on it.
+
+**Suggested fix.** Refuse only what a payment truly cannot change. A new standard deal always
+changes something (the landing site), and it is never wasted on a supplemental-only holder, so the
+clause should either go or narrow to "the deal already held is this same book+section". Whichever is
+chosen, the plain Arrange path is the reference behaviour: the two paths must agree, and today only
+one of them reads the rule `addResurrection` implements.
+
+Assertions: book1/597's deal pick is live for a player already holding the book1/350 deal, and
+taking it leaves exactly one deal, at the new site; a supplemental-only holder is offered the
+standard deal and ends holding both; a lone priced deal's payment is live for a deal-holder; and the
+plain unflagged Arrange path is unmoved, since it is the behaviour the other two are being brought
+into line with.
+
+**Closed in part (2026-08-24), and the part left undone is filed as 297.** The filing's premise
+about book1/597 — "its own text says nothing, so only the sheet rule applies" — is contradicted by
+the file: §1.597 offers "a free `<resurrection …>resurrection deal</resurrection>`, **if you do not
+have one already**". That clause is authorial (`597.xml` has one commit, the original books import),
+and it is the printed source for exactly the refusal the guard implements. So the first assertion —
+a deal-holder gets the pick, and taking it lands the deal at the new site — was **not** implemented:
+it would make the engine grant an option the page conditions away. What was implemented is the
+supplemental half, which stands under §1.597's wording too, since a boon is not a deal.
+
+---
+
+## 297. The resurrection waste guard is a blanket engine rule that only book1/597's printed wording justifies, so the first flag-linked offer on a page printing the replacement rule will be refused an option its own text grants
+
+**Priority: LOW — latent: no corpus instance, and the one live instance is right by accident.**
+Nothing in books 1–6 misbehaves. This is a trap laid for the next conversion.
+
+*(Filed 2026-08-24 while closing 296, from reading all 15 offer pages rather than the guard.)*
+
+`rewardWasteReason`'s first clause refuses a `<resurrection>` reward to a standard-deal holder
+(`render-rules.js:241`), and `menuWasteReason` refuses the payment for one. **The corpus does not
+speak with one voice about whether that is right, and the guard cannot hear the difference.** Of the
+15 sections offering a deal, 11 print the *replacement* rule ("If you arrange another resurrection
+later at a different temple, the original one is cancelled — cross it off your Adventure Sheet. You
+do not get a refund") — under which a deal-holder may always arrange another, and `addResurrection`
+implements exactly that. book1/597 prints the opposite: its deal is free "if you do not have one
+already", a printed *exclusion*.
+
+**Only the flag-linked and lone-priced shapes consult the guard**, and book1/597 is the corpus's
+only instance of either — so today the blanket rule is right on the one page it reaches, and the 14
+plain `<resurrection>` offers draw their own Arrange button with no waste check and replace as
+printed. The two paths disagree, and in books 1–6 that disagreement is **authorial**, not a defect:
+two pages, two printed rules, two behaviours.
+
+**What breaks.** The first book-7+ section that puts a `<resurrection>` behind a `flag=`/`price=`
+key while printing the replacement rule gets the wrong answer, and the lone-priced shape (task 221)
+fails harder than book1/597 would: `menuWasteReason` refuses the *payment*, so the whole page is
+dead to a deal-holder rather than one option on it. Nothing is lost or double-charged either way.
+
+**Suggested fix.** The exclusion is a printed condition on one offer, so it belongs on the node, not
+in a blanket engine rule — something the markup states (an attribute on `<resurrection>`, or the
+existing `<if resurrection>` gate the vocabulary already allows) with the engine defaulting to the
+sheet rule `addResurrection` implements. Whatever is chosen, `<if resurrection>` is worth checking in
+the same pass: it also reads `hasResurrection()` (`engine.js:259`), so it counts §6.355's
+supplemental boon as an arrangement — which is arguably right for a gate asking "is anything written
+in the box" and arguably not, and no corpus section pins it either way.
+
+Assertions: a flag-linked offer whose page prints the replacement rule is live for a deal-holder and
+replaces the old deal; a lone priced deal on such a page keeps its payment live; §1.597's exclusion
+still refuses its deal-holder (it is the page the default must not break); and whichever way
+`<if resurrection>` is settled, a boon-only holder gets a pinned answer from it.
+
+**Closed (2026-08-24).** The exclusion is now stated by the markup: `<resurrection unique="t">`,
+which book1/597 carries and no other section does, and the engine defaults to the sheet's
+replacement rule everywhere else. `rewardWasteReason` reads the attribute instead of asking the
+state alone, so `menuWasteReason` follows on the cost side for free, and the plain Arrange path
+reads it too — the attribute cannot mean one thing behind a `flag=` key and nothing at all on the
+button 14 pages draw. `<if resurrection>` keeps `hasResurrection()`, boon included, and now says
+why: all eight corpus gates are death-revival gates, and §6.355's boon does revive you.
+
+---
+
+## 298. `renderResurrection`'s `hidden="t"` auto-register path ignores `unique="t"`, so the exclusion task 297 gave the markup is honoured on two of the three paths that arrange a deal
+
+**Priority: LOW — latent: no corpus instance, and the attribute exists on one section that is
+neither hidden nor plain.** Nothing in books 1–6 misbehaves.
+
+*(Filed 2026-08-24 while closing 297, from the path that closing it did not touch.)*
+
+Task 297 moved the "if you do not have one already" exclusion out of `rewardWasteReason` and onto
+the node as `unique="t"`, and taught two paths to read it: the flag-linked pick (via
+`rewardWasteReason`, which `menuWasteReason` composes for the cost side) and the plain Arrange
+button (`render-market.js:898`). `renderResurrection` has a **third** path — `section && hidden`,
+which registers the deal automatically on entry with no button at all (§3.351's Island of Rebirth
+re-arms it each visit) — and that path calls `arrange()` without asking anything about what the
+player already holds.
+
+**What breaks.** A book-7+ section written as a hidden registration *and* printing an exclusion
+("if you have no resurrection arrangements, write X in the box") would silently replace a held deal
+instead of leaving it. Nothing is lost that the sheet rule would not also lose, and no corpus
+section has the combination — `unique="t"` appears once (book1/597, a visible flag-linked pick) and
+the hidden path's one user (§3.351) prints no exclusion — so this is a trap laid for the next
+conversion, of exactly the species 297 closed on the other two paths.
+
+**Suggested fix.** One condition in the `section && hidden` branch: skip the automatic
+registration when `unique="t"` and `state.hasStandardResurrection()`. Consider at the same time
+whether the gate belongs above `arrange()` for all three paths rather than in each of them — a
+single `resurrectionExcluded(state, node)` helper in a DOM-free module would let the view ask once,
+and would be the natural home for the printed-condition question if a second such attribute ever
+arrives.
+
+Assertions: a hidden `unique="t"` registration leaves a deal-holder's existing deal untouched and
+adds nothing; the same node registers normally for a player holding no deal, and for one holding
+only §6.355's supplemental boon; §3.351's hidden re-arming (no `unique=`) is unmoved for a
+deal-holder, since it is the behaviour the corpus actually depends on.
+
+**Closed (2026-08-24).** The exclusion is asked once, above every branch that arranges: one
+`excluded` const in `renderResurrection`, read by the silent `hidden="t"` registration and by the
+plain Arrange button that task 297 had taught separately. An excluded registration writes nothing
+and memoises nothing, so a page that loses the held deal before re-rendering may still arrange
+this one — which is what its own printed condition says. §3.351, the hidden path's only corpus
+user, prints no exclusion and is unmoved.
+
+---
+
+## 299. Nothing in the port fires on a change of BOOK, so book5/681's golden hair never pays the 20 Shards it promises on every crossing — and the corpus's only two `TODO` comments say so
+
+**Priority: MEDIUM — a printed reward the port never grants, reachable in normal play, in two live
+sections of a published book.** Not severe (20 Shards a crossing), but it is the "narrates a reward
+it never grants" species rather than a latent trap, and the source files admit it in as many words.
+
+*(Filed 2026-08-24 during conversion work on an unpublished book, where the same printed event has
+further sites. Books 1–6 evidence only, below.)*
+
+Holyamu turns the player's hair to spun gold at **book5/681**: the section ticks the codeword *Elk*
+and prints "Note that whenever you travel to another book in the *Fabled Lands* series you can add
+20 Shards to your Adventure Sheet. This represents your hair growing, and you cutting it and selling
+the gold!" **book5/587** is the undo — Holyamu "has turned your hair back to normal", the codeword is
+lost, and it prints "You can no longer receive 20 Shards every time you travel to another book."
+
+Both sections carry `<!-- TODO: implement gold-hair effects -->`, and
+
+```
+grep -rn "TODO\|FIXME\|XXX" --include='*.xml' books/
+```
+
+returns **exactly those two lines** across the whole shipped corpus. So this is not a defect that
+had to be found: it is the only one the source files themselves flag, and it has been sitting behind
+a codeword that is granted, tested and lifted correctly.
+
+**Why it cannot be tagged today.** The rule is keyed on an *event* — travelling to a different book
+— and no node in the format fires on one. `state.goTo(book, section)` (`state.js`) is the single
+choke point for every move, and it sets `data.book` without anyone reading the delta;
+`app.js`'s `navigate()` is its only caller. There is no per-book entry hook, and the shipped tags
+all fire where they are written: a `<tick>`/`<gain>` applies on the page, an `<extrachoice>` waits at
+a named section or a section `tag=`, an item `<effect type="use">` waits for a button. The closest
+shipped thing is `<extrachoice>` — a keyed, persistent, sheet-carried rule the books "note on your
+Adventure Sheet" — and it is persistent *navigation*, with no way to carry an effect.
+
+**Suggested fix — a standing rule the sheet carries, fired on the crossing.** A `<bookchange
+name="X" [once="t"]>` at effect position, whose body is an ordinary effect body, registered where
+the page prints it and applied when the book number changes:
+
+```xml
+<!-- book5/681 -->
+<bookchange name="5.681"><gain shards="20"/></bookchange>
+<!-- book5/587 -->
+<lose bookchange="5.681">You can no longer receive 20 Shards every time you travel to another book</lose>
+```
+
+Four notes on the shape, each of which has a shipped precedent to copy rather than a decision to
+take:
+
+- **Store the body as markup and re-parse it at firing time.** That is `readItemEffects`'
+  contract for an `<effect type="use">` body (task 41) — serialise the element children with
+  `XMLSerializer`, keep the string on the sheet, and let the VIEW parse it back
+  (`app.js` already does exactly this for a Use button). It is the only way a rule module can hold
+  markup without a DOM, which the module-seam test (`web/tests/node-import.mjs`) enforces.
+- **Key it by `name=`, and replace on re-registration.** `addExtraChoice`'s contract: a second visit
+  to the granting section must not register a second copy, and a cancel needs a handle. book5/587's
+  cancel is the same shape as `<extrachoice remove=>`.
+- **`once=` is the difference between the two halves of the family.** Hair keeps growing; a rule that
+  fires and then stops needs to deregister itself. book5/681 wants no `once=`.
+- **Fire before the arriving section renders and before `state.snapshot()`.** The page you land on
+  must already see the change, and undo must restore the previous section's entry state, which is
+  taken before the crossing. Both fall out of putting the call between `state.goTo()` and
+  `state.snapshot()` in `navigate()`.
+
+An inner `<goto>` in such a body should be ignored: the rule fires *during* a move the player has
+already committed to, so it has no navigation of its own to offer.
+
+**Assertions.** A registered rule is written to the sheet and its body does NOT apply on the page
+that prints it; a crossing to a different book fires it (and a move within the same book does not);
+`once="t"` deregisters after the first firing while a plain rule pays on every crossing; a second
+registration under one name replaces rather than duplicates, and a rule with no `name=` is refused;
+the rules survive a save round trip, bodies and all; `<lose bookchange="X">` lifts a standing rule
+and stops it paying; and book5/681 → another book → book5/587 → another book pays exactly once.
+Add the tag and its attributes to `build/validate-source.ps1`'s allowlist in the same change
+(task 199's rule), and delete both `TODO` comments with the markup that answers them.
+
+---
+
+## 300. Nothing validates a `modifier=`/`modifiers=` value, so one misspelling silently reverts a check to the very score the page says not to use — across 42 shipped sites, and it is task 46's defect from the source side
+
+**Priority: LOW — a latent trap, not a live defect.** All 42 values in the shipped corpus are legal
+today; what is missing is anything that would say so if one were not. It is filed because the
+failure mode is silent in every direction — no build error, no console warning, no failing
+assertion, and a game that plays on with a check made easier than the page prints it — and because
+the build already has the mechanism to close it.
+
+*(Filed 2026-08-25 during conversion work on an unpublished book. Books 1–6 evidence only, below.)*
+
+**The two attributes and where they sit.** `modifier=` is the ability-resolution mode and appears
+**41** times across books 1–6: `<set>` ×33, `<difficulty>` ×4, `<if>` ×2, `<adjust>` ×2, spelled
+`natural` ×35, `noweapon` ×5 and `affected` ×1 (`notool`, a legal fourth, is unused). `modifiers=`
+is the fight mode and appears **once** — `book5/689`'s Water Drake, `modifiers="noarmour"`. Both
+attribute NAMES are already on `validate-source.ps1`'s allowlist; neither VALUE is checked by
+anything.
+
+**Four readers, and every one of them treats an unknown value as "no modifier at all".**
+
+- `state.js abilityForMode` — `natural` → `abilityNatural`, `noweapon`/`notool` → `abilityNoWeapon`,
+  **anything else → `ability()`**, the full affected score.
+- `engine.js setValueMode` — returns `natural`/`affected` or **`null`**, and `null` is the current /
+  affected reading. This is the `<set>` path, and so 33 of the 41 sites.
+- `engine.js`'s condition path — `const natural = normalize(get('modifier')) === 'natural'`, so a
+  typo means "affected". One exception worth knowing: for `ability="stamina"` the test is the
+  *truthiness* of `modifier=`, so there a misspelling still selects the unwounded maximum and
+  changes nothing. It is the only place in the family where a typo is harmless.
+- `combat.js makeFight` — `modifiers.includes('noarmour')` on the raw lower-cased attribute. That is
+  a **substring** test rather than a parse, so it fails open in both directions: `noarmor` matches
+  nothing, and any string *containing* `noarmour` matches.
+
+**Why the harm is one-directional.** Every one of the 35 `natural` sites exists because the page
+says the roll is made before item bonuses. Falling through to the affected score adds the weapon or
+tool bonus back, which makes each of those checks **easier than printed** — the player never
+notices, and neither does anything else.
+
+**This is already a filed defect from the other side.** Task 46 fixed `modifier=` being *misread by
+the engine*: `<set>` treated it as an additive amount, so `resolveValue(state,'natural')` looked up a
+non-existent variable, returned 0, and every book-2 rank ceremony's `<set var="r" value="rank"
+modifier="natural"/>` stored `r=0` — making "roll 2d over r to gain a Rank" auto-succeed. The
+comment above `setValueMode` records it. The engine side is correct now; the **source** side has
+never had a guard, and the same attribute misspelled in a section produces the same class of silent
+auto-success.
+
+**Suggested fix — the tables that already exist.** `build/validate-source.ps1` closes value sets in
+two places: `FL_ENUMS`, with nine keys (`ability`, `abilityDamaged`, `choose`, `blessing`, `crew`,
+`gender`, `profession`, `ship`, `special`), and `FL_TYPE_VALUES` (`type`, per tag). Neither lists
+these two.
+
+- Add `'modifier' = 'affected natural noweapon notool'` to `FL_ENUMS`. That table splits on `|`,
+  which costs nothing here — no shipped site unions two modes.
+- `modifiers=` is not an enum, because the engine matches it as a substring list. Give it its own
+  check: split on whitespace and commas and require every word to be a known mode (today,
+  `noarmour` alone). Consider making the engine parse the same token list rather than calling
+  `includes()`, so the two agree; the substring match is the part that makes a typo undetectable in
+  both directions, and it is a one-line change with one shipped site to re-verify.
+- Add one corpus assertion pinned to the **word set** rather than to a section list, so it survives
+  the edition growing: every `modifier=`/`modifiers=` value under `data.availableBooks()` is one the
+  engine acts on. A section-list pin would have to be re-pinned by every book that ships.
+
+**Assertions.** The gate rejects `modifier="naturel"` on each of the four tags that carry it and
+`modifiers="noarmor"` on `<fight>`, and accepts all four legal `modifier=` spellings and `noarmour`;
+`build/validate-selftest.ps1` drives both directions over fixtures; the corpus census reads zero.
+No allowlist name to add — both attributes are already listed, which is exactly how they were
+missed.
+
+---
+
+## 301. Closing `modifier=`'s value set also closed the numeric/var addend `renderDifficulty` implements, so a shape the view supports is now a build error
+
+**Priority: LOW — filed as a deliberate narrowing, closed as a non-issue.** Nothing is broken
+today: the shape has **zero** uses anywhere under `books/`, published or not, `temp/` included —
+and, it turns out, no standing in the format either.
+
+*(Filed 2026-08-25 while implementing task 300; resolved the same day against `rules/`.)*
+
+**The fifth reader task 300 did not count.** That task listed four readers of `modifier=` and
+concluded the legal set is four mode words. `web/js/render-rolls.js` `renderDifficulty` is a fifth,
+and it reads the attribute differently: a keyword routes into the ability lookup, and **anything
+else is a numeric or var ADDEND** resolved through `resolveValue` (task 53's comment says so in as
+many words). So before task 300, `<difficulty ability="combat" level="10" modifier="3">` and
+`<difficulty … modifier="myvar">` were both live markup. After it, `FL_ENUMS['modifier']` rejects
+both at build time.
+
+**RESOLVED the same day, by reading the spec this filing had not.** `rules/JaFL-XML-Tags.md`
+declares `modifier` as `"S"` on every tag that carries it and closes its value list to
+`noweapon | noarmour | notool | natural`, plus `current` for `ability="stamina"`. **There is no
+numeric or var addend in the format at all.** `renderDifficulty`'s addend path is this port's own,
+and task 53's comment calling it "the historical numeric-modifier behaviour" is the tell that was
+there to be read. So nothing spec-legal was closed off, and there is no escape to add: the premise
+above — "a shape the view supports" — is true of the view and false of the format.
+
+**The reasoning against an escape stands on its own anyway**, and is worth keeping for the next
+attribute. A var-name addend is character-for-character indistinguishable from a misspelled mode
+word — `modifier="naturel"` is a perfectly good var name — so admitting one admits the other, and
+task 300's guard would catch nothing on `<difficulty>`, the tag where all four shipped
+`<difficulty modifier=>` sites sit. Where a page really wants a number, the idiomatic route exists
+and is already validated: `<difficulty …><adjust value="3"/></difficulty>`, one of
+`FL_ADJUST_READERS`' five readers, which `childAdjustment` sums into exactly the same total.
+
+**What reading the spec did turn up is filed as 302** — two spellings the format defines and this
+port does not act on. That is the real divergence, and it points the other way: not markup the gate
+wrongly rejects, but markup it must **keep** rejecting until the engine catches up.
+
+**Assertions.** None — there is nothing to assert about a shape the format does not have. The two
+cases the spec did earn are in 302.
+
+---
+
+## 302. The port acts on neither `modifier="noarmour"` nor `modifier="current"` off `<adjust>`, though the JaFL spec defines both — so two spec-legal spellings are build errors this port cannot honour
+
+**Priority: LOW — a capability gap, not a live defect.** No shipped section uses either spelling,
+and the source gate now rejects both **loudly**, which is the safe half of the trade. What is filed
+is that the rejection is a workaround for a missing engine branch, so that a later reader does not
+"fix" the gate by widening its table and quietly reopen task 300's defect.
+
+*(Filed 2026-08-25 while implementing task 300, from `rules/JaFL-XML-Tags.md`.)*
+
+**What the spec says.** `modifier` is declared `"S"` on `<if>`, `<difficulty>`, `<set>`, `<adjust>`
+(and `<training>`), and its value list is closed:
+
+> This may be 'noweapon', 'noarmour', 'notool' or 'natural'; these exclude (respectively) the
+> ability bonuses of a weapon, armour, a tool, or any of these things. The default is to include
+> these bonuses.
+
+with, on `<difficulty>` and `<training>`, a fifth: *"A final value, 'current', can be used with
+`ability="stamina"` to make a roll against the current Stamina value."*
+
+**The two gaps.**
+
+- **`noarmour` has no branch anywhere.** `state.js abilityForMode` handles `natural` and
+  `noweapon`/`notool` (both routed to `abilityNoWeapon`) and returns the full `ability()` for
+  everything else. There is no `abilityNoArmour`. A page reading "roll against DEFENCE, not
+  counting your armour" would therefore resolve *with* the armour bonus — task 300's fall-through
+  exactly, and toward the easier check as always.
+- **`current` is read in one place only** — `engine.js adjustAmount`, for `ability="stamina"`.
+  `renderDifficulty`'s keyword list is `natural|noweapon|notool|affected`, so `current` misses it,
+  falls to the numeric-addend path, resolves as a var name, reads **0**, and the mode is lost with
+  no trace. (`<difficulty ability="stamina">` does not work in this port regardless: `rollDifficulty`
+  goes through `firstAbility`, which knows only the six core abilities and returns `null` → an
+  ability score of 0. No corpus section rolls it, so this has never mattered.)
+
+**What the gate does about it now (task 300).** `FL_ENUMS['modifier']` omits `noarmour` outright,
+and `Test-AttrValue` rejects `current` on any tag but `<adjust>`. Both carry a comment saying the
+omission is deliberate and pointing here. `affected` — which this port added as the explicit
+spelling of the default, and which one corpus section uses — is likewise **not** in the spec; that
+direction is harmless, since the engine does act on it.
+
+**The fix, if a book ever needs it.** `noarmour` wants an `abilityNoArmour(ability)` beside
+`abilityNoWeapon` (the armour's Defence bonus is already separable — `combat.js` subtracts it for
+the Water Drake's `modifiers="noarmour"`, so the arithmetic exists), a branch in `abilityForMode`,
+and the word added to `FL_ENUMS`. `current` wants adding to `renderDifficulty`'s keyword list and
+routing to `state.data.stamina`, and its tag guard relaxed — and that is only worth doing alongside
+making `<difficulty ability="stamina">` resolve at all.
+
+**Assertions.** The gate rejects `modifier="noarmour"` on `<difficulty>` and `modifier="current"`
+on any tag but `<adjust>`, both driven by `build/validate-selftest.ps1`; `<adjust ability="stamina"
+modifier="current">` stays accepted. Whichever gap is closed, its case here inverts from a
+rejection to an acceptance, and the engine gains the assertion that the mode changes the score.
+
+---
+
+## 303. `<if ability="defence">` compares against 0, not the player's Defence, so book5/361's §160 route is unreachable at any Defence and book1/313's daggers always hit
+
+**Priority: MEDIUM — live, on two shipped pages, wrong on every visit.** Not an edge case and not a
+latent trap: both sections take the wrong branch for every character in every playthrough, and one
+of them charges Stamina for it.
+
+*(Filed 2026-08-25 while implementing task 302, which needs this route to exist.)*
+
+**The bug is one missing `else if`.** `engine.js evaluateCondition` routes an `ability=` comparison
+through `firstAbility`, and `ABILITIES` (`rules.js`) is **the six core abilities only** — `rank`,
+`stamina` and `defence` are derived stats, not members. Task 68 saw this and added arms for `rank`
+and `stamina`:
+
+```js
+if (spec === 'rank') v = state.rankValue();
+else if (spec === 'stamina') v = get('modifier') ? state.effectiveStaminaMax() : state.data.stamina;
+else { const ab = firstAbility(get('ability')); v = ab ? state.abilityForCheck(ab, natural) : 0; }
+```
+
+`defence` falls to the `else`, `firstAbility('defence')` returns `null`, and **`v = 0`**. Task 68's
+own comment names the failure — *"else the comparison ran against 0: every `<if ability="rank"
+greaterthan=N>` gate stayed shut"* — and it is the third stat's turn.
+
+**Measured, not read.** A character with COMBAT 8 and Rank 3 has `defence() = 11`, and
+`ability('defence')` reads **1** (0 clamped) because `defence` is not a key in `data.abilities`:
+
+- **book5/361** — *"If your Defence is 14 or more, `<goto section="160"/>`."* Markup:
+  `<if ability="defence" greaterthan="13">`. Evaluates `0 > 13` → false. Raising the character to
+  Defence **17** and re-evaluating still returns **false**: §160 is unreachable at *any* Defence,
+  and every player falls through to §271.
+- **book1/313** — *"If the total is higher than your Defence, a dagger hits you and you lose 1-6
+  Stamina."* Markup: `<if ability="defence" lessthan="x">` with `x` the 2-dice total. Evaluates
+  `0 < x`, true for every roll of 2-12, so **the daggers always hit** and the `<else>` ("the daggers
+  all miss") is unreachable. The printed odds are roughly even for a mid-game Defence; the port
+  charges 1-6 Stamina unconditionally.
+
+**The fix.** One arm, resolving it the way `evalExpression` already does (`engine.js`: `if (w ===
+'defence') return state.defence();`) — which is precisely the rule task 68 wrote down: *route them
+the way evalExpression/adjustAmount do*. `adjustAmount` and `rollDifficulty` have the same hole for
+`defence`, but **no corpus section uses `<adjust ability="defence">` or `<difficulty
+ability="defence">`** (the census is `<if>` ×2 and `<effect>` ×5, nothing else), so extending them
+is task 302's business where it needs a roll path, not this one's.
+
+**Assertions.** `<if ability="defence" greaterthan="N">` is true exactly when `defence()` exceeds N
+and false when it does not — pinned at a Defence that clears the threshold, since that is the case
+the bug makes indistinguishable from failure; `<if ability="defence" lessthan="var">` matches only
+when the var beats Defence; and the two shipped sections evaluate the branch the printed sentence
+describes. A control on `rank` keeps task 68's arm honest.
+
+---
+
+## 304. `defence()` sums items, Rank and auras but not afflictions, so book5/638's Curse of Vulnerability subtracts its 3 points from nothing and the curse is inert
+
+**Priority: MEDIUM — live, and the rule does literally nothing.** One shipped page, one curse, zero
+effect: the player is told they are cursed, the sheet shows the curse, and no number moves.
+
+*(Filed 2026-08-25 while implementing task 302, alongside 303 — same method, same family.)*
+
+**Every other contributor is there.** `state.js defence()` reads:
+
+```js
+return this.ability('combat') + this.rankValue() + this.armourBonus() + this.auraBonus('defence');
+```
+
+`ability('combat')` folds in `itemBonus`, `effectBonus`, `afflictionBonus`, `auraBonus` and
+`potionBonusFor` — **for COMBAT**. `rankValue()` adds the ring's aura. `armourBonus()` is the worn
+armour. `auraBonus('defence')` catches the `type="aura"`/`type="wielded"` effects that name Defence
+directly (the sword of stone, ring of guarding, Jade Defender — 4 of the corpus's 5
+`<effect ability="defence">` sites). What is missing is **`afflictionBonus('defence')`**, the fifth.
+
+**The one site, and it is a curse.** `books/book5/638.xml`:
+
+```xml
+<curse name="Curse of Vulnerability">
+    <effect ability="defence" bonus="-3"/>
+```
+
+Measured: with COMBAT 8 and Rank 3, `afflictionBonus('defence')` returns **-3** correctly — the sum
+is computed and then never read. `defence()` is **11** before the curse and **11** after; the book
+says 8. Because `combat.js` takes the player's Defence from `state.defence()`, the curse is inert in
+fights too, which is the only place a Defence penalty was ever going to bite.
+
+**Why it reads as an oversight rather than a decision.** `effectiveStaminaMax()` and `rankValue()`
+— the two sibling derived stats — both fold in their affliction/aura contributions, and
+`afflictionBonus` is written to take any ability key including `defence`. Nothing in the file argues
+for the exclusion.
+
+**The fix.** Add `+ this.afflictionBonus('defence')` to `defence()`. Watch the double-count
+question and answer it in a comment: a `<curse><effect ability="combat">` is already inside
+`ability('combat')`, so only effects naming `defence` itself are added here, which is exactly what
+`afflictionBonus('defence')` returns. Consider `afflictionMod` too — a `divide`/`target` transform
+naming `defence` would have the same problem — but no corpus affliction does, so leave it and say
+so.
+
+**Assertions.** Applying book5/638's curse drops `defence()` by exactly 3 and lifting it restores
+the original; a curse naming COMBAT moves Defence by its COMBAT effect once and not twice; and a
+fight against a cursed player reads the reduced Defence.
+
+---
+
+## 317. `rank` ignores `modifier=` on every tag but `<set>`, so `natural` reads the ring's +2 back in
+
+**DONE.** `GameState.rankForMode(mode)` added beside `rankValue()` — `natural` gives `data.rank`,
+every other word the full Rank — and all five readers now call it: `evaluateCondition`,
+`rollDifficulty`, `adjustAmount`, `adjustApplies`, and `evalExpression`, whose inline ternary was
+the one honoured site and is deleted as its first caller. `<rankcheck>` is deliberately untouched:
+`FL_TAG_ATTRS['rankcheck']` is `add dice`, so it cannot carry a `modifier=` to honour.
+
+Seven assertions — four in `suite-engine.js` beside the §2.270 fixture that already held a +2 ring
+(the `<if>` and `<difficulty>` arms, plus the control that `affected`/`noarmour`/`noweapon`/none all
+mean the full Rank), three in `suite-combat.js`'s task-92 block (both `<adjust>` readers). Verified
+by reverting `engine.js` and `state.js` together: four fail (`natural=5` where 3 is wanted, twice
+over) and the control throws `rankForMode is not a function`, which is the method itself being the
+fix. `RESULT ALL PASS pass=3032 fail=0`. Nothing shipped moves, as filed.
+
+**This closes the family 314–317 opened.** Every reader of `modifier=` in the port — `<if>`,
+`<set>`, `<difficulty>` and both of `<adjust>`'s — now resolves all six mode words for all nine
+words `FL_ENUMS['ability']` allows, through exactly three deciders: `abilityForMode` (the six core
+abilities and `defence`), `rankForMode` (`rank`), and the per-reader stamina arms, which differ on
+purpose — a `<set>`/`<if>`/`<adjust>` *condition* reads the wounded score bare, an `<adjust>`
+*contribution* the unwounded one. Four separate audits reached one reader each; what they had in
+common was a stat the widened helper did not compose, which is the thing to check first if a sixth
+reader ever appears.
+
+**The original filing.**
+
+**Priority: LOW — latent, and censused to be latent.** Filed 2026-08-28 by the census that closed
+task 316. Over the 4,369-file shipped corpus, `rank` is written with a `modifier=` on **`<set>`
+only** — 23 sites, all `natural`, all honoured — so nothing is mis-read today.
+
+**What the code does.** Every reader has a `rank` arm, and four of the five hard-code
+`state.rankValue()`:
+
+| reader | tag | rank arm |
+| --- | --- | --- |
+| `evalExpression` | `<set value="rank">` | `mode === 'natural' ? state.data.rank : state.rankValue()` |
+| `evaluateCondition` | `<if ability="rank">` | `state.rankValue()` |
+| `rollDifficulty` | `<difficulty ability="rank">` | `state.rankValue()` |
+| `adjustAmount` | `<adjust ability="rank"/>` | `state.rankValue()` |
+| `adjustApplies` | `<adjust ability="rank" greaterthan=>` | `state.rankValue()` |
+
+`rankValue()` adds the **ring of ultimate power's +2**, which is precisely the unwritten bonus
+`natural` exists to strip — task 136.4 added the `<set>` arm for exactly that reason (§2.270 stores
+`rank modifier="natural"` and then compares against it, "so a ring-holder must be judged by natural
+Rank"). The argument is not specific to `<set>`: a `<difficulty ability="rank" modifier="natural">`
+would roll against the ring-boosted Rank, and a `<adjust ability="rank" modifier="natural"/>` would
+contribute it, both silently two points easier than the page prints — the family's failure shape
+with a different stat in it.
+
+This is the last member. Tasks 302/303 gave the derived stats their arms, 314 widened `<set>`/`<if>`
+to all six mode words, 315 did `<adjust>`'s condition reader and 316 its value reader — but each of
+those routed through `abilityForMode`, and `rank` is the one stat that reader does not compose
+(`data.abilities` has no `rank` key and `rankValue()` is not one of its branches), so every fix
+walked straight past it.
+
+**Fix.** The narrow form is one shared helper — `rankForMode(mode)` on `GameState`, returning
+`data.rank` for `natural` and `rankValue()` otherwise — with the five arms above calling it and
+`evalExpression`'s inline ternary deleted as its first caller. Putting it on `GameState` beside
+`defenceForMode` is what stops the sixth reader repeating this; `defence()` delegating to
+`defenceForMode` is the precedent (task 304's note on drift). Only `natural` is distinguishable:
+the three `no-` words and `affected` all mean the full Rank, since no weapon, tool or armour
+touches it.
+
+**Test.** A fixture holding the ring (Rank N written, `rankValue()` N+2), asserting
+`<difficulty ability="rank" modifier="natural">` scores N and a bare one scores N+2, plus the
+`<adjust>` pair. All three read N+2 today. Keep the existing §2.270 `<set>` assertion as the
+control that the one honoured site stays honoured.
+
+## 316. `adjustAmount` has no `defence` arm, so an `<adjust ability="defence"/>` contribution reads 0
+
+**DONE.** One routing arm added beside `rank`, mode-aware like the rest —
+`if (key === 'defence') return state.abilityForMode('defence', mode);` — so the two readers of
+`<adjust>`'s `ability=` finally agree on all nine words the gate allows. Two assertions in
+`suite-combat.js`'s task-92 block, on a fixture wearing a +3 armour: the contribution equals
+`defence()`, and `modifier="noarmour"` drops it by exactly `armourBonus()`. Verified by reverting
+the engine change alone — `FAIL … got=0 defence=12` and `FAIL … noarmour=0`, which is the defect
+stated as a number. `RESULT ALL PASS pass=3027 fail=0`. Nothing shipped moves: zero corpus sites,
+as filed.
+
+With this, all four `modifier=` tags accept all three derived stats, and every reader resolves the
+six mode words **for the six core abilities, `defence` and `stamina`**. One stat is still short and
+the census that closed 316 found it: `rank` ignores `modifier=` everywhere except `<set>`, so
+`<adjust ability="rank" modifier="natural"/>` returns `rankValue()` — the ring of ultimate power's
++2 included — where the word asks for the written Rank. Filed as task 317; the corpus writes
+`rank` with a modifier on `<set>` only (23 sites, all `natural`, all honoured).
+
+**The original filing.**
+
+**Priority: LOW — latent, and censused to be latent.** Filed 2026-08-28 while fixing task 315,
+whose census covers it: **zero** `<adjust ability="defence">` nodes over the 4,369-file shipped
+corpus, so nothing contributes a wrong number today.
+
+**What the code does.** `build/validate-source.ps1`'s `FL_ENUMS['ability']` is
+`charisma combat magic sanctity scouting thievery rank stamina defence` — nine words, and it is
+not tag-restricted, so `<adjust ability="defence"/>` validates clean. `engine.js adjustAmount`
+then tests `rank`, `stamina` and `ABILITIES.includes(key)`, and **`rules.js` `ABILITIES` is the
+six CORE abilities** — `defence` is a derived stat and is not in it. So the `ability=` branch
+falls out of every arm, `adjustAmount` runs on to `name=` (absent) and returns **0**: the
+modifier contributes nothing and the roll is that many points short, silently.
+
+This is the shape tasks 68/302/303 closed one reader at a time — `firstAbility()` returning null
+for a derived stat and the caller scoring 0 — and `defence` is the stat it keeps happening to.
+It survives here because `adjustApplies`, the *condition* reader on the same tag six lines below,
+routes its else-arm through `abilityForMode`, which composes `defence` properly (task 304's
+`defenceForMode`). So `<adjust ability="defence" greaterthan="12" value="1"/>` gates correctly
+while `<adjust ability="defence"/>` contributes 0 — the two readers of one attribute disagree,
+which is what task 315 found in the other direction.
+
+**Fix.** One arm beside `rank`, mode-aware like the rest: `if (key === 'defence') return
+state.abilityForMode('defence', mode);` — `abilityForMode` already dispatches `defence`, so this
+is a routing line, not a new rule. `rollDifficulty` has exactly this arm already (task 302), which
+is the precedent for where it goes and what it returns.
+
+**Test.** One assertion in `suite-combat.js`'s task-92 block, next to task 315's: the §5.79-style
+fixture (weapon + armour) with `<lose><adjust ability="defence"/></lose>` asserting the
+contribution equals `defence()`, plus a `modifier="noarmour"` arm asserting it drops by
+`armourBonus()`. Both read 0 today.
+
+## 315. `adjustApplies` folds `modifier=` to a boolean on the `<adjust greaterthan|lessthan>` condition, which is the third mode-dropping site
+
+**DONE.** `adjustApplies`'s comparator arm now resolves the mode WORD instead of folding it:
+ordinary abilities (and `defence`, which is not in `ABILITIES` and so falls through to the same
+call) go to `state.abilityForMode(key, mode)`; `stamina` keeps the condition convention
+`<if ability="stamina">` uses — bare and `current` read the wounded score, any other modifier the
+unwounded one — with `natural` picking the written maximum as `adjustAmount` does. The two
+readers of `<adjust>`'s `ability=`/`modifier=` now agree.
+
+Nothing shipped moves, as filed: the corpus's two `<adjust modifier=>` sites (§2.579, §5.79) carry
+no comparator, and there are **zero** `<adjust ability="stamina">` nodes with one. Five assertions
+added to `suite-combat.js`'s task-92 block, each pitched exactly between the two scores so only the
+fold can move the verdict. Verified by reverting the engine change alone: `FAIL … full=8
+noweapon=6` and the `modifier="natural"` stamina arm both fail without it (the three controls pass
+either way, which is the point of them). `RESULT ALL PASS pass=3025 fail=0`.
+
+Censusing this turned up a third disagreement on the same tag, in the reader task 315 left alone:
+`adjustAmount` has no `defence` arm at all. Filed as task 316.
+
+
+**Priority: LOW — latent, and censused to be latent.** Filed 2026-08-28 while fixing task 314,
+whose census covers it: the corpus's two `<adjust modifier=>` sites are §2.579
+(`ability="stamina" modifier="natural"`) and §5.79 (`ability="combat" modifier="noweapon"`), and
+**neither carries a `greaterthan=`/`lessthan=`**, so no shipped section reaches the folding line.
+
+**What the code does.** Task 314 routed `<set>` and `<if>` through `state.abilityForMode`, so all
+four `modifier=` tags now honour all six words — *through the reader each tag's VALUE goes to*.
+`<adjust>` has two readers, not one, and only one was in 314's table. `engine.js adjustAmount`
+reads the contribution and calls `abilityForMode(key, mode)` — all six. But when the node carries
+`greaterthan=`/`lessthan=` the `ability=` stops being the contribution and becomes the
+**condition** (the contribution then comes from `value=`/`amount=`, per task 92), and that arm is
+`engine.js adjustApplies`:
+
+```js
+v = key === 'rank' ? state.rankValue()
+  : key === 'stamina' ? state.data.stamina
+  : state.abilityForCheck(key, normalize(get('modifier') || '') === 'natural');
+```
+
+which is exactly the boolean fold task 314 removed from `evaluateCondition`, one tag over. So
+`<adjust ability="combat" modifier="noweapon" greaterthan="8" amount="2"/>` would gate on the
+**weapon-boosted** COMBAT — the score the mode exists to exclude — while the identical
+`<adjust ability="combat" modifier="noweapon" amount="…">` two lines away reads it correctly.
+`abilityForCheck` is now just `abilityForMode(ab, natural ? 'natural' : null)`, so the fix is the
+same one-line substitution, and the `stamina` arm should take `modifier="current"` at the same
+time (that value IS legal on `<adjust>`, and here it silently already reads the wounded score,
+which is right for `current` and wrong for `natural`).
+
+**Test.** One suite assertion in the shape task 314's used: a fixture with a wielded weapon, one
+`<adjust ability="combat" modifier="noweapon" greaterthan="N">` pitched between the unarmed and
+the boosted score, asserting the modifier does not fire. It fails today.
+
+## 314. three of `modifier=`'s six values have no reader on `<set>` and two none on `<if>`, and the gate allows all six on both
+
+**DONE.** Fixed by widening the readers, as the analysis below argues, not by narrowing the gate.
+`state.abilityForValue` now takes the mode WORD instead of a boolean (its `natural` flag was the
+fold); `engine.js setValueMode` keeps the three `no-` words (new `SET_VALUE_MODES` list — `current`
+stays out, and the gate still refuses it on `<set>`); `evalExpression`'s ability branch passes the
+word to `abilityForValue`; and `evaluateCondition`'s ordinary-ability arm calls `abilityForMode`
+instead of folding to `abilityForCheck`. All four `modifier=` tags now agree with the gate and the
+JaFL spec. The comment quoted below — which named the right defect one layer above the code that
+fixes it — is rewritten to say which call site makes its claim true.
+
+Nothing shipped moves: the census was re-run over the 4,369-file corpus and reproduces exactly
+(`<set>` 33 = 32 `natural` + 1 `affected`, `<if>` 2 both `natural`, `<adjust>` 1 `natural` +
+1 `noweapon`, `<difficulty>` 4 `noweapon`). Four assertions added to `suite-engine.js`, going
+through `applyEffect(parse('<set …/>'))` rather than `evalExpression` directly — which is the whole
+point, since the old task-302 assertion tested the branch and not the path. Verified by reverting
+the engine fix alone: `FAIL … plain=12 noarmour=12 armour=3`, `FAIL … noweapon=8 plain=8`, and the
+`<if>` arm. `RESULT ALL PASS pass=3020 fail=0`. `adjustApplies` is the same fold on a reader 314's
+table did not cover — filed as task 315.
+
+
+**Priority: LOW — latent, and censused to be latent.** No shipped section writes one of the
+affected pairs, so nothing is mis-read today. It is filed because the failure mode is the one
+task 300 was filed for and the one this gate's own comment already names: an allowlisted
+`modifier=` with no reader on the tag it is written on falls through to the FULL affected score
+— **the very score the mode exists to exclude** — so the page's rule is silently made easier than
+it is printed, and both the gate and the suite stay green.
+
+*(Found during conversion work on an unpublished book, by an author who wanted `<set value="defence" modifier="noarmour">`, read the comment below as a guarantee that it
+would work, and measured the opposite.)*
+
+**What the code does.** `FL_ENUMS['modifier']` in `build/validate-source.ps1` is
+`affected current natural noarmour notool noweapon`, and exactly one value is restricted by tag:
+`current` is refused outside `<adjust>`/`<difficulty>` because "on `<set>`/`<if>` nothing reads
+it and it would fall through to the default silently - task 300's failure shape" (task 302's
+own comment). The same sentence is true of three more values, and the check stops one short:
+
+| tag | reader | honours |
+| --- | --- | --- |
+| `<difficulty>` | `rollDifficulty` -> `abilityForMode` | all six |
+| `<adjust>` | `adjustAmount` -> `abilityForMode` | all six |
+| `<if ability="defence">` | `abilityForMode('defence', mode)` | all six |
+| `<if ability="combat">` (and the other five) | `abilityForCheck(ab, natural)` | `natural` only |
+| `<set value=…>` | `setValueMode` -> `natural`/`affected` or **null** | `natural`, `affected` |
+
+So `<set value="defence" modifier="noarmour"/>` resolves `defenceForMode(null)`, which *is*
+`defence()` — the armoured score — and `<if ability="combat" modifier="noweapon" greaterthan="8">`
+compares the weapon-boosted score. (`noarmour` on a non-defence ability is a documented no-op and
+is not part of this: `state.js` says so, and it is correct — armour reaches no other score.)
+
+**A comment asserts the opposite, which is how it was believed.** `engine.js`'s expression
+resolver reads
+
+```js
+// defenceForMode(null) IS defence(), so an unmodified read is unchanged; what this
+// buys is that `<set value="defence" modifier="noarmour">` cannot validate clean
+// and then hand back the armoured score. (task 302)
+if (w === 'defence') return state.defenceForMode(mode);
+```
+
+The line is right and the claim above it is exactly wrong: `applySet` passes
+`setValueMode(modifier)`, which returns null for `noarmour`, so `mode` never reaches this branch
+as anything but null. **A comment naming the failure it prevents is worth re-reading against the
+call site that supplies its argument** — this one names the right defect at the wrong layer.
+
+**Censused, so the latency is measured and not assumed.** Over books 1-6: `<set modifier=>` is
+written 33 times (32 `natural`, 1 `affected`) and `<if modifier=>` twice (both `natural`) — every
+one honoured. The corpus's only "no-" modes are `<difficulty modifier="noweapon">` (4) and
+`<adjust modifier="noweapon">` (1), and both tags read it correctly. **The two tags that would
+drop a mode are precisely the two the corpus has never given one**, which is why five audits have
+walked past it.
+
+**The fix, and it should widen the readers rather than narrow the gate.** Both mode-aware readers
+already exist and are already called from the two correct tags: route `evalExpression`'s ability
+branch through `abilityForMode` (it hand-rolls `natural` today) and let `setValueMode` keep the
+three `no-` modes; do the same for `evaluateCondition`'s ordinary-ability branch, which folds the
+mode to a boolean before it gets there. That makes all four tags agree with the gate and with the
+JaFL spec, which lists `modifier=` on `<if>`/`<difficulty>`/`<set>`/`<adjust>` without
+per-tag exceptions. Narrowing the gate instead would keep the spec and the port apart and would
+have to be re-argued the first time a section needs the mode.
+
+**A suite assertion is what makes it stay fixed**, and it is cheap: a fixture wearing armour with
+a Defence bonus, one `<set value="defence" modifier="noarmour">` and one plain `<set
+value="defence">`, asserting the two differ by exactly `armourBonus()`. Today they are equal.
+
+## 313. eighteen of the nineteen corpus censuses read raw bundled text that keeps XML comments, so a commented-out node counts as a real one
+
+**Priority: LOW — latent, and measured to be latent.** Nothing is mis-measured today: stripping
+comments from the bundle before the suites run changes not one assertion, count or label across the
+whole run, measured (below). It is filed rather than dropped because the failure mode is
+**silent by construction** — these censuses exist to catch things "nothing anywhere says", so a
+census fed a phantom node reports a wrong number inside an assertion that may still pass — and
+because the input that triggers it is a practice the repository is actively growing: an explanatory
+comment that quotes the markup it explains.
+
+*(Filed 2026-08-28 by a reader who wrote such a comment, noticed it before committing, and then
+checked whether the corpus already contained any.)*
+
+**What the code does.** Every corpus census walks `data.loadBook(b)` and matches over the raw
+section string — nineteen of them, at `suite-actions.js` (11), `suite-corpus.js` (7) and
+`suite-inventory.js` (1). `loadBook` returns the bundled JSON verbatim, and **`build/build-data.ps1`
+does not strip comments**: book6/135’s
+
+```xml
+	<!-- modified so that even 'kept' weapons can be broken -->
+```
+
+is in `web/data/book6.json` today. So a census’s regex sees comment text exactly as it sees markup.
+Exactly one census already knows this — task 266’s `scan266` opens with
+`xml.replace(/<!--[\s\S]*?-->/g, '')` (`suite-actions.js`) — which is the argument that the other
+eighteen want it too, not that they are individually wrong.
+
+**The corpus already contains the input.** Five of the 64 shipped comments carry markup a census can
+match:
+
+| section | comment holds | seen as |
+| --- | --- | --- |
+| book2/726 | `<lose codeword="2.726.1" hidden="t"/>`, commented out | a real `<lose codeword>` node |
+| book1/605 | `<choice section="501">If paying a ransom</choice>` | a real `<choice>` with a link |
+| book2/248, book2/521, book3/640 | `choose="f"` | an attribute pair |
+
+book2/726 is the sharpest: task 273’s census opens `if (!/<lose\b[^>]*\bcodeword=/i.test(xml)) continue;`
+and that test passes **on the comment**, so the section is walked; `TAG273` then matches the
+commented-out node and counts it as a `<lose codeword>`. The pinned output is unaffected only
+because the node happens to sit under no `<if codeword>` guard — an accident of that page, not a
+property of the census.
+
+**Why "latent" is a measurement and not an assumption.** Patch `loadBook`’s cache to strip comments
+before any suite runs, and diff the whole `#results` block against an unpatched run:
+
+```
+with comments    : RESULT ALL PASS pass=3015 fail=0   (3016 result lines)
+comments stripped: RESULT ALL PASS pass=3015 fail=0   (3016 result lines)
+unified diff of the two blocks: empty
+```
+
+Diffing the **whole block** rather than the verdict is the part that matters: several censuses
+carry their figure inside a PASSING assertion’s label (task 300’s site count, task 266’s totals),
+so a verdict comparison would have proved nothing.
+
+**Fix.** Strip once, where every census gets it, rather than nineteen times. Two options:
+
+1. **In the suites** — a shared `rawSections(b)` helper in the test tree that wraps `loadBook` and
+   returns comment-free strings, with the nineteen call sites moved onto it and `scan266`’s own
+   `replace` deleted as redundant. Keeps the bundle byte-identical; touches only `web/tests`.
+2. **In the build** — drop comments when bundling. No runtime reader needs them (`parseXml` yields
+   comment nodes nothing walks, and the renderer never visits them), and it shrinks every
+   `book<N>.json`. This regenerates all of `web/data`, so it is the larger diff and it removes a
+   maintainer aid from the shipped artefact — the comments stay in `books/`, which is the source.
+
+Option 1 is recommended: the defect is in what the censuses read, and the bundle is not wrong.
+
+**Test.** One assertion in `suite-corpus.js`, pinned at zero over the bundled corpus: no section’s
+comment-stripped text differs from its raw text **in the count of tag opens** — i.e. no shipped
+comment contains markup. That fails today on book1/605 and book2/726, so pin it instead as "the
+censuses see the same tag count with and without comments", which the helper makes true and which
+keeps working when a future comment quotes markup. Whichever form, it must be a census of its own
+and not a fixture, because the input is the corpus.
+
+**Adjacent, and deliberately not folded in.** `build/validate-source.ps1` parses XML properly, so
+the build gate is unaffected — this is a test-tree defect only. And the reverse direction is
+already known and unrelated: a *prose* census over section text must strip comments too, which is a
+note about ad-hoc `grep`s rather than about the suite.
+
+**Done (option 1, the recommended one).** `web/tests/corpus-text.js` exports `rawSections(b)` —
+`loadBook` with every XML comment removed from each section's text, cached per book — and all
+nineteen call sites (`suite-actions.js` 11, `suite-corpus.js` 7, `suite-inventory.js` 1) read
+through it. `scan266`'s own `replace` is gone as redundant, with a line saying where the strip
+moved to. The bundle is untouched: `web/data`, `web/assets` and `version.js` are byte-identical
+(the test tree is outside `stamp-version.ps1`'s digest by design), so this is a four-file change
+under `web/tests` and nothing else.
+
+**The assertion, and why it is that one.** The filing's first form — "no shipped comment contains
+markup" — is a pin on today's corpus that fails on book1/605 and book2/726 and would fail again on
+the next explanatory comment that quotes its own markup. So the census rides the task 292/294 pass
+(all three want the parsed element, and an extra await over 4,369 sections costs virtual-time
+budget) and asks the parser instead: for every section, the count of tag opens in the text the
+censuses read must equal `querySelectorAll('*').length + 1`. Comment nodes are not elements, so the
+two mechanisms are independent, and the equality is what "the censuses see the same tag count with
+and without comments" means operationally. It also asserts the corpus still HAS comments to strip
+(61 sections today), because a census with no input is a census that proves nothing.
+
+**Measured both ways.** Restored: `RESULT ALL PASS pass=3016 fail=0` — 3015 plus this one
+assertion, and every other census's figure and label unmoved, which is the filing's own
+measurement re-confirmed from the other side. Negative control, the census pointed back at
+`data.loadBook`: `RESULT FAILURES pass=15 fail=1` naming
+`1/605 tags=12 elements=11, 2/726 tags=13 elements=12` — exactly the two sections predicted, one
+phantom tag each. A green run with the fix in is not evidence on its own here (the defect was
+latent); the failing control is.
+
+## 312. task 311 lifted the effective-ability ceiling and left `ability()`'s doc comment reading "clamped 1..12" — which `abilityNoWeapon`'s new comment then cites as its authority
+
+**Priority: LOW — a comment, not behaviour.** Nothing computes wrongly, no branch changes and no
+test can fail on it. It is filed with a number rather than folded into 311 because of its shape:
+the commit that made this line wrong also wrote a second comment that **points at it**, so the
+stale text is not merely wrong on its own, it is the thing a correct comment defers to.
+
+*(Filed 2026-08-26, one commit after 311 landed, by a reader who had to work out which of
+`ability()`'s two comments to believe before extending it.)*
+
+**What the code says.** `state.js:420`, six lines apart:
+
+```js
+  /** Affected ability score, including item/effect/affliction bonuses, clamped
+   *  1..12. ... */
+  ability(ability) {
+    ...
+    // Floor of 1, no ceiling: the printed 12 bounds the WRITTEN score ... (task 311)
+    return floorAbility(this.afflictionMod(ability, sum));
+  }
+```
+
+The body is right and the doc comment is the pre-311 text, untouched. 311 changed the return
+expression and added the explanation beneath it, and did not re-read the four lines above.
+
+**Why the citation is the point.** `abilityNoWeapon` (`state.js:510`), whose comment 311 DID
+update, reads: "Floored, not capped, **for the same reason `ability()` is**." A reader who
+follows that reference lands on "clamped 1..12" and has two comments by the same author, in the
+same commit, saying opposite things about the same rule. The port's own rule is stated correctly
+in the place it belongs — `rules.js` documents `clampAbility` as the WRITTEN score (bounded
+1..12, with the `Rules.xml` quotation) and `floorAbility` as the EFFECTIVE one (floor of 1, no
+ceiling) — so nothing is unresolved, only mis-signposted.
+
+**Scope: exactly one comment.** `abilityForMode` and `abilityForValue` clamp nothing themselves
+(they delegate to `ability()`/`abilityNoWeapon()`/`abilityNatural()`), `defenceForMode` composes
+an unclamped sum, and the two remaining `clampAbility` call sites — `adjustAbility` and
+`sanitizeData` — are the WRITTEN-score path, where the 12 has a source and both comments are
+accurate. Censused over `state.js`, `rules.js` and `combat.js`: this is the only line that says
+an effective ability score is capped.
+
+**The fix.** Rewrite `ability()`'s doc comment to say what the body says and to point at
+`floorAbility` rather than restate its argument, which is what keeps the reasoning in one place
+the next time the bound moves. No behaviour changes; the build stamp moves on the comment text,
+which is the stamp working.
+
+**The rule worth keeping.** A change to a function's return value has to re-read that function's
+OWN doc comment before it re-reads anybody else's — 311 updated a sibling's comment and its own
+body while leaving the header between them, which is the one position from which a wrong comment
+can mislead a correct one.
+
+**Verified.** `RESULT ALL PASS pass=3015 fail=0`, unmoved from 311's — a comment-only change
+cannot move an assertion, and a run that says so is the check that nothing else went with it.
+
+## 311. `ability()` clamps the EFFECTIVE score to 12, so book4/103's white sword is worth +5 to a book4 Warrior and +4 to a book5/6 one — and the attack roll reads the capped number
+
+**Priority: MEDIUM — live in books 4–6, silently and always in the player's disfavour.** Not a
+crash and no branch becomes unreachable (measured below), but it is uncorrectable from the sheet
+and undetectable from it: the Adventure Sheet shows COMBAT 12 for a character who should be at 15,
+so the missing points read as the rules.
+
+*(Filed 2026-08-26 while writing a task 310 assertion. The assertion needed `Math.min(12, cb0 + 7)`
+to pass, which is the cap admitting itself.)*
+
+**What the code does.** `ability()` (`state.js:426`) and `abilityForMode()` (`state.js:509`) both
+end `clampAbility(...)` applied to the **full sum** — natural score + `itemBonus` (which folds in
+the wielded weapon and the best tool) + `effectBonus` + `afflictionBonus` + `auraBonus` +
+`potionBonusFor`. `clampAbility` is `Math.max(1, Math.min(12, v))` over `ABILITY_MAX = 12`
+(`rules.js:28`, `rules.js:102`).
+
+**The reference engine pegs the minimum only.** `EffectSet.adjustAbility` ends:
+
+```java
+// Peg the minimum value for an affected ability at 1.
+// This stops curses from lowering an early character's stats below 1.
+return Math.max(1, value);
+```
+
+No maximum, and the comment says exactly why the one bound it has is there.
+`Adventurer.getAbilityValue` does not cap either. So the ceiling is port-introduced, and the floor
+— which the port also applies — is the part with a source.
+
+**The port already disagrees with itself about it.** `defence()`/`defenceForMode` is *not* clamped:
+COMBAT 8 + Rank 4 + a +6 armour reads **18**. So an effective score has a ceiling on the six core
+paths and none on the seventh, and `<if ability="defence" greaterthan="13">` (the corpus's one such
+gate) depends on the seventh having none.
+
+**Measured** (Node, `web/js/state.js`; corpus top bonuses first).
+
+The shipped corpus's highest bonuses are `weapon bonus="8"` — **one** item, book4/103's white sword,
+where the next-best weapon is +6 — and `tool bonus="6"`, the hyperium wand of book6/23 and
+book6/489 (`ability="magic"`). Against the pregen ability rows of the books that can reach them:
+
+```
+book4 Warrior   natural COMBAT 7 + white sword 8 = 15  ->  engine 12  (check reads 12)
+book4 Wayfarer  natural COMBAT 6 + white sword 8 = 14  ->  engine 12
+book4 Rogue     natural COMBAT 5 + white sword 8 = 13  ->  engine 12
+bk5/6 Warrior   natural COMBAT 8 + white sword 8 = 16  ->  engine 12
+bk5/6 Mage      natural MAGIC  8 + hyperium wand 6 = 14 ->  engine 12
+Defence         COMBAT 8 + Rank 4 + armour 6 = 18      ->  engine 18  (not clamped)
+```
+
+**It is not display-only.** `abilityForCheck` reads the capped number, so every `<difficulty>` and
+`<rankcheck>` roll uses it, and `combat.js:182` builds the attack roll from
+`state.ability('combat')` — a book5/6 Warrior with the white sword attacks at 12 where the rules
+give 16.
+
+**No branch is lost, and that is worth recording so the next reader need not re-derive it.** Census
+of `<if ability=>` gates over the shipped corpus (per task 270): the highest core-ability threshold
+is `sanctity greaterthan="8"`, and the only gate above 12 is `defence greaterthan="13"`, on the
+unclamped path. So the cap costs points on rolls, never a route — which is what separates this from
+task 303.
+
+**Deliberately not measured, and the fix must not assume it.** Whether clamping the **natural**
+score to 12 is right is a *different* question on *different* call sites — `adjustAbility`
+(`state.js:729`) and `sanitizeData` (`state.js:1394`) — and a natural ceiling may well be the
+printed rule. Read the reference's `<gain ability=>` path before touching those two. This filing is
+about the effective total alone; the narrow change is to stop clamping the sum at the two reader
+sites while leaving the floor of 1, which the reference does have.
+
+**Fixed 2026-08-26.** `rules.js` gains `floorAbility` (floor 1, no ceiling) beside `clampAbility`
+(1..12), and the two effective readers — `ability()` and `abilityNoWeapon()` — use it. The two
+natural-score sites keep `clampAbility`, so the change is to what a bonus may reach and never to
+what a `<gain ability=>` may write. Suite `pass=3004 → 3015`; `web/` only, so a stamp and not a
+data rebuild.
+
+**The printed rules settled it, and they nearly settled it the other way.** `rules/Rules.xml` does
+cap abilities at 12, twice — which is the first thing the fix had to survive rather than ignore:
+
+> Your **initial score** in each ability ranges from 1 (low ability) to 8. **Ability scores will
+> change** during your adventure, but you can never have an ability score lower than 1 or higher
+> than 12. *(the character-creation section)*
+>
+> You abilities (COMBAT, etc) can **increase** up to a maximum of 12. They can never go lower than
+> 1. **If you are told to lose a point off an ability which is already at 1, it stays as it is.**
+> *("Are there any limits on abilities?")*
+
+Both describe the number in the box: what an *initial score* is, what *increases*, and what
+happens when you are told to *lose a point*. Gains and losses are written-score operations — which
+is exactly where the port already applies `clampAbility`, correctly. Neither passage mentions a
+weapon.
+
+The genuine counter-argument, which is worth recording because a future reader will find it and
+should not have to re-weigh it alone: the same file uses "COMBAT score" to mean the
+weapon-inclusive number when it defines Defence — "your COMBAT score, **including any weapon
+bonus**, plus your Rank, plus the bonus for the armour you're wearing". So "ability score ... higher
+than 12" *could* be read as covering the total. Three things outweigh it. **JaFL**:
+`EffectSet.adjustAbility` — the function that applies weapon, tool, armour and aura bonuses — ends
+`return Math.max(1, value)`, and its comment explains the floor and never mentions a ceiling.
+**The corpus's own economy**: initial scores run to 8 and books 5–6 start a Warrior at COMBAT 8, so
+a total capped at 12 makes every weapon above +4 partly worthless to them and book4/103's +8 white
+sword worth +4 — a game does not sell a +8 sword it has already decided cannot be used. **The
+adjacent rule**: "count only the bonus given by your best item for each ability" answers *which*
+bonus applies with no ceiling on the result.
+
+**Defence moved with it, which the filing had backwards.** The filing said `defence()` "is not
+clamped", contrasting it with the six core paths. Half right: the *sum* is unclamped, but
+`defenceForMode` builds its COMBAT term from `this.ability('combat')` — the clamped reader — so the
+cap was costing Defence the same four points it cost the attack roll. That makes the defect larger
+than filed and the fix's reach wider: lifting the ceiling pays those points back in Defence too,
+which is what Rules.xml's "including any weapon bonus" requires. `modifier="noweapon"` still strips
+the weapon term exactly, because `abilityNoWeapon` sums its own terms rather than subtracting.
+
+**Two existing assertions were the ceiling's own fixtures**, and one of them was mine. Task 310's
+"a better weapon after a loss is still picked up" carried the `Math.min(12, cb0 + 7)` that filed
+this task, and is now `cb0 + 7` exactly. `suite-render`'s "noweapon computed pre-clamp (11, not
+12−2)" existed to prove the bare score was summed rather than subtracted off a clamped total — the
+fixture (COMBAT 11 + a +2 weapon) is the exact shape that hit the ceiling, so it is kept and
+re-pointed: the affected score is now the true 13, the bare score is unchanged at 11 (the original
+property, still holding), and re-adding the cap fails there first.
+
+**Assertions** (11: nine in `suite-engine`, one in `suite-combat`, the re-pointed one in
+`suite-render`). Driven from the shipped nodes, not fixtures: §4.103's white sword and §6.23's
+hyperium wand are read out of the corpus and applied, each with a guard arm on its `bonus=` so a
+re-worded section fails here rather than silently weakening the test. Then COMBAT 8 + 8 reading 16
+through `ability`, `abilityForCheck` and `rollDifficulty`; Defence carrying it; `noweapon` still
+stripping it; MAGIC 8 + 6 reading 14 off the tool path; the **floor** surviving a −9 curse (the
+bound that has a source); and a control that a written score still stops at 12. The
+`suite-combat` arm reads the fight log — `You roll 2+16=18 vs Def 10` — because the log line is
+where the number is legible to a player. Verified by reinstating the ceiling in `floorAbility`
+alone: seven arms fail across four suites, the log line reading `2+12=14`.
+
+**The natural-score cap: left untouched here, then read afterwards and confirmed correct.** The two
+`clampAbility` call sites — `adjustAbility` (`state.js:729`) and `sanitizeData` (`state.js:1394`) —
+are unchanged by this task, and the control arm pins them at 1..12. That was deliberate but
+unverified when the fix shipped; the check was made immediately after, and it holds. **This is the
+mirror image of the defect above**: on the effective path the 12 had no source, and on the written
+path it has two.
+
+`rules/Rules.xml` is the first, quoted above. JaFL is the second, and it states the rule in words
+before implementing it — `Adventurer.adjustAbility`'s doc comment reads "an ability can only be
+lowered to 1, and one of the major six can only go up to 12", and the body is exactly that:
+
+```java
+if (abilities[a].natural + delta < 1) { if (fatal) death = true; d = -abilities[a].natural + 1; }
+else if (abilities[a].natural + delta > 12) { d = 12 - abilities[a].natural; }
+```
+
+The port's `fatal` branch matches too (`if (fatal) death = true` against the drop to Stamina 0), and
+`d` is clamped *inside* JaFL's loop, so an `ability="*"` adjustment is bounded per ability — a loss
+takes a point off each ability above 1 and nothing off one already at 1. The port resolves `'*'` to
+all six (`engine.js:134`) and calls `adjustAbility` per target, each clamping on its own, so the two
+agree there as well. **No task: nothing to change, and the 12 on this path is not the unsourced
+ceiling that 311 was about.**
+
+**Three adjacent divergences found in the same read, none of them defects.** Recorded here so the
+next reader does not file them: (1) JaFL's `adjustAbility` returns the delta actually applied where
+the port returns the new score — a real difference, but inert, since all three callers
+(`combat.js:171`, `engine.js:172`, `engine.js:1801`) discard the return. (2) JaFL calls
+`isAbilityMaxed` from `TickNode.canBeSkipped`/`actionDoesAnything`, so a *forced* ability tick that
+would do nothing at 12 is neither presented as an action nor required of the player; the port has no
+equivalent and needs none, because all **141** ability-raising nodes in the shipped corpus are
+auto-applied on entry — **zero** carry `force="f"` — so there is no control to disable and no forced
+click to clear. With six books published and no seventh in the tree, a conversion cannot introduce
+the shape either. (3) Where such a tick carries an ability *effect* rather than an amount
+(book2/643's `effect="+fixed"`), JaFL's own condition (`!isAbilityMaxed(ability) || abilityEffect !=
+null`) exempts it from the maxed check regardless, which is what the port already does by applying
+effects separately from the numeric gain.
+
+## 310. `reconcileEquipment` writes the DEFAULT weapon/armour back into `data.equipped`, so an implicit default is stored as an explicit choice
+
+**Priority: MEDIUM — live in every published book, from the first purchase.** Not a crash and the
+player can correct it from the Adventure Sheet, but nothing tells them there is anything to
+correct: the sheet shows the weaker weapon as the wielded one and the COMBAT score agrees with it,
+so the loss reads as the rules rather than as a stuck selection.
+
+*(Filed 2026-08-26, found while writing an assertion about a section that consumes the weapon the
+player is wielding and then grants a replacement. The assertion was wrong and the engine was
+right, which is how the wider case came out.)*
+
+**The design task 186 wrote.** `_equipped(kind)` is documented as "the player's explicit choice
+(`data.equipped`) while it still names a carried item of that kind, else the strongest of that kind
+as the default" (`state.js`), and the reason the choice wins is real: book5/628's +3 Jade Defender
+carries a wielded Defence effect no plain +4 blade can match, so the port must not auto-switch away
+from a deliberate pick.
+
+**What the code does instead.** `reconcileEquipment` ends with `eq.weapon = w ? w.id : null` where
+`w = this.wieldedWeapon()` — i.e. it *persists whatever the reader just returned*, including the
+"strongest of that kind" fallback. It runs from `GameState.create`, `addItem`, `removeItemById`,
+`setEquipped` and the load path, so `data.equipped` is populated for every character from turn one
+and the two cases the comment distinguishes become indistinguishable. The fallback branch can then
+only ever fire when the stored item has LEFT the pack — never when a better one arrives.
+
+**Measured** (Node, `web/js/state.js` only):
+
+```
+items: battle-axe (+2)            -> wielded battle-axe, COMBAT 8   (correct)
+add magic sword (+4)              -> wielded battle-axe, COMBAT 8   (should be 10)
+lose battle-axe                   -> wielded magic sword, and the sword is now the STORED choice
+add holy sword (+7)               -> wielded magic sword, COMBAT 10 (should be 13)
+```
+
+Every pregen starts with a weapon, so the first line is every character: book1/16's market, or any
+of the corpus's weapon awards, is enough to reproduce it. The second half is the same fault one
+step on — book6/635's Warrior Maid confiscates a weapon, book4/103's white sword and book1/385's
+royal ring are the keep-protected pieces around it, and after any such loss the fallback is written
+back and sticks in turn.
+
+**The fix.** Keep `data.equipped` for explicit choices only. `setEquipped` writes it; the reconcile
+should CLEAR a stale entry rather than replace it with the fallback, leaving `_equipped` to
+default afresh on each read. That is what the existing comment already describes, so no behaviour
+the corpus depends on changes: a player who has chosen still keeps their choice (the Jade Defender
+case), and a player who has not gets the strongest, which is what the sheet already implies.
+Worth asserting in both directions — an explicit pick surviving a better acquisition, and an
+unchosen loadout following the best piece — since the two have been the same code path until now.
+
+**Armour has the identical shape** through `wornArmour`/`armourBonus`, and Defence is where it
+compounds, because `defence()` reads the worn armour and the Rank together.
+
+**Fixed 2026-08-26.** `reconcileEquipment` now clears a stale entry — one naming an item that has
+left the pack — and writes nothing else, so `data.equipped` holds deliberate picks only and the
+per-item `wielded`/`worn` display flags are rewritten from the readers as before. The sheet is
+unchanged: `ui.js` shows the pressed Wield/Wear button from those flags, so an unchosen default
+still reads as the piece in hand, and clicking another still makes the choice explicit.
+
+**The load path had to move with it, and the filing did not see that.** `sanitizeData` migrates a
+loadout from the legacy per-item flag whenever the stored id is absent or stale — written for a
+pre-186 save, where the flag is the one record of what reconcile had picked. After this fix that
+flag marks the **default**, and `equipped: {weapon: null}` is the normal state of an unchosen slot,
+so the migration would have frozen the default into a choice on **every load**: the engine fix
+would hold for one session and the bug would return on the next page refresh, service-worker
+reload or import. The discriminator is the presence of the `equipped` object itself — a pre-186 save
+has no such key at all — so the flag is now read only when the key is missing. A post-186 save's
+stale id is dropped instead, which is what reconcile does in play. A pre-310 save's populated
+`equipped` is still honoured verbatim: its stored id is indistinguishable from a real choice and
+names the loadout the sheet was showing, the same reasoning the pre-186 migration rests on.
+
+**Two existing fixtures asserted the bug**, which is the "they have been the same code path"
+warning above arriving in the tests. `suite-inventory`'s `mk186` and `suite-economy`'s Jade Defender
+case both relied on the Defender *arriving first* to be wielded, and both passed only because the
+write-back had promoted that default to a stored choice — so "a stronger later weapon does not
+steal the wield" was testing the defect, not task 186's rule. Both now call `setEquipped` to take
+it in hand, which is what task 186 was always about; the two §186 assertions that read
+`data.equipped` after a loss or a stale load were rewritten to the new invariant.
+
+**Assertions** (13, `suite-inventory`, both directions since they were one path): the measured
+four-line table as live arms — a lone weapon wielded with nothing stored, a better one taking over
+an unchosen slot, a loss falling back, and a better weapon *after* that loss still picked up (the
+half that the write-back's second-order case broke); the sheet flags following the reader; an
+explicit pick surviving a better acquisition; the same four for armour through `armourBonus`/
+`defence()`, plus the lesser piece still honoured when chosen; and the load path both ways —
+unchosen reloads unchosen and keeps following the best piece, a choice reloads as the same choice,
+a pre-186 save still migrates from the flag. Verified as regression tests by reinstating each half
+of the fix alone: the write-back alone fails 10 arms (reporting `wielded=battle-axe combat=8/6`,
+the filed table), and removing the load-path guard alone fails the three reload arms.
+
+## 309. `ROADMAP.md` sizes the map-position work against "the 4,437 section files", the glob count task 270 was filed to stop anyone quoting
+
+**Priority: LOW — one number in a planning document.** Filed because task 270 exists precisely to
+stop it, and because the number is load-bearing for the phase it appears in.
+
+*(Filed 2026-08-26 on reading `ROADMAP.md` after the defect buckets came clear; fixed the same
+day.)*
+
+**The claim.** The Player-position roadmap's "the blocker is data, not code" paragraph reads "the
+4,437 section files have no location attribute", sizing phases 2 and 3 — which must give every
+section a position — against that figure.
+
+**Measured.** `books/**/*.xml` returns **4,437**; the `^\d+[a-z]?$` basenames of the published
+books, which is what `build-data.ps1` bundles and `data.loadBook`/`availableBooks()` can see,
+return **4,369**. The 68-file gap is the 20 superseded `temp/` working copies plus the 48 files
+that are not sections at all (`Adventurers.xml`, `New.xml` and the six pregen biographies, per
+book) — exactly the two inflations `AGENTS.md` names. So the paragraph both overstates the work by
+68 files and counts six pregen biographies per book as sections needing a map position.
+
+**The fix.** `4,369 shipped section files`, which says which set it measured, as task 270 requires
+of any filing that quotes a count.
+
+**Not touched.** The Review log's older passes quote 4,437 as well ("a 4,437-section corpus scan").
+Those are historical records of what a past pass did, not live claims about the corpus, and
+rewriting them would falsify the record rather than correct it.
+
+## 308. `groupPlan.linkedAwards` grants EVERY item-family award sharing the price flag, where the Take path it stands in for grants one
+
+**Priority: LOW — inert in the published edition.** No shipped section has the shape, so this is a
+latent case to close before it ships, not a live defect. Filed the way task 286's census arms were:
+a section arriving in the list wants measuring, not assuming.
+
+*(Filed 2026-08-26 while implementing task 307, which read the same seam from the view side, and
+closed the same day — the fix section records where implementing it moved the line.)*
+
+**The asymmetry.** `renderItemAward` routes a flag-linked award two ways and the two are mutually
+exclusive by construction: `isChooseOne` (two or more linked rewards, at least one of them NOT
+item-family) means one payment must grant only the reward the player picks, and `isPricedItemAward`
+(every linked reward item-family) means arm-then-take. `groupPlan.linkedAwards` makes no such
+distinction — it collects every item-family node carrying the price flag that sits outside the
+group:
+
+```js
+sectionEl.querySelectorAll(`[flag="${k}"]`).forEach((r) => {
+  if (ITEM_FAMILY_TAGS.has(r.tagName.toLowerCase()) && !node.contains(r)) linkedAwards.push(r);
+});
+```
+
+`renderGroup` then grants all of them on one click and consumes the flag once. On a choose-one menu
+that is two wrongs at once: the player is handed the whole item half of a menu he was meant to pick
+one row of, and the non-item rows (a blessing, a resurrection) are left permanently dead, because
+their own Take reads the flag the group just consumed. Task 307's `linked@<flag>` marker inherits
+the same key, so it would then caption both wrongly-granted items as taken — correctly describing
+state that should never have been reached.
+
+**Census (shipped corpus, per task 270).** Every non-roll `<group>` carrying a `price=`, against the
+`[flag=]` rewards outside it: **two sections, one reward each, both item-family** — `book1/342` and
+`book4/111`, the same potion of restoration on the same shape. No group in the published edition
+pays for a menu of any kind, so nothing is mis-granted today and the guard changes no shipped page.
+
+**The fix, and why it is not the one first sketched.** The obvious guard is `isChooseOne` — skip
+the key when the menu is heterogeneous. Implementing it showed that helper is the wrong line to
+draw: `isPricedItemAward` covers a *pure item-family barter* too, and §4.634 is one — three goods
+on one flag, where taking one clears the flag and re-locks the other two. `isChooseOne` is false
+there (no non-item row), so an `isChooseOne` guard would still have let a group hand over all
+three. The invariant is not "is this menu heterogeneous" but **how many rewards the key names**:
+every Take path a payment arms grants ONE reward and consumes the flag, so the group can stand in
+for it only where there is exactly one to stand in for. The shipped guard is
+`linkedRewards(sectionEl, k).length !== 1 → skip`, which subsumes both shapes and reads as what it
+means.
+
+The open question — whether a skipped menu then has any live pick, since the group collapses to a
+button — settles by reading `engine.js`: the group's own `<lose price=>` **arms the flag**
+(`applyEffect`, `state.setFlag(get('price'), true)`), and task 307 established that the branch
+holding the picks is not re-decided mid-visit. So the picks are on the page and armed on the
+redraw, and the player names his own reward. Nothing needed adding for that.
+
+**Assertions.** Three fixtures, since the corpus drives none of it: a group paying a key carrying
+two items plus a blessing plans no linked awards (and `isChooseOne` confirms the fixture is the
+shape claimed); a pure two-item barter likewise (with `isPricedItemAward` confirming it); and a
+lone reward on the key is still planned with a second key beside it, so the guard is narrowing by
+count and not by "is there more than one key". Plus the census as a standing assertion in the task
+286 idiom — exactly `1/342 4/111` pair a group price with an item award outside it, and neither
+names a second reward on that key — so a book conversion that introduces the shape fails here
+rather than shipping it. Verified as regression tests by disabling the guard alone: both
+`task308` fixture arms fail, the census arms do not.
+
+## 307. a `<group>` that pays for a flag-linked award grants it and leaves the award's own Take button on the page, disabled and captioned "Pay first to choose this." — so book1/342 offers to sell you a potion you are already carrying
+
+**Priority: LOW — display only. The grant is correct and the payment is correct;** what is wrong
+is a control that survives the transaction it belongs to and then describes it backwards.
+
+*(Filed 2026-08-26, found while probing an item award for unrelated work.)*
+
+**The shape.** book1/342's alchemist: a pair of guards, a `<group>` that pays, and the reward
+outside it, linked by the payment flag.
+
+```
+<if shards="250"><if item="ink sac">
+  If you pay the money, and have an <b>ink sac</b>
+  (<group><text>cross it off</text>
+     <lose shards="250" price=""/><lose item="ink sac" price="x"/></group>
+  your Adventure Sheet) he will make you a
+  <item name="potion of restoration" flag="x" verb="Drink">…</item>.
+</if></if>
+```
+
+`groupPlan` collects flag-linked item awards rendered OUTSIDE the group (task 125's
+`linkedAwards`) and grants them on the group's click, consuming the flag, because the group is the
+real payment. Its comment says the award's own Take button "vanishes" before it can be clicked —
+the affordability `<if shards="250">` is expected to flip false the moment the money is spent.
+
+**It does not vanish.** The taken branch stays rendered for the rest of the visit — deliberately,
+because that is what keeps the paid group's own `☑` on the page — so the Take is redrawn beside
+it. `classifyRewardNode` sees a `flag=` whose `[price=]` partner exists and returns a gated award;
+the flag has already been consumed, so `flagGate` reports `not yet available` and the button
+renders disabled with `title="Pay first to choose this."`.
+
+**Measured on book1/342**, a Warrior holding an ink sac and 250 Shards, clicked once:
+
+```
+BEFORE:    [ ] ☐ cross it off        [x] Take Potion Of Restoration «Pay first to choose this.»
+AFTER PAY: [x] ☑ cross it off        [x] Take Potion Of Restoration «Pay first to choose this.»
+ITEMS: leather jerkin|battle-axe|map|potion of restoration
+```
+
+The potion is on the sheet and the ink sac and money are gone — the transaction is right in every
+particular. The button beneath it says the player has not paid yet.
+
+**Why it matters more than it looks.** The caption is not merely stale, it is the *inverse* of the
+state: the one thing the player has certainly done is pay. On a page where the group's label is
+generic ("cross it off", "adjust your Adventure Sheet accordingly") the disabled Take is the only
+control naming the reward, so it is the one a player reads to find out whether the deal went
+through.
+
+**The fix.** `renderGroup`'s `linkedAwards` loop already consumes the flag; it now also records the
+grant against that flag in the visit memo (`ctx.applied`, key `linked@<flag>`), and
+`renderChoosableReward` reads it: a granted item-family award renders the `☑ Potion Of Restoration`
+done form every other taken award uses, before the un-armed branch that would have captioned it.
+The award node's own path is not available where the group commits, so the flag is the key — which
+is exact, because the awards `groupPlan.linkedAwards` grants are precisely the item-family nodes
+carrying that flag outside the group. The `ITEM_FAMILY_TAGS` guard on the read keeps a non-item
+sibling sharing the flag (none in the corpus) from being marked taken when it was not granted.
+`rewardLabel`'s item branch is split so the Take prefix and the done tick draw the same display
+string (`itemAwardDisplay`) rather than two spellings of it. Suppressing the node was rejected: the
+reward's name is printed prose on these pages and would disappear from the sentence.
+
+Both stale comments are corrected in place — `groupPlan`'s claim that the Take "vanishes before it
+can be clicked", and the §342 test's copy of the same premise. A conditional branch is not
+re-decided mid-visit, which is the point of the taken branch and is why the button is still there.
+
+**Where it does not reach.** `ctx.applied` is per-visit, so a fresh landing on §1.342 draws the
+offer again — correct, since a player who has bought another ink sac may buy another potion. The
+census behind the flag-keyed marker: exactly two sections in the shipped corpus pair a `<group>`
+with an item-family award linked outside it (§1.342 and §4.111), each with one reward on one flag.
+
+**Where it bites.** Every section pairing a `<group>` with a flag-linked item award outside it, of
+which book1/342 is the corpus's own cited precedent for task 125 (book4/111 is the same potion on
+the same shape). Nothing about the shape is unusual; it is simply that the two mechanisms — a
+group that grants on behalf of a linked award, and a taken branch that stays on the page — were
+built for different reasons and have never been rendered together in a test.
+
+**Assertions.** In `suite-inventory`'s existing §1.342 block, after the group's click: the potion
+is possessed exactly once (already asserted); no enabled control offers it a second time; the
+control naming it reads `☑ …` and is not captioned "Pay first"; and the paid group still shows its
+own `☑` beside it — the last pins the redraw the whole defect depends on, so a future change that
+made the branch vanish would have to say so rather than silently satisfying the caption assertion.
+Verified as a regression test by disabling the writer alone: `FAIL §342 the potion control reads as
+taken, not as unpaid (task 307) :: text=Take Potion Of Restoration title=Pay first to choose this.`
+
+## 306. The fight widget's "Your Defence" row re-derives the score instead of asking the resolver, so a `modifiers="noarmour"` fight shows the armoured number the enemy is not rolling against
+
+**Priority: LOW — display only, and the resolution was always right.** No save is wrong and no
+outcome changes; what changes is whether the player can see why he lost.
+
+*(Filed and closed 2026-08-25, found while probing a fight widget for unrelated work.)*
+
+**Two numbers for one thing.** `combat.js playerDefenceFor` computes the Defence an enemy rolls
+against: a `playerDefence=` override wins outright, else the sheet Defence less the worn armour's
+bonus when `modifiers="noarmour"`, plus the section's `<tick special="defence">` boon and the
+fight's own Defence-through-Faith raise. `render-combat.js playerStatsRow` computed its own —
+`state.defence() + fightDefenceBonus() + defenceBonus` — which has the two section/fight bonuses
+and **neither fight-local term**.
+
+**Measured, on shipped pages.** book5/689 (the Water Drake, the corpus's one
+`modifiers="noarmour"` fight) with a +5 armour: the row prints **Your Defence 12** and the log
+line beneath it prints **vs your Def 7**. The two `playerDefence=` fights, book6/473 and
+book6/718, have the same shape — the row shows the sheet score while the enemy rolls against the
+override, and there the gap can run either way.
+
+**The row's own comment names the invariant it was breaking.** It says the transient bonuses are
+folded in "so the shown values match what resolution uses". They were, and the fight-local terms
+were not — because the row re-implements the sum rather than calling it. A view that re-computes
+what a resolver computes is a lie waiting for the resolver to gain a branch, and this one gained
+two.
+
+**The fix.** `playerDefenceFor` is exported as `playerFightDefence(state, fight)` and
+`playerStatsRow` takes the FIGHT rather than a bonus number, so there is one implementation and
+the row cannot drift again. Both call sites already hold the fight (the group row passes
+`fights[0]`, which may be absent when every member is defeated — a null fight reads as no
+fight-local term, which is the honest answer for a row with no fight left to describe). No rule
+module changes; `combat.js` gains an export and `render-combat.js` loses a computation. This is
+the architecture rule in `AGENTS.md` applied to a number rather than to a decision: the view
+builds DOM, the rule module owns the arithmetic.
+
+**Assertions.** A `modifiers="noarmour"` fight shows the unarmoured Defence and it equals the
+`vs your Def N` the log prints; a `playerDefence="7"` fight shows 7 where the sheet says
+otherwise, and again matches the log; an ordinary fight is unchanged, armour included. The log is
+the independent witness in each case, since it is printed by the resolver and not by the row.
+
+## 305. a `<tick god=>` shares `readEffects` with the afflictions, so it accepts `ability="defence"` (task 304) and `ability="stamina"` (task 185) — and `data.effects` is read only by the core-ability paths, so both parse, store and move nothing
+
+**Priority: LOW — no corpus site either way.** Filed as a hole task 304 *opened*; implementing it
+found the `stamina` half, which has been live since task 185 and is nobody's regression.
+
+*(Filed 2026-08-25 while implementing task 304. Widened and closed the same day — the heading and
+the census below are the corrected ones; the original filing named `defence` only.)*
+
+**One function serves two callers.** `engine.js readEffects` is called from `applyAffliction`
+(a `<curse>`/`<disease>`/`<poison>` body) and from `applyTick`'s `<tick god="…">` branch, and
+both filter their `ability=` through `afflictionAbility`. Task 304 added `defence` to that filter
+so §5.638's curse would stop being discarded at parse time. The affliction side then reads it —
+`state.js defenceForMode` sums `afflictionBonus('defence')`. The god side does not: `setGod`
+pushes its effects into `data.effects` tagged `source: 'god:<name>'`, and `defence()` sums
+`itemBonus`/`auraBonus`/`armourBonus`/`afflictionBonus` but **never `effectBonus`** for Defence.
+So `<tick god="Nagil"><effect ability="defence" bonus="2"/></tick>` would now validate, parse,
+store, display nothing and change nothing.
+
+**It was two words, not one — and the second is older than the task.** `afflictionAbility` admits
+`stamina` as well, and has since task 185. `effectiveStaminaMax()` reads
+`afflictionStaminaMod() + auraBonus('stamina')` and **never `effectBonus`**, so a
+`<tick god="X"><effect ability="stamina" bonus="5"/></tick>` has always parsed, stored and moved
+nothing. `effectBonus` has exactly one writer (`setGod`) and had two readers (`ability`,
+`abilityNoWeapon`) — both core-ability paths — so *every* non-core word the parser accepts on the
+god path was dead, not just the one 304 added.
+
+**Census: zero, both words.** Books 1-6 hold two `<tick god=>` sites carrying an `<effect>`
+(§1.437, §2.334 — Sig's initiate `+1 THIEVERY`), and both name a core ability that has always
+worked. None names `defence` or `stamina`. And the spec settles the shape question: `<effect>` is
+defined there as "an effect of an item or curse", so the god-effect form is port-local
+(task 59) and the spec neither blesses nor restricts which abilities it may name.
+
+**Closed by widening the engine, per the choice made 2026-08-25.** The alternative on the table
+was task 301's rule — *where the engine has no branch for a value, the gate must reject it* — with
+`validate-source.ps1` refusing `<effect ability="defence|stamina">` under a `<tick|gain god=>`. It
+was rejected because it removes a capability with no workaround for a shape the spec does not
+restrict, and because widening is where 301→302 already pointed: rejecting first and widening later
+is two changes where one does.
+
+**The fix.** `defenceForMode` gains `+ this.effectBonus('defence')` and `effectiveStaminaMax()`
+gains `+ this.effectBonus('stamina')`, both guarded like the aura term. Two consequences have to
+travel with them or the fix is worse than the hole:
+- **`sanitizeData`'s Stamina ceiling recomputes `effectiveStaminaMax` by hand** and must gain the
+  god term too, or a god-raised save is clamped back down on every load. That means moving the
+  `out.effects` sanitize above the clamp, since the clamp now reads it.
+- **`removeGod` must cap current Stamina to the new ceiling**, the way `reconcileEquipment` does
+  when a Stamina-raising aura item is dropped. Renouncing used to strip a number nothing read.
+
+**Assertions.** A god granting Defence moves `defence()` by exactly 2 and back to 0 on
+renunciation, is kept by `noarmour` and stripped by `natural`; one granting COMBAT still moves
+Defence once, not twice; a god granting Stamina raises the effective maximum, survives a
+save/load round-trip un-clamped, and takes current Stamina down with it when renounced; and
+§1.437's shipped Sig grant still reaches THIEVERY and nothing else.
+
+---
+
+## 318. Re-archive completed task details 275–317 and clear them out of the priority buckets — LOW (process/docs)
+
+*(Filed 2026-08-31; recurring maintenance after tasks 141, 165, 211, 255 and 274.)* Task 274
+archived completed details 1–274, but the 275–317 burn-down has since completed every detailed task
+again. Their checked rows fill the HIGH/MEDIUM/LOW work queues while ~2,810 lines of completed
+detail sit between the checklist and the Review log, so TASKS.md is back to 5,911 lines — nearly
+four times the 1,556 task 274 left it at — and the "first open task" workflow is harder to scan.
+
+Move completed detail sections 275–317 into TASKS-archive.md under their stable IDs, consolidate
+their summary rows into the single numeric **Done** list, and leave only open-task detail plus the
+Review log in TASKS.md. Extend the archive intro/Contents range without losing completion notes or
+historical review text. Documentation-only; validate every checklist ID has exactly one detail
+heading across the two files, then commit.
+
+**Note for the pass: the drift runs one way this time.** Of the 25 checked bucket rows (293–317),
+**none** is listed under **Done**, which ends at 292 — so the set-union merge task 274 needed finds
+zero overlap and the whole job is a numeric insert. Do the bulk move by line-slice with boundary
+assertions, as tasks 255 and 274 did — the first moved line is `## 275.`, the last is the closing
+`---`, and the next surviving line is the archive-range note.
+
+*Done 2026-08-31:* documentation-only re-archive, scope 275–317 as filed plus this task's own
+detail (318), matching how tasks 165, 211, 255 and 274 archived themselves. Moved every detail
+section 275–318 verbatim (completion notes intact, headings unchanged) into TASKS-archive.md,
+extended the archive intro/Contents to IDs 1–318, and merged the 25 bucket rows into the **Done**
+checklist in numeric order. The **HIGH**/**MEDIUM**/**LOW** headings stay in place, each carrying
+the `*(none open — file new … work here)*` placeholder, so new work is still filed under an
+existing bucket. TASKS.md keeps the intro, those three headings, the full **Done** checklist, the
+archive-range note (now 1–318) and the Review log, dropping from **5,911 to 3,107 lines**; the
+archive grows from 11,437 to 14,359.
+
+Three things worth carrying forward. **Closing a task writes its bucket row and never touches
+**Done**, so between re-archive passes the two lists diverge in whichever direction the pass
+happens to leave them.** Task 274 found both directions at once (4 rows duplicated, 3 bucket-only);
+this pass found the second direction alone, at its full extent — all 25 closed tasks sat in a
+bucket and not one had reached **Done**. The set-union merge is still the right shape because it is
+safe against either, but the standing lesson is simpler: **the numeric list is only ever written by
+a re-archive pass**, so its length is a measure of when the last one ran and not of what is done.
+
+**The intro's status sentence was stale by five tasks, and it is the first thing a reader checks.**
+It read "Every filed task through 312 is complete … **313 and 314 are open**" with 313–317 all
+closed, because that sentence is maintained by this pass and by nothing that closes a task. Between
+passes, read it as a claim to verify against the checkboxes, not as a fact. Fixed here, and the
+**Done** list's own stated invariant ("listed by task number") had one violation for the same
+reason — task 280's row was appended after 281 and 282 had already closed — now sorted, so the two
+files' checklists are both strictly numeric.
+
+**A balanced `git diff --stat` does not prove a bulk move was byte-faithful.** Both files are CRLF
+in the working copy, and MSYS `sed -n` strips the CR, so the 2,814-line block landed LF-only inside
+a CRLF file. The diff read a perfectly balanced 2,814 insertions / 2,814 deletions with no
+line-ending noise at all, because `core.autocrlf=true` normalises both sides to LF in the index —
+the only tells were git's own "LF will be replaced by CRLF" warning and a byte count
+(`d.count(b'
+')` against `d.count(b'
+')`). **Count the terminators, not the diff lines**, on
+any move done with a text-mode tool; the file was renormalised to uniform CRLF before commit.
+Validated afterwards that all 317 checklist IDs (1–318 less 207, withdrawn) have exactly one `##
+<N>.` detail heading across the two files, that the archive's detail IDs are exactly 1–318 with no
+gaps or duplicates, and that no ID appears twice in **Done**. The archive's Contents list carries
+317 rows, not 318: 207 keeps its archived detail but has no checklist row, which is how the
+withdrawal has been recorded since task 211. No code, data, build or test files touched, so no
+rebuild or stamp change is implied.
 
 ---
