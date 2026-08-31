@@ -349,12 +349,21 @@ function Test-AttrValue([string]$tag, [string]$attr, [string]$value) {
     }
     # codeword= is checked by VALUE and not only by name, because a misspelling is invisible
     # everywhere else: the engine cannot tell an unknown codeword from one the player has not
-    # earned, so the <if> it guards just stays shut. Unions split on '|' like an enum, and the
-    # two exemption shapes above are skipped. $FL_CODEWORDS is $null when the authority could
-    # not be read, in which case Test-SourceTree has said so and this stands down rather than
-    # failing all 1,207 sites over a missing .ini. (task 325)
+    # earned, so the <if> it guards just stays shut. The two exemption shapes above are
+    # skipped. $FL_CODEWORDS is $null when the authority could not be read, in which case
+    # Test-SourceTree has said so and this stands down rather than failing all 1,207 sites
+    # over a missing .ini. (task 325)
+    #
+    # The split takes BOTH separators, because codeword= is the one attribute that reads two:
+    # matchCodewords says "comma => AND, pipe => OR", and the <gain>/<tick>/<lose> handlers
+    # split on [|,] alike, so a comma list is a list of NAMES and not a name. Splitting on
+    # '|' alone handed the whole string to the lookup and reported correct markup as
+    # undeclared - which no shipped section trips, because none writes the AND form, and
+    # which is exactly why a gate rejecting valid markup could sit here unread. Every other
+    # list-valued attribute here really does split on '|' alone; do not generalise this to
+    # them. (task 336)
     if ($attr -eq 'codeword' -and $null -ne $script:FL_CODEWORDS) {
-        foreach ($part in ($value -split '\|')) {
+        foreach ($part in ($value -split '[|,]')) {
             $p = $part.Trim()
             if ($p -eq '' -or $p -eq '?' -or $p -eq '*') { continue }
             if ($p -match $script:FL_SCOPED_FLAG) { continue }

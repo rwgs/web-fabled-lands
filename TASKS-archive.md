@@ -15706,3 +15706,72 @@ by `Get-IniMapTitle`, and `Map.Title=` is untouched), and the gate prints one mo
 `node-import.mjs` `pass=35 fail=0`, browser `RESULT ALL PASS pass=3035 fail=0`.
 
 ---
+
+## 336. The codeword value check splits on `|` alone, rejecting the engine's comma AND-form
+
+**Priority: LOW.** Latent: no shipped section writes the form, so the gate is green today. What
+is wrong is that it would reject correct markup — the failure direction that gets a check
+switched off rather than fixed.
+
+### What is wrong
+
+`codeword=` is the one attribute the engine reads with **two** separators. `matchCodewords` in
+`engine.js` says so in its first line of comment and implements it:
+
+```js
+function matchCodewords(spec, has) {
+  // comma => AND, pipe => OR, single => has
+  if (spec.includes(',')) return spec.split(',').every((c) => has(c.trim()));
+```
+
+and the three effect handlers agree — `<lose codeword=>`, `<gain|tick codeword=>` and the
+`<if>`/`<elseif>` reader all split on `[|,]`. So `codeword="Ready,Relic"` is two names and
+`codeword="Ready|Relic"` is two names; only the boolean joining them differs.
+
+Task 325's value check split on `'\|'` alone. A comma list therefore reached the lookup as one
+long string and came back undeclared:
+
+```
+book1/2.xml : <if> codeword="Ready,Relic" is not declared in any book.ini Codewords= list
+```
+
+Two things follow, and the second is the one worth the task. The gate **rejects** valid markup,
+so an author writing the AND form the engine documents gets a build failure naming a `.ini` file
+that has nothing wrong with it. And a misspelling *inside* such a list is reported for the wrong
+reason — the whole string is called undeclared, which happens to be loud, but the check that
+exists to name the offending word never runs.
+
+No section in the six published books writes a comma in `codeword=` (measured: zero across all
+4,369), which is exactly why this could sit in the gate unread since 325.
+
+### Fix
+
+Split on `[|,]`. The comment now says why this one attribute takes both separators, and warns
+against generalising the line: every other list-valued attribute here — `cargo=`, the
+`FL_ENUMS` set — really is `|`-only, and `modifiers=` has its own `[\s,]+` split already.
+
+Nothing else in the branch changes. The scoped-flag exemption pattern (`^\d+[./]\S+$`) contains
+no comma, the `?`/`*` wildcards are unaffected, and `FL_CODEWORD_SEEN`/`_AWARDED` now record
+each name of an AND-list separately, which is the correct bookkeeping for the two notes in step
+5: a codeword tested only inside a comma list is genuinely tested.
+
+### Validation
+
+Two assertions in `validate-selftest.ps1`, one per direction, and both were confirmed to fail
+before the fix (`RESULT FAILURES pass=51 fail=2`) rather than assumed to:
+
+- the AND form of declared codewords is accepted — `<if codeword="Ready,Relic">` plus a
+  `<lose codeword="Rune,&#201;clat"/>` so the `É` escape is exercised through the new split
+  too;
+- a misspelling inside an AND-list is still caught by name — `codeword="Ready,Runes"` must
+  report `Runes`, not the whole string. Without this the fix could have been "accept the
+  separator" and quietly stopped checking the contents, which is the worse of the two
+  failures available.
+
+`validate-selftest.ps1` `RESULT ALL PASS pass=53 fail=0` (51 before). `build-data.ps1` writes no
+generated diff and the corpus reports the same errors and notes as before, since no section
+writes the form. `release-selftest.ps1` `pass=48 fail=0`, `node-import.mjs` `pass=35 fail=0`,
+browser `RESULT ALL PASS pass=3035 fail=0`. `stamp-version.ps1` reports "already at" — `build/`
+is not app source.
+
+---

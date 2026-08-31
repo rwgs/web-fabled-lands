@@ -246,6 +246,14 @@ $CASES = @(
        text  = '<section name="2"><if codeword="Ready|Runes"><p>Marked.</p></if></section>'
        want  = 'codeword="Runes" is not declared' }
 
+    # The comma list is the AND form, and it must be split for the same reason the pipe is -
+    # otherwise the fix for task 336 (accept the separator) would silently stop checking the
+    # names inside it, which is the worse of the two failures it could have.
+    @{ label = 'a misspelled codeword inside a comma AND-list (task 336)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><if codeword="Ready,Runes"><p>Marked.</p></if></section>'
+       want  = 'codeword="Runes" is not declared' }
+
     # A section-scoped flag that lost its separator - book 4 section 345 cleared "4457" where
     # section 457 sets "4.457". This is why the exemption needs the '.' or '/' and not just a
     # leading digit: "4457" would otherwise read as machinery and pass.
@@ -341,6 +349,14 @@ $ok325 = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2">' +
     '<tick codeword="1.10.1" hidden="t"/><lose codeword="5/520"/><set codeword="3.318.sold" value="t"/>' +
     '</section>' }
 Assert 'the codeword shapes the corpus really writes are left alone (task 325)' ($ok325.Errors.Count -eq 0) ($ok325.Errors -join ' | ')
+# The other half of task 336's check: the AND form the engine documents must be legal. Read as
+# one name it lands in the lookup as "Ready,Relic" and reports undeclared, so this assertion
+# fails on the pre-336 split; the negative case above keeps the names inside it checked.
+$ok336 = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2">' +
+    '<if codeword="Ready,Relic"><p>Both held.</p></if>' +
+    '<lose codeword="Rune,&#201;clat"/>' +
+    '</section>' }
+Assert 'a comma AND-list of codewords is accepted, as matchCodewords reads it (task 336)' ($ok336.Errors.Count -eq 0) ($ok336.Errors -join ' | ')
 # ...and with the authority unreadable the check stands down rather than failing every value:
 # one error naming the .ini, and no value errors behind it.
 $novac = Build-Fixture @{ 'books/book1/book.ini' = "Map=Sokara.JPG`nDeath=680`n" }

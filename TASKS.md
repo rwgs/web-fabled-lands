@@ -384,6 +384,27 @@ this order.*
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
 
+Worked 2026-08-31 (tasks 335, 336): filed and closed both. Found during conversion work on an
+unpublished book, which is why neither shows up in a run over the six: **both are ways task
+325's value check rejects markup that is correct**, and the published corpus writes neither
+shape. 335 is the authority being one name short — book 1 prints 36 codewords and declared 35,
+omitting `Auric` — and 336 is the reader being one separator short, `'\|'` where
+`matchCodewords` documents "comma => AND, pipe => OR". The pair is worth reading together
+because the check's own comment already contains the answer to both: it says the lists are
+checked as a **union** rather than per book, because the alphabetical rule says where a
+codeword is *earned* and not where it may be *tested*. A name a volume prints and its own
+sections never use is exactly the case that union exists for, and 335 is that case going
+undeclared for want of anyone reconciling the list against the printed page — the more so
+because the file carried a note claiming two of its entries were unprinted when both are
+printed, which reads as evidence the reconciliation had happened.
+What the pass changes about how this check is trusted: **a green gate over the six books is not
+evidence that the gate accepts the vocabulary the engine implements.** 336's fix is one
+character; finding it needed a comparison of the checker's split against `engine.js`'s, which
+no assertion made until now. Both directions are asserted in `validate-selftest.ps1` (53, from
+51), and the two new assertions were run against the pre-fix split to confirm they fail
+(`pass=51 fail=2`) rather than being assumed to. Nothing else was filed; the remaining
+list-valued attributes were checked and are correctly `|`-only.
+
 Worked 2026-08-31 (task 334): closed **334**, filed nothing. `Invoke-FixtureBuild` captures the
 build's stream 6 into a list rather than discarding it, and prints the captured lines one at a
 time before re-throwing, so the CI log that showed a bare "fix the source XML above" now shows
