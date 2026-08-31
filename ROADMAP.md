@@ -58,7 +58,11 @@ the phase's central claim. A function name costs one search to resolve, survives
 every edit that does not rename it, and fails loudly (no match) rather than
 quietly (a plausible wrong line) when it does go stale. This is the second pass
 this file has needed for rotted figures — task 309 corrected a file count here —
-so the rule is recorded rather than re-derived.
+so the rule is recorded rather than re-derived. **It now lives in `AGENTS.md`**
+("Documentation — cite the function, not the line"), because tasks 322 and 323
+re-derived it for `PLAN.md`, `docs/The-Books.md` and `REVIEW.md` after this file
+had already stated it: a rule kept inside one document only ever gets applied to
+that document (task 323).
 
 ## Phase 1: A pin at the port you are docked at
 

@@ -11,7 +11,7 @@ facts that change how the project is understood to `AGENTS.md` or `SPEC.md`.
 
 ## Problem
 
-The Maps modal (`showMaps`, `web/js/app.js:1152`) shows the six regional maps and the world
+The Maps modal (`showMaps` in `web/js/app.js`) shows the six regional maps and the world
 map as flat images. Nothing on them says where the player is, so the player works out their
 own position from the prose - which the printed books support with a paper map and a finger,
 and this port currently does not support at all.
@@ -21,9 +21,9 @@ hand-drawn label illustrations with no grid or section numbers, none of the 4,36
 section files has a location attribute, and the reference `java-engine/` has no map data
 either.
 
-One positional fact does exist. `state.data.location` is the current dock - declared at
-`web/js/state.js:120` and written by `arriveAtDock` at `web/js/state.js:1118` - covering
-**25 named ports across 97 sections**. This phase spends that and adds nothing to the
+One positional fact does exist. `state.data.location` is the current dock - declared in
+`web/js/state.js`'s starting `data` shape and written by `arriveAtDock` in the same file -
+covering **25 named ports across 97 sections**. This phase spends that and adds nothing to the
 corpus; roadmap phases 2 and 3 build the datasets that do not exist yet.
 
 ## Constraints discovered
@@ -37,12 +37,13 @@ currently prints, which is what task 320 is filed to fix.
   misses those three. Confirmed by grep over the shipped corpus.
 - **25 unique dock names**, which is the whole gazetteer phase 1 has to supply.
 - **The Maps modal is reachable before any book is loaded** - the title-screen Maps button
-  at `web/js/app.js:250`. Coordinates must therefore ride in `meta.json`, the payload that is
-  always present, and **not** in a per-book JSON.
-- **`.map-img` is `max-height: 62vh` with automatic width** (`web/css/style.css:507`), so the
-  rendered image box changes size with the viewport. Percentage offsets have to resolve
-  against the image, not against `.map-view`, which is a plain `text-align: center` wrapper
-  (`style.css:506`).
+  (`bMap` in `web/js/app.js`, whose handler calls `showMaps(null)`). Coordinates must
+  therefore ride in `meta.json`, the payload that is always present, and **not** in a
+  per-book JSON.
+- **`.map-img` is `max-height: 62vh` with automatic width** (the `.map-img` rule in
+  `web/css/style.css`), so the rendered image box changes size with the viewport. Percentage
+  offsets have to resolve against the image, not against `.map-view`, whose rule in the same
+  file makes it a plain `text-align: center` wrapper.
 - **`data.location` is `null` inland and at sea**, which is most of the game.
 - **`book.ini`'s `Map=` is not a precedent for a build-read key.** It sits in each book folder
   and declares `Map=`, but that key is inert - the build picks each regional map by the

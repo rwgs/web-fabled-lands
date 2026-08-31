@@ -333,6 +333,41 @@ this all caused, incidentally, was never git's staging path normalising — it w
 **editing tool writing LF into a CRLF worktree file**, after which git stored LF
 against a CRLF parent and every line read as changed.
 
+## Documentation — cite the function, not the line
+**A code reference you write in a document names the function, selector, key or
+attribute and links the file** — `showMaps` in `app.js`, the `.map-img` rule in
+`style.css`, `<tick special="lock">` in `books/book1/91.xml` — with **no `file:line` or
+`#L` anchor**. A line number is stale the moment anything above it is edited, and it rots
+*invisibly*: nothing in the build or the suite re-checks a number in prose, so it keeps
+reading as verified evidence long after it points at unrelated code. A symbol name costs
+one search to resolve, survives every edit that does not rename it, and fails **loudly**
+(no match) rather than quietly (a plausible wrong line).
+
+This binds the **living** documents — `ROADMAP.md`, `PLAN.md`, `REVIEW.md`, `README.md`,
+`SPEC.md`, `DECISIONS.md`, `docs/`, and an open task's steps in `TASKS.md`. It is **not**
+retroactive over the dated records: `TASKS-archive.md` and the review logs hold hundreds
+of line citations that were correct when written, and rewriting a record of what a pass
+found is worse than leaving a number that is legibly historical. Nor does it forbid
+quoting a *broken* citation as evidence — the passes below all do, and `ROADMAP.md`'s
+copy of this rule does too. Cite live code by name; quote a rotted number only to show
+that it rotted.
+
+Three passes re-derived this rule before it was written down here, which is why it now
+lives in `AGENTS.md` rather than inside one document: task 320 (`ROADMAP.md` — one
+citation had drifted onto `showRules` and another onto an affliction's Stamina cap, both
+offered as proof of that phase's central claim), task 322 (the same sweep problem across
+`PLAN.md` and `docs/The-Books.md`) and task 323 (`REVIEW.md` — every one of its four code
+line numbers had drifted; one resolved to `export function keepSheetFocus` and was
+offered *twice* as evidence for a defect task 65 had already fixed, in a function that
+had since moved from `app.js` to `ui.js`).
+
+Two habits follow from it. **Fix the claim everywhere it appears, not only in the
+document the task names** — each of the three passes above found a sibling document still
+repeating a claim retired weeks earlier, and found it only because an unrelated `grep`
+happened to run. And in a **dated record** such as `REVIEW.md`'s findings or `TASKS.md`'s
+review log, note the later fix rather than deleting the finding: the honest form of a
+review record is what was true then plus what happened since.
+
 ## Task workflow
 The backlog is `TASKS.md`. Open items are `- [ ]`, done items `- [x]` (a summary
 checklist is at the top of the file; the detail for each is in the sections below).

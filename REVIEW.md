@@ -5,60 +5,97 @@ static rules rendering, player-facing flows, and the existing browser test setup
 The working tree was clean at the start of the review. No critical or high-severity
 defects were found.
 
+**Status as of 2026-08-31: every finding below is closed.** This is a dated review
+record, so the findings are kept as written and each carries a `Resolved` note
+naming the task that fixed it and where the fixed code lives now. Nothing here
+describes a live defect. Citations name the function, selector or key rather than a
+line number, per the rule `ROADMAP.md` states and `AGENTS.md` now carries. Task 323
+was filed against the four line numbers inside the New Findings — one of them
+offered twice as evidence for a finding already fixed — but this file held **20
+distinct ones in 22 citations**, counting the audit log and one bare `` `:775` ``
+continuation, and nearly all had drifted onto unrelated code: `render.js:2568` past
+the end of a 2,124-line file, `sw.js:42` onto a generated-block marker,
+`README.md:226` onto the build-stamp documentation three sections from the
+illustration text it was cited for. All of them are converted.
+
 ## New Findings
 
 ### Medium — asset-only releases remain stale in installed PWAs
 
-`build/stamp-version.ps1:32`–`build/stamp-version.ps1:37` derives the cache
-version from JavaScript, CSS, JSON, HTML, and the manifest, but excludes
-`web/assets/`. Asset changes are valid build outputs: `build/build-data.ps1:208`,
-`build/build-data.ps1:223`, and `build/build-data.ps1:242` copy maps and
-illustrations there. The service worker precaches maps (`web/sw.js:42`) and uses
-cache-first responses (`web/sw.js:89`), so an icon, map, or illustration changed
+`build/stamp-version.ps1`'s `$files` digest input set collects JavaScript, CSS,
+JSON, HTML, and the manifest, but excludes `web/assets/`. Asset changes are valid
+build outputs: `build-data.ps1`'s "Copy the world map", "Copy per-book regional
+maps" and "Copy per-book section illustrations" passes all write there. The service
+worker precaches maps (`BOOK_MAPS`, in `sw.js`'s `OPTIONAL` list) and answers from
+cache first (its `fetch` listener), so an icon, map, or illustration changed
 without a code/data change is never refreshed for existing installs.
 
 Include deployable assets in the build stamp or publish them with revisioned
 filenames. Do not hash the generated `sw.js` itself, as that would make the cache
 version circular. Recorded as task 64.
 
+**Resolved by task 64.** `stamp-version.ps1` now folds `web/assets` (recursive,
+`-File`) into `$files`, so any asset change moves the stamp and therefore the
+service-worker cache key. `sw.js` stayed out of `web/assets/` and so stays
+non-circular, and the three section illustrations were added to `OPTIONAL`.
+
 ### Low — the rules modal creates invalid table structure
 
-`renderStatic` first renders all `h1`–`h6` elements as headings
-(`web/js/app.js:775`), making its later identical condition that creates a
-`<th>` unreachable (`web/js/app.js:781`). `rules/QuickRules.xml:3` places an
-`<h3>` inside a `<tr>`, so the browser receives a heading element directly in a
-table row rather than a header cell. This loses table semantics and can produce
-inconsistent layout/accessibility.
+`renderStatic` first renders all `h1`–`h6` elements as headings, making its later
+identical condition that creates a `<th>` unreachable. `rules/QuickRules.xml`
+places an `<h3>` inside a `<tr>` (its first table row), so the browser receives a
+heading element directly in a table row rather than a header cell. This loses table
+semantics and can produce inconsistent layout/accessibility.
 
 Render headings inside table rows as `<th>` cells (with a suitable `colspan`)
 and retain regular headings only outside tables. Add a focused DOM test. Recorded
 as task 65.
 
+**Resolved by task 65.** `renderStatic`'s `h1`–`h6` branch now tests
+`parent.tagName === 'TR'` *first* and emits a `<th>` spanning the table's widest
+row, falling through to a real heading outside a table. The function also no longer
+lives in `app.js`: it moved to `ui.js`, which is where the fixed branch and its
+task-65 comment are. `app.js` keeps a comment recording the move.
+
 ## Confirmed Backlog
 
-- **TTS skips bare story prose.** `web/js/tts.js:56` wraps only paragraphs, but
-  sections such as `books/book4/16.xml:3` and `books/book2/745.xml:3` use bare
+All five were open when this review ran and all five are now done.
+
+- **TTS skips bare story prose.** `tts.js`'s `prepare` wraps only paragraphs, but
+  sections such as `books/book4/16` and `books/book2/745` use bare
   text nodes. Narration has no chunks for those sections. Complete task 33.
+  **Done (33):** `prepare` now also calls `wrapFlowRuns` over the top-level runs.
 - **Some game rules still live in the renderer/app layer.** This makes direct
   unit testing harder and breaks the project's stated DOM-free engine boundary.
-  Complete task 34.
-- **iOS installed icons are unreliable.** `web/index.html:11` references an SVG
-  apple-touch icon; supply a PNG icon and precache it as task 35 specifies.
-- **Locked caches can still be edited.** The buttons rendered in
-  `web/js/render.js:2568` onward do not consult the state lock used by the
-  gambling flow in `books/book1/91.xml:7`. Complete task 38.
-- **The vampire can be fought armed.** In `books/book2/462.xml:4` equipment is
-  confiscated, but the live `dead="f"` condition can return it before the fight
-  resolves (`books/book2/462.xml:11`). Complete task 39.
+  Complete task 34. **Done (34)**, and extended by task 119's split of the
+  renderer into `render-rules.js` / `render-gates.js` / `visit-state.js`.
+- **iOS installed icons are unreliable.** `index.html`'s `apple-touch-icon` link
+  references an SVG; supply a PNG icon and precache it as task 35 specifies.
+  **Done (35):** that link now points at `assets/apple-touch-icon.png`.
+- **Locked caches can still be edited.** The money-cache buttons do not consult
+  the state lock used by the gambling flow in `books/book1/91` (its
+  `<tick special="lock" cache="1.91">`). Complete task 38. **Done (38):**
+  `renderMoneyCache` in `render-market.js` disables the input and both buttons
+  when `ctx.rollLockCaches` holds the cache and `state.isCacheLocked` is true.
+- **The vampire can be fought armed.** In `books/book2/462` equipment is
+  confiscated by two `<transfer … to="2.462">` nodes, but the live `dead="f"`
+  condition can return it (`<transfer item="*" from="2.462">`) before the fight
+  resolves. Complete task 39. **Done (39):** the return is deferred until the
+  fight resolves.
 
 ## Recommendations
+
+Both are done.
 
 - Add a CI job that serves `web/` and requires the existing
   `web/_test.html` every-section smoke suite to pass. The suite is comprehensive,
   but the repository has no checked-in workflow to run it on changes.
-- Align the illustration documentation with the shipped build. `README.md:226`
-  says illustrations are absent, while the build deliberately ships the three
-  referenced illustration assets through `build/build-data.ps1:242`.
+  **Done (66):** `.github/workflows/smoke.yml`.
+- Align the illustration documentation with the shipped build. `README.md`'s
+  illustrations section said illustrations are absent, while the build deliberately
+  ships the three referenced illustration assets through `build-data.ps1`'s "Copy
+  per-book section illustrations" pass. **Done (67):** that section now describes
+  the three shipped illustrations.
 
 ## Validation
 
@@ -139,8 +176,9 @@ arm/consume/re-arm cycle.
 Reviewed 2026-07-09: the external review in `REVIEW.md` was verified against the
 code — its two new findings were already filed as tasks **64**/**65** (both
 premises re-confirmed: the stamp hashes js/css/json/html/manifest but not
-`web/assets/`; `renderStatic`'s `<th>` branch at `app.js:781` is shadowed by the
-identical heading test at `:775`), and its confirmed-backlog items all map to
+`web/assets/`; `renderStatic`'s `<th>` branch is shadowed by the identical
+heading test above it — `renderStatic` was in `app.js` at the time of this pass
+and is in `ui.js` now), and its confirmed-backlog items all map to
 the open tasks 33/34/35/38/39. Its two unrecorded recommendations are now filed
 as tasks **66** (CI smoke-suite workflow — no `.github/` exists) and **67**
 (README says section illustrations are absent, but the build ships the three

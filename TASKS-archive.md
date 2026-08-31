@@ -332,6 +332,7 @@ The completed tasks archived in this file (stable IDs 1–325). Detail sections 
 - [x] 321. The two task files are the repo's only CRLF blobs, so a tool edit rewrites them whole
 - [x] 322. `book.ini` is read by nothing, so its `Map=` key reads as live configuration while the build ignores it
 - [x] 325. The gate validates codeword attribute *names* but never codeword *values*, so a typo'd codeword fails silently in play
+- [x] 323. `REVIEW.md`/`PLAN.md` cite source by line, and all four of `REVIEW.md`'s had drifted onto unrelated code
 
 ---
 
@@ -14789,5 +14790,81 @@ headless suite to `RESULT ALL PASS`. Confirm the gate actually bites by misspell
 codeword in a scratch copy and watching the build fail with that file named; a check this
 class can pass vacuously if the list parse yields an empty set, so also assert a non-empty
 list per book.
+
+---
+
+## 323. `REVIEW.md` and `PLAN.md` still cite source by line number, and `REVIEW.md`'s have drifted onto unrelated code
+
+**Priority: LOW.** Documentation accuracy. Nothing ships wrong, but one of the stale
+citations is offered twice as *evidence for a finding*, and the finding it supports was
+fixed two hundred tasks ago.
+
+### What is wrong
+
+Task 320 answered its own step 4 with a rule — **cite the function, not the line** — and
+stripped every `#L` anchor out of `ROADMAP.md`, including one that was still correct, on the
+grounds that "a rule that only applies to the citations already broken does not survive the
+next edit". That pass changed `ROADMAP.md` only. Two sibling planning documents still carry
+the banned form, and they are in opposite states:
+
+**`REVIEW.md` — four citations, all drifted.** The Low finding "the rules modal creates
+invalid table structure" cites `renderStatic` at `web/js/app.js:775` and `:781`:
+
+| Cited as | What is actually there now |
+|---|---|
+| `app.js:775` — "renders all `h1`–`h6` as headings" | `if (pane) (pane.querySelector('.sheet-close') \|\| pane).focus();` |
+| `app.js:781` — "the later identical condition that creates a `<th>`" | `export function keepSheetFocus(pane, rerender) {` |
+| `render.js:2568` — "the buttons rendered … onward" | a blank line |
+
+`renderStatic` is **not in `app.js` at all** any more — it moved to `ui.js`, and `app.js:1225`
+carries a comment saying so ("The rules formatter renderStatic now lives in ui.js"). Worse,
+**the defect itself was fixed**: `ui.js:415-423` tests `parent.tagName === 'TR'` *first* and
+emits a spanning `<th>`, with a comment crediting **task 65** — the very task `REVIEW.md`
+line 142 names while re-confirming the premise. So the document asserts a live defect, at
+a location in the wrong file, for code that already handles the case.
+
+**`PLAN.md` — six citations, all currently exact** (`app.js:1152` is `showMaps`,
+`app.js:250` the Maps button, `state.js:120` the `location` field, `state.js:1118`
+`arriveAtDock`, `style.css:506`/`:507` the map CSS). Nothing to correct; they are simply the
+fragile form, and they are fragile in the same file whose `book.ini` claim task 322 had to
+fix for the same underlying reason.
+
+### Why it matters
+
+This is the third pass in a row to land on the same class (320 on `ROADMAP.md`, 322 on
+`book.ini` plus `PLAN.md` and `docs/The-Books.md`, this one on `REVIEW.md`), and the pattern
+across them is consistent: a correction is applied to the document that the task happened to
+name, while the sibling documents repeating the same claim are never swept. 322 found
+`PLAN.md` and `docs/The-Books.md` still carrying the `Map=` precedent four weeks after 320
+retired it in `ROADMAP.md`, and found them only because a `grep` for `book.ini` happened to
+run.
+
+A drifted line number is the failure mode 320 described exactly: it "fails quietly by
+pointing at plausible wrong code". `app.js:781` resolving to `export function
+keepSheetFocus` looks like a real citation to anyone not opening the file.
+
+### Steps
+
+1. In `REVIEW.md`, correct the rules-modal finding: the citations move to `renderStatic` in
+   `ui.js`, and the finding is **resolved by task 65**, not open. Mark it as such rather than
+   deleting it — the document is a dated review record, so the honest form is to note what
+   the later fix was, the way its own line 142 already notes premises being re-confirmed.
+   Check the remaining `REVIEW.md` citations while there (`render.js:2568`,
+   `books/book1/91.xml:7`, `books/book2/462.xml:4`, `rules/QuickRules.xml:3`) — the first is
+   already a blank line, and the XML ones are untested.
+2. Replace every `#L`-style line citation in `REVIEW.md` and `PLAN.md` with the function,
+   selector or key name, per the rule `ROADMAP.md` now states. `PLAN.md`'s six are correct
+   today, so this is form not content — do it anyway, for the reason 320 gave.
+3. Consider whether the rule belongs in `AGENTS.md` rather than only inside `ROADMAP.md`,
+   since it has now been re-derived by three separate passes and applies to every document
+   in the repo. That is the cheap structural fix for the sweep problem; a checker is not
+   worth building for eleven citations.
+
+### Validation
+
+Documentation only: no rebuild, no suite run, and no generated output may change
+(`git status` should show only `.md` files, and `stamp-version.ps1` should report "already
+at" its current stamp). Verify each replaced citation by opening the named symbol — a
+function name that does not exist fails loudly, which is the whole point of the change.
 
 ---

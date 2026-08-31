@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-322 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log), and **325** is complete out of order; **323,
-324 and 326 (all LOW) are open**. File new
+323 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log), and **325** is complete out of order; **324,
+326, 327, 328 and 329 (all LOW) are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -25,11 +25,11 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 323. `REVIEW.md` cites `renderStatic` at `app.js:775`/`:781` for a defect that task 65 already fixed and a function that has since moved to `ui.js` — the same fragile-citation class task 320 fixed in `ROADMAP.md` only, leaving `PLAN.md`'s six `#L` citations (all still exact) and `REVIEW.md`'s four (all drifted) carrying the form that pass banned
 - [ ] 324. the Maps modal captions every regional map with the **book** title from `books.ini` (book 3's map reads "Over the Blood-Dark Sea") when `book.ini` holds a `Map.Title` written for the map itself ("The Ports & Anchorages of the Violet Ocean") — a better caption for all six, sitting unread in the tree
 - [ ] 326. task **207** is missing from **both** indexes — no `- [x] 207.` line in this file's Done checklist and no entry in `TASKS-archive.md`'s Contents — so a completed task exists only as an orphan `## 207.` detail section, breaking the stated invariant that "the checklist above still carries every task's stable ID and status"
 - [ ] 327. task 325's unused-codeword note counts a `<lose>` or an `<if>` as "used", so the case it exists to surface — a codeword the port never **awards** — is not reported: book 2's `Beach` and `Bilge` are tested and swept but reachable by no `<gain>`/`<tick>`, which is exactly what that book's `# Unnecessary codewords: Bait,Beach,Bilge` comment records, and the third name is masked by a no-op `<tick>`
 - [ ] 328. two sections carry a `<tick codeword="X"/><lose codeword="X"/>` no-op pair (book 2 sections 579 and 633), and one of them invents a codeword — `Bogus` — that exists nowhere else in the corpus and in no `Codewords=` list, so task 325 had to add it to the gate's port-flag allowlist to keep the build green: an allowlist entry whose only job is to keep scaffolding alive
+- [ ] 329. `PLAN.md`'s status header says "the backlog carries one open item (task 320)" and dates itself today, but 320 is closed and the backlog carries four — a stale *status* rather than a stale citation, in the file task 323 had just swept for citations, and a count `PLAN.md` cannot help rotting because it restates a figure another file owns
 
 **Done**
 
@@ -361,82 +361,7 @@ this order.*
 - [x] 321. `TASKS.md` and `TASKS-archive.md` were the only two tracked blobs that were not LF — but not for the reason filed: git never normalised them, it PRESERVED their CRLF, and the 6,348-line diff came from an editing tool writing LF into a CRLF worktree file. Two distinct causes: one lone CR in task 319's own write-up made the archive binary, and a text file whose index blob already holds CRLF keeps CRLF on every later staging
 - [x] 322. every book's `book.ini` is read by **nothing** — no script under `build/` opens it — so its `Map=` key reads as the live declaration of which image is that book's map while the build actually selects by the `-Map$` basename pattern, and book 3 proves it inert: `Map=Violet Ocean.JPG` names a file that does not exist, yet `VioletOcean-Map.JPG` ships correctly as `book3.jpg`
 - [x] 325. `validate-source.ps1` validates codeword **attribute names** but never codeword **values**, so a typo'd `<gain codeword="Anchr">` passes the gate and silently never matches its `<if codeword="Anchor">` — the player just cannot progress, and `book.ini`'s `Codewords=` already holds the authoritative per-book list to check against
-
----
-
-## 323. `REVIEW.md` and `PLAN.md` still cite source by line number, and `REVIEW.md`'s have drifted onto unrelated code
-
-**Priority: LOW.** Documentation accuracy. Nothing ships wrong, but one of the stale
-citations is offered twice as *evidence for a finding*, and the finding it supports was
-fixed two hundred tasks ago.
-
-### What is wrong
-
-Task 320 answered its own step 4 with a rule — **cite the function, not the line** — and
-stripped every `#L` anchor out of `ROADMAP.md`, including one that was still correct, on the
-grounds that "a rule that only applies to the citations already broken does not survive the
-next edit". That pass changed `ROADMAP.md` only. Two sibling planning documents still carry
-the banned form, and they are in opposite states:
-
-**`REVIEW.md` — four citations, all drifted.** The Low finding "the rules modal creates
-invalid table structure" cites `renderStatic` at `web/js/app.js:775` and `:781`:
-
-| Cited as | What is actually there now |
-|---|---|
-| `app.js:775` — "renders all `h1`–`h6` as headings" | `if (pane) (pane.querySelector('.sheet-close') \|\| pane).focus();` |
-| `app.js:781` — "the later identical condition that creates a `<th>`" | `export function keepSheetFocus(pane, rerender) {` |
-| `render.js:2568` — "the buttons rendered … onward" | a blank line |
-
-`renderStatic` is **not in `app.js` at all** any more — it moved to `ui.js`, and `app.js:1225`
-carries a comment saying so ("The rules formatter renderStatic now lives in ui.js"). Worse,
-**the defect itself was fixed**: `ui.js:415-423` tests `parent.tagName === 'TR'` *first* and
-emits a spanning `<th>`, with a comment crediting **task 65** — the very task `REVIEW.md`
-line 142 names while re-confirming the premise. So the document asserts a live defect, at
-a location in the wrong file, for code that already handles the case.
-
-**`PLAN.md` — six citations, all currently exact** (`app.js:1152` is `showMaps`,
-`app.js:250` the Maps button, `state.js:120` the `location` field, `state.js:1118`
-`arriveAtDock`, `style.css:506`/`:507` the map CSS). Nothing to correct; they are simply the
-fragile form, and they are fragile in the same file whose `book.ini` claim task 322 had to
-fix for the same underlying reason.
-
-### Why it matters
-
-This is the third pass in a row to land on the same class (320 on `ROADMAP.md`, 322 on
-`book.ini` plus `PLAN.md` and `docs/The-Books.md`, this one on `REVIEW.md`), and the pattern
-across them is consistent: a correction is applied to the document that the task happened to
-name, while the sibling documents repeating the same claim are never swept. 322 found
-`PLAN.md` and `docs/The-Books.md` still carrying the `Map=` precedent four weeks after 320
-retired it in `ROADMAP.md`, and found them only because a `grep` for `book.ini` happened to
-run.
-
-A drifted line number is the failure mode 320 described exactly: it "fails quietly by
-pointing at plausible wrong code". `app.js:781` resolving to `export function
-keepSheetFocus` looks like a real citation to anyone not opening the file.
-
-### Steps
-
-1. In `REVIEW.md`, correct the rules-modal finding: the citations move to `renderStatic` in
-   `ui.js`, and the finding is **resolved by task 65**, not open. Mark it as such rather than
-   deleting it — the document is a dated review record, so the honest form is to note what
-   the later fix was, the way its own line 142 already notes premises being re-confirmed.
-   Check the remaining `REVIEW.md` citations while there (`render.js:2568`,
-   `books/book1/91.xml:7`, `books/book2/462.xml:4`, `rules/QuickRules.xml:3`) — the first is
-   already a blank line, and the XML ones are untested.
-2. Replace every `#L`-style line citation in `REVIEW.md` and `PLAN.md` with the function,
-   selector or key name, per the rule `ROADMAP.md` now states. `PLAN.md`'s six are correct
-   today, so this is form not content — do it anyway, for the reason 320 gave.
-3. Consider whether the rule belongs in `AGENTS.md` rather than only inside `ROADMAP.md`,
-   since it has now been re-derived by three separate passes and applies to every document
-   in the repo. That is the cheap structural fix for the sweep problem; a checker is not
-   worth building for eleven citations.
-
-### Validation
-
-Documentation only: no rebuild, no suite run, and no generated output may change
-(`git status` should show only `.md` files, and `stamp-version.ps1` should report "already
-at" its current stamp). Verify each replaced citation by opening the named symbol — a
-function name that does not exist fails loudly, which is the whole point of the change.
+- [x] 323. `REVIEW.md` cites `renderStatic` at `app.js:775`/`:781` for a defect that task 65 already fixed and a function that has since moved to `ui.js` — the same fragile-citation class task 320 fixed in `ROADMAP.md` only, leaving `PLAN.md`'s six `#L` citations (all still exact) and `REVIEW.md`'s four (all drifted) carrying the form that pass banned
 
 ---
 
@@ -673,7 +598,58 @@ covers this).
 
 ---
 
-> **Completed task details (tasks 1–325) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 325) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
+## 329. `PLAN.md`'s status header names one open backlog item, and that item is closed
+
+**Priority: LOW.** Documentation accuracy in the same file task 323 just swept, but a
+different failure class — a stale *status*, not a stale citation, so 323 left it alone
+rather than combining tasks.
+
+### What is wrong
+
+`PLAN.md`'s opening paragraph reads:
+
+> **Status: not started.** Nothing is in flight as of 2026-08-31. The backlog carries one
+> open item (task 320, a documentation correction to the very phase planned below) …
+
+Task **320 is done** (it is in this file's Done checklist and its detail is archived), and
+the backlog does not carry one open item — it carries **324, 326, 327 and 328**. The "as of
+2026-08-31" date is today's, so the sentence reads freshly verified while both of its facts
+are wrong. `PLAN.md` also still says the next feature is `ROADMAP.md`'s phase 1, which is
+true.
+
+### Why it matters
+
+Same reason 320/322/323 gave for line numbers, one level up: a status line with a date on
+it is read as current, and a reader who trusts "one open item" skips the backlog. Unlike a
+citation, no `grep` for a symbol will ever catch it — the only check is comparing the
+sentence against `TASKS.md`.
+
+It is also structural rather than a one-off. `PLAN.md` says of itself that it is "replaced
+when the next non-trivial change begins", so a count of open backlog items inside it is
+guaranteed to rot between replacements. The cheap fix is to not state a derivable figure
+there at all — the same test `AGENTS.md` applies to a live `.ini` key (does it hold
+something you cannot derive?), applied to prose.
+
+### Steps
+
+1. Correct the paragraph: drop the open-item count and the task-320 reference, keeping the
+   "not started / next feature is phase 1" substance, which is what the section is for.
+   Point at `TASKS.md` for the backlog state instead of restating it.
+2. Check the sibling planning documents for the same shape — a dated status sentence that
+   restates a count owned by another file — since the sweep problem `AGENTS.md` now records
+   is exactly what let this survive 323.
+3. If `AGENTS.md`'s new citation rule should also cover derivable figures, say so there in
+   one sentence rather than filing a fourth pass on the same class.
+
+### Validation
+
+Documentation only: `git status` shows only `.md` files and `stamp-version.ps1` reports
+"already at" its current stamp. Verify by reading the corrected paragraph against
+`TASKS.md`'s open `- [ ]` lines — they must agree, or the paragraph must not claim to know.
+
+---
+
+> **Completed task details (tasks 1–325) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 325) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -682,6 +658,51 @@ covers this).
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (task 323): every code line citation is gone from `REVIEW.md` and
+`PLAN.md`, replaced by the function, selector or key. Documentation only — `git status`
+shows `.md` files alone and `stamp-version.ps1` reports "already at
+26.08.31.6415baf" — so no rebuild and no suite run, per the task's own validation. All
+**27** replacement symbols were checked to resolve against the tree. Filed **329**.
+
+**The filing undercounted `REVIEW.md` five-fold, and the four it named were the least of
+them.** 323 was filed as "`REVIEW.md`'s four (all drifted)", counting only the citations
+inside the two New Findings. The file carried **20 distinct line numbers across 22
+citations** — `grep -o` over the whole file, which is the census that matters here — and
+nearly all of the other sixteen had drifted too: `stamp-version.ps1:32`–`:37` now lands
+inside the script's comment block, `sw.js:42` on `// END GENERATED BOOK INVENTORY`,
+`render.js:2568` past the end of a file that is 2,124 lines long, and
+`README.md:226` onto the *stamp* documentation, three
+sections away from the illustration text it was cited for. This is task 270's rule
+arriving in a documentation filing rather than a corpus census: a count has to say which
+set it measured. The four were the ones a reader would notice; the census that matters is
+"every `file:line` in the file", and it takes one `grep`.
+
+**Every finding in `REVIEW.md` is closed, which the document nowhere said.** Checking the
+citations meant resolving each claim, and all of them are fixed: both New Findings (64, 65),
+all five Confirmed Backlog items (33, 34, 35, 38, 39) and both Recommendations (66, 67).
+`index.html`'s apple-touch icon is a PNG, the stamp folds `web/assets` in, `prepare` calls
+`wrapFlowRuns`, `renderMoneyCache` reads `isCacheLocked`. Converting a citation while
+leaving the prose asserting a live defect would have produced something worse than the
+drift — a *correct* pointer to code that contradicts the claim — so each finding now carries
+a dated `Resolved`/`Done` note naming the task and where the fixed code lives. That is a
+scope extension beyond the task's step 1, which named only the rules-modal finding; it is
+the same mechanical operation applied consistently, and step 1's own instruction ("mark it
+as such rather than deleting it — the document is a dated review record") is the rule it
+follows.
+
+**`PLAN.md`'s six were all still exact**, as filed, including the pair that looks swapped:
+`showMaps` really is at `app.js:1152` and the title-screen Maps button at `:250`. (`sed -n
+'1152p;250p'` prints in *file* order regardless of argument order, which briefly read as
+drift.) They were converted anyway, for 320's reason.
+
+**Step 3's rule is now in `AGENTS.md`** ("Documentation — cite the function, not the line"),
+with `ROADMAP.md`'s copy pointing at it. Scoped deliberately: it binds the **living**
+documents and an open task's steps, and is **not** retroactive over `TASKS-archive.md` or
+the review logs, which hold hundreds of citations that were correct when written — rewriting
+a record of what a pass found is worse than a number that is legibly historical. It also
+does not forbid quoting a rotted citation *as* the evidence that it rotted, which this
+entry, the rule itself and `ROADMAP.md` all do.
 
 Worked 2026-08-31 (task 325): the gate now checks codeword **values**, not just the attribute
 name. `validate-source.ps1` parses each `books/book<N>/book.ini`'s `Codewords=` as Java
