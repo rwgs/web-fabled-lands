@@ -29,7 +29,9 @@ function Assert([string]$label, [bool]$cond, [string]$detail) {
 # lives in its own file (as books 1-4 and 6 do) and one with inline prose (as book 5 does).
 $FIXTURE = @{
     'books/book1/1.xml'    = '<section name="1" boxes="2"><p>Start. <goto section="2"/></p><choices><choice section="2">On</choice><choice book="7" section="500">Book 7</choice></choices></section>'
-    'books/book1/2.xml'    = '<section name="2"><tick codeword="Ready" hidden="t"/><difficulty ability="scouting" level="10"/><outcomes><outcome range="1-6" section="1"/></outcomes></section>'
+    # "Ready" is ticked here and "Relic" only swept, which is the pair task 327's second note
+    # turns on: an awarded codeword must stay silent while a tested-or-cleared one is reported.
+    'books/book1/2.xml'    = '<section name="2"><tick codeword="Ready" hidden="t"/><lose codeword="Relic"/><difficulty ability="scouting" level="10"/><outcomes><outcome range="1-6" section="1"/></outcomes></section>'
     'books/book1/2a.xml'   = '<section name="2a"><p>A continuation.</p><return/></section>'
     'books/book1/Adventurers.xml' = '<adventurers><starting><adventurer name="Andriel the Hammer" profession="Warrior" gender="m"/></starting></adventurers>'
     'books/book1/Andriel.xml'     = '<section name="Andriel"><p>A warrior of few words.</p></section>'
@@ -43,8 +45,8 @@ $FIXTURE = @{
     # The codeword authority (task 325). Book 1's list is deliberately written in the awkward
     # shape the real books use - a trailing-backslash continuation and a \uXXXX escape - so a
     # reader that only took the first line, or that compared the escape literally, would fail
-    # the CLEAN fixture below rather than passing quietly. "Relic" is declared and never used,
-    # which is what the Notes channel reports.
+    # the CLEAN fixture below rather than passing quietly. "Rune" and "Eclat" are declared and
+    # never used at all, which is what the Notes channel reports.
     'books/book1/book.ini' = "Map=Sokara.JPG`nDeath=680`nCodewords=Ready,Relic,\`n`tRune,\u00c9clat`n# a trailing comment, as books 1, 2 and 4 carry`n"
     'books/book2/book.ini' = "Map=Golnir.JPG`nDeath=560`nCodewords=Bounty`n"
     'books/book2/1.xml'    = '<section name="1"><trade ship="brig" cargo="timb" buy="10"/><if crew="excellent"><p>Fine crew.</p></if></section>'
@@ -77,16 +79,23 @@ function Build-Fixture([hashtable]$overrides) {
 $clean = Build-Fixture $null
 Assert 'a valid fixture tree reports no errors' ($clean.Errors.Count -eq 0) ($clean.Errors -join ' | ')
 Assert 'every fixture file is actually checked (sections + adventurers + bio + rules)' ($clean.Checked -eq 9) "checked=$($clean.Checked)"
-# The Notes channel: information, never a verdict. Book 1 declares four codewords and its
-# sections use one, book 2 declares one and uses none, so four are reported - and reaching
+# The Notes channel: information, never a verdict. Book 1 declares four codewords - it awards
+# one (Ready), sweeps one without ever awarding it (Relic) and never mentions the other two -
+# and book 2 declares one and uses none, so four are reported across two gradings. Reaching
 # "Rune" at all proves the continuation line was followed, while reaching Eclat proves the
 # \u00c9 escape decoded. Asserting the COUNT is what stops a reader that quietly returned an
 # empty list from passing here: with no codewords parsed there is nothing to call unused.
-# (task 325)
+# (tasks 325, 327)
 Assert 'a codeword declared and never used is a note, not an error (task 325)' ($clean.Notes.Count -eq 4) ($clean.Notes -join ' | ')
 Assert 'the continuation line of a Codewords= list is parsed (task 325)' (@($clean.Notes | Where-Object { $_ -like '*"Rune"*' }).Count -eq 1) ($clean.Notes -join ' | ')
 Assert 'a \u00c9 escape in Codewords= is decoded (task 325)' (@($clean.Notes | Where-Object { $_ -like "*`"$([char]0x00C9)clat`"*" }).Count -eq 1) ($clean.Notes -join ' | ')
 Assert 'an unused codeword is reported against the book that declares it (task 325)' (@($clean.Notes | Where-Object { $_ -like 'book2/book.ini*"Bounty"*' }).Count -eq 1) ($clean.Notes -join ' | ')
+# task 327: the two gradings must not collapse into each other. A <lose>-only codeword is the
+# missed-<gain> shape and gets the second wording; an awarded one gets no note of either kind,
+# which is the half that fails if the award set is read as "any codeword= site".
+Assert 'a codeword tested or swept but never awarded gets its own note (task 327)' (@($clean.Notes | Where-Object { $_ -like 'book1/book.ini*"Relic"*no section awards it*' }).Count -eq 1) ($clean.Notes -join ' | ')
+Assert 'a never-awarded codeword is not called wholly unreferenced (task 327)' (@($clean.Notes | Where-Object { $_ -like '*"Relic"*awards or tests it*' }).Count -eq 0) ($clean.Notes -join ' | ')
+Assert 'a codeword some section <tick>s draws no note at all (task 327)' (@($clean.Notes | Where-Object { $_ -like '*"Ready"*' }).Count -eq 0) ($clean.Notes -join ' | ')
 
 # ---- 2. One mutation per class of mistake ----------------------------------------------
 # Each case: a label, the file it breaks, its replacement text, and a fragment the error must

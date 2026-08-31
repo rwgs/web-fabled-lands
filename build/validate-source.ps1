@@ -220,11 +220,20 @@ $script:FL_PORT_FLAGS = @(
 #    unbundled book.
 $script:FL_FORWARD_CODEWORDS = @('Hill', 'Ink', 'Iota', 'Judas', 'Kink')
 
+# The tags that GIVE a codeword. Every other carrier of codeword= (if, elseif, lose, adjust)
+# only reads it or takes it away, so a codeword seen on those alone is tested and swept but
+# reachable by nothing - the shape a missed <gain> leaves behind, and the one the reverse
+# report in step 5 exists to find. (task 327)
+$script:FL_AWARD_TAGS = @('gain', 'tick', 'set', 'outcome')
+
 # Set per Test-SourceTree run: lowercased codeword -> the book that declares it, or 0 for the
 # two exemption lists above. $null means the authority could not be read and the value check
 # stands down (Test-SourceTree has reported that separately) rather than failing every site.
+# SEEN is every site; AWARDED is the FL_AWARD_TAGS subset of it, so "seen but not awarded" is
+# a set difference and the two notes in step 5 are one pass apart.
 $script:FL_CODEWORDS = $null
 $script:FL_CODEWORD_SEEN = @{}
+$script:FL_CODEWORD_AWARDED = @{}
 
 # book.ini is Java Properties, and Codewords= leans on two features of that format: a trailing
 # backslash CONTINUES the value onto the next line (all six books wrap it across three or more),
@@ -354,6 +363,7 @@ function Test-AttrValue([string]$tag, [string]$attr, [string]$value) {
                 return "codeword=`"$part`" is not declared in any book.ini Codewords= list"
             }
             $script:FL_CODEWORD_SEEN[$k] = $true
+            if ($script:FL_AWARD_TAGS -contains $tag) { $script:FL_CODEWORD_AWARDED[$k] = $true }
         }
         return $null
     }
@@ -464,6 +474,7 @@ function Test-SourceTree([string]$rulesDir, [hashtable]$bookDirs) {
     #    beats the other direction - a silently empty set that passes everything. (task 325)
     $script:FL_CODEWORDS = $null
     $script:FL_CODEWORD_SEEN = @{}
+    $script:FL_CODEWORD_AWARDED = @{}
     $declared = @{}
     $spelling = @{}   # lowercased key -> the casing the .ini declares, for the report in 5
     $authority = $true
@@ -589,19 +600,28 @@ function Test-SourceTree([string]$rulesDir, [hashtable]$bookDirs) {
         Test-XmlVocabulary (Get-XmlDoc $xml).DocumentElement $label $errors
     }
 
-    # 5. The reverse direction, reported as INFORMATION and never as a failure: a codeword the
-    #    inside front cover lists that no section ever awards or tests. It usually means a missed
-    #    <gain> - the branch exists, nothing opens it - but the printed books really do list a
-    #    codeword they never use, so it cannot abort a build. The transcriber did this pass by
-    #    eye and wrote the answer into the .ini comments ("# Unused codewords: Avert" in book 1,
-    #    "# Unnecessary codewords: Dark" in book 4); this reproduces it mechanically, and today
-    #    it agrees with those two notes exactly. (task 325)
+    # 5. The reverse direction, reported as INFORMATION and never as a failure, in two grades.
+    #    UNREFERENCED: a codeword the inside front cover lists that no section mentions at all.
+    #    The printed books really do list codewords they never use, so this is usually nothing
+    #    to fix. NEVER AWARDED: a codeword sections test or sweep but no <gain>/<tick>/<set>/
+    #    <outcome> ever gives - the branch exists and nothing can open it, which means the
+    #    transcription dropped an award rather than the book printing a spare name. Kept apart
+    #    because the remedy differs: the second wants a missing <gain> found, the first wants
+    #    nothing. Both stay notes - book 2's two never-awarded codewords are like that in the
+    #    printed book as well as here, so this cannot become a failure without editing the
+    #    corpus. The transcriber did this pass by eye and wrote the answers into the .ini
+    #    comments ("# Unused codewords: Avert" in book 1, "# Unnecessary codewords: Dark" in
+    #    book 4, "# Unnecessary codewords: Bait,Beach,Bilge" in book 2); this reproduces them
+    #    mechanically, and today it agrees with all three but for Bait, which section 579 hides
+    #    behind a no-op <tick>/<lose> pair (task 328). (tasks 325, 327)
     if ($null -ne $script:FL_CODEWORDS) {
         foreach ($b in $bookNumbers) {
             $dirName = Split-Path -Leaf $bookDirs[$b]
             foreach ($k in @($script:FL_CODEWORDS.Keys | Where-Object { $script:FL_CODEWORDS[$_] -eq $b } | Sort-Object)) {
                 if (-not $script:FL_CODEWORD_SEEN.ContainsKey($k)) {
                     [void]$notes.Add("$dirName/book.ini : codeword `"$($spelling[$k])`" is declared but no section awards or tests it")
+                } elseif (-not $script:FL_CODEWORD_AWARDED.ContainsKey($k)) {
+                    [void]$notes.Add("$dirName/book.ini : codeword `"$($spelling[$k])`" is tested or cleared but no section awards it - a missing <gain>?")
                 }
             }
         }

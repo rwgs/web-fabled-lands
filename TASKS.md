@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-326 is complete (listed under **Done** below), apart from 207 and 326, both
-withdrawn as misdiagnoses (see the Review log); **327, 328, 329 and 330 (all
+327 is complete (listed under **Done** below), apart from 207 and 326, both
+withdrawn as misdiagnoses (see the Review log); **328, 329 and 330 (all
 LOW) are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
@@ -25,7 +25,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 327. task 325's unused-codeword note counts a `<lose>` or an `<if>` as "used", so the case it exists to surface — a codeword the port never **awards** — is not reported: book 2's `Beach` and `Bilge` are tested and swept but reachable by no `<gain>`/`<tick>`, which is exactly what that book's `# Unnecessary codewords: Bait,Beach,Bilge` comment records, and the third name is masked by a no-op `<tick>`
 - [ ] 328. two sections carry a `<tick codeword="X"/><lose codeword="X"/>` no-op pair (book 2 sections 579 and 633), and one of them invents a codeword — `Bogus` — that exists nowhere else in the corpus and in no `Codewords=` list, so task 325 had to add it to the gate's port-flag allowlist to keep the build green: an allowlist entry whose only job is to keep scaffolding alive
 - [ ] 329. `PLAN.md`'s status header says "the backlog carries one open item (task 320)" and dates itself today, but 320 is closed and the backlog carries four — a stale *status* rather than a stale citation, in the file task 323 had just swept for citations, and a count `PLAN.md` cannot help rotting because it restates a figure another file owns
 - [ ] 330. `run-tests.ps1` diagnoses an empty dump as a CAPTURE failure ("no stdout handle?"), but a browser that launches and does no work at all writes the same empty file — an Edge mid-update wrote no DOM, no `--screenshot` and no `--version` while still creating its profile, and `AGENTS.md`'s one-second discriminator ("`--version` printing nothing confirms the missing handle") reads that evidence as exactly the wrong cause
@@ -364,70 +363,7 @@ this order.*
 - [x] 324. the Maps modal captions every regional map with the **book** title from `books.ini` (book 3's map reads "Over the Blood-Dark Sea") when `book.ini` holds a `Map.Title` written for the map itself ("The Ports & Anchorages of the Violet Ocean") — a better caption for all six, sitting unread in the tree
 - [~] 326. Task 207 is indexed nowhere, so a completed task survives only as an orphan detail section
   — **withdrawn, not a defect** (see the Review log)
-
----
-
-## 327. The unused-codeword note counts a `<lose>` as use, so the missed-`<gain>` case it exists for goes unreported
-
-**Priority: LOW.** The check task 325 added is sound; this is the half of it that reports the
-wrong set. No player-visible defect is known — the two codewords involved are only ever swept
-by a "lose all codewords in this book" page — but the note's stated purpose is to catch a
-missed `<gain>`, and today it cannot.
-
-### What is wrong
-
-`Test-SourceTree`'s reverse report (`validate-source.ps1`, step 5) marks a codeword *seen*
-from `$script:FL_CODEWORD_SEEN`, which `Test-AttrValue` fills for **every** `codeword=` site
-regardless of tag. So a codeword that only ever appears on `<if>`, `<elseif>` or `<lose>` —
-tested and taken away, but reachable by no `<gain>`, `<tick>`, `<set>` or `<outcome>` — reads
-as used and is never reported. That is precisely the shape a missed `<gain>` leaves behind:
-the branch exists, the sweep exists, nothing opens it.
-
-Two codewords in the shipped corpus are in that state, both in book 2: **`Beach`** and
-**`Bilge`**. Each appears exactly once, in section 579's `<group force="t">` "lose all
-codewords in this book" sweep, and nowhere else. The build's note today says nothing about
-either, because a `<lose>` counted as use.
-
-The transcriber found them by eye and wrote the answer into `books/book2/book.ini`:
-`# Unnecessary codewords: Bait,Beach,Bilge`. The third name, **`Bait`**, escapes an
-award-aware check too, but for a different reason — section 579 carries a no-op
-`<tick codeword="Bait"/>` immediately before its `<lose codeword="Bait"/>`, so a check keyed
-on the tag sees an award. That pair is filed separately as task 328.
-
-### Why it matters
-
-The two hand-written `.ini` comments the note already reproduces (`# Unused codewords: Avert`,
-`# Unnecessary codewords: Dark`) are the *declared but wholly unreferenced* case. The book 2
-comment is the *declared but never awarded* case, and it is the one that means something went
-wrong in transcription rather than in the printed book. Reproducing two of the transcriber's
-three notes and silently dropping the third is worse than reproducing none, because the note
-now looks complete.
-
-### Steps
-
-1. Split the seen-set in `validate-source.ps1` into **awarded** and **referenced**.
-   `Test-AttrValue` already receives `$tag`; the awarding tags are `gain`, `tick`, `set` and
-   `outcome`, and every other carrier (`if`, `elseif`, `lose`, `adjust`) only reads or clears.
-2. Report a declared codeword with references but no award as its own note, worded so it is
-   not confused with the wholly-unused one — the fix for this one is a missing `<gain>`,
-   where the fix for the other is usually nothing at all.
-3. Keep both as **notes**. Book 2's two are in the printed book as well as the port, so this
-   cannot become a build failure without changing the corpus.
-4. Add a self-test fixture for it: a codeword declared, `<lose>`-swept, and never awarded must
-   produce the new note while a codeword that is `<tick>`-ed somewhere must not.
-5. Once the check subsumes them, reconcile the three `book.ini` comments — they are a by-eye
-   pass of exactly this reconciliation and two are now **stale**: book 1's
-   `# Extra, unlisted codewords: Aloft,Altitude` and book 4's
-   `# Extra, unlisted codewords: Dispel` name codewords that have since been appended to those
-   files' own `Codewords=` lines, so they describe a gap that no longer exists. Do not delete
-   book 2's, which is the one still telling the truth.
-
-### Validation
-
-`validate-source.ps1` and `validate-selftest.ps1` change and no source XML does, so
-`build-data.ps1` must produce **no** generated diff. Run `validate-selftest.ps1`, then the
-full build, and confirm the build prints **four** notes: `Avert`, `Dark`, and the two new
-never-awarded ones for book 2. Then the headless suite to `RESULT ALL PASS`.
+- [x] 327. task 325's unused-codeword note counts a `<lose>` or an `<if>` as "used", so the case it exists to surface — a codeword the port never **awards** — is not reported: book 2's `Beach` and `Bilge` are tested and swept but reachable by no `<gain>`/`<tick>`, which is exactly what that book's `# Unnecessary codewords: Bait,Beach,Bilge` comment records, and the third name is masked by a no-op `<tick>`
 
 ---
 
@@ -602,7 +538,7 @@ so run it by hand.
 
 ---
 
-> **Completed task details (tasks 1–326) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
+> **Completed task details (tasks 1–327) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -611,6 +547,44 @@ so run it by hand.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (task 327): closed **327** — the reverse codeword report now grades what it
+finds. `validate-source.ps1` keeps a second set, `FL_CODEWORD_AWARDED`, filled only from the
+four tags that GIVE a codeword (`gain`, `tick`, `set`, `outcome`); the other four carriers
+(`if`, `elseif`, `lose`, `adjust`) still mark it seen but no longer mark it awarded. Step 5
+reports "declared but no section awards or tests it" as before, and a new second note,
+"tested or cleared but no section awards it — a missing `<gain>`?", for the set difference.
+Both stay **notes**: book 2's two are like that in the printed book too. `validate-selftest.ps1`
+gains three assertions and one fixture edit (51 pass, was 48); the build validates the same
+**4,407 files** and produces **no** generated diff, as the task predicted.
+
+**The build now prints four notes, and two of them are new**: `Avert` and `Dark` unchanged,
+plus `book2/book.ini : codeword "Beach"` and `"Bilge"` — both reachable only by section 579's
+"lose every codeword in this book" sweep. That is the whole of the transcriber's
+`# Unnecessary codewords: Bait,Beach,Bilge` note except `Bait`, which section 579 hides behind
+a no-op `<tick codeword="Bait"/>` and which task 328 removes.
+
+**The `<adjust>` classification was checked against the corpus rather than assumed.** Forty
+`<adjust codeword=>` sites bump a counter and read as awards to the eye, so putting them on
+the wrong side would have been invisible; every codeword they touch is awarded elsewhere by
+one of the four real award tags, so the choice changes no note today and the classification
+rests on what the tag means, not on what happened to pass.
+
+**Step 5's reconciliation found both stale comments as filed, and they were rewritten rather
+than deleted.** Book 1's `# Extra, unlisted codewords: Aloft,Altitude` and book 4's
+`# Extra, unlisted codewords: Dispel` name codewords now present in those files' own
+`Codewords=` lines — appended out of alphabetical order at the end of book 1's, folded into
+alphabetical place in book 4's. The *reason* those two lines exist is still true and still
+worth knowing (neither codeword is printed on its book's inside front cover, which is why
+book 1's list ends non-alphabetically), so each comment now records that fact and says the
+gap has since been closed. Deleting them would have left book 1's out-of-order tail
+unexplained. Book 2's comment is untouched and gains a line noting which two of its three
+names the gate now reports and why the third does not.
+
+The fixture pair is the half that matters: book 1's `Relic` is `<lose>`-swept and never
+awarded (new note), `Ready` is `<tick>`-ed (no note of either kind). An award set read as
+"any `codeword=` site" — the defect — passes the first assertion and fails the second.
+Headless suite green at **`RESULT ALL PASS pass=3035 fail=0`**. Nothing new filed.
 
 Worked 2026-08-31 (bookkeeping, task 326): **withdrew 326** — the gap it reports does not exist.
 Both indexes carry 207. The row reads `- [~] 207.` rather than `- [x] 207.`, and has done since the

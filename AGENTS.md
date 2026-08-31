@@ -50,8 +50,13 @@ combat, markets, ships, live adventure sheet). Plain HTML/CSS/ES modules —
   and are exempted in the gate, not in the `.ini`: section-scoped bookkeeping flags
   (`2.567.1a`, `5/520` — matched by shape), the port's own named state flags
   (`StillInYellowport`, `HydraDamage` — an explicit list), and codewords printed in the
-  unpublished books 7–12 (`Hill`, `Judas`). The reverse direction — a declared codeword no
-  section uses — is reported as a **note**, never a failure. `Map.Title=` is the second, read
+  unpublished books 7–12 (`Hill`, `Judas`). The reverse direction is reported as a **note**,
+  never a failure, in two grades that must not be collapsed: a declared codeword **no section
+  mentions at all** (usually nothing to fix — the printed books do list spare names), and one
+  sections test or sweep but no `<gain>`/`<tick>`/`<set>`/`<outcome>` ever gives, which means a
+  transcription dropped an award. Only those four tags mark a codeword awarded; `if`, `elseif`,
+  `lose` and `adjust` mark it merely seen, and counting those as use is what hid book 2's
+  `Beach` and `Bilge` until task 327. `Map.Title=` is the second, read
   by `Get-IniMapTitle` in `build-data.ps1` and passed through `meta.json` so the Maps modal can
   caption — and alt-text — each regional map with the map's own subject ("The Ports &
   Anchorages of the Violet Ocean") rather than the volume title ("Over the Blood-Dark Sea");

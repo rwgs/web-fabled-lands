@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–326), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324) and task 326 (ID 326). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for completed tasks (stable IDs 1–327), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326) and task 327 (ID 327). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–326). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
+The completed tasks archived in this file (stable IDs 1–327). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -335,6 +335,7 @@ The completed tasks archived in this file (stable IDs 1–326). Detail sections 
 - [x] 323. `REVIEW.md`/`PLAN.md` cite source by line, and all four of `REVIEW.md`'s had drifted onto unrelated code
 - [x] 324. The Maps modal captions each regional map with the book title, when `book.ini` holds a title written for the map
 - [~] 326. Task 207 is indexed nowhere, so a completed task survives only as an orphan detail section
+- [x] 327. The unused-codeword note counts a `<lose>` as use, so the missed-`<gain>` case it exists for goes unreported
 
 ---
 
@@ -14962,5 +14963,68 @@ fixes the census rather than the index. The marker set is now stated at each of 
 a pass looks it up — `TASKS.md`'s archive pointer, this file's Contents heading, and the task
 workflow in `AGENTS.md` — and task 274's Review-log claim carries a correction note instead of
 being deleted, since a dated record is honest as what was true then plus what happened since.
+
+---
+## 327. The unused-codeword note counts a `<lose>` as use, so the missed-`<gain>` case it exists for goes unreported
+
+**Priority: LOW.** The check task 325 added is sound; this is the half of it that reports the
+wrong set. No player-visible defect is known — the two codewords involved are only ever swept
+by a "lose all codewords in this book" page — but the note's stated purpose is to catch a
+missed `<gain>`, and today it cannot.
+
+### What is wrong
+
+`Test-SourceTree`'s reverse report (`validate-source.ps1`, step 5) marks a codeword *seen*
+from `$script:FL_CODEWORD_SEEN`, which `Test-AttrValue` fills for **every** `codeword=` site
+regardless of tag. So a codeword that only ever appears on `<if>`, `<elseif>` or `<lose>` —
+tested and taken away, but reachable by no `<gain>`, `<tick>`, `<set>` or `<outcome>` — reads
+as used and is never reported. That is precisely the shape a missed `<gain>` leaves behind:
+the branch exists, the sweep exists, nothing opens it.
+
+Two codewords in the shipped corpus are in that state, both in book 2: **`Beach`** and
+**`Bilge`**. Each appears exactly once, in section 579's `<group force="t">` "lose all
+codewords in this book" sweep, and nowhere else. The build's note today says nothing about
+either, because a `<lose>` counted as use.
+
+The transcriber found them by eye and wrote the answer into `books/book2/book.ini`:
+`# Unnecessary codewords: Bait,Beach,Bilge`. The third name, **`Bait`**, escapes an
+award-aware check too, but for a different reason — section 579 carries a no-op
+`<tick codeword="Bait"/>` immediately before its `<lose codeword="Bait"/>`, so a check keyed
+on the tag sees an award. That pair is filed separately as task 328.
+
+### Why it matters
+
+The two hand-written `.ini` comments the note already reproduces (`# Unused codewords: Avert`,
+`# Unnecessary codewords: Dark`) are the *declared but wholly unreferenced* case. The book 2
+comment is the *declared but never awarded* case, and it is the one that means something went
+wrong in transcription rather than in the printed book. Reproducing two of the transcriber's
+three notes and silently dropping the third is worse than reproducing none, because the note
+now looks complete.
+
+### Steps
+
+1. Split the seen-set in `validate-source.ps1` into **awarded** and **referenced**.
+   `Test-AttrValue` already receives `$tag`; the awarding tags are `gain`, `tick`, `set` and
+   `outcome`, and every other carrier (`if`, `elseif`, `lose`, `adjust`) only reads or clears.
+2. Report a declared codeword with references but no award as its own note, worded so it is
+   not confused with the wholly-unused one — the fix for this one is a missing `<gain>`,
+   where the fix for the other is usually nothing at all.
+3. Keep both as **notes**. Book 2's two are in the printed book as well as the port, so this
+   cannot become a build failure without changing the corpus.
+4. Add a self-test fixture for it: a codeword declared, `<lose>`-swept, and never awarded must
+   produce the new note while a codeword that is `<tick>`-ed somewhere must not.
+5. Once the check subsumes them, reconcile the three `book.ini` comments — they are a by-eye
+   pass of exactly this reconciliation and two are now **stale**: book 1's
+   `# Extra, unlisted codewords: Aloft,Altitude` and book 4's
+   `# Extra, unlisted codewords: Dispel` name codewords that have since been appended to those
+   files' own `Codewords=` lines, so they describe a gap that no longer exists. Do not delete
+   book 2's, which is the one still telling the truth.
+
+### Validation
+
+`validate-source.ps1` and `validate-selftest.ps1` change and no source XML does, so
+`build-data.ps1` must produce **no** generated diff. Run `validate-selftest.ps1`, then the
+full build, and confirm the build prints **four** notes: `Avert`, `Dark`, and the two new
+never-awarded ones for book 2. Then the headless suite to `RESULT ALL PASS`.
 
 ---
