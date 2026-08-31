@@ -20,11 +20,13 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-*(none open — file new MEDIUM work here)*
+- [ ] 325. `validate-source.ps1` validates codeword **attribute names** but never codeword **values**, so a typo'd `<gain codeword="Anchr">` passes the gate and silently never matches its `<if codeword="Anchor">` — the player just cannot progress, and `book.ini`'s `Codewords=` already holds the authoritative per-book list to check against
 
 **LOW**
 
-- [ ] 322. every book's `book.ini` is read by **nothing** — no script under `build/` opens it — so its `Map=` key reads as the live declaration of which image is that book's map while the build actually selects by the `-Map$` basename pattern, and book 3 proves it inert: `Map=Violet Ocean.JPG` names a file that does not exist, yet `VioletOcean-Map.JPG` ships correctly as `book3.jpg`
+- [ ] 323. `REVIEW.md` cites `renderStatic` at `app.js:775`/`:781` for a defect that task 65 already fixed and a function that has since moved to `ui.js` — the same fragile-citation class task 320 fixed in `ROADMAP.md` only, leaving `PLAN.md`'s six `#L` citations (all still exact) and `REVIEW.md`'s four (all drifted) carrying the form that pass banned
+- [ ] 324. the Maps modal captions every regional map with the **book** title from `books.ini` (book 3's map reads "Over the Blood-Dark Sea") when `book.ini` holds a `Map.Title` written for the map itself ("The Ports & Anchorages of the Violet Ocean") — a better caption for all six, sitting unread in the tree
+- [ ] 326. task **207** is missing from **both** indexes — no `- [x] 207.` line in this file's Done checklist and no entry in `TASKS-archive.md`'s Contents — so a completed task exists only as an orphan `## 207.` detail section, breaking the stated invariant that "the checklist above still carries every task's stable ID and status"
 
 **Done**
 
@@ -354,85 +356,269 @@ this order.*
 - [x] 319. The line-ending trap task 318 hit was recorded only in the Review log, where a trap that changes how you run a bulk edit belongs in `AGENTS.md` — and the sharper half of it, a broken shell assertion, turned out not to exist
 - [x] 320. `ROADMAP.md`'s phase 1 cites two source locations that have moved and miscounts the dock sites its gazetteer is sized against — `showMaps` is at `app.js:1152` not 1142, `state.js:995` is affliction code rather than the `data.location` write (`arriveAtDock`, `state.js:1118`), and "25 named ports across 96 sections" is 94: `<set dock=>` moves a SHIP, not the player, so the 97 sections carrying a `dock=`-family attribute are not the sites that set the location
 - [x] 321. `TASKS.md` and `TASKS-archive.md` were the only two tracked blobs that were not LF — but not for the reason filed: git never normalised them, it PRESERVED their CRLF, and the 6,348-line diff came from an editing tool writing LF into a CRLF worktree file. Two distinct causes: one lone CR in task 319's own write-up made the archive binary, and a text file whose index blob already holds CRLF keeps CRLF on every later staging
+- [x] 322. every book's `book.ini` is read by **nothing** — no script under `build/` opens it — so its `Map=` key reads as the live declaration of which image is that book's map while the build actually selects by the `-Map$` basename pattern, and book 3 proves it inert: `Map=Violet Ocean.JPG` names a file that does not exist, yet `VioletOcean-Map.JPG` ships correctly as `book3.jpg`
 
 ---
 
-## 322. `book.ini` is read by nothing, so its `Map=` key reads as live configuration while the build ignores it
+## 323. `REVIEW.md` and `PLAN.md` still cite source by line number, and `REVIEW.md`'s have drifted onto unrelated code
 
-**Priority: LOW.** Nothing ships wrong today — every book's regional map is copied correctly,
-including book 3's. The cost is that a source file in `books/` states a fact about the build
-that is not true, and one book's value is already stale enough to prove it.
+**Priority: LOW.** Documentation accuracy. Nothing ships wrong, but one of the stale
+citations is offered twice as *evidence for a finding*, and the finding it supports was
+fixed two hundred tasks ago.
 
 ### What is wrong
 
-Each `books/book<N>/book.ini` declares a `Map=` key:
+Task 320 answered its own step 4 with a rule — **cite the function, not the line** — and
+stripped every `#L` anchor out of `ROADMAP.md`, including one that was still correct, on the
+grounds that "a rule that only applies to the citations already broken does not survive the
+next edit". That pass changed `ROADMAP.md` only. Two sibling planning documents still carry
+the banned form, and they are in opposite states:
 
-| Book | `Map=` | File on disk | Ships as |
-|---|---|---|---|
-| 1 | `Sokara.JPG` | `Sokara-Map.JPG` | `book1.jpg` |
-| 2 | `Golnir.JPG` | `Golnir-Map.JPG` | `book2.jpg` |
-| 3 | `Violet Ocean.JPG` | `VioletOcean-Map.JPG` | `book3.jpg` |
-| 4 | `Great Steppes.JPG` | `GreatSteppes-Map.JPG` | `book4.jpg` |
-| 5 | `Uttaku.JPG` | `Uttaku-Map.JPG` | `book5.jpg` |
-| 6 | `Akatsurai.JPG` | `Akatsurai-Map.JPG` | `book6.jpg` |
+**`REVIEW.md` — four citations, all drifted.** The Low finding "the rules modal creates
+invalid table structure" cites `renderStatic` at `web/js/app.js:775` and `:781`:
 
-**No value in that column names a file that exists**, and the build does not care: it picks
-the regional map with `Where-Object { $_.BaseName -match '-Map$' }` in `build-data.ps1` and
-copies the match to `web/assets/maps/book<N>.jpg`. Nor is `Map=` read anywhere else —
-`grep` for `book.ini` across `build/*.ps1` and `web/js/*.js` returns nothing, so the whole
-file is inert in this port. It is inherited from the reference `java-engine/` data format.
+| Cited as | What is actually there now |
+|---|---|
+| `app.js:775` — "renders all `h1`–`h6` as headings" | `if (pane) (pane.querySelector('.sheet-close') \|\| pane).focus();` |
+| `app.js:781` — "the later identical condition that creates a `<th>`" | `export function keepSheetFocus(pane, rerender) {` |
+| `render.js:2568` — "the buttons rendered … onward" | a blank line |
 
-Book 3 is the one that shows it. Books 1, 2, 5 and 6 differ from their real filename only by
-the `-Map` suffix, so `Map=Sokara.JPG` reads like a shorthand a reader might assume the build
-expands. `Map=Violet Ocean.JPG` versus `VioletOcean-Map.JPG` cannot be reconciled by any rule
-— the space moves — which is what makes the key demonstrably unread rather than merely
-abbreviated.
+`renderStatic` is **not in `app.js` at all** any more — it moved to `ui.js`, and `app.js:1225`
+carries a comment saying so ("The rules formatter renderStatic now lives in ui.js"). Worse,
+**the defect itself was fixed**: `ui.js:415-423` tests `parent.tagName === 'TR'` *first* and
+emits a spanning `<th>`, with a comment crediting **task 65** — the very task `REVIEW.md`
+line 142 names while re-confirming the premise. So the document asserts a live defect, at
+a location in the wrong file, for code that already handles the case.
+
+**`PLAN.md` — six citations, all currently exact** (`app.js:1152` is `showMaps`,
+`app.js:250` the Maps button, `state.js:120` the `location` field, `state.js:1118`
+`arriveAtDock`, `style.css:506`/`:507` the map CSS). Nothing to correct; they are simply the
+fragile form, and they are fragile in the same file whose `book.ini` claim task 322 had to
+fix for the same underlying reason.
 
 ### Why it matters
 
-This is the shape task 320 found in `ROADMAP.md`, one directory over: a file that looks like
-configuration, is treated as evidence, and is checked by nothing. Phase 1 of `ROADMAP.md`
-originally proposed `places.ini` "alongside the existing `book.ini` that already declares
-`Map=`" — reading the inert key as an established precedent for a build-read `.ini` per book.
-That citation is now corrected, but the source of the confusion is still in the tree, and the
-next reader of `books/book3/book.ini` has no way to tell the key is dead.
+This is the third pass in a row to land on the same class (320 on `ROADMAP.md`, 322 on
+`book.ini` plus `PLAN.md` and `docs/The-Books.md`, this one on `REVIEW.md`), and the pattern
+across them is consistent: a correction is applied to the document that the task happened to
+name, while the sibling documents repeating the same claim are never swept. 322 found
+`PLAN.md` and `docs/The-Books.md` still carrying the `Map=` precedent four weeks after 320
+retired it in `ROADMAP.md`, and found them only because a `grep` for `book.ini` happened to
+run.
 
-`validate-source.ps1` gates the section XML and never looks at `book.ini`, so nothing fails
-when a value rots. That is correct — it is not a section file — but it does mean the staleness
-is unbounded.
+A drifted line number is the failure mode 320 described exactly: it "fails quietly by
+pointing at plausible wrong code". `app.js:781` resolving to `export function
+keepSheetFocus` looks like a real citation to anyone not opening the file.
 
 ### Steps
 
-1. Decide which of the two this is, and it is a genuine choice rather than an obvious one:
-   - **Make it live** — have `build-data.ps1` resolve the regional map through `Map=` instead
-     of the `-Map$` pattern, and fix the six values to name real files. Turns an inherited
-     file into the declaration it appears to be, and matches how `books.ini`'s `Published=`
-     already drives the build (task 209). Costs a build-script change and a `release.ps1`
-     look, since the map copy is part of what a withdrawn book reconciles.
-   - **Mark it dead** — leave the build alone and record in `AGENTS.md`'s repository map that
-     `book.ini` is inherited reference data read by nothing, so `Map=` is not the source of
-     truth for the regional map (the `-Map$` filename is). Cheapest, and honest, but leaves
-     six wrong values in the tree.
-2. Whichever is chosen, say it where a reader of `books/` will meet it — the repository map in
-   `AGENTS.md` currently describes `books/books.ini` and the section XML but not `book.ini`.
-3. Do **not** rename any `.JPG` to satisfy the ini. The `-Map$` pattern is what the build
-   depends on today, and a rename would break the copy for every book at once.
+1. In `REVIEW.md`, correct the rules-modal finding: the citations move to `renderStatic` in
+   `ui.js`, and the finding is **resolved by task 65**, not open. Mark it as such rather than
+   deleting it — the document is a dated review record, so the honest form is to note what
+   the later fix was, the way its own line 142 already notes premises being re-confirmed.
+   Check the remaining `REVIEW.md` citations while there (`render.js:2568`,
+   `books/book1/91.xml:7`, `books/book2/462.xml:4`, `rules/QuickRules.xml:3`) — the first is
+   already a blank line, and the XML ones are untested.
+2. Replace every `#L`-style line citation in `REVIEW.md` and `PLAN.md` with the function,
+   selector or key name, per the rule `ROADMAP.md` now states. `PLAN.md`'s six are correct
+   today, so this is form not content — do it anyway, for the reason 320 gave.
+3. Consider whether the rule belongs in `AGENTS.md` rather than only inside `ROADMAP.md`,
+   since it has now been re-derived by three separate passes and applies to every document
+   in the repo. That is the cheap structural fix for the sweep problem; a checker is not
+   worth building for eleven citations.
 
 ### Validation
 
-If step 1 takes the "mark it dead" arm: documentation only, no rebuild, no suite run, and no
-generated output may change.
-
-If it takes the "make it live" arm: `build-data.ps1` and `release.ps1` change, so run
-`pwsh -File build/build-data.ps1` and confirm `web/assets/maps/book<N>.jpg` is byte-identical
-to before for all six books (hash each), then `release-selftest.ps1`, `validate-selftest.ps1`
-and the headless suite to `RESULT ALL PASS`. A build that silently stops copying a map leaves
-the Maps modal showing the "not installed" note, which no assertion currently covers — so
-check the six hashes explicitly rather than trusting a green suite.
+Documentation only: no rebuild, no suite run, and no generated output may change
+(`git status` should show only `.md` files, and `stamp-version.ps1` should report "already
+at" its current stamp). Verify each replaced citation by opening the named symbol — a
+function name that does not exist fails loudly, which is the whole point of the change.
 
 ---
 
-> **Completed task details (tasks 1–321) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
+## 324. The Maps modal captions each regional map with the book title, when `book.ini` holds a title written for the map
+
+**Priority: LOW.** A visible-quality improvement, not a defect — every map shows *a* caption
+today, just the less apt one.
+
+### What is wrong
+
+`showMaps` in `web/js/app.js` builds one tab target per published book and captions it with
+`data.bookTitle(n)`, the `<N>.Title` from `books.ini`. That is the title of the *volume*. Each
+`books/book<N>/book.ini` also carries a `Map.Title` written for the *map*, and for four of the
+six books they are materially different things:
+
+| Book | Caption shown now (`books.ini` `Title=`) | `book.ini` `Map.Title=` |
+|---|---|---|
+| 1 | The War-Torn Kingdom | Sokara |
+| 2 | Cities of Gold and Glory | The Merchant Kingdom of Golnir |
+| 3 | Over the Blood-Dark Sea | The Ports & Anchorages of the Violet Ocean |
+| 4 | Devils & Howling Darkness | The Howling Wasteland of the Great Steppes |
+| 5 | The Court of Hidden Faces | Uttaku: The Land of Hidden Faces |
+| 6 | Lords of the Rising Sun | Akatsurai: The Land Below the Sunrise |
+
+Book 3 is the clearest: the map is a chart of ports and anchorages, and "Over the Blood-Dark
+Sea" tells a reader nothing about what they are looking at. The caption is also the image's
+`alt` text (`img.alt = t.title`), so this is an accessibility improvement as well as a
+cosmetic one — a screen-reader user currently hears the book title where the map's own
+subject would be more use.
+
+### Why it matters
+
+The information is already in the tree, hand-written per book, and nothing reads it. Task 322
+settled that `book.ini`'s `Map=` should stay dead because it duplicates a fact the filesystem
+already answers; `Map.Title` is the opposite case and the reason that task's conclusion was
+scoped to `Map=` only. It holds something **no other file in the repo knows**, which is the
+stated test in `AGENTS.md` for whether an `.ini` key deserves to be live.
+
+### Steps
+
+1. Read `Map.Title` per book in `build/build-data.ps1` and pass it through into `meta.json`
+   beside the existing book titles. It must be in `meta.json` and not a per-book JSON: the
+   Maps modal is reachable before any book loads (`PLAN.md` records this constraint for the
+   gazetteer, and it applies identically here).
+   `book.ini` is **Java Properties**, not simple INI — `Codewords=` uses backslash line
+   continuations and `\u00c9`-style escapes — so read the single `Map.Title` key with a
+   targeted match rather than writing a general parser for a file this task does not
+   otherwise need. Note task 325 will want the continuation handling; do not build it here
+   speculatively.
+2. Caption with `Map.Title` where present, falling back to `data.bookTitle(n)` where it is
+   missing, so a book folder without the key still renders. The world map's hard-coded
+   "The Fabled Lands" is unaffected.
+3. A missing `Map.Title` must **not** be a build error — unlike `Published=`, this is
+   decoration, and failing a build over a caption would be out of proportion.
+
+### Validation
+
+`build-data.ps1` changes, so rebuild and confirm the diff is confined to `meta.json` (plus the
+stamp) — no per-book JSON, no map or art copy may move. Then the headless suite to
+`RESULT ALL PASS`. Open the Maps modal and read the six captions; the `alt` text changes with
+them, so check one with the image path broken to confirm the missing-map note still wins.
+
+---
+
+## 325. The gate validates codeword attribute *names* but never codeword *values*, so a typo'd codeword fails silently in play
+
+**Priority: MEDIUM.** This is the only one of the `book.ini` findings that is a latent
+correctness bug rather than a documentation or polish issue: the failure is invisible to
+every check the repo has, and lands on the player as an unwinnable section.
+
+### What is wrong
+
+`build/validate-source.ps1` allows `codeword` as an attribute on `<if>`, `<elseif>`,
+`<gain>`, `<lose>`, `<tick>`, `<adjust>`, `<outcome>` and others. Every one of those entries
+is an **attribute-name** allowlist — it asserts that `codeword=` may appear on the tag, and
+never looks at the string inside it. There is no value-level codeword check anywhere in
+`build/`.
+
+So a misspelling passes the gate silently:
+
+```xml
+<gain codeword="Anchr"/>     <!-- the award, misspelled -->
+...
+<if codeword="Anchor">        <!-- the test, spelled correctly -->
+```
+
+The build succeeds, the section renders, no assertion fires, and the branch simply never
+opens. The player has no way to tell a codeword they were never awarded from one the port
+dropped, and neither does a reviewer reading either section on its own — the two sites are
+usually in different files, often different books.
+
+The corpus already holds the authority to check against: each `books/book<N>/book.ini`
+declares `Codewords=` for that book, and the transcriber annotated the gaps by hand —
+book 1 ends `# Extra, unlisted codewords: Aloft,Altitude` and `# Unused codewords: Avert`,
+book 2 `# Unnecessary codewords: Bait,Beach,Bilge`, book 4 both kinds, and books 3 and 5
+record that everything reconciles ("all present and accounted for"). Those comments are a
+previous pass of exactly this check, done by eye.
+
+### Why it matters
+
+Book 1's list is alphabetically constrained — every codeword in book 1 begins with A, book 2
+with B, and so on through book 6 — so a cross-book leak is mechanically detectable too, not
+just a typo. This is the highest-value thing in `book.ini` and the reason task 322's
+"nothing reads it, leave it dead" conclusion was deliberately scoped to `Map=` alone.
+
+### Steps
+
+1. Read `Codewords=` per book in `validate-source.ps1`. It is **Java Properties**: the value
+   uses backslash **line continuations** (all six books wrap it across three or more lines)
+   and `\uXXXX` escapes (book 5 has `\u00c9lan` and `\u00c9lite`). Both must be handled or the
+   list silently truncates at the first line — which would make the new check fire on dozens
+   of valid codewords and get switched off.
+2. Cross-check every `codeword=` value in that book's sections against the list, and report
+   an unknown value as a gate failure with the file and tag that carries it. Decide
+   explicitly what to do about the transcriber's own annotated exceptions — the "extra,
+   unlisted" codewords are in the sections but *not* in `Codewords=`, so a naive check fails
+   the build on book 1 immediately. Either add them to the `.ini` or carry an allowlist, but
+   do not weaken the check to a warning.
+3. Report the reverse direction too, as information rather than failure: a codeword declared
+   in `Codewords=` that no section ever awards is what book 1's `# Unused codewords: Avert`
+   note is recording, and it usually means a missed `<gain>` rather than a spare word.
+4. Add fixtures to `build/validate-selftest.ps1` in the same change, per the standing rule
+   that a new gate check ships with its self-test: one misspelled value that must fail, one
+   continuation-wrapped list that must parse whole, and one `\u00c9` escape that must match.
+
+### Validation
+
+`validate-source.ps1` and `validate-selftest.ps1` change but no source XML does, so
+`build-data.ps1` must produce **no** generated diff — that is the check that the new gate is
+inspecting rather than rewriting. Run `validate-selftest.ps1`, then the full build, then the
+headless suite to `RESULT ALL PASS`. Confirm the gate actually bites by misspelling one
+codeword in a scratch copy and watching the build fail with that file named; a check this
+class can pass vacuously if the list parse yields an empty set, so also assert a non-empty
+list per book.
+
+---
+
+## 326. Task 207 is indexed nowhere, so a completed task survives only as an orphan detail section
+
+**Priority: LOW.** Bookkeeping. No code is affected, but the backlog's two index files both
+claim to be complete and neither is.
+
+### What is wrong
+
+`TASKS-archive.md` holds a detail section `## 207. A <while> pass's provisional vars are
+position-sensitive within the body`. Nothing points at it:
+
+- `TASKS.md`'s **Done** checklist runs `… - [x] 206. … - [x] 208. …` with no `207` line.
+- `TASKS-archive.md`'s own **Contents** list has no `- [x] 207.` entry either.
+
+So the only way to discover task 207 is to scroll the archive or grep for the heading. Both
+index files state an invariant they break: `TASKS.md`'s archive pointer says "The checklist
+above still carries every task's stable ID and status", and the archive's contents heading
+says "The completed tasks archived in this file (stable IDs 1–322)".
+
+This predates task 322 — `git show HEAD:TASKS.md` at the commit before it has the same gap,
+with 206 and 208 both present — so it is an old dropped line rather than fresh damage, and
+207 is the only ID affected out of 322.
+
+### Why it matters
+
+Small, but it is the index that every other task navigates by, and a silent hole in it is the
+kind of thing that makes a later census wrong. Counting `- [x]` lines in `TASKS.md` yields
+321 where the archive holds 322 detail sections; a reader reconciling those two numbers has
+no reason to suspect a missing row rather than a duplicated section.
+
+### Steps
+
+1. Add `- [x] 207.` to `TASKS.md`'s Done checklist between 206 and 208, and the matching
+   entry to `TASKS-archive.md`'s Contents list in the same place, both summarising the
+   existing `## 207.` heading. Do **not** reword the detail section.
+2. While there, check the same way round for the opposite gap — a checklist row with no
+   detail section — since only the one direction has been measured:
+   `comm -3` the `- [x] <N>` IDs in `TASKS.md` against the `## <N>.` IDs in
+   `TASKS-archive.md` and confirm the difference is empty afterwards. That one command is
+   the whole check.
+
+### Validation
+
+Documentation only: no rebuild, no suite run, `stamp-version.ps1` reports "already at" its
+current stamp, and `git status` shows only the two task files. The `comm -3` in step 2 must
+print nothing.
+
+---
+
+> **Completed task details (tasks 1–322) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -441,6 +627,59 @@ check the six hashes explicitly rather than trusting a green suite.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (docs pass, task 322): closed **322** by the **"mark it dead"** arm, the user's
+choice after a written comparison. `AGENTS.md`'s repository map gains a `book.ini` entry,
+`docs/The-Books.md` and `PLAN.md` are corrected. Documentation only — `stamp-version.ps1`
+reported "already at 26.08.28.ba963ea" and `git status` showed no generated file. Filed **323**,
+**324**, **325** and **326**.
+
+**The reason to keep `Map=` dead is not that it is cheaper — it is that the key duplicates a fact
+the filesystem already answers.** `books.ini`'s `Published=` is read *because* it carries an
+editorial decision nothing can derive; `build-data.ps1`'s own comment says it is deliberately a
+list and not a `book*/` glob, so a half-transcribed folder is not bundled the moment it appears.
+`Map=` names which file is the map, and the directory already knows. A `-Map$` pattern is
+re-checked against the directory on every build and cannot drift; a declaration of the same fact
+can, and book 3's did. **That test — does the key hold something you cannot derive? — is now in
+`AGENTS.md`**, because it decides the next such question without re-running this argument.
+
+**The task's framing was too narrow, and taking "all five keys are equally inert" at face value
+would have buried two real findings.** Inert is not the same as worthless, and the user's push
+("would it be better live?") is what forced the file to be read as a whole rather than one key at
+a time. Two of the other four hold things **no other file in the repo knows**:
+`Map.Title` is a caption written for the map ("The Ports & Anchorages of the Violet Ocean") where
+`showMaps` currently shows the *book* title ("Over the Blood-Dark Sea"), and it is the `alt` text
+too — filed as **324**. `Codewords=` is the authoritative per-book codeword list, and
+`validate-source.ps1` validates codeword **attribute names** but never **values**, so a typo'd
+`<gain codeword="Anchr">` passes the gate and silently never matches `<if codeword="Anchor">` —
+filed as **325**, the only MEDIUM of the three, because it is a latent correctness bug rather
+than polish. The strongest case for a live `book.ini` was never the key the task was filed about.
+
+**Carry forward: a "nothing reads this" finding needs the whole file read, not the named key.**
+322 was filed off a `grep` for `book.ini` and inherited that grep's scope. The same shape as 320,
+which was filed off a `grep` of `dock=` without opening the handler — one level up again.
+
+**Carry forward: book 4 disproves the tidy version of the story.** `books/book4/book.ini` carries
+a commented-out `#Map=SteppesSmaller.jpg` beneath its live `Map=`, which is the inherited format's
+override mechanism in visible use. So `Map=` is not merely decorative — the honest reason to leave
+it dead is that **this port has no second candidate image in any book folder**, not that an
+override could never be wanted. If one ever is, the shape is `Map=` as an *optional* override with
+an unresolvable value a **build error**, never a silent fallback to the pattern.
+
+**Carry forward: the docs sweep problem is now three passes old.** 320 corrected `ROADMAP.md`'s
+`book.ini` claim; `PLAN.md` and `docs/The-Books.md` carried the same claim untouched for four
+weeks and were found only because this task's grep happened to run. Checking the siblings turned
+up `REVIEW.md` citing `renderStatic` at `app.js:775`/`:781` — a function that has since **moved to
+`ui.js`**, for a defect **task 65 already fixed** (`ui.js` tests `parent.tagName === 'TR'` first),
+with `render.js:2568` now a blank line. Filed as **323**. A correction applied only to the
+document a task names is not finished.
+
+**Checking this pass's own edit found a hole predating it.** Reconciling the two task indexes
+after moving 322's detail — `comm -3` over the `- [x] <N>` IDs here against the `## <N>.` IDs in
+the archive — turned up **207** in neither index: no Done row in this file and no Contents entry
+in the archive, so it survives only as an orphan detail section. Present at `HEAD` before this
+pass, with 206 and 208 both indexed, so it is an old dropped line. Filed as **326**. The
+reconciliation itself is one command and is now step 2 of that task.
 
 Worked 2026-08-31 (repo hygiene, task 321): closed **321** by arm **(a)**, the user's choice from
 a written comparison of the three. Two commits — a one-character escape, then a line-endings-only

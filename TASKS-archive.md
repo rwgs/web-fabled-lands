@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–321), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320) and task 321 (ID 321). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for completed tasks (stable IDs 1–322), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321) and task 322 (ID 322). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–321). Detail sections follow below in their original filed order; find one by its `## <N>.` heading.
+The completed tasks archived in this file (stable IDs 1–322). Detail sections follow below in their original filed order; find one by its `## <N>.` heading.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -330,6 +330,7 @@ The completed tasks archived in this file (stable IDs 1–321). Detail sections 
 - [x] 319. The line-ending trap task 318 hit was recorded only in the Review log, where a trap that changes how you run a bulk edit belongs in `AGENTS.md` — and the sharper half of it, a broken shell assertion, turned out not to exist
 - [x] 320. `ROADMAP.md` phase 1 cites two moved locations and undercounts its own dock sites
 - [x] 321. The two task files are the repo's only CRLF blobs, so a tool edit rewrites them whole
+- [x] 322. `book.ini` is read by nothing, so its `Map=` key reads as live configuration while the build ignores it
 
 ---
 
@@ -14639,5 +14640,80 @@ to a temp file and verified there before overwriting. **Byte-splicing a tracked 
 only because it was committed first** — which it was, by task 320 minutes earlier.
 
 No rebuild, no suite run; `AGENTS.md` and the two task files only, so no generated output.
+
+---
+
+## 322. `book.ini` is read by nothing, so its `Map=` key reads as live configuration while the build ignores it
+
+**Priority: LOW.** Nothing ships wrong today — every book's regional map is copied correctly,
+including book 3's. The cost is that a source file in `books/` states a fact about the build
+that is not true, and one book's value is already stale enough to prove it.
+
+### What is wrong
+
+Each `books/book<N>/book.ini` declares a `Map=` key:
+
+| Book | `Map=` | File on disk | Ships as |
+|---|---|---|---|
+| 1 | `Sokara.JPG` | `Sokara-Map.JPG` | `book1.jpg` |
+| 2 | `Golnir.JPG` | `Golnir-Map.JPG` | `book2.jpg` |
+| 3 | `Violet Ocean.JPG` | `VioletOcean-Map.JPG` | `book3.jpg` |
+| 4 | `Great Steppes.JPG` | `GreatSteppes-Map.JPG` | `book4.jpg` |
+| 5 | `Uttaku.JPG` | `Uttaku-Map.JPG` | `book5.jpg` |
+| 6 | `Akatsurai.JPG` | `Akatsurai-Map.JPG` | `book6.jpg` |
+
+**No value in that column names a file that exists**, and the build does not care: it picks
+the regional map with `Where-Object { $_.BaseName -match '-Map$' }` in `build-data.ps1` and
+copies the match to `web/assets/maps/book<N>.jpg`. Nor is `Map=` read anywhere else —
+`grep` for `book.ini` across `build/*.ps1` and `web/js/*.js` returns nothing, so the whole
+file is inert in this port. It is inherited from the reference `java-engine/` data format.
+
+Book 3 is the one that shows it. Books 1, 2, 5 and 6 differ from their real filename only by
+the `-Map` suffix, so `Map=Sokara.JPG` reads like a shorthand a reader might assume the build
+expands. `Map=Violet Ocean.JPG` versus `VioletOcean-Map.JPG` cannot be reconciled by any rule
+— the space moves — which is what makes the key demonstrably unread rather than merely
+abbreviated.
+
+### Why it matters
+
+This is the shape task 320 found in `ROADMAP.md`, one directory over: a file that looks like
+configuration, is treated as evidence, and is checked by nothing. Phase 1 of `ROADMAP.md`
+originally proposed `places.ini` "alongside the existing `book.ini` that already declares
+`Map=`" — reading the inert key as an established precedent for a build-read `.ini` per book.
+That citation is now corrected, but the source of the confusion is still in the tree, and the
+next reader of `books/book3/book.ini` has no way to tell the key is dead.
+
+`validate-source.ps1` gates the section XML and never looks at `book.ini`, so nothing fails
+when a value rots. That is correct — it is not a section file — but it does mean the staleness
+is unbounded.
+
+### Steps
+
+1. Decide which of the two this is, and it is a genuine choice rather than an obvious one:
+   - **Make it live** — have `build-data.ps1` resolve the regional map through `Map=` instead
+     of the `-Map$` pattern, and fix the six values to name real files. Turns an inherited
+     file into the declaration it appears to be, and matches how `books.ini`'s `Published=`
+     already drives the build (task 209). Costs a build-script change and a `release.ps1`
+     look, since the map copy is part of what a withdrawn book reconciles.
+   - **Mark it dead** — leave the build alone and record in `AGENTS.md`'s repository map that
+     `book.ini` is inherited reference data read by nothing, so `Map=` is not the source of
+     truth for the regional map (the `-Map$` filename is). Cheapest, and honest, but leaves
+     six wrong values in the tree.
+2. Whichever is chosen, say it where a reader of `books/` will meet it — the repository map in
+   `AGENTS.md` currently describes `books/books.ini` and the section XML but not `book.ini`.
+3. Do **not** rename any `.JPG` to satisfy the ini. The `-Map$` pattern is what the build
+   depends on today, and a rename would break the copy for every book at once.
+
+### Validation
+
+If step 1 takes the "mark it dead" arm: documentation only, no rebuild, no suite run, and no
+generated output may change.
+
+If it takes the "make it live" arm: `build-data.ps1` and `release.ps1` change, so run
+`pwsh -File build/build-data.ps1` and confirm `web/assets/maps/book<N>.jpg` is byte-identical
+to before for all six books (hash each), then `release-selftest.ps1`, `validate-selftest.ps1`
+and the headless suite to `RESULT ALL PASS`. A build that silently stops copying a map leaves
+the Maps modal showing the "not installed" note, which no assertion currently covers — so
+check the six hashes explicitly rather than trusting a green suite.
 
 ---

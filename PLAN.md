@@ -44,8 +44,11 @@ currently prints, which is what task 320 is filed to fix.
   against the image, not against `.map-view`, which is a plain `text-align: center` wrapper
   (`style.css:506`).
 - **`data.location` is `null` inland and at sea**, which is most of the game.
-- **`book.ini` already declares `Map=`**, so a per-book gazetteer file sits naturally beside
-  it.
+- **`book.ini` is not a precedent for a build-read `.ini`.** It sits in each book folder and
+  declares `Map=`, but nothing under `build/` opens it, so that key is inert - the build picks
+  each regional map by the `-Map$` basename pattern, which is why book 3's
+  `Map=Violet Ocean.JPG` names no file that exists. `places.ini` needs a reader written for
+  it, and writing one does not make `Map=` live.
 
 ## Approach
 

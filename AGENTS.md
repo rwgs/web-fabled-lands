@@ -40,6 +40,21 @@ combat, markets, ships, live adventure sheet). Plain HTML/CSS/ES modules —
   which books a build ships: it drives validation, the per-book JSON, the copied maps and
   art, `sw.js`'s offline inventory and the every-section scan. Publishing/withdrawing a
   book is a content change to this line, never a build-script edit (task 209).
+- **`books/book<N>/book.ini`** — inherited from the reference `java-engine/` data format and
+  **read by nothing in this port *today*.** No script under `build/` opens it, so none of
+  `Map`, `Map.Title`, `Death`, `Codewords` or `Icon` currently reaches the build or the app.
+  **Unread is not the same as worthless** — `Map.Title` and `Codewords=` hold things nothing
+  else in the repo knows, and are filed as tasks 324 and 325. What is settled (task 322) is
+  the one key that looks most like configuration: `Map=` is **not** the source of truth for
+  that book's regional map. The build selects it by the **`-Map$` basename pattern**, and book
+  3 proves the key dead — `Map=Violet Ocean.JPG` names no file on disk, while
+  `VioletOcean-Map.JPG` ships correctly as `book3.jpg`. That stays pattern-driven on purpose:
+  a pattern is re-checked against the directory on every build and so cannot drift, where a
+  declaration of the same fact can and did. Contrast `books.ini` above, which is read
+  *because* `Published=` carries an editorial decision the filesystem cannot answer — **the
+  test for a live `.ini` key here is whether it holds something you cannot derive.** So **do
+  not cite `book.ini` as build configuration or as a precedent for one**, and do not rename a
+  `.JPG` to satisfy it — but do read it before assuming a fact about a book is unrecorded.
 - **`web/data/*.json` and `web/js/version.js`** — **GENERATED** from `books/` +
   `rules/` by the build. **Never hand-edit them;** change the XML and rebuild.
 - **`web/sw.js`** — hand-written, *except* the `BOOK_DATA`/`BOOK_MAPS`/`BOOK_ILLUS` lists
