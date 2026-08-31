@@ -274,16 +274,38 @@ line-ending noise at all, because `core.autocrlf=true` with no `.gitattributes`
 normalises both sides to LF in the index; the only tells were git's own "LF will
 be replaced by CRLF" warning and a byte count. **That same normalisation is why
 this is cosmetic**: the committed bytes are LF whatever the working copy holds,
-the build LF-normalises the bundled section text, `TASKS.md` is read by no script,
-and 18 of the 4,632 tracked text files carrying a terminator are already all-LF
-from earlier passes with no consequence — so **never "fix" a file's endings as a
-drive-by**, and don't read the git warning as a defect. Shell assertions are not
-at risk either: `$(...)` drops a trailing CR under this Cygwin bash, so a
-`sed`-based boundary check and a `head`-based one both pass. The one habit worth
-keeping is **one tool family per pipeline**, so a file you rewrite wholesale comes
-out uniform; verify with a terminator count (how many CRLF against how many
-LF, over the whole file) rather than with the diff, which cannot answer the
-question.
+the build LF-normalises the bundled section text, `TASKS.md` is read by no script
+— so **never "fix" a file's endings as a drive-by**, and don't read the git
+warning as a defect. Shell assertions are not at risk either: `$(...)` drops a
+trailing CR under this Cygwin bash, so a `sed`-based boundary check and a
+`head`-based one both pass. The one habit worth keeping is **one tool family per
+pipeline**, so a file you rewrite wholesale comes out uniform; verify with a
+terminator count (how many CRLF against how many LF, over the whole file) rather
+than with the diff, which cannot answer the question.
+
+**"The committed bytes are LF either way" is true today only because task 321 made
+it true, and autocrlf has two documented ways to keep CRLF that are worth knowing
+before you trust it.** When 319 wrote that sentence it held for 4,630 tracked
+files and failed on the two this project edits most — `TASKS.md` (`i/crlf`) and
+`TASKS-archive.md` (`i/-text`) — for two different reasons:
+- **One lone CR** (a CR not followed by LF) anywhere in a file makes git classify
+  the whole file binary, and a binary file is never converted in either direction.
+  `TASKS-archive.md` had exactly one, inside a code span in 319's own note about
+  CR handling, which is what made it `-text` for 14,521 CRLF lines.
+- **Once a text file's index blob contains CRLF, git keeps CRLF** on every later
+  staging instead of normalising. So a CRLF blob is self-perpetuating: it does not
+  heal on the next commit, and `git status` stays clean because both sides match.
+
+Both are fixed — every tracked blob is now `i/lf` (4,643 files; the 32 `i/-text`
+are real images and the 8 `i/none` are single-line files) — so a tool writing
+either ending now produces a scoped diff. **Two measurement traps survive the fix**,
+and both report the reassuring answer: `git show` applies eol conversion, so it
+tells you the opposite of what the blob holds — use **`git cat-file blob`**. And
+`grep -c $'\r$'` returns **0 for a fully-CRLF file** under this bash, because grep
+strips the CR before the pattern sees it; count bytes instead. The whole-file diff
+this all caused, incidentally, was never git's staging path normalising — it was an
+**editing tool writing LF into a CRLF worktree file**, after which git stored LF
+against a CRLF parent and every line read as changed.
 
 ## Task workflow
 The backlog is `TASKS.md`. Open items are `- [ ]`, done items `- [x]` (a summary

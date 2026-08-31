@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-320 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **321 (LOW) and 322 (LOW) are open**. File new
+321 is complete (listed under **Done** below), apart from 207, withdrawn as a
+misdiagnosis (see the Review log); **322 (LOW) is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -24,7 +24,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 321. `TASKS.md` and `TASKS-archive.md` are the only two tracked files whose **committed blobs** are CRLF — every other tracked `.md` blob is LF — so any edit staged through a tool that normalises rewrites the whole file (6,348 changed lines for an 84-line edit), which is the opposite of what task 319 recorded when it concluded "`core.autocrlf=true` makes the committed bytes LF either way"
 - [ ] 322. every book's `book.ini` is read by **nothing** — no script under `build/` opens it — so its `Map=` key reads as the live declaration of which image is that book's map while the build actually selects by the `-Map$` basename pattern, and book 3 proves it inert: `Map=Violet Ocean.JPG` names a file that does not exist, yet `VioletOcean-Map.JPG` ships correctly as `book3.jpg`
 
 **Done**
@@ -354,63 +353,9 @@ this order.*
 - [x] 318. Re-archive completed task details 275–317 and clear them out of the priority buckets
 - [x] 319. The line-ending trap task 318 hit was recorded only in the Review log, where a trap that changes how you run a bulk edit belongs in `AGENTS.md` — and the sharper half of it, a broken shell assertion, turned out not to exist
 - [x] 320. `ROADMAP.md`'s phase 1 cites two source locations that have moved and miscounts the dock sites its gazetteer is sized against — `showMaps` is at `app.js:1152` not 1142, `state.js:995` is affliction code rather than the `data.location` write (`arriveAtDock`, `state.js:1118`), and "25 named ports across 96 sections" is 94: `<set dock=>` moves a SHIP, not the player, so the 97 sections carrying a `dock=`-family attribute are not the sites that set the location
+- [x] 321. `TASKS.md` and `TASKS-archive.md` were the only two tracked blobs that were not LF — but not for the reason filed: git never normalised them, it PRESERVED their CRLF, and the 6,348-line diff came from an editing tool writing LF into a CRLF worktree file. Two distinct causes: one lone CR in task 319's own write-up made the archive binary, and a text file whose index blob already holds CRLF keeps CRLF on every later staging
 
 ---
-
-## 321. The two task files are the repo's only CRLF blobs, so a tool edit rewrites them whole
-
-**Priority: LOW.** Nothing is broken and nothing ships differently. It costs review time, on
-the two files this project edits most.
-
-### The fact
-
-Measured over every tracked `.md` blob (`git cat-file blob` on the raw bytes — **not**
-`git show`, which applies eol conversion and reports the opposite):
-
-| | Committed blob |
-|---|---|
-| `TASKS.md` | **CRLF** (3,136 CR) |
-| `TASKS-archive.md` | **CRLF** (14,409 CR) |
-| every other tracked `.md` | LF (0 CR) |
-
-Worktree copies are CRLF across the board, which is what `core.autocrlf=true` intends and is
-not the issue.
-
-### The cost
-
-An edit to either file that gets staged through the normalising path stores an LF blob
-against a CRLF parent, so **every line reads as changed**: filing task 320 produced 84 lines
-of real change and a **6,348-line diff**. The change is unreviewable, and the file silently
-migrates to LF as a side effect of an unrelated edit.
-
-It is avoidable once known - staging with conversion disabled preserves the CRLF blob and
-the diff collapses to the real 84 lines - but it is invisible until someone measures raw
-bytes, and the obvious check (`git show HEAD:TASKS.md | grep $'\r$'`) reports the wrong
-answer because `git show` converts.
-
-### Why this is filed rather than fixed
-
-Task 319 surveyed line endings and concluded the situation was harmless, on the grounds that
-"`core.autocrlf=true` makes the committed bytes LF either way". That holds for 4,630-odd
-tracked files and **not** for these two. 319 also explicitly warned against a drive-by
-`.gitattributes`, and it was right to - which is exactly why this is a filed decision rather
-than something to do while passing.
-
-### Steps
-
-1. Decide between: (a) normalise both files to LF in **one deliberate commit** that changes
-   nothing else and says so in its message; (b) add a `.gitattributes` pinning the
-   convention repo-wide; or (c) leave them and record the staging workaround in `AGENTS.md`
-   beside task 319's note.
-2. Whichever is chosen, correct 319's claim where it is recorded, since it is the sentence
-   that would stop the next person from looking.
-3. If (a) or (b): confirm afterwards that `git cat-file blob` reports 0 CR for both files,
-   and that no other tracked file changed.
-
-### Validation
-
-Repository hygiene only — no rebuild, no suite run, and no generated output may change.
-Verify by raw blob inspection, never by `git show`.
 
 ## 322. `book.ini` is read by nothing, so its `Map=` key reads as live configuration while the build ignores it
 
@@ -487,7 +432,7 @@ check the six hashes explicitly rather than trusting a green suite.
 
 ---
 
-> **Completed task details (tasks 1–320) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
+> **Completed task details (tasks 1–321) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -496,6 +441,42 @@ check the six hashes explicitly rather than trusting a green suite.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (repo hygiene, task 321): closed **321** by arm **(a)**, the user's choice from
+a written comparison of the three. Two commits — a one-character escape, then a line-endings-only
+normalisation — plus the `AGENTS.md` correction step 2 required. Every tracked blob is now `i/lf`
+(4,643), with 0 `i/crlf` and 0 `i/mixed`.
+
+**The filed cause was backwards, and correcting it is what made the fix the right one.** 321 said
+an edit "staged through the normalising path" stores an LF blob against a CRLF parent. git does the
+opposite: a text file whose index blob already holds CRLF **keeps** CRLF on every later staging,
+scoped diff and all — task 320's pass proved it by committing 295/84 and leaving both blobs CRLF.
+The 6,348-line diff came from an **editing tool writing LF into the worktree**. Arm (c) would
+therefore have documented a workaround for a step that was never at fault.
+
+**Two files, two different mechanisms, and the filing's table flattened them into one.**
+`TASKS-archive.md` was not CRLF-text at all — it was **binary**, because of exactly one lone CR at
+byte offset 980447, and git treats any file containing one that way (`i/-text`), after which
+autocrlf touches it in neither direction. The byte was inside a code span in **task 319's own
+write-up about CR handling**, where it rendered as nothing: the sentence read "would compare `---`
+against `---` and fail". One character fixed the prose and the classification together.
+`TASKS.md`, by contrast, was clean CRLF text (0 lone CR, 0 bare LF) held by the self-perpetuating
+rule above.
+
+**Carry forward: two line-ending measurements in common use return the reassuring answer.** 319
+already recorded that `git show` converts and `git cat-file blob` does not. This pass added the
+second, by hitting it: **`grep -c $'\r$'` reports 0 for a fully-CRLF file** under this Cygwin bash,
+because grep strips the CR before the pattern sees it — it read 0 for a `ROADMAP.md` holding 222
+CRLF and no bare LF. Count bytes. Both are now in `AGENTS.md`.
+
+**Carry forward: verify a mechanical rewrite before it lands, not after.** The normalisation was
+checked by stripping CRs from each `HEAD` blob and `cmp`-ing against the new worktree copy
+(identical) and by confirming each byte count fell by exactly its CRLF count — so "line endings
+only" is a measurement rather than an intention. Also: a `List[byte].AddRange($b[0..n])` splice
+truncated `TASKS-archive.md` to 2 bytes, because PowerShell's range operator yields `Object[]` and
+only the two `Add` calls survived. `git checkout --` restored it exactly, which it could only do
+because task 320 had committed the file minutes earlier. **Byte-splice a tracked file only when it
+is committed**, write to a temp copy, and verify there first.
 
 Worked 2026-08-31 (docs pass, task 320): closed **320** — `ROADMAP.md`'s three phases now cite
 functions instead of line numbers, and its dock census says which set it measured. `ROADMAP.md`
