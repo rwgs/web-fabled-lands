@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-328 is complete (listed under **Done** below), apart from 207 and 326, both
-withdrawn as misdiagnoses (see the Review log); **329 and 330 (both
+331 is complete (listed under **Done** below), apart from 207 and 326, both
+withdrawn as misdiagnoses (see the Review log); **330 and 331 (both
 LOW) are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
@@ -25,8 +25,8 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 329. `PLAN.md`'s status header says "the backlog carries one open item (task 320)" and dates itself today, but 320 is closed and the backlog carries four — a stale *status* rather than a stale citation, in the file task 323 had just swept for citations, and a count `PLAN.md` cannot help rotting because it restates a figure another file owns
 - [ ] 330. `run-tests.ps1` diagnoses an empty dump as a CAPTURE failure ("no stdout handle?"), but a browser that launches and does no work at all writes the same empty file — an Edge mid-update wrote no DOM, no `--screenshot` and no `--version` while still creating its profile, and `AGENTS.md`'s one-second discriminator ("`--version` printing nothing confirms the missing handle") reads that evidence as exactly the wrong cause
+- [ ] 331. `PLAN.md` says `state.data.location` covers "25 named ports across **97** sections" and that three `<set dock=>` sections "set a dock", but `<set dock=>` berths a *ship* — only the **94** `<section dock=>` sections move the player, which is the figure `ROADMAP.md` already prints after task 320; the two planning files disagree on phase 1's own census, and `ROADMAP.md`'s "97 sections carry at least one of the four attributes" is itself the union of only two (all four: **102**)
 
 **Done**
 
@@ -365,57 +365,7 @@ this order.*
 - [x] 327. task 325's unused-codeword note counts a `<lose>` or an `<if>` as "used", so the case it exists to surface — a codeword the port never **awards** — is not reported: book 2's `Beach` and `Bilge` are tested and swept but reachable by no `<gain>`/`<tick>`, which is exactly what that book's `# Unnecessary codewords: Bait,Beach,Bilge` comment records, and the third name is masked by a no-op `<tick>`
 - [x] 328. two sections carry a no-op `<tick codeword="X"/>` (book 2 sections 579 and 633), and one of them invents a codeword — `Bogus` — that exists nowhere else in the corpus and in no `Codewords=` list, so task 325 had to add it to the gate's port-flag allowlist to keep the build green: an allowlist entry whose only job is to keep scaffolding alive
   — filed as a `<tick>`/`<lose>` **pair**; §579's `<lose>` is the first entry of a complete 20-codeword sweep, so only three of the four nodes were dead (see the Review log)
-
----
-
-## 329. `PLAN.md`'s status header names one open backlog item, and that item is closed
-
-**Priority: LOW.** Documentation accuracy in the same file task 323 just swept, but a
-different failure class — a stale *status*, not a stale citation, so 323 left it alone
-rather than combining tasks.
-
-### What is wrong
-
-`PLAN.md`'s opening paragraph reads:
-
-> **Status: not started.** Nothing is in flight as of 2026-08-31. The backlog carries one
-> open item (task 320, a documentation correction to the very phase planned below) …
-
-Task **320 is done** (it is in this file's Done checklist and its detail is archived), and
-the backlog does not carry one open item — it carries **324, 326, 327 and 328**. The "as of
-2026-08-31" date is today's, so the sentence reads freshly verified while both of its facts
-are wrong. `PLAN.md` also still says the next feature is `ROADMAP.md`'s phase 1, which is
-true.
-
-### Why it matters
-
-Same reason 320/322/323 gave for line numbers, one level up: a status line with a date on
-it is read as current, and a reader who trusts "one open item" skips the backlog. Unlike a
-citation, no `grep` for a symbol will ever catch it — the only check is comparing the
-sentence against `TASKS.md`.
-
-It is also structural rather than a one-off. `PLAN.md` says of itself that it is "replaced
-when the next non-trivial change begins", so a count of open backlog items inside it is
-guaranteed to rot between replacements. The cheap fix is to not state a derivable figure
-there at all — the same test `AGENTS.md` applies to a live `.ini` key (does it hold
-something you cannot derive?), applied to prose.
-
-### Steps
-
-1. Correct the paragraph: drop the open-item count and the task-320 reference, keeping the
-   "not started / next feature is phase 1" substance, which is what the section is for.
-   Point at `TASKS.md` for the backlog state instead of restating it.
-2. Check the sibling planning documents for the same shape — a dated status sentence that
-   restates a count owned by another file — since the sweep problem `AGENTS.md` now records
-   is exactly what let this survive 323.
-3. If `AGENTS.md`'s new citation rule should also cover derivable figures, say so there in
-   one sentence rather than filing a fourth pass on the same class.
-
-### Validation
-
-Documentation only: `git status` shows only `.md` files and `stamp-version.ps1` reports
-"already at" its current stamp. Verify by reading the corrected paragraph against
-`TASKS.md`'s open `- [ ]` lines — they must agree, or the paragraph must not claim to know.
+- [x] 329. `PLAN.md`'s status header says "the backlog carries one open item (task 320)" and dates itself today, but 320 is closed and the backlog carries four — a stale *status* rather than a stale citation, in the file task 323 had just swept for citations, and a count `PLAN.md` cannot help rotting because it restates a figure another file owns
 
 ---
 
@@ -479,7 +429,66 @@ so run it by hand.
 
 ---
 
-> **Completed task details (tasks 1–328) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
+## 331. `PLAN.md` counts 97 sections as setting the player's location, where 94 do
+
+**Priority: LOW.** Planning figures; no code reads either number. But phase 1's gazetteer
+census is the whole reason both documents state it, and they state it differently.
+
+### What is wrong
+
+`PLAN.md` says `state.data.location` covers "**25 named ports across 97 sections**", and its
+first constraint bullet explains the figure: "**97 sections set a dock, not 96, and they do it
+two ways** — 94 carry `<section dock=>`; three more set it through `<set dock=>` alone".
+
+`<set dock=>` does not set the player's location. The `dock` arm of `applySet` in
+`web/js/engine.js` moves the **current ship's** berth (`s.docked = get('dock')`) and returns
+without touching `data.location`; only `arriveAtDock` in `web/js/state.js`, driven by the
+section's own `dock=` attribute, moves the player. `ROADMAP.md`'s phase 1 states that
+distinction and gives **94** for "sets `data.location`" — task 320 put it there. So the two
+planning files print different figures for the same census, and the overstated one is the file
+the work would be done from.
+
+Re-measured over the shipped corpus (the `^\d+[a-z]?$` basenames of the six published books,
+4,369 files): `<section dock=>` 94 sections, `<set dock=>` 3 sections / 14 nodes, `todock=` 2,
+`<if docked=>` 3, and the gazetteer is 25 names either way.
+
+The same census corrects `ROADMAP.md` too, in the sentence above its table: "Four attributes
+carry a dock name, and **97** shipped sections carry at least one of them". 97 is the union of
+the first two attributes only — the union of all four is **102**, because the two `todock=`
+sections (`books/book1/176.xml`, `books/book4/114.xml`) and the three `<if docked=>` sections
+(`books/book3/53.xml`, `books/book3/222.xml`, `books/book3/345.xml`) carry no `dock=` of their
+own. The per-attribute table is right; only that sentence is wrong.
+
+### Why it matters
+
+Task 320 was filed because a phase's central claim rested on drifted figures, and tasks
+322/323 because the correction was not swept into the sibling documents. This is the residue of
+exactly that: `ROADMAP.md` was corrected, `PLAN.md` was written from the pre-correction figure,
+and the number phase 1 turns on — how many sections a dock pin can actually cover — is three
+too high in the file an implementer reads first.
+
+### Steps
+
+1. In `PLAN.md`, change "25 named ports across 97 sections" to 94 and rewrite the first
+   constraint bullet: 94 sections move the player, through `<section dock=>`; the three
+   `<set dock=>`-only sections berth a ship and leave `data.location` alone. Keep the three
+   filenames — they are the evidence for the distinction, not for the count.
+2. Drop the "where a figure here disagrees with `ROADMAP.md`" caveat at the head of that
+   section, which task 329 added only to stand until this is fixed.
+3. In `ROADMAP.md`, correct the union sentence — either to 102 with the four-attribute
+   breakdown, or scoped ("97 carry a `dock=`"). Do not touch the table, which is correct.
+4. Re-measure rather than copying the figures above, and record the command in the pass note,
+   the form `docs/Corpus-Census.md` uses.
+
+### Validation
+
+Documentation only: `git status` shows only `.md` files and `stamp-version.ps1` reports
+"already at" its current stamp. Afterwards the two files must print the same figure for the
+same census, and each figure must say which attribute set it measured.
+
+---
+
+> **Completed task details (tasks 1–329) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -488,6 +497,33 @@ so run it by hand.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (task 329): closed **329** and filed **331**. `PLAN.md`'s status paragraph
+now states only what it owns — not started, next feature is `ROADMAP.md`'s phase 1 — and sends
+the reader to `TASKS.md`'s open `- [ ]` items rather than counting them. Step 2's sweep found
+one real sibling: `docs/Contributing.md` said "As of 2026-08-31, **318 tasks are closed and
+none are open**" against 328 filed and two open, and now defers the same way. `REVIEW.md`'s
+dated "every finding below is closed" was deliberately left — it counts findings in its own
+file. `docs/Corpus-Census.md` and `docs/Home.md` date their figures but print the command for
+each, which is the other acceptable form. Step 3's one sentence is in `AGENTS.md` under
+"Documentation — cite the function, not the line": a line number rots invisibly, a dated status
+sentence rots *reassuringly*, and no `grep` for a symbol catches either.
+
+**The stale status was hiding a stale figure, which is task 331.** `PLAN.md` says
+`state.data.location` covers "25 named ports across **97** sections" and counts three
+`<set dock=>` sections as setting the location — but the `dock` arm of `applySet` in `engine.js`
+moves a *ship's* berth and never touches `data.location`, so the figure is **94**, which is what
+`ROADMAP.md` has printed since task 320. Two planning documents, one census, different numbers.
+Re-measured over the shipped 4,369 files: `<section dock=>` 94, `<set dock=>` 3 sections / 14
+nodes, `todock=` 2, `<if docked=>` 3, 25 names. That same count also catches `ROADMAP.md`
+claiming "97 shipped sections carry at least one of them" for a union that is **102** — its
+table is right, the sentence above it is not. Both are filed as 331 rather than fixed here;
+`PLAN.md`'s constraint block meanwhile says which of the two files to trust.
+
+Archiving turned up an index gap of its own: **task 328's detail was moved to
+`TASKS-archive.md` without a Contents row**, and that file's header still read "stable IDs
+1–327". Both corrected alongside 329's row. Documentation only — `git status` shows `.md` files
+and nothing else, and `stamp-version.ps1` reports "already at" its current stamp.
 
 Worked 2026-08-31 (task 328): closed **328** — but **three nodes, not four**. Both no-op
 `<tick codeword=>` carriers are gone (book 2 sections 579 and 633) along with section 633's

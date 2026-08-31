@@ -37,9 +37,9 @@ The build and test commands are in [Build Pipeline](Build-Pipeline.md) and
 | A durable convention | [`AGENTS.md`](../AGENTS.md). |
 
 Closed task detail is archived in [`TASKS-archive.md`](../TASKS-archive.md); the Review log
-at the end of `TASKS.md` records each audit pass and is where new work is filed. As of
-2026-08-31, **318 tasks are closed and none are open** - so the next pickup is a phase from
-`ROADMAP.md`.
+at the end of `TASKS.md` records each audit pass and is where new work is filed. That file
+is the only place that knows what is open - read its `- [ ]` lines rather than a count copied
+to here, and when the buckets are clear the next pickup is a phase from `ROADMAP.md`.
 
 ---
 

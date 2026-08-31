@@ -1,9 +1,11 @@
 # A pin at the port you are docked at
 
-**Status: not started.** Nothing is in flight as of 2026-08-31. The backlog carries one
-open item (task 320, a documentation correction to the very phase planned below), and the
-next feature is `ROADMAP.md`'s phase 1, planned here so the work can begin without
-rederiving it.
+**Status: not started.** Nothing is in flight as of 2026-08-31, and the next feature is
+`ROADMAP.md`'s phase 1, planned here so the work can begin without rederiving it. For the
+state of the defect backlog, read `TASKS.md`'s open `- [ ]` items — this file deliberately
+does not restate a count that file owns, because a figure copied into a document that is
+replaced only when the next change begins is guaranteed to rot between replacements
+(task 329).
 
 Replaced when the next non-trivial change begins, so anything that must outlive this change
 is promoted first: decisions that constrain future work to `DECISIONS.md`, and verified
@@ -28,8 +30,10 @@ corpus; roadmap phases 2 and 3 build the datasets that do not exist yet.
 
 ## Constraints discovered
 
-Verified against the tree on 2026-08-31. The first three correct figures `ROADMAP.md`
-currently prints, which is what task 320 is filed to fix.
+Verified against the tree on 2026-08-31. Where a figure here disagrees with `ROADMAP.md`'s
+phase 1 section, that file is the corrected one: task 320 separated `dock=` from "sets the
+player's location" there, and the bullets below were not re-measured against the distinction
+(task 331).
 
 - **97 sections set a dock, not 96, and they do it two ways.** 94 carry `<section dock=>`;
   three more set it through `<set dock=>` alone - `books/book3/367.xml`,

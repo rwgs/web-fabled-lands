@@ -377,6 +377,15 @@ happened to run. And in a **dated record** such as `REVIEW.md`'s findings or `TA
 review log, note the later fix rather than deleting the finding: the honest form of a
 review record is what was true then plus what happened since.
 
+**The same test covers a derivable figure: don't restate a count another file owns.** A
+line number rots invisibly; a dated status sentence rots *reassuringly*, because the date
+reads as freshly verified and no `grep` for a symbol can ever catch it. `PLAN.md` said "the
+backlog carries one open item (task 320)" on a day when 320 was closed and four were open,
+and `docs/Contributing.md` said "**318** tasks are closed and none are open" with two open
+(task 329). Point at the file that owns the fact — `TASKS.md`'s open `- [ ]` lines — or, if
+the figure has to be stated, print the command that measures it, as `docs/Corpus-Census.md`
+does.
+
 ## Task workflow
 The backlog is `TASKS.md`. Open items are `- [ ]`, done items `- [x]`, and a filing
 withdrawn as a misdiagnosis keeps its stable ID as `- [~]` (a summary checklist is at

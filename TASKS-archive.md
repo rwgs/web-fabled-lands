@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–327), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326) and task 327 (ID 327). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for completed tasks (stable IDs 1–329), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326), task 327 (ID 327), task 328 (ID 328) and task 329 (ID 329). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–327). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
+The completed tasks archived in this file (stable IDs 1–329). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -336,6 +336,8 @@ The completed tasks archived in this file (stable IDs 1–327). Detail sections 
 - [x] 324. The Maps modal captions each regional map with the book title, when `book.ini` holds a title written for the map
 - [~] 326. Task 207 is indexed nowhere, so a completed task survives only as an orphan detail section
 - [x] 327. The unused-codeword note counts a `<lose>` as use, so the missed-`<gain>` case it exists for goes unreported
+- [x] 328. Two sections carry a no-op `<tick>`/`<lose>` codeword pair, one of which invents a codeword
+- [x] 329. `PLAN.md`'s status header names one open backlog item, and that item is closed
 
 ---
 
@@ -15118,5 +15120,89 @@ the pairs were inert.
 something the engine reads. `books/book2/book.ini` was not touched. `web/data/book2.json` was the
 only generated file to move; `validate-selftest.ps1` passes 51, the browser suite passes 3,035,
 and the re-run build is a byte-for-byte no-op.
+
+---
+
+## 329. `PLAN.md`'s status header names one open backlog item, and that item is closed
+
+**Priority: LOW.** Documentation accuracy in the same file task 323 just swept, but a
+different failure class — a stale *status*, not a stale citation, so 323 left it alone
+rather than combining tasks.
+
+### What is wrong
+
+`PLAN.md`'s opening paragraph reads:
+
+> **Status: not started.** Nothing is in flight as of 2026-08-31. The backlog carries one
+> open item (task 320, a documentation correction to the very phase planned below) …
+
+Task **320 is done** (it is in this file's Done checklist and its detail is archived), and
+the backlog does not carry one open item — it carries **324, 326, 327 and 328**. The "as of
+2026-08-31" date is today's, so the sentence reads freshly verified while both of its facts
+are wrong. `PLAN.md` also still says the next feature is `ROADMAP.md`'s phase 1, which is
+true.
+
+### Why it matters
+
+Same reason 320/322/323 gave for line numbers, one level up: a status line with a date on
+it is read as current, and a reader who trusts "one open item" skips the backlog. Unlike a
+citation, no `grep` for a symbol will ever catch it — the only check is comparing the
+sentence against `TASKS.md`.
+
+It is also structural rather than a one-off. `PLAN.md` says of itself that it is "replaced
+when the next non-trivial change begins", so a count of open backlog items inside it is
+guaranteed to rot between replacements. The cheap fix is to not state a derivable figure
+there at all — the same test `AGENTS.md` applies to a live `.ini` key (does it hold
+something you cannot derive?), applied to prose.
+
+### Steps
+
+1. Correct the paragraph: drop the open-item count and the task-320 reference, keeping the
+   "not started / next feature is phase 1" substance, which is what the section is for.
+   Point at `TASKS.md` for the backlog state instead of restating it.
+2. Check the sibling planning documents for the same shape — a dated status sentence that
+   restates a count owned by another file — since the sweep problem `AGENTS.md` now records
+   is exactly what let this survive 323.
+3. If `AGENTS.md`'s new citation rule should also cover derivable figures, say so there in
+   one sentence rather than filing a fourth pass on the same class.
+
+### Validation
+
+Documentation only: `git status` shows only `.md` files and `stamp-version.ps1` reports
+"already at" its current stamp. Verify by reading the corrected paragraph against
+`TASKS.md`'s open `- [ ]` lines — they must agree, or the paragraph must not claim to know.
+
+### Outcome (worked 2026-08-31)
+
+Closed as filed, plus the sibling the sweep in step 2 turned up. `PLAN.md`'s status paragraph
+now states only what it owns — not started, next feature is `ROADMAP.md`'s phase 1 — and points
+at `TASKS.md`'s open `- [ ]` items instead of counting them, with one sentence saying why a
+document that is replaced only when the next change begins must not restate a figure another
+file owns.
+
+**Step 2 found one live sibling and one that only looked like one.** `docs/Contributing.md`
+carried the same shape and was equally wrong — "As of 2026-08-31, **318 tasks are closed and
+none are open**" against 328 filed and two open — and now defers to `TASKS.md` in the same way.
+`REVIEW.md`'s "Status as of 2026-08-31: every finding below is closed" was left alone: it counts
+findings in its own file, which is a fact it owns. `docs/Corpus-Census.md` and `docs/Home.md`
+both date their figures but print the command that measures each one, which is the other
+acceptable form.
+
+Step 3's sentence is in `AGENTS.md`, appended to "Documentation — cite the function, not the
+line": a line number rots invisibly, a dated status sentence rots *reassuringly*, and neither is
+caught by a `grep` for a symbol. Point at the owning file, or print the command.
+
+**The pass also found the figure that made the caveat necessary, filed as task 331.** `PLAN.md`
+says `state.data.location` covers "25 named ports across **97** sections", counting three
+`<set dock=>` sections as setting the location when that tag berths a *ship* — `ROADMAP.md`
+already prints the correct **94** after task 320, so the two planning documents disagree about
+phase 1's own census. Correcting it is not this task, so the constraint block now says which of
+the two is authoritative and names 331; `ROADMAP.md`'s own union sentence (97 for a union that
+is 102 across all four attributes) is filed there as well.
+
+One more index gap turned up while archiving: **task 328's detail was moved here without a
+Contents row**, and this file's header still read "stable IDs 1–327". Both are corrected in the
+same pass, since 329's own row goes in the same list. Documentation only —
+`stamp-version.ps1` reports "already at" its current stamp and no generated file moved.
 
 ---
