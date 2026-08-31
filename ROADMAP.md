@@ -32,8 +32,8 @@ are missing.
 
 **`dock=` is not the same set as "sets the player's location", and the gazetteer's
 census has to know the difference** (task 320). Four attributes carry a dock name,
-and 97 shipped sections carry at least one of them, but only the first moves the
-player:
+and 102 shipped sections carry at least one of the four, but only the first moves
+the player:
 
 | Attribute | Sections | What it does |
 |---|---|---|
@@ -43,9 +43,10 @@ player:
 | `<if docked="X">` | 3 | reads a ship's berth |
 
 All four draw from the **same closed set of 25 names**, so a gazetteer keyed by
-dock name is complete either way — but a census written as "every section with
-`dock=`" counts 97 and measures ship movement, while one written as "every section
-that sets the location" counts 94. Say which you mean.
+dock name is complete either way — but a census written as "every section with a
+`dock=` attribute" counts 97 — rows one and three, so it measures ship movement too
+— while one written as "every section that sets the location" counts 94, and the
+union of all four rows is 102. Say which you mean.
 
 **Cite the function, not the line.** Every code reference in this file now names a
 function and links the file — `showMaps` in `app.js`, `arriveAtDock` in `state.js` —

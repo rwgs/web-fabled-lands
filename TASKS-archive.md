@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–330), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326), task 327 (ID 327), task 328 (ID 328), task 329 (ID 329) and task 330 (ID 330). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for completed tasks (stable IDs 1–331), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326), task 327 (ID 327), task 328 (ID 328), task 329 (ID 329), task 330 (ID 330) and task 331 (ID 331). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–330). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
+The completed tasks archived in this file (stable IDs 1–331). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -339,6 +339,7 @@ The completed tasks archived in this file (stable IDs 1–330). Detail sections 
 - [x] 328. Two sections carry a no-op `<tick>`/`<lose>` codeword pair, one of which invents a codeword
 - [x] 329. `PLAN.md`'s status header names one open backlog item, and that item is closed
 - [x] 330. An empty dump is diagnosed as a capture failure, when the browser may simply have done nothing
+- [x] 331. `PLAN.md` counts 97 sections as setting the player's location, where 94 do
 
 ---
 
@@ -15309,5 +15310,114 @@ browser launch — `Start-Process -Wait` waits forever and `--virtual-time-budge
 not a timeout — so the wedged browser this task is about hangs the run instead of failing it if
 it hangs rather than exits 0. This pass added a second unbounded `-Wait` on the failure path,
 which is the same shape and reason to write it down.
+
+---
+
+## 331. `PLAN.md` counts 97 sections as setting the player's location, where 94 do
+
+**Priority: LOW.** Planning figures; no code reads either number. But phase 1's gazetteer
+census is the whole reason both documents state it, and they state it differently.
+
+### What is wrong
+
+`PLAN.md` says `state.data.location` covers "**25 named ports across 97 sections**", and its
+first constraint bullet explains the figure: "**97 sections set a dock, not 96, and they do it
+two ways** — 94 carry `<section dock=>`; three more set it through `<set dock=>` alone".
+
+`<set dock=>` does not set the player's location. The `dock` arm of `applySet` in
+`web/js/engine.js` moves the **current ship's** berth (`s.docked = get('dock')`) and returns
+without touching `data.location`; only `arriveAtDock` in `web/js/state.js`, driven by the
+section's own `dock=` attribute, moves the player. `ROADMAP.md`'s phase 1 states that
+distinction and gives **94** for "sets `data.location`" — task 320 put it there. So the two
+planning files print different figures for the same census, and the overstated one is the file
+the work would be done from.
+
+Re-measured over the shipped corpus (the `^\d+[a-z]?$` basenames of the six published books,
+4,369 files): `<section dock=>` 94 sections, `<set dock=>` 3 sections / 14 nodes, `todock=` 2,
+`<if docked=>` 3, and the gazetteer is 25 names either way.
+
+The same census corrects `ROADMAP.md` too, in the sentence above its table: "Four attributes
+carry a dock name, and **97** shipped sections carry at least one of them". 97 is the union of
+the first two attributes only — the union of all four is **102**, because the two `todock=`
+sections (`books/book1/176.xml`, `books/book4/114.xml`) and the three `<if docked=>` sections
+(`books/book3/53.xml`, `books/book3/222.xml`, `books/book3/345.xml`) carry no `dock=` of their
+own. The per-attribute table is right; only that sentence is wrong.
+
+### Why it matters
+
+Task 320 was filed because a phase's central claim rested on drifted figures, and tasks
+322/323 because the correction was not swept into the sibling documents. This is the residue of
+exactly that: `ROADMAP.md` was corrected, `PLAN.md` was written from the pre-correction figure,
+and the number phase 1 turns on — how many sections a dock pin can actually cover — is three
+too high in the file an implementer reads first.
+
+### Steps
+
+1. In `PLAN.md`, change "25 named ports across 97 sections" to 94 and rewrite the first
+   constraint bullet: 94 sections move the player, through `<section dock=>`; the three
+   `<set dock=>`-only sections berth a ship and leave `data.location` alone. Keep the three
+   filenames — they are the evidence for the distinction, not for the count.
+2. Drop the "where a figure here disagrees with `ROADMAP.md`" caveat at the head of that
+   section, which task 329 added only to stand until this is fixed.
+3. In `ROADMAP.md`, correct the union sentence — either to 102 with the four-attribute
+   breakdown, or scoped ("97 carry a `dock=`"). Do not touch the table, which is correct.
+4. Re-measure rather than copying the figures above, and record the command in the pass note,
+   the form `docs/Corpus-Census.md` uses.
+
+### Validation
+
+Documentation only: `git status` shows only `.md` files and `stamp-version.ps1` reports
+"already at" its current stamp. Afterwards the two files must print the same figure for the
+same census, and each figure must say which attribute set it measured.
+
+
+### Pass note (2026-08-31)
+
+`PLAN.md` now prints **94** wherever it states this census, and its first constraint bullet
+says why rather than only what: `<section dock=>` is the attribute `arriveAtDock` reads (the
+single call site is in `render.js`), while the `dock` arm of `applySet` sets the current ship's
+`docked` and returns without touching `data.location`. The three `<set dock=>`-only filenames
+stayed put, as evidence for the distinction and not for the count. Task 329's "where a figure
+here disagrees with `ROADMAP.md`" caveat is gone; it was written to stand only until this pass.
+
+Two further figures in `PLAN.md` were the same census restated, and both moved: the rejected
+"coordinates in the section XML" alternative would mean editing **94** files, not 97, and its
+`suite-corpus` bullet asked for a census of two attributes where `ROADMAP.md`'s asks for all
+four. That bullet now names all four and points at the table, so the two files describe one
+assertion.
+
+`ROADMAP.md`'s union sentence now reads **102** for "at least one of the four", and the
+paragraph under the table says which rows each figure measures: 94 is row one, 97 is rows one
+and three (the two attributes actually *named* `dock`), 102 is all four. The table itself was
+already right and was not touched.
+
+Re-measured rather than copied, over the shipped corpus (the `^\d+[a-z]?$` basenames of the six
+published books, 4,369 files):
+
+```
+find books/book1 books/book2 books/book3 books/book4 books/book5 books/book6 \
+     -maxdepth 1 -type f -regextype posix-extended -regex '.*/[0-9]+[a-z]?\.xml' > corpus.txt
+F=$(cat corpus.txt)
+grep -lE '<section [^>]*[[:space:]]dock="' $F   #  94 sections
+grep -l  '<set [^>]*dock="'                $F   #   3 sections, 14 nodes
+grep -l  'todock="'                        $F   #   2 sections
+grep -lE '<(if|elseif) [^>]*docked="'      $F   #   3 sections
+```
+
+Sorted and unioned, those four lists give **102** distinct sections, the first and third give
+**97**, and their dock values collapse to the same **25** names — so nothing about the
+gazetteer's size moved, only the sentence describing which sections a pin can follow.
+
+**`todock="` contains `dock="`, which is exactly how a 94 reads as 96.** Drop the
+`[[:space:]]` and `<section [^>]*dock="` also matches `books/book1/176.xml` and
+`books/book4/114.xml`, whose only dock-family attribute is `todock=`. The mirror trap sits in
+the `<set>` arm: `<set [^>]*[[:space:]]dock="` returns **one** file, not three, because `<set `
+has already consumed the space before `dock` in `<set dock="Yellowport"/>`. Neither miscount
+shows in a total — only listing the filenames, or the nodes, exposes it. Anyone re-running this
+census should print the lists, not the counts.
+
+Documentation only: `git status` showed four `.md` files and nothing else, and
+`stamp-version.ps1` reported "already at" its current stamp (`26.08.31.2f83845`), so no
+generated file moved.
 
 ---

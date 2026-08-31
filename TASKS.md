@@ -4,8 +4,7 @@ Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
 332 is complete (listed under **Done** below), apart from 207 and 326, both
-withdrawn as misdiagnoses (see the Review log); **331 and 332 (both
-LOW) are open**. File new
+withdrawn as misdiagnoses (see the Review log); **332 (LOW) is open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -25,7 +24,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 331. `PLAN.md` says `state.data.location` covers "25 named ports across **97** sections" and that three `<set dock=>` sections "set a dock", but `<set dock=>` berths a *ship* — only the **94** `<section dock=>` sections move the player, which is the figure `ROADMAP.md` already prints after task 320; the two planning files disagree on phase 1's own census, and `ROADMAP.md`'s "97 sections carry at least one of the four attributes" is itself the union of only two (all four: **102**)
 - [ ] 332. nothing bounds the browser launch by wall clock — `run-tests.ps1` uses `Start-Process -Wait` and CI a bare `chrome … &&`, while `--virtual-time-budget` is explicitly *not* a timeout — so the wedged browser task 330 is about fails the run only because it exits 0: one that hangs instead takes the run (and a CI job with no `timeout-minutes`) with it, and task 330 added a second unbounded wait on the failure path
 
 **Done**
@@ -367,65 +365,7 @@ this order.*
   — filed as a `<tick>`/`<lose>` **pair**; §579's `<lose>` is the first entry of a complete 20-codeword sweep, so only three of the four nodes were dead (see the Review log)
 - [x] 329. `PLAN.md`'s status header says "the backlog carries one open item (task 320)" and dates itself today, but 320 is closed and the backlog carries four — a stale *status* rather than a stale citation, in the file task 323 had just swept for citations, and a count `PLAN.md` cannot help rotting because it restates a figure another file owns
 - [x] 330. `run-tests.ps1` diagnoses an empty dump as a CAPTURE failure ("no stdout handle?"), but a browser that launches and does no work at all writes the same empty file — an Edge mid-update wrote no DOM, no `--screenshot` and no `--version` while still creating its profile, and `AGENTS.md`'s one-second discriminator ("`--version` printing nothing confirms the missing handle") reads that evidence as exactly the wrong cause
-
----
-
-## 331. `PLAN.md` counts 97 sections as setting the player's location, where 94 do
-
-**Priority: LOW.** Planning figures; no code reads either number. But phase 1's gazetteer
-census is the whole reason both documents state it, and they state it differently.
-
-### What is wrong
-
-`PLAN.md` says `state.data.location` covers "**25 named ports across 97 sections**", and its
-first constraint bullet explains the figure: "**97 sections set a dock, not 96, and they do it
-two ways** — 94 carry `<section dock=>`; three more set it through `<set dock=>` alone".
-
-`<set dock=>` does not set the player's location. The `dock` arm of `applySet` in
-`web/js/engine.js` moves the **current ship's** berth (`s.docked = get('dock')`) and returns
-without touching `data.location`; only `arriveAtDock` in `web/js/state.js`, driven by the
-section's own `dock=` attribute, moves the player. `ROADMAP.md`'s phase 1 states that
-distinction and gives **94** for "sets `data.location`" — task 320 put it there. So the two
-planning files print different figures for the same census, and the overstated one is the file
-the work would be done from.
-
-Re-measured over the shipped corpus (the `^\d+[a-z]?$` basenames of the six published books,
-4,369 files): `<section dock=>` 94 sections, `<set dock=>` 3 sections / 14 nodes, `todock=` 2,
-`<if docked=>` 3, and the gazetteer is 25 names either way.
-
-The same census corrects `ROADMAP.md` too, in the sentence above its table: "Four attributes
-carry a dock name, and **97** shipped sections carry at least one of them". 97 is the union of
-the first two attributes only — the union of all four is **102**, because the two `todock=`
-sections (`books/book1/176.xml`, `books/book4/114.xml`) and the three `<if docked=>` sections
-(`books/book3/53.xml`, `books/book3/222.xml`, `books/book3/345.xml`) carry no `dock=` of their
-own. The per-attribute table is right; only that sentence is wrong.
-
-### Why it matters
-
-Task 320 was filed because a phase's central claim rested on drifted figures, and tasks
-322/323 because the correction was not swept into the sibling documents. This is the residue of
-exactly that: `ROADMAP.md` was corrected, `PLAN.md` was written from the pre-correction figure,
-and the number phase 1 turns on — how many sections a dock pin can actually cover — is three
-too high in the file an implementer reads first.
-
-### Steps
-
-1. In `PLAN.md`, change "25 named ports across 97 sections" to 94 and rewrite the first
-   constraint bullet: 94 sections move the player, through `<section dock=>`; the three
-   `<set dock=>`-only sections berth a ship and leave `data.location` alone. Keep the three
-   filenames — they are the evidence for the distinction, not for the count.
-2. Drop the "where a figure here disagrees with `ROADMAP.md`" caveat at the head of that
-   section, which task 329 added only to stand until this is fixed.
-3. In `ROADMAP.md`, correct the union sentence — either to 102 with the four-attribute
-   breakdown, or scoped ("97 carry a `dock=`"). Do not touch the table, which is correct.
-4. Re-measure rather than copying the figures above, and record the command in the pass note,
-   the form `docs/Corpus-Census.md` uses.
-
-### Validation
-
-Documentation only: `git status` shows only `.md` files and `stamp-version.ps1` reports
-"already at" its current stamp. Afterwards the two files must print the same figure for the
-same census, and each figure must say which attribute set it measured.
+- [x] 331. `PLAN.md` says `state.data.location` covers "25 named ports across **97** sections" and that three `<set dock=>` sections "set a dock", but `<set dock=>` berths a *ship* — only the **94** `<section dock=>` sections move the player, which is the figure `ROADMAP.md` already prints after task 320; the two planning files disagree on phase 1's own census, and `ROADMAP.md`'s "97 sections carry at least one of the four attributes" is itself the union of only two (all four: **102**)
 
 ---
 
@@ -487,7 +427,7 @@ in CI) must pass with its new case, and its total wall time must stay in the sam
 
 ---
 
-> **Completed task details (tasks 1–330) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
+> **Completed task details (tasks 1–331) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -496,6 +436,23 @@ in CI) must pass with its new case, and its total wall time must stay in the sam
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (task 331): closed **331**, filed nothing. `PLAN.md` and `ROADMAP.md` now
+print the same figure for the same census, and each says which attribute set it measured: 94
+sections set `data.location` (`<section dock=>`, the one arm `arriveAtDock` reads), 97 carry an
+attribute *named* `dock` (that arm plus `<set dock=>`, which berths a ship), and 102 carry any
+of the four in `ROADMAP.md`'s table. Task 329's "where a figure here disagrees with
+`ROADMAP.md`" caveat has been removed, having done its job.
+
+Two more `PLAN.md` figures were this census restated and moved with it — the rejected
+section-XML alternative would edit 94 files, and its `suite-corpus` bullet asked for a census of
+two attributes where `ROADMAP.md` asks for all four. Step 4's re-measurement is recorded as a
+runnable command in the archived write-up, along with the trap that produces the wrong number:
+`todock="` contains `dock="`, so a pattern with no boundary before `dock` reads 94 as 96, while
+the boundary that fixes it reads 3 `<set dock=>` sections as 1, because `<set ` has already
+eaten the space. Neither error shows in a total, only in the filenames.
+
+Documentation only — the four `.md` files, no rebuild, `stamp-version.ps1` "already at".
 
 Worked 2026-08-31 (task 330): closed **330** and filed **332**. `run-tests.ps1`'s empty-dump
 branch no longer asserts a cause — `Test-BrowserWritesOutput` re-launches the browser once with

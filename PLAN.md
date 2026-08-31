@@ -25,20 +25,20 @@ either.
 
 One positional fact does exist. `state.data.location` is the current dock - declared in
 `web/js/state.js`'s starting `data` shape and written by `arriveAtDock` in the same file -
-covering **25 named ports across 97 sections**. This phase spends that and adds nothing to the
+covering **25 named ports across 94 sections**. This phase spends that and adds nothing to the
 corpus; roadmap phases 2 and 3 build the datasets that do not exist yet.
 
 ## Constraints discovered
 
-Verified against the tree on 2026-08-31. Where a figure here disagrees with `ROADMAP.md`'s
-phase 1 section, that file is the corrected one: task 320 separated `dock=` from "sets the
-player's location" there, and the bullets below were not re-measured against the distinction
-(task 331).
+Verified against the tree on 2026-08-31.
 
-- **97 sections set a dock, not 96, and they do it two ways.** 94 carry `<section dock=>`;
-  three more set it through `<set dock=>` alone - `books/book3/367.xml`,
-  `books/book3/405.xml`, `books/book5/634.xml`. A census written against `<section dock=>`
-  misses those three. Confirmed by grep over the shipped corpus.
+- **94 sections move the player, and they do it one way - `<section dock=>`.** That is the
+  attribute `arriveAtDock` reads, and the only thing that writes `data.location`. Three
+  further sections carry `<set dock=>` and no `<section dock=>` - `books/book3/367.xml`,
+  `books/book3/405.xml`, `books/book5/634.xml` - but the `dock` arm of `applySet` in
+  `web/js/engine.js` berths the **current ship** and returns without touching
+  `data.location`, so a pin never follows them. A census of "every section with a `dock=`
+  attribute" counts those three in and reaches 97; the pin's census is 94.
 - **25 unique dock names**, which is the whole gazetteer phase 1 has to supply.
 - **The Maps modal is reachable before any book is loaded** - the title-screen Maps button
   (`bMap` in `web/js/app.js`, whose handler calls `showMaps(null)`). Coordinates must
@@ -89,7 +89,7 @@ Reuse rather than re-derive: `arriveAtDock` is already the single writer of
   is invisible to any automated check. The corpus assertion below catches a *missing* entry,
   never a misplaced one.
 - **`places.ini` is a second source format** alongside the XML corpus and `books.ini`.
-  Rejected alternative: putting coordinates in the section XML, which would mean editing 97
+  Rejected alternative: putting coordinates in the section XML, which would mean editing 94
   section files to add data the printed book does not contain - against the rule that markup
   only wraps what is printed.
 - No source-XML change and no save-format change, so nothing here can affect existing saves.
@@ -101,9 +101,10 @@ Automated:
 - `pwsh -File build/build-data.ps1`, then `build/run-tests.ps1` to `RESULT ALL PASS`, with
   an assertion count no lower than today's **3,032**.
 - A `suite-corpus` assertion that **every** dock value in the corpus resolves to a gazetteer
-  entry. It must census **both** `<section dock=>` and `<set dock=>` - catching the failure
-  where the three `<set>`-only sections are silently skipped and the assertion passes over a
-  corpus it did not fully walk.
+  entry. It must census **all four** dock-bearing attributes - `<section dock=>`,
+  `<section todock=>`, `<set dock=>`, `<if docked=>`, as `ROADMAP.md`'s phase 1 table lists
+  them - catching the failure where the arms a `<section dock=>` census cannot see are
+  silently skipped and the assertion passes over a corpus it did not fully walk.
 - A `release-selftest.ps1` case if `places.ini` becomes a per-book output, so a withdrawn
   book's gazetteer is reconciled like its map.
 
