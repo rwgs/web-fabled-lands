@@ -14380,7 +14380,7 @@ out of 318 and only one survived contact with a fixture.
   construction**, which is the whole of the remedy.
 - **"It breaks the boundary assertions" was false.** The scarier claim was that a `sed`-based
   `[ "$(sed -n 5p f)" = "---" ]` passes only because sed dropped the byte, so the same check over
-  `head` output would compare `---` against `---` and fail. It does not: under this Cygwin bash
+  `head` output would compare `---\r` against `---` and fail. It does not: under this Cygwin bash
   (5.3.15) `$(...)` drops the trailing CR too, so **both** forms pass. Verified rather than
   reasoned, and dropped from the note.
 
