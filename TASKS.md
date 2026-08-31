@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-318 is complete (listed under **Done** below), apart from 207, withdrawn as a
+319 is complete (listed under **Done** below), apart from 207, withdrawn as a
 misdiagnosis (see the Review log); **nothing is open** in any bucket. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
@@ -351,10 +351,11 @@ this order.*
 - [x] 316. `adjustAmount` has no `defence` arm, so `<adjust ability="defence"/>` contributes 0 — the gate allows `defence` in `ability=`, and the same tag's `adjustApplies` reads it correctly through `abilityForMode`
 - [x] 317. `rank` ignores `modifier=` on every tag but `<set>`, so `<adjust ability="rank" modifier="natural"/>` and `<difficulty ability="rank" modifier="natural">` read the ring of ultimate power's +2 back in — the last stat left out of the 314–316 family
 - [x] 318. Re-archive completed task details 275–317 and clear them out of the priority buckets
+- [x] 319. The line-ending trap task 318 hit was recorded only in the Review log, where a trap that changes how you run a bulk edit belongs in `AGENTS.md` — and the sharper half of it, a broken shell assertion, turned out not to exist
 
 ---
 
-> **Completed task details (tasks 1–318) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
+> **Completed task details (tasks 1–319) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -363,6 +364,33 @@ this order.*
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (docs pass, task 319): closed **319** — the CRLF trap 318 found is now a
+paragraph in [`AGENTS.md`](AGENTS.md)'s **Command execution** notes, beside the "prefer direct file
+edits over shell-based search/replace" bullet it reinforces. `AGENTS.md` only, so no rebuild.
+
+**Writing it down cost the claim half its content, because the fixture disagreed with the pass that
+filed it.** Two assertions came out of 318; one was a guess and one was wrong.
+
+- *Which tools strip the CR* is a split, not a property of "text-mode tools": over a CRLF fixture
+  `sed`, `awk` and `grep` strip it while `head`, `tail`, `cut`, `tr` and `cat` keep it. 318's script
+  mixed the families, which is precisely why only the `sed`-extracted block was damaged and the
+  `head`/`tail` halves stayed CRLF. **One family per pipeline is uniform by construction.**
+- *"It breaks the boundary assertions"* is false. `$(...)` drops a trailing CR under this Cygwin
+  bash, so a `sed`-based `[ "$(sed -n 5p f)" = "---" ]` and a `head`-based one both pass. The
+  scariest sentence in the 318 write-up did not survive a two-line test, and is not in the note.
+
+**So the surviving finding is cosmetic, and the note leads with that.** A survey of every tracked
+file: **4,614 of the 4,632 carrying a terminator are all-CRLF, 18 are all-LF, none is mixed** — the
+18 were flipped whole-file by earlier passes (`books/book1/597.xml`, `web/js/render-gates.js` among
+them, from tasks 296 and 290) with no consequence, because `core.autocrlf=true` makes the committed
+bytes LF either way, the build LF-normalises the section text, and `TASKS.md` feeds no script.
+**A note about a harmless thing must say it is harmless**, or it invites a pass spent "fixing" 18
+files and adding a `.gitattributes` nobody asked for — so it ends on *never as a drive-by*.
+
+**Carry forward: a trap belongs where it changes behaviour, not only where it was found.** The
+Review log records what a pass found; `AGENTS.md` is what the next pass reads first. 318 put a
+how-to-run-a-bulk-edit lesson in the log alone, which is why this needed a second number.
 
 Worked 2026-08-31 (archive pass, no code): closed **318** — moved completed detail sections
 275–317 into [`TASKS-archive.md`](TASKS-archive.md) (plus this task's own detail, as 165, 211, 255

@@ -264,6 +264,27 @@ hard rule:
 - If a command is blocked or likely to trip AV heuristics, stop and propose the
   smallest safe manual alternative.
 
+**A shell-driven bulk edit can split a file's line endings, `git diff` will never
+show it, and the commit is safe anyway — so know the shape, don't chase it.** On a
+CRLF file `sed`, `awk` and `grep` strip the CR while `head`, `tail`, `cut`, `tr`
+and `cat` keep it, so a pipeline mixing the two families writes LF-only lines into
+a CRLF file. Task 318 moved a 2,814-line block with `sed -n` and the diff still
+read a perfectly balanced `2814 insertions(+), 2814 deletions(-)` with no
+line-ending noise at all, because `core.autocrlf=true` with no `.gitattributes`
+normalises both sides to LF in the index; the only tells were git's own "LF will
+be replaced by CRLF" warning and a byte count. **That same normalisation is why
+this is cosmetic**: the committed bytes are LF whatever the working copy holds,
+the build LF-normalises the bundled section text, `TASKS.md` is read by no script,
+and 18 of the 4,632 tracked text files carrying a terminator are already all-LF
+from earlier passes with no consequence — so **never "fix" a file's endings as a
+drive-by**, and don't read the git warning as a defect. Shell assertions are not
+at risk either: `$(...)` drops a trailing CR under this Cygwin bash, so a
+`sed`-based boundary check and a `head`-based one both pass. The one habit worth
+keeping is **one tool family per pipeline**, so a file you rewrite wholesale comes
+out uniform; verify with a terminator count (how many CRLF against how many
+LF, over the whole file) rather than with the diff, which cannot answer the
+question.
+
 ## Task workflow
 The backlog is `TASKS.md`. Open items are `- [ ]`, done items `- [x]` (a summary
 checklist is at the top of the file; the detail for each is in the sections below).

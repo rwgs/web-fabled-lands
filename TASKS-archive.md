@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–318), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274) and task 318 (IDs 275–318). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for completed tasks (stable IDs 1–319), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318) and task 319 (ID 319). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–318). Detail sections follow below in their original filed order; find one by its `## <N>.` heading.
+The completed tasks archived in this file (stable IDs 1–319). Detail sections follow below in their original filed order; find one by its `## <N>.` heading.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -327,6 +327,7 @@ The completed tasks archived in this file (stable IDs 1–318). Detail sections 
 - [x] 316. `adjustAmount` has no `defence` arm, so `<adjust ability="defence"/>` contributes 0 — the gate allows `defence` in `ability=`, and the same tag's `adjustApplies` reads it correctly through `abilityForMode`
 - [x] 317. `rank` ignores `modifier=` on every tag but `<set>`, so `<adjust ability="rank" modifier="natural"/>` and `<difficulty ability="rank" modifier="natural">` read the ring of ultimate power's +2 back in — the last stat left out of the 314–316 family
 - [x] 318. Re-archive completed task details 275–317 and clear them out of the priority buckets
+- [x] 319. The line-ending trap task 318 hit was recorded only in the Review log, where a trap that changes how you run a bulk edit belongs in `AGENTS.md` — and the sharper half of it, a broken shell assertion, turned out not to exist
 
 ---
 
@@ -14354,6 +14355,53 @@ Validated afterwards that all 317 checklist IDs (1–318 less 207, withdrawn) ha
 gaps or duplicates, and that no ID appears twice in **Done**. The archive's Contents list carries
 317 rows, not 318: 207 keeps its archived detail but has no checklist row, which is how the
 withdrawal has been recorded since task 211. No code, data, build or test files touched, so no
+rebuild or stamp change is implied.
+
+---
+
+## 319. The line-ending trap task 318 hit was recorded only in the Review log, where a trap that changes how you run a bulk edit belongs in `AGENTS.md` — and the sharper half of it, a broken shell assertion, turned out not to exist — LOW (process/docs)
+
+*(Filed 2026-08-31, immediately after 318, at the user's request.)* Task 318's bulk move wrote a
+2,814-line block with MSYS `sed -n` into a CRLF file and produced LF-only lines inside it, which
+`git diff --stat` reported as a perfectly balanced 2,814/2,814 with no line-ending noise. The pass
+recorded that in the Review log, which is the right place for *what a pass found* and the wrong
+place for *how to run the next bulk edit* — nothing in `AGENTS.md`'s command-execution notes said
+it, and that section is where an agent looks before driving files from the shell. Add it there.
+
+**The measurement came first and cut the claim down twice.** Two things were asserted on the way
+out of 318 and only one survived contact with a fixture.
+
+- **Which tools strip the CR was a guess, and it is a split.** Over a three-line CRLF fixture,
+  `sed`, `awk` and `grep` strip the CR; `head`, `tail`, `cut`, `tr` and `cat` keep it. 318's own
+  script mixed the families — `head -n`/`tail -n +` for the surviving halves (byte-faithful) and
+  `sed -n` for the moved block (stripped) — which is exactly why the damage was confined to the
+  block and the rest of the file stayed CRLF. **A pipeline that uses one family is uniform by
+  construction**, which is the whole of the remedy.
+- **"It breaks the boundary assertions" was false.** The scarier claim was that a `sed`-based
+  `[ "$(sed -n 5p f)" = "---" ]` passes only because sed dropped the byte, so the same check over
+  `head` output would compare `---` against `---` and fail. It does not: under this Cygwin bash
+  (5.3.15) `$(...)` drops the trailing CR too, so **both** forms pass. Verified rather than
+  reasoned, and dropped from the note.
+
+**What survived is a cosmetic finding, and the note says so in its first sentence.** The committed
+bytes are LF whatever the working copy holds (`core.autocrlf=true`, no `.gitattributes`), the build
+LF-normalises the bundled section text before writing the JSON, and `TASKS.md` is read by no build
+or test script. The proof that it costs nothing is already in the tree: a survey of every tracked
+file found **4,614 of the 4,632 carrying a terminator are all-CRLF, 18 are all-LF and none is
+mixed** — those 18 were flipped whole-file by earlier passes (they include `books/book1/597.xml`
+and `web/js/render-gates.js`, touched by tasks 296 and 290) with no consequence anyone noticed.
+**A note about a harmless thing has to say it is harmless**, or the next agent spends a pass
+"fixing" 18 files and adding a `.gitattributes` nobody asked for; the paragraph therefore ends on
+*never do that as a drive-by* rather than on the warning.
+
+*Done 2026-08-31:* one paragraph added to `AGENTS.md` under **Command execution**, after the
+AV-heuristics bullets and beside the existing "prefer direct file edits over shell-based
+search/replace" rule it reinforces. It names the two tool families, the diff that cannot see the
+difference and why (index normalisation), the reason it is cosmetic, the 4,614/18/0 survey, the
+refuted assertion claim, and the one habit worth keeping — one tool family per pipeline, checked
+with a terminator count rather than with the diff. `AGENTS.md` only; the heading keeps its
+"(Bitdefender on Windows)" parenthetical, which is now slightly narrower than the section's
+contents and was left alone as out of scope. No code, data, build or test files touched, so no
 rebuild or stamp change is implied.
 
 ---
