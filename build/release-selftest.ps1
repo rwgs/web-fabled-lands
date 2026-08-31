@@ -12,7 +12,8 @@
     3. A REAL build of a fixture tree, both directions of an added-book transition, once per
        number in $ADDED: adding a book must reach meta.json, its bundled data and the
        offline inventory; withdrawing it must delete exactly its own generated files and
-       nothing else.
+       nothing else. Then the failure path: a fixture broken on purpose must fail carrying
+       the build's own diagnosis, naming the offending file.
 
   Nothing under books/ or web/ is touched: every fixture is built in a temp directory and
   removed afterwards (build-data.ps1 takes -Root for exactly this).
@@ -228,8 +229,25 @@ function Set-Published([int]$n, [string]$published) {
     ) -join "`n")
 }
 function Invoke-FixtureBuild {
-    # 6>$null: the build's own progress lines would drown the assertions.
-    & (Join-Path $PSScriptRoot 'build-data.ps1') -Root $tmp 6>$null
+    # Stream 6 is captured, not discarded: the build's own progress lines would drown the
+    # assertions, but that same stream carries both gates' DIAGNOSIS - a heading and one line
+    # per offending file, written just before they throw. Under the old 6>$null those lines
+    # vanished, so a failing run showed "fix the source XML above" above nothing at all, and
+    # recovering the reason cost a hand-built reproduction of the fixture (task 334). A
+    # passing run stays as quiet as before; a failing one prints what it captured before
+    # re-throwing, so the log names the files that were wrong.
+    $log = [System.Collections.Generic.List[string]]::new()
+    try {
+        & (Join-Path $PSScriptRoot 'build-data.ps1') -Root $tmp 6>&1 |
+            ForEach-Object { $log.Add([string]$_) }
+    } catch {
+        # Replayed a line at a time, not folded into the thrown message: the error view
+        # reflows a multi-line message onto continuation lines, which loses the indent that
+        # separates the gate's heading from the files it lists.
+        Write-Host 'The fixture build FAILED - its own output follows:'
+        $log | ForEach-Object { Write-Host "  build> $_" }
+        throw
+    }
 }
 
 foreach ($n in $ADDED) {
@@ -276,6 +294,23 @@ foreach ($n in $ADDED) {
     Assert "withdrawing book $n leaves a manual illustration drop-in alone (not build-owned)" `
         (Test-Path (Join-Path $tmp 'web/assets/illus/142.jpg'))
 }
+
+# ---- the failure path: a broken fixture must say WHICH file broke ----------------------
+# A non-zero exit is not a diagnosis. Delete the book.ini task 333 added and the codeword
+# gate fires exactly as it did on CI for four commits - so this checks the thing that was
+# missing then: the failure carries the gate's own heading and the offending filename, and
+# not just "fix the source XML above" over an empty log (task 334).
+New-E2EFixture $ADDED[0]
+Remove-Item (Join-Path $tmp 'books/book1/book.ini')
+Set-Published $ADDED[0] "1,$($ADDED[0])"
+# 6>&1 collects what the replay PRINTS, so the assertion reads the CI log rather than a
+# value only this test can see; the build's own progress lines never reach it, having been
+# captured inside the function.
+$diag = ''
+$threw = $false
+try { Invoke-FixtureBuild 6>&1 | ForEach-Object { $diag += "$_`n" } } catch { $threw = $true }
+Assert 'a failing fixture build replays the gate diagnosis, naming the offending file' `
+    ($threw -and $diag -like '*XML validation FAILED*' -and $diag -like '*book1/book.ini*') $diag
 
 if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
 

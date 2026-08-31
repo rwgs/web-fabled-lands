@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–332), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326), task 327 (ID 327), task 328 (ID 328), task 329 (ID 329), task 330 (ID 330), task 331 (ID 331) and task 332 (ID 332). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for completed tasks (stable IDs 1–334), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326), task 327 (ID 327), task 328 (ID 328), task 329 (ID 329), task 330 (ID 330), task 331 (ID 331), task 332 (ID 332), task 333 (ID 333) and task 334 (ID 334). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–332). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
+The completed tasks archived in this file (stable IDs 1–334). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -341,6 +341,8 @@ The completed tasks archived in this file (stable IDs 1–332). Detail sections 
 - [x] 330. An empty dump is diagnosed as a capture failure, when the browser may simply have done nothing
 - [x] 331. `PLAN.md` counts 97 sections as setting the player's location, where 94 do
 - [x] 332. Nothing bounds the browser launch by wall clock, so a hung browser hangs the run
+- [x] 333. The release self-test's fixture has no `book.ini`, so task 325's codeword gate fails every CI run
+- [x] 334. The release self-test discards the build's diagnosis, leaving CI a bare `throw`
 
 ---
 
@@ -15566,5 +15568,72 @@ information channel, not its verdict — so the build does not abort.
 
 **Filed 334:** the reason this took a reproduction to diagnose rather than a glance at the CI
 log — `Invoke-FixtureBuild` discards the build's own error listing.
+
+---
+
+## 334. The release self-test discards the build's diagnosis, leaving CI a bare `throw`
+
+**Priority: LOW.** Nothing ships wrong and no failure is missed — the job fails, loudly, with
+the right exit code. What is lost is the reason, which the build had already worked out and
+written.
+
+### What is wrong
+
+`Invoke-FixtureBuild` in `release-selftest.ps1` runs the real build with `6>$null`, and the
+comment says why: "the build's own progress lines would drown the assertions." True of the
+progress lines — but stream 6 is also where `build-data.ps1` writes its **diagnosis**. Both
+gates print a heading and then one line per problem through `Write-Host` before they throw:
+
+```
+XML validation FAILED - 2 problem(s) in 7 file(s) checked:
+  book1/book.ini : no Codewords= list, so no codeword VALUE can be checked in any book
+  book2/book.ini : no Codewords= list, so no codeword VALUE can be checked in any book
+```
+
+Under `6>$null` all three lines vanish and the log keeps only the terminating error — "Build
+aborted: fix the source XML above and re-run." above nothing at all. That is what task 333's
+CI log showed for four commits, and recovering the message cost a hand-built reproduction of
+the fixture to make the build say it again.
+
+The same suppression covers `books.ini` validation, which fails the identical way.
+
+### What to do
+
+Capture stream 6 rather than discarding it, and replay it only when the build fails —
+`$out = & … 6>&1` with the build's output printed in the `catch`, or redirected to a file the
+failure path prints. The assertions stay quiet on a passing run, which is the point of the
+`6>$null`, and a failing run says which files were wrong.
+
+Check it the way the self-tests already check their own failure paths: a fixture that is
+invalid on purpose (drop the `book.ini` task 333 added) must produce a run whose output
+**names the offending file**, not merely a non-zero exit.
+
+**Done (2026-08-31).** `Invoke-FixtureBuild` pipes the build's stream 6 into a collector
+(`6>&1 | ForEach-Object { $log.Add(...) }`) instead of discarding it. A passing run is exactly
+as quiet as before; a failing one prints `The fixture build FAILED - its own output follows:`
+and replays every captured line prefixed `  build> ` before re-throwing, so the terminating
+error now lands underneath the gate's own heading and the files it named:
+
+```
+The fixture build FAILED - its own output follows:
+  build> Validating source XML...
+  build> XML validation FAILED - 1 problem(s) in 7 file(s) checked:
+  build>   book1/book.ini : no Codewords= list, so no codeword VALUE can be checked in any book
+Exception: build-data.ps1: Build aborted: fix the source XML above and re-run.
+```
+
+The lines are replayed one at a time rather than folded into the thrown message, which was
+tried first and rejected: PS7's error view reflows a multi-line message onto continuation
+lines, collapsing the indent that separates the gate's heading from the files it lists.
+
+The failure path itself is now asserted, as the task asked. The fixture is rebuilt with
+`book1/book.ini` deleted, and `Invoke-FixtureBuild 6>&1` collects what the replay *prints* —
+so the assertion reads what a CI log would show rather than a value only the test can see —
+and checks that the run both threw and named `book1/book.ini` under `XML validation FAILED`.
+
+`release-selftest.ps1` reports `RESULT ALL PASS pass=48 fail=0` and exits 0;
+`validate-selftest.ps1` (51), `node-import.mjs` (35) and the browser suite (3,035) are
+unaffected. Only `build/release-selftest.ps1` changed, so no rebuild or version stamp is
+needed: `stamp-version.ps1` hashes `web/`, not the build scripts.
 
 ---

@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-333 is complete (listed under **Done** below), apart from 207 and 326, both
-withdrawn as misdiagnoses (see the Review log), and **334, which is open** under
-LOW. File new work under the priority bucket that fits, and record the pass in
+334 is complete (listed under **Done** below), apart from 207 and 326, both
+withdrawn as misdiagnoses (see the Review log); **nothing is open.** File new
+work under the priority bucket that fits, and record the pass in
 the Review log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -24,7 +24,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 334. `release-selftest.ps1`'s `Invoke-FixtureBuild` runs the real build with `6>$null` to keep its progress lines out of the assertions, but that stream also carries the build's *diagnosis* — so when task 333's fixture failed the codeword gate, CI printed a bare `throw` from `build-data.ps1:164` with the two lines naming the offending files discarded, and the log said only "fix the source XML above" above nothing at all
+*(none open — file new LOW work here)*
 
 **Done**
 
@@ -368,49 +368,11 @@ this order.*
 - [x] 331. `PLAN.md` says `state.data.location` covers "25 named ports across **97** sections" and that three `<set dock=>` sections "set a dock", but `<set dock=>` berths a *ship* — only the **94** `<section dock=>` sections move the player, which is the figure `ROADMAP.md` already prints after task 320; the two planning files disagree on phase 1's own census, and `ROADMAP.md`'s "97 sections carry at least one of the four attributes" is itself the union of only two (all four: **102**)
 - [x] 332. nothing bounds the browser launch by wall clock — `run-tests.ps1` uses `Start-Process -Wait` and CI a bare `chrome … &&`, while `--virtual-time-budget` is explicitly *not* a timeout — so the wedged browser task 330 is about fails the run only because it exits 0: one that hangs instead takes the run (and a CI job with no `timeout-minutes`) with it, and task 330 added a second unbounded wait on the failure path
 - [x] 333. `release-selftest.ps1`'s miniature fixture writes no `book.ini`, so task 325's codeword gate — which treats a book declaring no `Codewords=` as an error in its own right, because the lists are checked as a union — aborts the real build the self-test drives, failing the `build-scripts` job on every commit since 325 while the ordinary build-and-test loop stays green
+- [x] 334. `release-selftest.ps1`'s `Invoke-FixtureBuild` runs the real build with `6>$null` to keep its progress lines out of the assertions, but that stream also carries the build's *diagnosis* — so when task 333's fixture failed the codeword gate, CI printed a bare `throw` from `build-data.ps1:164` with the two lines naming the offending files discarded, and the log said only "fix the source XML above" above nothing at all
 
 ---
 
-> **Completed task details (tasks 1–333) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
-
----
-
-## 334. The release self-test discards the build's diagnosis, leaving CI a bare `throw`
-
-**Priority: LOW.** Nothing ships wrong and no failure is missed — the job fails, loudly, with
-the right exit code. What is lost is the reason, which the build had already worked out and
-written.
-
-### What is wrong
-
-`Invoke-FixtureBuild` in `release-selftest.ps1` runs the real build with `6>$null`, and the
-comment says why: "the build's own progress lines would drown the assertions." True of the
-progress lines — but stream 6 is also where `build-data.ps1` writes its **diagnosis**. Both
-gates print a heading and then one line per problem through `Write-Host` before they throw:
-
-```
-XML validation FAILED - 2 problem(s) in 7 file(s) checked:
-  book1/book.ini : no Codewords= list, so no codeword VALUE can be checked in any book
-  book2/book.ini : no Codewords= list, so no codeword VALUE can be checked in any book
-```
-
-Under `6>$null` all three lines vanish and the log keeps only the terminating error — "Build
-aborted: fix the source XML above and re-run." above nothing at all. That is what task 333's
-CI log showed for four commits, and recovering the message cost a hand-built reproduction of
-the fixture to make the build say it again.
-
-The same suppression covers `books.ini` validation, which fails the identical way.
-
-### What to do
-
-Capture stream 6 rather than discarding it, and replay it only when the build fails —
-`$out = & … 6>&1` with the build's output printed in the `catch`, or redirected to a file the
-failure path prints. The assertions stay quiet on a passing run, which is the point of the
-`6>$null`, and a failing run says which files were wrong.
-
-Check it the way the self-tests already check their own failure paths: a fixture that is
-invalid on purpose (drop the `book.ini` task 333 added) must produce a run whose output
-**names the offending file**, not merely a non-zero exit.
+> **Completed task details (tasks 1–334) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -419,6 +381,25 @@ invalid on purpose (drop the `book.ini` task 333 added) must produce a run whose
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (task 334): closed **334**, filed nothing. `Invoke-FixtureBuild` captures the
+build's stream 6 into a list rather than discarding it, and prints the captured lines one at a
+time before re-throwing, so the CI log that showed a bare "fix the source XML above" now shows
+the gate's heading and the file it named above it. Folding the log into the thrown message was
+tried first and rejected: PS7's error view reflows a multi-line message onto continuation
+lines and collapses the indent that separates the heading from its file list.
+
+The new assertion drives the real failure path rather than a stand-in — the fixture is rebuilt
+with `book1/book.ini` deleted and `Invoke-FixtureBuild 6>&1` collects what the replay
+*prints*, so what the test reads is what CI would show. `release-selftest.ps1` reports
+`RESULT ALL PASS pass=48 fail=0`; nothing under `books/` or `web/` changed, so no rebuild or
+stamp was needed.
+
+Also in this pass: the archive's own index was one task behind. Task 333's detail was moved to
+`TASKS-archive.md` without a **Contents** row, and its intro still read "stable IDs 1–332",
+so adding 334's row beside a missing one would have carried the gap forward. Both rows are
+present now and both ranges read 1–334. Nothing else was found; the backlog is empty, so the
+next pass takes a phase from `ROADMAP.md`.
 
 Worked 2026-08-31 (task 333): closed **333** and filed **334**. CI had been red on `main` for
 four commits (329, 330, 331, 332) — the `build-scripts` job, in the step that drives
