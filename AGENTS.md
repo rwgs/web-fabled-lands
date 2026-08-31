@@ -373,8 +373,12 @@ review log, note the later fix rather than deleting the finding: the honest form
 review record is what was true then plus what happened since.
 
 ## Task workflow
-The backlog is `TASKS.md`. Open items are `- [ ]`, done items `- [x]` (a summary
-checklist is at the top of the file; the detail for each is in the sections below).
+The backlog is `TASKS.md`. Open items are `- [ ]`, done items `- [x]`, and a filing
+withdrawn as a misdiagnosis keeps its stable ID as `- [~]` (a summary checklist is at
+the top of the file; the detail for each is in the sections below). **A census that
+reconciles the checklist against the detail headings must match all three markers** —
+matching only `- [x]` drops the withdrawn rows and reports them as missing, which is
+how two separate passes (tasks 274 and 326) both mis-measured task 207.
 1. Read `TASKS.md` and take the **first open (`- [ ]`) task**.
 2. Follow its steps exactly — each task is self-contained. Don't skip steps and
    don't combine tasks unless explicitly instructed.

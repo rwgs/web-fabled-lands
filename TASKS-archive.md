@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–325), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322) and task 325 (ID 325). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326, which are still open. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for completed tasks (stable IDs 1–326), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324) and task 326 (ID 326). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–325). Detail sections follow below in their original filed order; find one by its `## <N>.` heading.
+The completed tasks archived in this file (stable IDs 1–326). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -334,6 +334,7 @@ The completed tasks archived in this file (stable IDs 1–325). Detail sections 
 - [x] 325. The gate validates codeword attribute *names* but never codeword *values*, so a typo'd codeword fails silently in play
 - [x] 323. `REVIEW.md`/`PLAN.md` cite source by line, and all four of `REVIEW.md`'s had drifted onto unrelated code
 - [x] 324. The Maps modal captions each regional map with the book title, when `book.ini` holds a title written for the map
+- [~] 326. Task 207 is indexed nowhere, so a completed task survives only as an orphan detail section
 
 ---
 
@@ -14928,5 +14929,38 @@ stated test in `AGENTS.md` for whether an `.ini` key deserves to be live.
 stamp) — no per-book JSON, no map or art copy may move. Then the headless suite to
 `RESULT ALL PASS`. Open the Maps modal and read the six captions; the `alt` text changes with
 them, so check one with the image path broken to confirm the missing-map note still wins.
+
+---
+
+## 326. Task 207 is indexed nowhere, so a completed task survives only as an orphan detail section
+
+**WITHDRAWN — the gap it reports does not exist.** Filed by task 322's pass while reconciling
+the two task indexes, and disproved by the very reconciliation the filing named as its own
+step 2.
+
+The claim was that `TASKS.md`'s **Done** checklist and `TASKS-archive.md`'s **Contents** both
+skip 207, leaving its detail section reachable only by scrolling or grepping. Both index it.
+The row reads `- [~] 207.` — withdrawn — rather than `- [x] 207.`: it has been in `TASKS.md`
+since the withdrawal commit and in the archive's Contents since task 211, whose own completion
+note records putting it there in as many words ("including 207's `[~]` withdrawn row, which
+keeps its pointer to the Review log"). `git log -S` over that row finds two commits, both
+adding it and neither removing it.
+
+Step 2's census settles it, run over all three markers instead of `- [x]` alone: **330 checklist
+rows against 330 detail headings** (326 archived here, 4 open in `TASKS.md`), with `comm -3`
+empty in **both** directions — no checklist ID without a detail section, and no detail section
+without a checklist row. This file's Contents carries one row per detail heading, both ways.
+
+**The filing's method is the defect, and this is the second pass it has caught out.** Matching
+`- [x] <N>` sees two of the three markers the checklist uses, so the one withdrawn row reads as
+an absence — and an absence in an index looks exactly like a dropped line. Task 274's re-archive
+made the same measurement on 2026-08-13 and wrote the same conclusion into the Review log ("207
+keeps its detail and has no checklist row"), where it sat for eighteen days available to be read
+as corroboration; the two counts the filing could not reconcile (321 `- [x]` rows against 322
+detail sections) are the same off-by-one from the same cause. Withdrawing this task therefore
+fixes the census rather than the index. The marker set is now stated at each of the three places
+a pass looks it up — `TASKS.md`'s archive pointer, this file's Contents heading, and the task
+workflow in `AGENTS.md` — and task 274's Review-log claim carries a correction note instead of
+being deleted, since a dated record is honest as what was true then plus what happened since.
 
 ---

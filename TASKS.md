@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-325 is complete (listed under **Done** below), apart from 207, withdrawn as a
-misdiagnosis (see the Review log); **326, 327, 328, 329 and 330 (all LOW) are
-open**. File new
+326 is complete (listed under **Done** below), apart from 207 and 326, both
+withdrawn as misdiagnoses (see the Review log); **327, 328, 329 and 330 (all
+LOW) are open**. File new
 work under the priority bucket that fits, and record the pass in the Review
 log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -25,7 +25,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 326. task **207** is missing from **both** indexes — no `- [x] 207.` line in this file's Done checklist and no entry in `TASKS-archive.md`'s Contents — so a completed task exists only as an orphan `## 207.` detail section, breaking the stated invariant that "the checklist above still carries every task's stable ID and status"
 - [ ] 327. task 325's unused-codeword note counts a `<lose>` or an `<if>` as "used", so the case it exists to surface — a codeword the port never **awards** — is not reported: book 2's `Beach` and `Bilge` are tested and swept but reachable by no `<gain>`/`<tick>`, which is exactly what that book's `# Unnecessary codewords: Bait,Beach,Bilge` comment records, and the third name is masked by a no-op `<tick>`
 - [ ] 328. two sections carry a `<tick codeword="X"/><lose codeword="X"/>` no-op pair (book 2 sections 579 and 633), and one of them invents a codeword — `Bogus` — that exists nowhere else in the corpus and in no `Codewords=` list, so task 325 had to add it to the gate's port-flag allowlist to keep the build green: an allowlist entry whose only job is to keep scaffolding alive
 - [ ] 329. `PLAN.md`'s status header says "the backlog carries one open item (task 320)" and dates itself today, but 320 is closed and the backlog carries four — a stale *status* rather than a stale citation, in the file task 323 had just swept for citations, and a count `PLAN.md` cannot help rotting because it restates a figure another file owns
@@ -363,54 +362,8 @@ this order.*
 - [x] 325. `validate-source.ps1` validates codeword **attribute names** but never codeword **values**, so a typo'd `<gain codeword="Anchr">` passes the gate and silently never matches its `<if codeword="Anchor">` — the player just cannot progress, and `book.ini`'s `Codewords=` already holds the authoritative per-book list to check against
 - [x] 323. `REVIEW.md` cites `renderStatic` at `app.js:775`/`:781` for a defect that task 65 already fixed and a function that has since moved to `ui.js` — the same fragile-citation class task 320 fixed in `ROADMAP.md` only, leaving `PLAN.md`'s six `#L` citations (all still exact) and `REVIEW.md`'s four (all drifted) carrying the form that pass banned
 - [x] 324. the Maps modal captions every regional map with the **book** title from `books.ini` (book 3's map reads "Over the Blood-Dark Sea") when `book.ini` holds a `Map.Title` written for the map itself ("The Ports & Anchorages of the Violet Ocean") — a better caption for all six, sitting unread in the tree
-
----
-
-## 326. Task 207 is indexed nowhere, so a completed task survives only as an orphan detail section
-
-**Priority: LOW.** Bookkeeping. No code is affected, but the backlog's two index files both
-claim to be complete and neither is.
-
-### What is wrong
-
-`TASKS-archive.md` holds a detail section `## 207. A <while> pass's provisional vars are
-position-sensitive within the body`. Nothing points at it:
-
-- `TASKS.md`'s **Done** checklist runs `… - [x] 206. … - [x] 208. …` with no `207` line.
-- `TASKS-archive.md`'s own **Contents** list has no `- [x] 207.` entry either.
-
-So the only way to discover task 207 is to scroll the archive or grep for the heading. Both
-index files state an invariant they break: `TASKS.md`'s archive pointer says "The checklist
-above still carries every task's stable ID and status", and the archive's contents heading
-says "The completed tasks archived in this file (stable IDs 1–322)".
-
-This predates task 322 — `git show HEAD:TASKS.md` at the commit before it has the same gap,
-with 206 and 208 both present — so it is an old dropped line rather than fresh damage, and
-207 is the only ID affected out of 322.
-
-### Why it matters
-
-Small, but it is the index that every other task navigates by, and a silent hole in it is the
-kind of thing that makes a later census wrong. Counting `- [x]` lines in `TASKS.md` yields
-321 where the archive holds 322 detail sections; a reader reconciling those two numbers has
-no reason to suspect a missing row rather than a duplicated section.
-
-### Steps
-
-1. Add `- [x] 207.` to `TASKS.md`'s Done checklist between 206 and 208, and the matching
-   entry to `TASKS-archive.md`'s Contents list in the same place, both summarising the
-   existing `## 207.` heading. Do **not** reword the detail section.
-2. While there, check the same way round for the opposite gap — a checklist row with no
-   detail section — since only the one direction has been measured:
-   `comm -3` the `- [x] <N>` IDs in `TASKS.md` against the `## <N>.` IDs in
-   `TASKS-archive.md` and confirm the difference is empty afterwards. That one command is
-   the whole check.
-
-### Validation
-
-Documentation only: no rebuild, no suite run, `stamp-version.ps1` reports "already at" its
-current stamp, and `git status` shows only the two task files. The `comm -3` in step 2 must
-print nothing.
+- [~] 326. Task 207 is indexed nowhere, so a completed task survives only as an orphan detail section
+  — **withdrawn, not a defect** (see the Review log)
 
 ---
 
@@ -649,7 +602,7 @@ so run it by hand.
 
 ---
 
-> **Completed task details (tasks 1–325) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. No completed detail remains in this file; the Review log follows.
+> **Completed task details (tasks 1–326) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
 
 ---
 
@@ -658,6 +611,35 @@ so run it by hand.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-08-31 (bookkeeping, task 326): **withdrew 326** — the gap it reports does not exist.
+Both indexes carry 207. The row reads `- [~] 207.` rather than `- [x] 207.`, and has done since the
+withdrawal commit in this file and since task 211 in the archive's Contents, whose completion note
+records putting it there in as many words; `git log -S` over that row finds two commits, both
+adding it and neither removing it. Its detail section moved to `TASKS-archive.md` rewritten as a
+withdrawal, mirroring 207's own, with a `- [~] 326.` row in both indexes.
+
+**The task's own step 2 disproved it, and it is the census that was broken, not the index.** Run
+over all three markers instead of `- [x]` alone: **330 checklist rows against 330 detail headings**
+(326 archived, 4 open here), `comm -3` empty in both directions, and the archive's Contents holding
+one row per detail heading, both ways. The 321-against-322 mismatch the filing could not account for is that one
+withdrawn row, counted by neither side of its own comparison.
+
+**This is the second pass to make the same measurement, so the fix goes where a pass looks the
+marker up.** Task 274's re-archive wrote "207 keeps its detail and has no checklist row" into this
+log on 2026-08-13, where it stood eighteen days as corroboration for anyone who repeated the grep.
+The marker set is now spelled out in three places — the archive pointer above, the archive's
+Contents heading, and `AGENTS.md`'s task workflow, which had defined only `- [ ]` and `- [x]`.
+Task 274's claim keeps its place with a correction note appended rather than being rewritten: a
+dated record is what was true then plus what happened since.
+
+**A false filing earns the same close as a true one.** Following step 1 literally would have added
+a duplicate `- [x] 207.` beside the `- [~]` row and relabelled a withdrawn task as done, so it was
+not run; step 2, which the filing itself calls the whole check, was. Fixed one stale line found
+while editing it: the archive intro still listed its provenance only through task 325 and still
+described 323, 324 and 326 as open, three commits after 323 and 324 archived themselves.
+Documentation only — `git status` shows three `.md` files, no rebuild and no suite run, and
+`stamp-version.ps1` reports "already at" the current stamp.
 
 Worked 2026-08-31 (task 324): closed **324** — every regional map is now captioned, and
 alt-texted, with `book.ini`'s `Map.Title` (the map's own subject: "The Ports & Anchorages of the
@@ -2482,6 +2464,9 @@ carried exactly 19 headings with IDs 256–274 contiguous — then validated aft
 checklist IDs (1–274 less 207, withdrawn) have exactly one detail heading across the two files.
 That last check is also what explains the archive's 273-row Contents against 274 detail sections:
 207 keeps its detail and has no checklist row, which is how the withdrawal has read since task 211.
+*(Corrected by task 326: 207 does have a checklist row in both files — `- [~] 207.`, in this file
+since the withdrawal and in the archive's Contents since this very pass's predecessor, task 211.
+This census missed it by matching `- [x]` alone.)*
 
 Worked 2026-08-13 (implementation pass, task 273): closed **273**, filing nothing — every bucket is
 now clear, so the next pass starts from `ROADMAP.md`. Took the filing's own recommendation and
