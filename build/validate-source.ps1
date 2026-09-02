@@ -235,7 +235,7 @@ $script:FL_AWARD_TAGS = @('gain', 'tick', 'set', 'outcome')
 # All three are ORDINAL dictionaries and the keys are the codeword's exact spelling, because
 # the game is case-SENSITIVE and the gate must be too: `GameState.hasCodeword`/`addCodeword`
 # use ordinary object keys and JaFL's `Codewords` uses Java `Properties` keys, so a
-# `<gain codeword="anchor">` does not satisfy an `<if codeword="Anchor">` — the branch simply
+# `<gain codeword="anchor">` does not satisfy an `<if codeword="Anchor">` - the branch simply
 # never opens, with no diagnostic, which is task 325's failure mode exactly. A plain
 # PowerShell `@{}` would defeat this on its own: hashtable keys are case-INSENSITIVE, so
 # dropping the ToLowerInvariant() calls without changing the container would have changed

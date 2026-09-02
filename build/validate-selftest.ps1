@@ -264,7 +264,7 @@ $CASES = @(
        text  = '<section name="2"><gain codeword="ready"/><if codeword="Ready"><p>Marked.</p></if></section>'
        want  = 'codeword="ready" is not declared' }
 
-    # …and inside a list, because the split happens BEFORE the lookup: a correctly cased first
+    # ...and inside a list, because the split happens BEFORE the lookup: a correctly cased first
     # token must not carry a mis-cased second one through.
     @{ label = 'a lower-cased codeword inside a | union (task 338)'
        file  = 'books/book1/2.xml'
@@ -390,7 +390,7 @@ $ok338 = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2">' +
     '<tick codeword="StillInYellowport" hidden="t"/><lose codeword="HydraDamage"/>' +
     '</section>' }
 Assert 'the exact declared spelling still passes, singleton and in a list (task 338)' ($ok338.Errors.Count -eq 0) ($ok338.Errors -join ' | ')
-# …and the two-grade report still names the codeword in the casing the .ini declares, which is
+# ...and the two-grade report still names the codeword in the casing the .ini declares, which is
 # now the dictionary key itself rather than a parallel casing map.
 Assert 'the unused-codeword note keeps the declared casing (task 338)' (
     @($clean.Notes | Where-Object { $_ -like '*"Rune"*' -or $_ -like '*"Bounty"*' }).Count -eq 2) ($clean.Notes -join ' | ')
