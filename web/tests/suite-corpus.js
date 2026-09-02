@@ -150,7 +150,12 @@ export async function run(ctx) {
       ok('task343: every OPEN disease cure sits in a section that names poison in its own words',
          openDisease.length === 3 && openDiseaseQuiet.length === 0,
          'open=' + openDisease.join(',') + ' silent=' + openDiseaseQuiet.join(','));
-      ok('task343: so does every disease="*" cure, save §5.180 — the documented exception (task 350)',
+      // §5.180 is the one whose section never mentions poison, and task 350 settled that it
+      // still clears both: a printed DENIAL narrows a selector, printed SILENCE does not, and
+      // §5.180's "cure you of any diseases" is a list of what the potion does rather than a
+      // limit on it. Pinning it BY NAME is what keeps that a decision about one node instead of
+      // a licence for a class - a second such node fails here and gets read against the rule.
+      ok('task343/350: §5.180 is still the only disease="*" cure whose section never names poison',
          star.length === 13 && starQuiet.join(',') === '5.180',
          'n=' + star.length + ' silent=' + starQuiet.join(','));
       ok('task343: the corpus writes ONE open poison cure, and its section denies curing disease',

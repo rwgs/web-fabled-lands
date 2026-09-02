@@ -1799,6 +1799,48 @@ export async function run(ctx) {
            && rules.needsAfflictionChoice(parse('<section><lose disease="Ghoulbite"/></section>').querySelector('lose'), g) === false
            && rules.afflictionSelector(parse('<section><gain curse="Shadar"/></section>').querySelector('gain')) === null);
       }
+      // task 350: the two potions of restoration, driven. §5.180 says "cure you of any
+      // diseases" and carries `disease="*"` alone; §1.342's twin says "cure poison and disease"
+      // and carries both attributes. Under the family reading both clear both lists, which is
+      // the settled answer rather than a tolerated one: §5.180 nowhere DENIES curing poison, and
+      // a printed denial is what narrows a selector (§1.338) where printed silence does not.
+      // Narrowing it would have meant new markup, a validator allowlist entry and a rebuild to
+      // make one potion behave unlike its own twin.
+      {
+        const drink350 = async (book, section) => {
+          const g = mk343(book);
+          poison343(g); disease343(g);
+          g.addCurse({ name: 'Shadar Curse', effects: [{ ability: 'charisma', bonus: -1 }] });
+          g.data.stamina = 1;
+          const sec = await data.getSection(book, section);
+          const potion = Array.from(sec.querySelectorAll('item')).find((it) => /potion of restoration/i.test(it.getAttribute('name') || ''));
+          const body = potion && potion.querySelector('effect');
+          if (body) eng.applyEffectBody(body, g);
+          return g;
+        };
+        const g180 = await drink350(5, '180');
+        ok('task350: §5.180\'s potion clears the disease AND the poison, and heals',
+           g180.data.diseases.length === 0 && g180.data.poisons.length === 0
+           && g180.data.stamina === g180.effectiveStaminaMax(),
+           `d=${g180.data.diseases.length} p=${g180.data.poisons.length} stam=${g180.data.stamina}`);
+        ok('task350: …and still cannot lift the curse, which no potion claims to',
+           g180.data.curses.length === 1);
+        const g342 = await drink350(1, '342');
+        ok('task350: §1.342\'s twin potion is unaffected — it clears both by its own two attributes',
+           g342.data.diseases.length === 0 && g342.data.poisons.length === 0
+           && g342.data.curses.length === 1,
+           `d=${g342.data.diseases.length} p=${g342.data.poisons.length}`);
+        // The markup difference the decision is ABOUT, asserted so a re-transcription that
+        // added poison="*" to §5.180 (or dropped it from §1.342) is visible here.
+        const src = async (b, s) => (await rawSections(b))[s];
+        const x180 = await src(5, '180');
+        const x342 = await src(1, '342');
+        ok('task350: §5.180 carries disease="*" alone where §1.342 carries both attributes',
+           /<lose\s+disease="\*"\s*\/>/.test(x180) && !/poison=/.test(x180)
+           && /<lose\s+poison="\*"\s*\/>/.test(x342) && /<lose\s+disease="\*"\s*\/>/.test(x342),
+           'poison in 5.180: ' + /poison=/.test(x180));
+      }
+
       // The cure survives the save round trip: the lists are ordinary persisted data, so this
       // is a control on the sanitizer rather than on the plan.
       {

@@ -16861,3 +16861,81 @@ backspace.
 combination, no player can see a difference today.
 
 ---
+
+## 350. §5.180's potion cures more than its printed sentence promises
+
+**Priority: LOW.** A rounding error in the player's favour on one item, and the reference engine
+behaves the same way — but it is a divergence from the printed text, which this port treats as
+the authority, so it is recorded rather than left as folklore in a code comment.
+
+### What is wrong
+
+Task 343 made `afflictionFamily('disease')` read diseases **and** poisons, because 15 of the 16
+shipped `<lose disease=>` nodes sit in a section whose own words promise both. The 16th is
+§5.180's potion of restoration, which says "The potion can be used once only to restore all
+lost Stamina points and cure you of any **diseases**" and is transcribed
+`<lose disease="*"/>` inside its `<effect type="use">`. Under the family reading, drinking it
+also clears every poison.
+
+Book 1 section 342 is the control that shows the transcription is deliberate rather than
+accidental: the same potion of restoration there says "cure poison and disease" and carries
+**both** `<lose poison="*"/>` and `<lose disease="*"/>`. So the corpus does distinguish the two
+potions, and §5.180's single attribute is the narrower one on purpose.
+
+The reference model reads §5.180 the same way this port now does — `Curse.matches` makes a
+DISEASE selector match a POISON with no exception — so nothing here is a regression against
+JaFL. What is unresolved is which authority wins for this one node: the printed sentence, or the
+attribute the transcription chose.
+
+`suite-corpus` pins §5.180 by name as the single `disease="*"` node whose section never mentions
+poison, so this cannot quietly become a class of nodes.
+
+### Resolution — kept, and the rule written down
+
+**Kept: §5.180's potion clears poison as well as disease.** The rule that settles it was already
+implicit in task 343 and is now stated in `afflictionFamily`'s comment: **a printed DENIAL
+narrows a selector; printed SILENCE does not.**
+
+§1.338's healer "can cure you of poison but **is unable to cure disease**" — an explicit denial,
+and the reason `poison=` reads its own list alone even though the reference model is symmetric.
+§5.180 says "cure you of any diseases" and says nothing at all about poison. That is a list of
+what the potion does, not a limit on it. The two sentences are different in kind, and treating
+them alike in either direction is what would be inconsistent.
+
+Three things make keeping it the better answer rather than only the cheaper one:
+
+- it is the reference model's reading — `Curse.matches` makes a DISEASE selector match a POISON
+  with no exception;
+- it is the reading the other 15 `<lose disease=>` nodes require;
+- narrowing it would have needed new markup, a `validate-source.ps1` allowlist entry (task 199)
+  and a data rebuild in order to make one potion in one book behave unlike its own twin —
+  scaffolding whose only job is to keep one node special, which is the shape task 328 deleted.
+
+So step 2 does not arise, and step 1 is answered in the direction of "keep it, and stop calling
+it an exception". What changed is the **evidence**, not the behaviour: the comment states the
+rule and its reason instead of deferring to a filed task, and the two potions are now driven
+rather than described.
+
+### Validation
+
+7 new assertions. Both potions are driven through their real `<effect type="use">` bodies:
+
+- §5.180's potion clears the disease **and** the poison and heals to the effective maximum,
+  while leaving the curse standing — which no potion claims to lift;
+- §1.342's twin is unaffected, clearing both by its own two attributes (step 3);
+- and the markup difference the decision is *about* is asserted — `disease="*"` alone in §5.180,
+  both attributes in §1.342 — so a re-transcription that added `poison="*"` to the one or
+  dropped it from the other is visible here rather than silently making the comment wrong.
+
+The `suite-corpus` census assertion is kept and reworded: §5.180 is still the only `disease="*"`
+cure whose section never names poison. Pinning it **by name** is what keeps this a decision
+about one node instead of a licence for a class — a second such node fails there and gets read
+against the rule.
+
+`node web/tests/node-import.mjs` `pass=35 fail=0`, focused `-Suite inventory,corpus`
+`RESULT ALL PASS pass=606 fail=0`, full browser suite `RESULT ALL PASS pass=3214 fail=0`
+(3210 before). No `books/`/`rules/` change — the corpus is correct as transcribed — so
+`stamp-version.ps1` only and no generated data diff. No `CHANGELOG.md` entry: nothing a player
+can see changed, because nothing changed.
+
+---

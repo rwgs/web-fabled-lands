@@ -1787,14 +1787,23 @@ export function afflictionNameMatches(name, nm) {
  *  Following the reference symmetrically would let §1.338 charge a diseased-only player 25
  *  Shards and cure them, which its printed sentence expressly denies — and an explicit denial
  *  outranks the reference's own hedge on this very line ("I think poisons and diseases are
- *  usually treated the same … until I'm sure, I'll leave them separated"). The 16th node is the
- *  one the union makes more generous than its printed sentence: §5.180's potion of restoration
- *  says "cure you of any diseases" where §1.342's twin potion says "cure poison and disease"
- *  and carries both attributes. The reference model reads §5.180 the same way, so it is filed
- *  as task 350 rather than special-cased here.
+ *  usually treated the same … until I'm sure, I'll leave them separated").
  *
- *  A corpus assertion pins that reading, so a future node breaking the pattern fails loudly
- *  instead of silently curing the wrong list. */
+ *  **A printed DENIAL narrows a selector; printed SILENCE does not.** That is the whole rule
+ *  the asymmetry rests on, and the 16th `<lose disease=>` node is what settles it (task 350).
+ *  §5.180's potion of restoration says "cure you of any diseases" and carries `disease="*"`
+ *  alone, where §1.342's twin potion says "cure poison and disease" and carries both
+ *  attributes — so the transcription really does distinguish them. But §5.180 nowhere says the
+ *  potion cannot cure poison; it simply does not mention it, which is a list of what the item
+ *  does and not a limit on it. So §5.180 clears both, deliberately: it is the reference
+ *  model's reading (`Curse.matches` admits no exception), it is the reading the other 15 nodes
+ *  need, and narrowing it would have meant new markup, a validator allowlist entry and a data
+ *  rebuild to make one potion in one book behave unlike its own twin — scaffolding whose only
+ *  job is one node, which is the shape task 328 deleted.
+ *
+ *  Corpus assertions pin both halves — that §5.180 is still the ONLY `disease="*"` node whose
+ *  section never mentions poison, and that §1.342's twin is unaffected — so a future node
+ *  reaching the same silence is reviewed against this rule rather than absorbed by it. */
 export function afflictionFamily(type) {
   if (type === 'disease') return ['disease', 'poison'];
   if (type === 'poison') return ['poison'];

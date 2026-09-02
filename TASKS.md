@@ -3,10 +3,10 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-350 appears below: 207 and 326 are withdrawn as misdiagnoses, 350 is the only
-open item, and all others are complete (see the Review log). File new work under
-the priority bucket that fits, and record the pass in the Review log. Completed
-detail sections are archived in
+350 appears below: 207 and 326 are withdrawn as misdiagnoses and **all others are
+complete** — the backlog carries no open item (see the Review log). File new work
+under the priority bucket that fits, and record the pass in the Review log.
+Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
 
@@ -20,10 +20,11 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
+*(none open — file new MEDIUM work here)*
 
 **LOW**
 
-- [ ] 350. Book 5 section 180's potion of restoration says "cure you of any diseases" but is transcribed `<lose disease="*"/>`, which task 343 made read the disease/poison family, so the potion now also cures poison — more than its printed sentence promises, and unlike book 1 section 342's twin potion which says "cure poison and disease" and carries both attributes
+*(none open — file new LOW work here)*
 
 **Done**
 
@@ -383,57 +384,11 @@ this order.*
 - [x] 347. `renderSheet` filtered codeword keys with `/^\d+\.\d/` alone — "hide internal box-codewords" — which catches only the dot-numeric shape, so the slash-scoped (`5/520`), word-continuing (`5.Aku.leaving`) and explicitly named engine flags (`StillInYellowport`, `HydraDamage`, `CharismaBonus`) were all chipped under "Codewords" beside Anchor; the sheet now shows a codeword only when the edition declares it, from the `Codewords=` union the build folds into `meta.json`
 - [x] 348. both sail callers set `story._pendingSourceNode` BEFORE calling `sailThenGo`, but with several local ships that function stands a which-ship picker and returns having navigated nowhere — so the Story claimed the sail choice was taken while the question was open, and an item detour opened in that window (`Story.useItem` passes no source node, correctly) inherited it, its `<return>` crossing off a route no ship had sailed
 - [x] 349. two derived-stat readers bypassed the mode-aware helpers beside them: `defenceForMode` stripped the weapon, armour, Defence aura, Defence affliction and god effect for `natural` and then added `rankValue()` unconditionally, so the ring of ultimate power's +2 Rank aura survived into "natural" Defence; and `<if ability="stamina">`/`<set value="stamina">` were two-way — any modifier meant the effective maximum — so `natural` read back the aura-inflated max
+- [x] 350. §5.180's potion of restoration says "cure you of any diseases" and carries `disease="*"` alone, where §1.342's twin says "cure poison and disease" and carries both — so task 343's family reading makes it clear poison too; **resolved as correct**, because a printed DENIAL narrows a selector (§1.338) while printed SILENCE does not, and §5.180 nowhere says the potion cannot cure poison
 
 ---
 
-> **Completed task details (tasks 1–336) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
-
-## 350. §5.180's potion cures more than its printed sentence promises
-
-**Priority: LOW.** A rounding error in the player's favour on one item, and the reference engine
-behaves the same way — but it is a divergence from the printed text, which this port treats as
-the authority, so it is recorded rather than left as folklore in a code comment.
-
-### What is wrong
-
-Task 343 made `afflictionFamily('disease')` read diseases **and** poisons, because 15 of the 16
-shipped `<lose disease=>` nodes sit in a section whose own words promise both. The 16th is
-§5.180's potion of restoration, which says "The potion can be used once only to restore all
-lost Stamina points and cure you of any **diseases**" and is transcribed
-`<lose disease="*"/>` inside its `<effect type="use">`. Under the family reading, drinking it
-also clears every poison.
-
-Book 1 section 342 is the control that shows the transcription is deliberate rather than
-accidental: the same potion of restoration there says "cure poison and disease" and carries
-**both** `<lose poison="*"/>` and `<lose disease="*"/>`. So the corpus does distinguish the two
-potions, and §5.180's single attribute is the narrower one on purpose.
-
-The reference model reads §5.180 the same way this port now does — `Curse.matches` makes a
-DISEASE selector match a POISON with no exception — so nothing here is a regression against
-JaFL. What is unresolved is which authority wins for this one node: the printed sentence, or the
-attribute the transcription chose.
-
-`suite-corpus` pins §5.180 by name as the single `disease="*"` node whose section never mentions
-poison, so this cannot quietly become a class of nodes.
-
-### Steps
-
-1. Decide the authority for this node and say so in `afflictionFamily`'s comment either way: the
-   printed "any diseases" (narrow it) or the family attribute (keep it, and stop calling it an
-   exception).
-2. If it is narrowed, do it WITHOUT weakening the family reading the other 15 nodes need — a
-   per-node opt-out has to be markup the validator allowlist knows about, not a section-number
-   special case in a rule module.
-3. Check §1.342's twin potion stays unaffected either way, and keep the `suite-corpus` census
-   assertion honest: if the exception goes away, that assertion's expected list changes with it.
-
-### Validation
-
-Run the focused inventory and corpus suites, the DOM-free import check and the full browser
-suite. If step 2 adds markup, add it to `build/validate-source.ps1`'s allowlist in the same
-change (task 199) and rebuild the bundled data.
-
----
+> **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The backlog currently has no open item, so no detail section remains in this file; the Review log follows.
 
 ---
 
@@ -442,6 +397,31 @@ change (task 199) and rebuild the bundled data.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 350): closed **350**, filed nothing. **The backlog is now empty.** The
+task asked for a decision and the decision is that §5.180's potion is right as it stands: it
+clears poison as well as disease, deliberately.
+**The rule that settles it is one sentence, and it was already implicit in task 343: a printed
+DENIAL narrows a selector; printed SILENCE does not.** §1.338's healer "can cure you of poison
+but **is unable to cure disease**" — an explicit denial, which is why `poison=` reads its own
+list alone and outranks the reference model's symmetry. §5.180 says "cure you of any diseases"
+and says nothing whatever about poison; that is a list of what the potion does, not a limit on
+it. The two are different kinds of sentence, and treating them the same in either direction is
+what would be inconsistent.
+Three things made keeping it the better answer rather than merely the cheaper one. It is the
+reference model's reading (`Curse.matches` admits no exception). It is the reading the other 15
+`<lose disease=>` nodes need. And narrowing it would have meant new markup, a
+`validate-source.ps1` allowlist entry and a data rebuild in order to make one potion in one
+book behave unlike its own twin — scaffolding whose only job is to keep one node special, which
+is the shape task 328 deleted.
+What changed, then, is not behaviour but **evidence**: the code comment now states the rule and
+the reason instead of deferring to a filed task, and both potions are DRIVEN in
+`suite-inventory` rather than described — §5.180 clearing both lists and healing while leaving
+the curse standing, §1.342's twin unaffected, and the markup difference the decision is about
+asserted so a re-transcription that added `poison="*"` to §5.180 (or dropped it from §1.342)
+shows up here. The `suite-corpus` assertion keeps §5.180 pinned **by name**, which is what makes
+this a decision about one node rather than a licence for a class: a second `disease="*"` node
+whose section never mentions poison fails that assertion and gets read against the rule.
 
 Worked 2026-09-02 (task 349): closed **349**, filed nothing. `defenceForMode` reads Rank through
 `rankForMode(m)`, and one `staminaForMode(mode, bare)` on `GameState` replaces the four private
