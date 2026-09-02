@@ -642,9 +642,17 @@ function applyLose(el, state, opts) {
   // Lift a standing <bookchange> rule by name — book5/587's "You can no longer receive 20
   // Shards every time you travel to another book", the cancel half of the family. (task 299)
   if (get('bookchange') != null) { if (state.removeBookChange(get('bookchange'))) notes.push('rule lifted'); }
-  if (get('curse') != null) { if (state.removeCurse(get('curse'))) notes.push('curse lifted'); }
-  if (get('disease') != null) { if (state.removeDisease(get('disease'))) notes.push('cured disease'); }
-  if (get('poison') != null) { if (state.removePoison(get('poison'))) notes.push('cured poison'); }
+  // A cure reads its whole affliction FAMILY (state.afflictionFamily): a disease selector sees
+  // diseases AND poisons, which is what the sections writing `<lose disease="?">` print, while a
+  // curse or poison selector stays on its own list. An open "?" asks opts.chooser which one
+  // leaves when several qualify — the view stands the picker — and the note names what ACTUALLY
+  // left, so a disease selector that cured a poison does not report "cured disease". (task 343)
+  const cured = new Set();
+  for (const sel of ['curse', 'disease', 'poison']) {
+    if (get(sel) == null) continue;
+    for (const gone of state.removeAffliction(sel, get(sel), opts.chooser)) cured.add(gone.type);
+  }
+  for (const kind of cured) notes.push(kind === 'curse' ? 'curse lifted' : ('cured ' + kind));
   if (get('title') != null) { state.removeTitle(get('title')); }
   if (get('god') != null) { state.removeGod(get('god')); }
   // "Lose any resurrection arrangements you had" clears every deal (book2/394,

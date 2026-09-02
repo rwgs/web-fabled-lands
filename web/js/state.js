@@ -992,6 +992,27 @@ export class GameState {
   // name. Their ability effects feed afflictionBonus() until the affliction is
   // cured; a non-cumulative re-infection has "no further effects".
   _afflictionList(type) { return type === 'disease' ? this.data.diseases : (type === 'poison' ? this.data.poisons : this.data.curses); }
+  /** Every affliction a `type`/`name` selector matches, in family then list order, one entry
+   *  per distinct { list, name } so a cumulative stack (§5.489's Avenger's Bite) offers a
+   *  picker ONE answer rather than one per wound. Each entry's `type` is the list the record
+   *  really lives in, so removing a poison that a DISEASE selector found still updates the
+   *  poison array. This is the DOM-free plan every reader shares — conditions, the
+   *  reward-waste gate, applyLose and the view's which-one picker. (task 343) */
+  afflictionMatches(type, name) {
+    const out = [], seen = new Set();
+    for (const kind of afflictionFamily(type)) {
+      for (const a of this._afflictionList(kind)) {
+        const nm = a.name || a.type || kind;
+        if (!afflictionNameMatches(name, nm)) continue;
+        const key = kind + '\u0000' + normalize(nm);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ type: kind, name: nm });
+      }
+    }
+    return out;
+  }
+  hasAffliction(type, name) { return this.afflictionMatches(type, name).length > 0; }
   addAffliction(type, obj = {}) {
     const list = this._afflictionList(type);
     const rec = { name: obj.name || type, type, effects: obj.effects || [], cumulative: !!obj.cumulative, lift: obj.lift || null };
@@ -1020,28 +1041,48 @@ export class GameState {
   // §5.565/§5.631/§5.697 is meant to end that fight's entire temporary COMBAT drain —
   // splicing one copy left the rest as a permanent penalty. Only cumulative stacks ever
   // share a name (a repeat application of a non-cumulative affliction is a no-op), so
-  // this can never collapse two unrelated records. `?` still drops one arbitrary
-  // affliction and `*` still clears the list. (task 184)
-  removeAffliction(type, name) {
-    const list = this._afflictionList(type);
-    if (name === '*') { const had = list.length; if (had) { list.length = 0; this.changed(); } return had > 0; }
-    if (name === '?') { if (list.length) { list.shift(); this.changed(); return true; } return false; }
-    const k = normalize(name);
-    const kept = list.filter((a) => normalize(a.name || a.type || '') !== k);
-    if (kept.length === list.length) return false;
-    list.length = 0; list.push(...kept);
+  // this can never collapse two unrelated records. (task 184)
+  //
+  // The selector reads its whole FAMILY (afflictionFamily), so `<lose disease="?">` can cure a
+  // poison — which is exactly what the three sections writing it print. `*` clears every match;
+  // `?`/blank removes ONE, named by `chooser` when several qualify (the view's picker) and
+  // otherwise the first in family/list order. Returns the { type, name } entries removed, so a
+  // caller can report which affliction actually left. (tasks 184 + 343)
+  //
+  // "ONE" now means one AFFLICTION, not one record: an open cure of a cumulative stack lifts
+  // the whole aggregate, where task 184's `?` spliced a single copy and left the rest as a
+  // permanent penalty. That is 184's own argument carried to the open selector, and the picker
+  // requires it — a button reading "Avenger's Bite" that leaves the curse standing is
+  // incoherent. afflictionMatches de-duplicates for the same reason. (task 343)
+  removeAffliction(type, name, chooser = null) {
+    const matches = this.afflictionMatches(type, name);
+    if (!matches.length) return [];
+    let take = matches;
+    if (name == null || name === '' || name === '?') {
+      const pick = (chooser && matches.length > 1) ? chooser(matches.slice(), 1, 'affliction') : null;
+      const named = (pick && pick.length) ? matches.find((m) => sameAffliction(m, pick[0])) : null;
+      take = [named || matches[0]];
+    }
+    for (const m of take) {
+      const list = this._afflictionList(m.type);
+      const k = normalize(m.name);
+      const kept = list.filter((a) => normalize(a.name || a.type || '') !== k);
+      list.length = 0; list.push(...kept);
+    }
     this.changed();
-    return true;
+    return take;
   }
 
-  hasCurse(name) { return matchAffliction(this.data.curses, name); }
+  hasCurse(name) { return this.hasAffliction('curse', name); }
   addCurse(c) { this.addAffliction('curse', typeof c === 'string' ? { name: c } : { name: c.name || c.type, effects: c.effects, cumulative: c.cumulative, lift: c.lift }); }
-  removeCurse(name) { return this.removeAffliction('curse', name); }
+  // The three wrappers keep their boolean contract (`if (state.removeDisease(…))` reads it);
+  // a caller wanting to know WHICH affliction left calls removeAffliction directly.
+  removeCurse(name, chooser = null) { return this.removeAffliction('curse', name, chooser).length > 0; }
 
-  hasDisease(name) { return matchAffliction(this.data.diseases, name); }
-  hasPoison(name) { return matchAffliction(this.data.poisons, name); }
-  removeDisease(name) { return this.removeAffliction('disease', name); }
-  removePoison(name) { return this.removeAffliction('poison', name); }
+  hasDisease(name) { return this.hasAffliction('disease', name); }
+  hasPoison(name) { return this.hasAffliction('poison', name); }
+  removeDisease(name, chooser = null) { return this.removeAffliction('disease', name, chooser).length > 0; }
+  removePoison(name, chooser = null) { return this.removeAffliction('poison', name, chooser).length > 0; }
 
   // ---- gods / titles ---------------------------------------------------
   hasGod(g) { return this.data.gods.includes(g); }
@@ -1677,12 +1718,59 @@ export function matchItemQuery(items, pattern, tags, group) {
   return matches;
 }
 
-/** True if an affliction list holds `name`; '*'/'?'/'' mean "any affliction". */
+/** True if an affliction list holds `name`; '*'/'?'/'' mean "any affliction". The single-list
+ *  form, for a caller holding a bare list rather than a GameState; the family-aware readers are
+ *  GameState.afflictionMatches / hasAffliction. */
 export function matchAffliction(list, name) {
   if (!list || !list.length) return false;
+  return list.some((a) => afflictionNameMatches(name, typeof a === 'string' ? a : a.name));
+}
+
+/** Does a selector's name match a stored affliction's? '*'/'?'/blank are the wildcards; a real
+ *  name compares case- and space-insensitively, the reference model's own name test. */
+export function afflictionNameMatches(name, nm) {
   if (name == null || name === '' || name === '*' || name === '?') return true;
-  const want = normalize(name);
-  return list.some((a) => normalize(typeof a === 'string' ? a : a.name) === want);
+  return nm != null && normalize(name) === normalize(nm);
+}
+
+/** Which affliction lists a `type` selector searches (task 343).
+ *
+ *  The reference model keeps curses, diseases and poisons in ONE list and makes a DISEASE or
+ *  POISON selector match either (`Curse.matches` in `java-engine/flands/Curse.java`), while a
+ *  CURSE selector matches curses alone — the books are emphatic that a healer who cures disease
+ *  and poison still "cannot lift a curse" (§1.114, §4.500, §5.674). The web state keeps three
+ *  arrays and never formed that family, so `<lose disease="?">` searched diseases only and a
+ *  poisoned character was told there was nothing to cure — at §5.105 after paying 75 Shards
+ *  for it.
+ *
+ *  The union here is NOT symmetric, and that is deliberate. `disease=` reads the family: of the
+ *  16 shipped `<lose disease=>` nodes (13 "*", 3 "?"), 15 sit in a section that names poison in
+ *  its own words — §1.77's "delete the disease or poison", §1.114's "disease or poison",
+ *  §4.500's "cure you of any disease or poison", §5.674's "disease or poison effect". `poison=`
+ *  reads poisons alone, because the corpus writes an OPEN one exactly once and there the book
+ *  NARROWS to poison: §1.338's healer "can cure you of poison but is unable to cure disease"
+ *  (its other uses are "*" beside a disease="*" twin, and two exact "Scorpion Poison" gates).
+ *  Following the reference symmetrically would let §1.338 charge a diseased-only player 25
+ *  Shards and cure them, which its printed sentence expressly denies — and an explicit denial
+ *  outranks the reference's own hedge on this very line ("I think poisons and diseases are
+ *  usually treated the same … until I'm sure, I'll leave them separated"). The 16th node is the
+ *  one the union makes more generous than its printed sentence: §5.180's potion of restoration
+ *  says "cure you of any diseases" where §1.342's twin potion says "cure poison and disease"
+ *  and carries both attributes. The reference model reads §5.180 the same way, so it is filed
+ *  as task 350 rather than special-cased here.
+ *
+ *  A corpus assertion pins that reading, so a future node breaking the pattern fails loudly
+ *  instead of silently curing the wrong list. */
+export function afflictionFamily(type) {
+  if (type === 'disease') return ['disease', 'poison'];
+  if (type === 'poison') return ['poison'];
+  return ['curse'];
+}
+
+/** Are two match entries the same affliction? Compares the list and the name, so a chooser's
+ *  answer is re-found in the plan rather than trusted as an index. */
+export function sameAffliction(a, b) {
+  return !!(a && b && a.type === b.type && normalize(a.name) === normalize(b.name));
 }
 
 export function loadSlotMeta() {

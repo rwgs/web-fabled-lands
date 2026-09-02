@@ -830,6 +830,64 @@ export function openAbilityNode(costNode, rewards = []) {
   return rewards.find((r) => needsAbilityChoice(r)) || null;
 }
 
+// ---- afflictions: which disease/poison/curse a cure takes (task 343) --------
+// Only a <lose> SELECTS an affliction; a <gain>/<tick curse=> inflicts a named one. The
+// attributes are checked in this order, so a node carrying two (§1.574's `poison="*"
+// disease="*"`) reports the first — harmless, because no shipped node writes two OPEN
+// selectors, and only an open one is ever asked about.
+const AFFLICTION_SELECTORS = ['curse', 'disease', 'poison'];
+export function afflictionSelector(node) {
+  if (!node || node.tagName.toLowerCase() !== 'lose') return null;
+  for (const type of AFFLICTION_SELECTORS) {
+    const name = node.getAttribute(type);
+    if (name != null) return { type, name };
+  }
+  return null;
+}
+
+// The afflictions an OPEN cure could take, as state.afflictionMatches entries — the pool a
+// picker draws from. Empty unless the selector is open: a name or "*" is deterministic, so
+// there is nothing to ask.
+export function afflictionChoiceOptions(node, state) {
+  const sel = afflictionSelector(node);
+  if (!sel || (sel.name !== '?' && sel.name !== '')) return [];
+  return state.afflictionMatches(sel.type, sel.name);
+}
+
+// Does this cure ask the player WHICH affliction leaves? Only an open "?" with more than one
+// match in its family — with exactly one, removeAffliction's own default IS that one, so the
+// question would have a single answer. (task 343)
+export function needsAfflictionChoice(node, state) {
+  return afflictionChoiceOptions(node, state).length > 1;
+}
+
+// The node an affliction picker answers for across a price/flag link: the cost itself, else
+// whichever linked reward holds the open cure. §1.338's healer and §5.105's high priestess
+// both put the cure on the REWARD side of the link, so the payment has to look there — the
+// affliction twin of openAbilityNode.
+export function openAfflictionNode(costNode, rewards, state) {
+  if (costNode && needsAfflictionChoice(costNode, state)) return costNode;
+  return (rewards || []).find((r) => needsAfflictionChoice(r, state)) || null;
+}
+
+// Why a payment whose linked reward is a CURE must not be taken: the player has nothing it
+// would remove, so the Shards would buy an effect that does nothing. §1.338's 25 and §5.105's
+// 75/30 buy exactly one thing — "cured of a poison or a disease" — and no amount of paying can
+// give the player an affliction to spend it on, which is what separates this from the
+// carry-limit refusal menuWasteReason discounts.
+//
+// Scoped hard: EVERY linked reward must be a cure, and every one of them wasted. A payment
+// buying a cure beside something the player can still take is a real purchase, and one buying
+// anything else is not this case at all. The reasons come from rewardWasteReason, so the
+// wording stays the one the choose-one menu already shows. (task 343)
+export function cureWasteReason(rewards, state) {
+  const cures = (rewards || []).filter((r) => afflictionSelector(r));
+  if (!cures.length || cures.length !== rewards.length) return null;
+  const reasons = cures.map((r) => rewardWasteReason(state, r));
+  if (reasons.some((why) => !why)) return null;
+  return new Set(reasons).size === 1 ? reasons[0] : 'You have nothing for this to cure.';
+}
+
 // Does a <tick …="?" addbonus|addtag|removetag> ask the player to choose WHICH
 // possession is enchanted? Only when the target is an open "?"/blank of a kind with
 // more than one candidate — a name/all, a tags=/using= narrowing, or a cache target
@@ -979,6 +1037,7 @@ export function isFightHeld(view, node) {
 //   { mode:'forced-optional'|'payment'|'ability-choice'|'equipment-choice'|'profession-choice' }
 //   { mode:'forfeit-choice' }              — an open possession forfeit: pick which leaves
 //   { mode:'blessing-choice' }             — an open blessing forfeit: pick which leaves
+//   { mode:'affliction-choice' }           — an open cure: pick which affliction leaves
 //   { mode:'apply', showWords, setVarName, rollOwned, rerunnable } — the plain effect;
 //     rollOwned freezes a <set> whose var a roll owns (task 61), rerunnable re-evaluates
 //     an absolute <set value=…> every render.
@@ -1105,6 +1164,14 @@ export function classifyPassive(node, view) {
   // the same place: below the fight gate, because a blessing charged through a picker on a
   // branch that may never be taken cannot be given back. (task 285)
   if (!hidden && needsBlessingChoice(node, view.state)) return { mode: 'blessing-choice' };
+
+  // An open CURE is the same "which one?" shape on a third currency, so it sits in the same
+  // place: §4.71's mages "lift a curse" and §1.114's administrator cures "a disease or poison",
+  // and with two in the family the engine's list order is not the player's answer. Below the
+  // fight gate for the blessing forfeit's reason, and below the price/flag branch above on
+  // purpose — the corpus's three PAID open cures (§1.338, §5.105, §5.674) hang off a payment,
+  // whose own picker (openAfflictionNode) asks before the money moves. (task 343)
+  if (!hidden && needsAfflictionChoice(node, view.state)) return { mode: 'affliction-choice' };
 
   const setVarName = tag === 'set' ? node.getAttribute('var') : null;
   // A roll this visit has taken ownership of this var: freeze the <set> so it can

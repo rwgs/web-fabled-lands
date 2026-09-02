@@ -88,6 +88,40 @@ export async function run(ctx) {
       }
     }
 
+    // --- task 343: the corpus pattern the affliction family reading rests on -------------------
+    // afflictionFamily makes `disease=` search diseases AND poisons while `poison=` searches
+    // poisons alone. That asymmetry is a claim about how the transcription writes the two
+    // attributes, not a taste, so it is MEASURED here: a new node breaking the pattern fails
+    // this assertion instead of silently curing the wrong list. The evidence is the section's
+    // own printed words, which is why the check reads the raw XML rather than a node list.
+    {
+      const star = [], starQuiet = [], openDisease = [], openDiseaseQuiet = [], openPoison = [], openPoisonLoose = [];
+      for (const b of books) {
+        const raw = await rawSections(b);
+        for (const [key, xml] of Object.entries(raw)) {
+          const at = b + '.' + key;
+          const namesPoison = /poison/i.test(xml);
+          for (const m of xml.matchAll(/<lose\b[^>]*\bdisease="([^"]*)"/g)) {
+            if (m[1] === '*') { star.push(at); if (!namesPoison) starQuiet.push(at); }
+            if (m[1] === '?') { openDisease.push(at); if (!namesPoison) openDiseaseQuiet.push(at); }
+          }
+          for (const m of xml.matchAll(/<lose\b[^>]*\bpoison="\?"/g)) {
+            openPoison.push(at);
+            if (!/unable to cure disease/i.test(xml)) openPoisonLoose.push(at);
+          }
+        }
+      }
+      ok('task343: every OPEN disease cure sits in a section that names poison in its own words',
+         openDisease.length === 3 && openDiseaseQuiet.length === 0,
+         'open=' + openDisease.join(',') + ' silent=' + openDiseaseQuiet.join(','));
+      ok('task343: so does every disease="*" cure, save §5.180 — the documented exception (task 350)',
+         star.length === 13 && starQuiet.join(',') === '5.180',
+         'n=' + star.length + ' silent=' + starQuiet.join(','));
+      ok('task343: the corpus writes ONE open poison cure, and its section denies curing disease',
+         openPoison.join(',') === '1.338' && openPoisonLoose.length === 0,
+         'open=' + openPoison.join(',') + ' loose=' + openPoisonLoose.join(','));
+    }
+
     // --- task 324: the Maps modal captions each map with book.ini's Map.Title ------------------
     // The caption (and the image's alt text) comes from meta.json's per-book mapTitle, which the
     // build reads from book.ini. Every published book carries the key today, and it is a caption

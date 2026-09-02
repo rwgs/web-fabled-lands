@@ -3,10 +3,10 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-349 appears below: 207 and 326 are withdrawn as misdiagnoses, 337-339,
-341-344 and 346-349 are open, and all others are complete (see the Review
-log). File new work under the priority bucket that fits, and record the pass
-in the Review log. Completed detail sections are archived in
+350 appears below: 207 and 326 are withdrawn as misdiagnoses, 337-339, 341, 342,
+344 and 346-350 are open, and all others are complete (see the Review log). File
+new work under the priority bucket that fits, and record the pass in the Review
+log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
 
@@ -20,7 +20,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 343. JaFL matches disease and poison as one affliction family, but a web `<lose disease="?"|"*">` only searches diseases, so shipped “poison or disease” cures can refuse or charge a poisoned player and leave the poison in place; open cures also take the first match without asking
 - [ ] 342. Cargo purchases, crew upgrades and inline cargo barters silently use the first local ship when several are docked together, while JaFL requires the player to select which vessel changes
 - [ ] 337. Book 1 section 460 rewrites the printed "codeword Acid or a copper amulet" sentence as two separate sentences instead of changing markup only
 - [ ] 338. The codeword-value gate compares lower-cased spellings even though both the web engine and JaFL use case-sensitive keys, so `codeword="anchor"` is accepted as declared `Anchor` and can fail silently in play
@@ -34,6 +33,7 @@ there once the buckets below are clear.
 - [ ] 347. The Adventure Sheet hides only internal codewords shaped like `1.10.1`, so slash-scoped and named engine flags such as `5/520`, `5.Aku.leaving`, `StillInYellowport` and `HydraDamage` are displayed to the player as printed codewords
 - [ ] 348. Opening a multi-ship sail picker records its choice as `_pendingSourceNode` before a ship is selected, so abandoning the picker and taking an item `<return>` detour crosses off a sail route the player never took
 - [ ] 349. Natural derived-stat reads still include unwritten bonuses: `defenceForMode` adds aura-raised `rankValue()`, while the `<if>` and `<set>` Stamina readers return the effective aura/affliction maximum instead of the written score
+- [ ] 350. Book 5 section 180's potion of restoration says "cure you of any diseases" but is transcribed `<lose disease="*"/>`, which task 343 made read the disease/poison family, so the potion now also cures poison — more than its printed sentence promises, and unlike book 1 section 342's twin potion which says "cure poison and disease" and carries both attributes
 
 **Done**
 
@@ -382,6 +382,7 @@ this order.*
 - [x] 336. the `codeword=` value check splits on `|` alone, but `matchCodewords` in `engine.js` documents and implements "comma => AND, pipe => OR" — and `<gain>`/`<tick>`/`<lose>` split on `[|,]` as well — so the AND form the engine supports reads as one long name and is reported undeclared; no shipped section writes it, which is why a gate that rejects valid markup went unnoticed
 - [x] 340. saving inside a `<return>` detour lost the source `<choice>` because `serializeFrame` named the clicked node by scanning the render memo map `ctx.pathNodes`, which `renderChoices` never writes — it mints a synthetic `.cN` path and calls `renderChoice` directly — so the frame saved `usedSourcePath: null` and the post-reload `<return>` handed the non-`revisit` choice back live; a revealed `<outcome>`'s own `<goto>` failed the mirror way, recorded under a `.oN` path `resolveNodePath` cannot parse
 - [x] 345. `serializeVisit` carried task 156's `fightBonus` snapshot but no equipment-lock snapshot, so a mid-visit reload resumed §6.135 with both slots free while `ctx.applied` still said the hidden `<tick special="weaponlock">` had run — the sheet's Wield controls came back live and `<lose weapon="?" using="t">` broke whichever blade the player had swapped to instead of the one Mister Dragon had already caught
+- [x] 343. the three affliction arrays never formed the reference model's disease/poison family, so `<lose disease="?"|"*">` searched diseases alone and the 15 shipped nodes that print "poison or disease" left a poisoned character uncured — at §5.105 after paying 75 Shards for it — while an open cure took the first match with no picker
 
 ---
 
@@ -604,62 +605,6 @@ surface pickers for it).
 Run the focused economy and actions suites, the DOM-free import check and the full browser
 suite. Manually inspect the vessel picker at a cargo market and crew-upgrade section on a
 narrow layout; no control may be clipped or leave the transaction half-committed.
-
----
-
-## 343. Disease selectors do not include poison, and open cures do not ask which affliction
-
-**Priority: MEDIUM.** This is live on paid and automatic cures across the published corpus.
-A poisoned character can be told they have nothing to cure, or can pay and win a cure whose
-effect removes nothing, leaving the ability penalty in place.
-
-### What is wrong
-
-JaFL stores curses, diseases and poisons in one `CurseList`. `Curse.matches` in
-`java-engine/flands/Curse.java` keeps magical curses separate, but deliberately makes a
-disease selector match **both disease and poison** (and vice versa). When several matches
-exist, `CurseList.findMatches` honours the player's selected entry instead of silently taking
-array position zero.
-
-The web state has three arrays and never forms that shared family:
-
-- `applyLose` in `web/js/engine.js` sends `disease=` only to `removeDisease` and `poison=`
-  only to `removePoison`;
-- `hasDisease`/`hasPoison` and `rewardWasteReason` test only the named array, so the payment
-  gate can refuse a valid cure before the effect runs;
-- `removeAffliction('?')` removes the first record with no view-level chooser. The picker
-  work for open possessions, abilities and blessings never covered afflictions.
-
-The corpus states the intended family in plain words. Book 5 sections 105 and 674 use
-`<lose disease="?">` for "a poison or a disease" / "one disease or poison effect". Book 1
-section 114 and book 4 sections 404, 500, 537, 672 and 699 use `disease="*"` while promising
-to cure poison and disease. Other pages carry both attributes explicitly, which currently
-masks the split; book 1 section 338 is a poison-only control that must stay poison-only.
-
-### Steps
-
-1. Add one DOM-free affliction match/removal plan. A disease or poison selector searches the
-   union of both lists; a curse selector searches curses only. Preserve the stored type so
-   removing a selected poison updates the poison array and a disease the disease array.
-2. Route `hasDisease`/`hasPoison`-style condition/payment checks and `applyLose` through that
-   contract where JaFL's selector semantics apply. Keep exact named condition behavior
-   covered so an unrelated poison cannot satisfy `<if disease="Ghoulbite">` unless the
-   reference's name/type match says it should.
-3. For `?`, ask which matching affliction leaves when more than one qualifies; with one,
-   commit directly. For `*`, clear every match with no picker. Do not combine magical curses
-   with the disease/poison family.
-4. Make the picker part of the flag-linked payment/reward lifecycle: no Shards or flag move
-   until the answer commits, and an unavailable cure remains visibly disabled for the right
-   reason.
-5. Add end-to-end coverage for a poisoned-only character at sections 5.105 and 5.674, a
-   disease+poison choice, the automatic disease=`*` cures above, and the poison-only healer at
-   section 1.338.
-
-### Validation
-
-Run the focused inventory/economy/actions suites, the DOM-free import check and the full
-browser suite. Confirm a cure removes the affliction's ability/Stamina effects immediately
-and that save/load retains the cured lists.
 
 ---
 
@@ -886,6 +831,53 @@ Run the focused engine/combat suites, the DOM-free import check and the full bro
 
 > **Completed task details (tasks 1–336) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
 
+## 350. §5.180's potion cures more than its printed sentence promises
+
+**Priority: LOW.** A rounding error in the player's favour on one item, and the reference engine
+behaves the same way — but it is a divergence from the printed text, which this port treats as
+the authority, so it is recorded rather than left as folklore in a code comment.
+
+### What is wrong
+
+Task 343 made `afflictionFamily('disease')` read diseases **and** poisons, because 15 of the 16
+shipped `<lose disease=>` nodes sit in a section whose own words promise both. The 16th is
+§5.180's potion of restoration, which says "The potion can be used once only to restore all
+lost Stamina points and cure you of any **diseases**" and is transcribed
+`<lose disease="*"/>` inside its `<effect type="use">`. Under the family reading, drinking it
+also clears every poison.
+
+Book 1 section 342 is the control that shows the transcription is deliberate rather than
+accidental: the same potion of restoration there says "cure poison and disease" and carries
+**both** `<lose poison="*"/>` and `<lose disease="*"/>`. So the corpus does distinguish the two
+potions, and §5.180's single attribute is the narrower one on purpose.
+
+The reference model reads §5.180 the same way this port now does — `Curse.matches` makes a
+DISEASE selector match a POISON with no exception — so nothing here is a regression against
+JaFL. What is unresolved is which authority wins for this one node: the printed sentence, or the
+attribute the transcription chose.
+
+`suite-corpus` pins §5.180 by name as the single `disease="*"` node whose section never mentions
+poison, so this cannot quietly become a class of nodes.
+
+### Steps
+
+1. Decide the authority for this node and say so in `afflictionFamily`'s comment either way: the
+   printed "any diseases" (narrow it) or the family attribute (keep it, and stop calling it an
+   exception).
+2. If it is narrowed, do it WITHOUT weakening the family reading the other 15 nodes need — a
+   per-node opt-out has to be markup the validator allowlist knows about, not a section-number
+   special case in a rule module.
+3. Check §1.342's twin potion stays unaffected either way, and keep the `suite-corpus` census
+   assertion honest: if the exception goes away, that assertion's expected list changes with it.
+
+### Validation
+
+Run the focused inventory and corpus suites, the DOM-free import check and the full browser
+suite. If step 2 adds markup, add it to `build/validate-source.ps1`'s allowlist in the same
+change (task 199) and rebuild the bundled data.
+
+---
+
 ---
 
 ## Review log
@@ -893,6 +885,41 @@ Run the focused engine/combat suites, the DOM-free import check and the full bro
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 343): closed **343**, filed **350**. The three affliction arrays now
+form the reference model's disease/poison family through one DOM-free plan
+(`afflictionFamily`/`afflictionMatches`/`removeAffliction`), which every reader shares by
+delegation — the `<if>` conditions, `rewardWasteReason`'s payment gate and `applyLose` all
+changed behaviour without three parallel edits. An open `?` cure now asks which affliction
+leaves, through the picker seams tasks 224/285 already built.
+**The judgement call the filing left open, and the one thing worth reading this entry for:
+whether the union is symmetric.** The reference makes it so — `Curse.matches` lets a POISON
+selector match a DISEASE as readily as the reverse — and the filing's own step 1 says "a disease
+or poison selector searches the union of both lists", while its step 5 asks for §1.338 as a
+"poison-only control". Those cannot both hold. It is resolved for the printed text, which this
+port treats as the authority over the reference: `disease=` reads the family, `poison=` does not,
+because §1.338's healer "can cure you of poison but **is unable to cure disease**" and the
+symmetric reading would charge a diseased-only player 25 Shards and cure them anyway. An explicit
+printed denial outranks the reference's own hedge, which sits on that very line ("I think poisons
+and diseases are usually treated the same … until I'm sure, I'll leave them separated").
+What makes that defensible rather than curve-fitting is that it is **measured, in the suite, from
+the sections' own words**: of the 16 shipped `<lose disease=>` nodes, 15 sit in a section naming
+poison; the corpus writes an OPEN `poison=` exactly once, and that section is the one that denies
+curing disease. Three `suite-corpus` assertions read those figures out of the raw XML, so a node
+breaking the pattern fails a build rather than silently curing the wrong list. The 16th node —
+§5.180's potion, "cure you of any diseases", which the family reading now also un-poisons — is
+**task 350** rather than a section-number special case in a rule module. It is also the reason
+the corpus assertion names §5.180 explicitly: an exception you have to list is one you cannot
+forget.
+One semantic change went beyond the filing and it is task 184's own argument carried forward: `?`
+removes one AFFLICTION, not one RECORD, so an open cure of a cumulative stack lifts the whole
+aggregate where 184's `?` spliced a single copy and left the rest as a permanent penalty. The
+picker requires it — a button reading "Avenger's Bite" that leaves the curse standing is
+incoherent — and 184's assertion was rewritten to state the sharper rule rather than quietly
+updated to match. Both halves of the fix were confirmed to discriminate by reverting them
+separately: without the family, 12 assertions fail (§5.105 reporting `poisons=1 shards=100` —
+the money moved, the poison stayed); without the chooser, 4 fail, every one showing the disease
+cured where the player had named the poison.
 
 Worked 2026-09-02 (task 345): closed **345**, filed nothing. `equipLockSnapshot`/
 `restoreEquipLocks` on `GameState`, carried by the visit record and restored in `Story.resume`

@@ -17,6 +17,7 @@ import {
   linkedRewards, isCounterReward, isChooseOne, isPricedItemAward, isPricedResurrection, hasVisiblePay,
   rewardWasteReason, menuWasteReason, forcedChoiceGroup, pendingRollVar, viewPendingVars, isFightHeld,
   defaultEffectWords, needsAbilityChoice, openAbilityNode,
+  afflictionChoiceOptions, needsAfflictionChoice, openAfflictionNode, cureWasteReason,
 } from './render-rules.js';
 import { aggregateFightOutcome } from './render-gates.js';
 import { titleCase, bonusSuffix, blessingLabel } from './render-util.js';
@@ -105,6 +106,14 @@ function groupBundledChoice(story, effects) {
       return { kind: 'ability', node: fx };
     }
   }
+  // §1.77's high priestess bundles the cure with its own price: <group force="t"> holding
+  // <lose shards="cost"/> beside <lose disease="?"/>, so the open cure never reaches
+  // classifyPassive and its picker has to be the group's. Last of the three because the two
+  // above are FORFEITS — where a group somehow held both, the thing the player gives up is the
+  // more urgent question than the thing they get back. (task 343)
+  for (const fx of effects) {
+    if (needsAfflictionChoice(fx, story.state)) return { kind: 'affliction', node: fx };
+  }
   return null;
 }
 
@@ -179,6 +188,7 @@ export function renderGroup(story, container, node, path) {
       if (!forfeit) { commit(null); return; }
       btn.disabled = true; // the pick replaces the button — never let a second click re-run it
       if (forfeit.kind === 'ability') showAbilityPicker(story, container, forfeit.node, commit);
+      else if (forfeit.kind === 'affliction') showAfflictionPicker(story, container, forfeit.node, commit);
       else showForfeitPicker(story, container, forfeit.plan, commit);
     });
   }
@@ -312,6 +322,7 @@ export function renderPassive(story, container, node, path) {
     case 'equipment-choice':  return renderEquipmentChoice(story, container, node, path);
     case 'forfeit-choice':    return renderForfeitChoice(story, container, node, path);
     case 'blessing-choice':   return renderBlessingChoice(story, container, node, path);
+    case 'affliction-choice': return renderAfflictionChoice(story, container, node, path);
     case 'profession-choice': return renderProfessionChoice(story, container, node, path);
     default: { // 'apply' — the plain effect, memoised per-visit
       const key = 'fx@' + path;
@@ -455,6 +466,39 @@ function renderBlessingChoice(story, container, node, path) {
   return box;
 }
 
+// An open cure (`<lose disease="?">`, `<lose curse="?">`) with more than one affliction in its
+// family: print its words, then stand a picker where the effect would have applied, so the
+// player names which one is cured rather than the engine taking list order. The blessing
+// forfeit's twin in every mechanical respect — same fx@ memo (marking it applied before the
+// pick commits would void the cure on the re-render), same pendingChoice hold on the exits —
+// but the sign is reversed: this is a benefit, so the buttons read "✓" rather than "−".
+// (tasks 285 + 343)
+function renderAfflictionChoice(story, container, node, path) {
+  const memo = 'fx@' + path;
+  appendFxWords(story, container, node, path);
+  if (story.ctx.applied.has(memo)) return null; // already chosen this visit
+  story.pendingChoice = true; // the exits wait for the answer (task 251)
+  const box = document.createElement('div');
+  box.className = 'ship-choice affliction-choice';
+  box.appendChild(document.createTextNode('Cure which? '));
+  afflictionChoiceOptions(node, story.state).forEach((m) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-mini';
+    btn.textContent = '✓ ' + m.name;
+    btn.addEventListener('click', () => {
+      const mark = story.spendMark();
+      const note = applyEffect(node, story.state, { chooser: () => [m] });
+      story.noteSpend(path, mark);
+      story.ctx.applied.add(memo);
+      if (note) story.notify(note);
+      story.rerender();
+    });
+    box.appendChild(btn);
+  });
+  container.appendChild(box);
+  return box;
+}
+
 function renderProfessionChoice(story, container, node, path) {
   const memo = 'fx@' + path;
   const desc = document.createElement('span');
@@ -564,6 +608,10 @@ function renderOptionalPay(story, container, node, path, key) {
   // ability" as the cost, or as the effect the payment applies) has to name what leaves
   // here — classifyPassive routed it past 'ability-choice'. (task 224)
   const abilityNode = openAbilityNode(node, rewards);
+  // An open cure on either half of the link ("cured of a poison or a disease" as the reward
+  // §1.338/§5.105 pay for) names what leaves here, before the Shards move — classifyPassive
+  // held that reward inert precisely so this button applies it. (task 343)
+  const afflictionNode = openAfflictionNode(node, rewards, story.state);
   // `forNode` is the node the chooser answers for: a forfeit picker names the cost's own
   // possession (the default), an ability picker names the ability of whichever node asked.
   // Keeping them apart matters — an item candidate is not a valid answer for an ability.
@@ -585,6 +633,10 @@ function renderOptionalPay(story, container, node, path, key) {
     // "You can have only one X blessing at a time" — refuse the re-buy so the
     // Shards aren't spent for a blessing that addBlessing would just dedupe away.
     btn.disabled = true; btn.title = 'You already have this blessing';
+  } else if (cureWasteReason(rewards, story.state)) {
+    // The same refusal on the other side of the link: an unafflicted player must not pay
+    // §1.338's 25 Shards (or §5.105's 75) for a cure with nothing to remove. (task 343)
+    btn.disabled = true; btn.title = cureWasteReason(rewards, story.state);
   } else if (cost && story.state.data.shards < cost) {
     btn.disabled = true; btn.title = 'Not enough Shards';
   } else if (plan && plan.needsChoice) {
@@ -595,6 +647,11 @@ function renderOptionalPay(story, container, node, path, key) {
     btn.addEventListener('click', () => {
       btn.disabled = true;
       showAbilityPicker(story, container, abilityNode, (chooser) => commit(chooser, abilityNode));
+    });
+  } else if (afflictionNode) {
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      showAfflictionPicker(story, container, afflictionNode, (chooser) => commit(chooser, afflictionNode));
     });
   } else {
     btn.addEventListener('click', () => commit(null));
@@ -678,6 +735,24 @@ function showAbilityPicker(story, container, node, commit) {
   const isLoss = node.tagName.toLowerCase() === 'lose';
   const opts = abilityChoiceOptions(node.getAttribute('ability'), story.state, isLoss);
   story.appendAbilityPicker(container, opts, (ab) => commit(() => [ab]), isLoss ? '−' : '+');
+}
+
+// Reveal a "cure which?" picker for an open cure a payment or a group is about to commit, so
+// the affliction the player names is the one that leaves. The affliction twin of
+// showAbilityPicker; eligibility needs no code of its own here because afflictionChoiceOptions
+// already IS the match list the engine would remove from. (task 343)
+function showAfflictionPicker(story, container, node, commit) {
+  const box = document.createElement('div');
+  box.className = 'ship-choice affliction-choice';
+  box.appendChild(document.createTextNode('Cure which? '));
+  afflictionChoiceOptions(node, story.state).forEach((m) => {
+    const b = document.createElement('button');
+    b.className = 'btn-mini';
+    b.textContent = m.name;
+    b.addEventListener('click', () => commit(() => [m]));
+    box.appendChild(b);
+  });
+  container.appendChild(box);
 }
 
 // Render a force="f" optional effect as a once-per-visit opt-in button (task 74). When

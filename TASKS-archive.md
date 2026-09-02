@@ -15936,3 +15936,113 @@ breaks the broadsword while the Jade Defender survives — the exploit above, re
 (`26.09.02.4647f50`) and no generated data diff.
 
 ---
+
+## 343. Disease selectors do not include poison, and open cures do not ask which affliction
+
+**Priority: MEDIUM.** This is live on paid and automatic cures across the published corpus.
+A poisoned character can be told they have nothing to cure, or can pay and win a cure whose
+effect removes nothing, leaving the ability penalty in place.
+
+### What is wrong
+
+JaFL stores curses, diseases and poisons in one `CurseList`. `Curse.matches` in
+`java-engine/flands/Curse.java` keeps magical curses separate, but deliberately makes a
+disease selector match **both disease and poison** (and vice versa). When several matches
+exist, `CurseList.findMatches` honours the player's selected entry instead of silently taking
+array position zero.
+
+The web state has three arrays and never forms that shared family:
+
+- `applyLose` in `web/js/engine.js` sends `disease=` only to `removeDisease` and `poison=`
+  only to `removePoison`;
+- `hasDisease`/`hasPoison` and `rewardWasteReason` test only the named array, so the payment
+  gate can refuse a valid cure before the effect runs;
+- `removeAffliction('?')` removes the first record with no view-level chooser. The picker
+  work for open possessions, abilities and blessings never covered afflictions.
+
+The corpus states the intended family in plain words. Book 5 sections 105 and 674 use
+`<lose disease="?">` for "a poison or a disease" / "one disease or poison effect". Book 1
+section 114 and book 4 sections 404, 500, 537, 672 and 699 use `disease="*"` while promising
+to cure poison and disease. Other pages carry both attributes explicitly, which currently
+masks the split; book 1 section 338 is a poison-only control that must stay poison-only.
+
+### Fix
+
+One DOM-free plan in `state.js`. `afflictionFamily(type)` names the lists a selector searches;
+`GameState.afflictionMatches(type, name)` returns what it matches, one entry per distinct
+{ list, name } and each tagged with the list the record really lives in, so removing a poison a
+DISEASE selector found still updates the poison array. `hasAffliction` and
+`removeAffliction(type, name, chooser)` are both built on it, and `hasCurse`/`hasDisease`/
+`hasPoison`/`removeCurse`/`removeDisease`/`removePoison` became thin wrappers — so the
+conditions in `engine.js`, `rewardWasteReason`'s payment gate and `applyLose` all changed
+behaviour by delegation rather than by three parallel edits.
+
+**The union is asymmetric on purpose, and the asymmetry is measured rather than asserted.**
+`disease=` reads the family; `poison=` reads poisons alone. Of the 16 shipped `<lose disease=>`
+nodes, 15 sit in a section that names poison in its own printed words; the corpus writes an OPEN
+`poison=` exactly once, and there the book narrows — §1.338's healer "can cure you of poison but
+is unable to cure disease". Following `Curse.matches` symmetrically would let §1.338 charge a
+diseased-only player 25 Shards and cure them, contradicting its own sentence, and an explicit
+denial outranks the reference's own hedge on that very line ("I think poisons and diseases are
+usually treated the same … until I'm sure, I'll leave them separated"). `suite-corpus` measures
+all three claims from the raw XML, so a node that breaks the pattern fails a build instead of
+silently curing the wrong list. The one node the family reading makes more generous than its
+printed sentence — §5.180's potion — is filed as **task 350**.
+
+For `?`, the view asks. `needsAfflictionChoice`/`afflictionChoiceOptions`/`openAfflictionNode` in
+`render-rules.js` decide whether there is a question and which node it answers for;
+`classifyPassive` gained an `'affliction-choice'` verdict beside `'blessing-choice'`, and
+`render-rewards.js` a `renderAfflictionChoice` (the standalone cure, e.g. §4.71's "lift a curse")
+and a `showAfflictionPicker` shared by the payment family and by `groupBundledChoice`. The three
+PAID open cures all hang off a payment — §1.338 and §5.105 through `renderOptionalPay`'s
+`flag=` reward, §1.77 bundled inside its own `<group>` — so the picker sits before the commit and
+neither the Shards nor the price flag move until the answer lands. With exactly one match nothing
+is asked, because `removeAffliction`'s own default IS that one.
+
+`cureWasteReason` closes the other half of step 4: an unafflicted player is no longer allowed to
+pay for a cure with nothing to remove. Scoped hard — every linked reward must be a cure and
+every one of them wasted — because a payment buying a cure beside something takeable is a real
+purchase, and `menuWasteReason`'s carry-limit discount shows why a blanket rule would be wrong.
+
+**One semantic change beyond the filing, and it is task 184's own argument carried forward.**
+`?` now removes one AFFLICTION rather than one RECORD, so an open cure of a cumulative stack
+lifts the whole aggregate where task 184's `?` spliced a single copy and left the rest as a
+permanent penalty. The picker requires it: a button reading "Avenger's Bite" that leaves the
+curse standing is incoherent. Task 184's assertion was updated to state the sharper rule and
+name the curse that must survive.
+
+### Validation
+
+36 new assertions — 33 in `suite-inventory`, 3 in `suite-corpus`. Both halves of the fix were
+confirmed to discriminate rather than assumed to. Reverting `afflictionFamily('disease')` to
+`['disease']` fails **12** of them (`pass=450 fail=13`, the 13th a cascade where the picker is
+not there to click), including §5.105 reporting `poisons=1 shards=100` — the money moved, the
+poison stayed. Ignoring the chooser instead fails **4** (`pass=553 fail=4`), all of them showing
+the DISEASE cured where the player had named the poison. The end-to-end coverage step 5 asked
+for, driven through the real sections:
+
+- **§5.105** (the high priestess, 75 Shards "to be cured of a poison or a disease"): a
+  poisoned-only character is offered the payment, cured, and has the ability penalty restored
+  — this is the live defect, where the money moved and the poison stayed. An unafflicted
+  character is refused with the reason named, and neither the Shards nor the price flag move.
+- **§1.338** (the poison-only healer, the control): a poisoned character is cured; a
+  diseased-only one is refused rather than charged, because the printed sentence says the
+  healer cannot cure disease.
+- **§5.674** (the physician, paid roll, cure on the 3-6 outcome) with a disease AND a poison:
+  the picker offers both by name, nothing is cured until the answer commits, the affliction the
+  player names is the one that goes, and the spared disease keeps its penalty.
+- **§1.77**, whose open cure is bundled inside the `<group>` that charges for it: the group asks
+  before it charges, and the pick commits the cure and its price together.
+- The automatic `disease="*"` cures at **§1.114, §4.404, §4.500 and §4.699**: entry clears both
+  lists, and the curse stays standing except at §4.404, which carries `<lose curse="*">` too.
+- The plan itself: the three families, `hasDisease`/`hasPoison` following them, an exact name
+  still needing the name, one match asking nothing and two asking, a `*`/named selector never
+  asked about, `<gain curse=>` not being a selector at all, and a save/load keeping the cured
+  lists.
+
+`node web/tests/node-import.mjs` `pass=35 fail=0` (`state.js` and `render-rules.js` stay
+DOM-free). Full browser suite `RESULT ALL PASS pass=3107 fail=0` (3071 before). No
+`books/`/`rules/` change, so `stamp-version.ps1` only (`26.09.02.bb4e71e`) and no generated
+data diff.
+
+---

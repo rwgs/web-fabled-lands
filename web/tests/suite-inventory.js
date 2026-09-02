@@ -6,6 +6,7 @@ import * as eng from '../js/engine.js';
 import { makeFight } from '../js/combat.js';
 import { goodsFrom, buyTrade, applyInlineBuy } from '../js/market.js';
 import { Story } from '../js/render.js';
+import * as rules from '../js/render-rules.js';
 import { renderSheet } from '../js/ui.js';
 import { rawSections } from './corpus-text.js';
 
@@ -1572,7 +1573,15 @@ export async function run(ctx) {
       gsem184.addCurse({ name:'Avenger\'s Bite', effects:[{ ability:'combat', bonus:-1 }], cumulative:true });
       gsem184.addCurse({ name:'Avenger\'s Bite', effects:[{ ability:'combat', bonus:-1 }], cumulative:true });
       gsem184.addCurse({ name:'Skunk-juice', effects:[{ ability:'charisma', bonus:-2 }] });
-      ok('§184 `?` removes exactly one arbitrary curse', gsem184.removeCurse('?') === true && gsem184.data.curses.length === 2, `n=${gsem184.data.curses.length}`);
+      // task 343 sharpened what "one" means here: `?` takes one AFFLICTION, which for a
+      // cumulative stack is its whole aggregate (both Avenger's Bite records), not one wound's
+      // worth. That is task 184's own argument applied to the open selector — and the picker
+      // needs it, since a button reading "Avenger's Bite" that leaves the curse standing is
+      // incoherent. Skunk-juice, the untouched second curse, is what must survive.
+      ok('§184/343 `?` removes exactly one affliction — the whole cumulative aggregate, not one wound',
+         gsem184.removeCurse('?') === true && gsem184.data.curses.length === 1
+         && gsem184.data.curses[0].name === 'Skunk-juice',
+         `n=${gsem184.data.curses.length} left=${gsem184.data.curses.map((c) => c.name).join(',')}`);
       ok('§184 `*` clears every curse', gsem184.removeCurse('*') === true && gsem184.data.curses.length === 0);
       const gmix184 = mk184();
       gmix184.addCurse({ name:'Avenger\'s Bite', effects:[{ ability:'combat', bonus:-1 }], cumulative:true });
@@ -1580,6 +1589,228 @@ export async function run(ctx) {
       gmix184.addCurse({ name:'Skunk-juice', effects:[{ ability:'charisma', bonus:-2 }] });
       const chMix = gmix184.ability('charisma');
       ok('§184 a named removal is case-insensitive and spares other curses', gmix184.removeCurse('avenger\'s bite') === true && gmix184.data.curses.length === 1 && gmix184.hasCurse('Skunk-juice') && gmix184.ability('charisma') === chMix, `n=${gmix184.data.curses.length}`);
+    }
+
+    // --- task 343: a cure reads the disease/poison FAMILY, and an open one asks which ------
+    // The reference model keeps one list and makes a disease selector match a poison as well
+    // (`Curse.matches`); the web state kept three arrays and never formed the family, so
+    // `<lose disease="?">` searched diseases only. Every shipped node that writes it prints
+    // "poison or disease", so a poisoned character was told there was nothing to cure — at
+    // §5.105 *after* paying 75 Shards for it. The union is asymmetric on purpose: `poison=`
+    // stays on its own list, because the corpus writes it only where the book narrows to
+    // poison (§1.338's healer "is unable to cure disease"). See afflictionFamily.
+    {
+      const mk343 = (book = 5) => {
+        const g = GameState.create({ name: 'T343', gender: 'm', profession: 'Warrior', book, adv });
+        g.ephemeral = true;
+        return g;
+      };
+      const poison343 = (g) => g.addAffliction('poison', { name: 'Scorpion Poison', effects: [{ ability: 'combat', bonus: -2 }] });
+      const disease343 = (g) => g.addAffliction('disease', { name: 'Ghoulbite', effects: [{ ability: 'sanctity', bonus: -1 }] });
+      // Enter a section and hand back its container + story.
+      const enter343 = async (g, book, section) => {
+        const cont = document.createElement('div');
+        let st;
+        st = new Story(cont, g, { navigate: (b, sn) => { g.goTo(b, sn); }, onDeath(){}, notify(){} });
+        g.setVisitProvider(() => st.serializeVisit());
+        g.goTo(book, section);
+        st.begin(await data.getSection(book, section), book, section);
+        return { cont, st };
+      };
+      const payBtn = (cont, re) => Array.from(cont.querySelectorAll('.pay-action')).find((b) => re.test(b.textContent));
+      const cureBtns = (cont) => Array.from(cont.querySelectorAll('.affliction-choice .btn-mini'));
+
+      // The family plan itself, and the asymmetry it encodes.
+      {
+        const g = mk343();
+        poison343(g); disease343(g);
+        g.addCurse({ name: 'Shadar Curse', effects: [{ ability: 'charisma', bonus: -1 }] });
+        ok('task343: a disease selector matches diseases AND poisons, in list order',
+           JSON.stringify(g.afflictionMatches('disease', '?')) === '[{"type":"disease","name":"Ghoulbite"},{"type":"poison","name":"Scorpion Poison"}]',
+           JSON.stringify(g.afflictionMatches('disease', '?')));
+        ok('task343: a poison selector stays on the poison list (§1.338 cannot cure disease)',
+           JSON.stringify(g.afflictionMatches('poison', '?')) === '[{"type":"poison","name":"Scorpion Poison"}]',
+           JSON.stringify(g.afflictionMatches('poison', '?')));
+        ok('task343: a curse selector never sees the disease/poison family, and vice versa',
+           g.afflictionMatches('curse', '?').length === 1 && g.afflictionMatches('curse', '?')[0].name === 'Shadar Curse'
+           && !g.afflictionMatches('disease', '?').some((m) => m.type === 'curse'));
+        ok('task343: hasDisease/hasPoison follow the same families',
+           g.hasDisease('?') === true && g.hasPoison('?') === true
+           && g.hasDisease('Scorpion Poison') === true && g.hasPoison('Ghoulbite') === false,
+           `d?=${g.hasDisease('?')} p(Ghoulbite)=${g.hasPoison('Ghoulbite')}`);
+        ok('task343: an exact name still needs the name — an unrelated poison is not Ghoulbite',
+           g.hasDisease('Ghoulbite') === true && g.hasDisease('Blight of Nagil') === false);
+      }
+      // A poisoned-only character passes the reward-waste gate a disease selector guards.
+      {
+        const g = mk343();
+        poison343(g);
+        const cure = parse('<section name="w343"><lose disease="?">cured of a poison or a disease</lose></section>').querySelector('lose');
+        ok('task343: the reward-waste gate no longer refuses a disease cure for a poisoned player',
+           rules.rewardWasteReason(g, cure) === null, String(rules.rewardWasteReason(g, cure)));
+        const gClean = mk343();
+        ok('task343: …and still refuses it when there is nothing at all to cure',
+           rules.rewardWasteReason(gClean, cure) === "You don't have that affliction.");
+      }
+
+      // §5.105 — the high priestess. 75 Shards "to be cured of a poison or a disease": a
+      // poisoned-only character must be cured, which is the live defect (the money moved and
+      // the poison stayed). The cure is the flag= reward of a price= cost, so the payment
+      // button applies it.
+      {
+        const g = mk343();
+        g.data.shards = 100;
+        poison343(g);
+        const combat = g.ability('combat');
+        const e = await enter343(g, 5, '105');
+        const pay = payBtn(e.cont, /75/);
+        ok('§5.105 offers the 75-Shard payment to a poisoned character', !!pay && pay.disabled === false,
+           pay ? `disabled=${pay.disabled} title=${pay.title}` : 'no button');
+        pay.click();
+        ok('§5.105 cures the poison a disease selector found (was money for nothing)',
+           g.data.poisons.length === 0 && g.data.shards === 25,
+           `poisons=${g.data.poisons.length} shards=${g.data.shards}`);
+        ok('§5.105 the cure restores the affected ability immediately', g.ability('combat') === combat + 2,
+           `combat=${g.ability('combat')}`);
+      }
+      // …and an unafflicted character is not allowed to pay for it at all (step 4).
+      {
+        const g = mk343();
+        g.data.shards = 100;
+        const e = await enter343(g, 5, '105');
+        const pay = payBtn(e.cont, /75/);
+        ok('§5.105 refuses the payment when there is nothing to cure, naming the reason',
+           !!pay && pay.disabled === true && /affliction/.test(pay.title),
+           pay ? `disabled=${pay.disabled} title=${pay.title}` : 'no button');
+        ok('§5.105 …and the Shards and the price flag stay put', g.data.shards === 100 && !g.getFlag('c'));
+      }
+
+      // §1.338 — the poison-only healer, the control. A poisoned player is cured; a player with
+      // only a disease is refused, because the printed sentence says the healer "is unable to
+      // cure disease".
+      {
+        const g = mk343(1);
+        g.data.shards = 50;
+        poison343(g);
+        const e = await enter343(g, 1, '338');
+        const pay = payBtn(e.cont, /25/);
+        ok('§1.338 offers its 25 Shards to a poisoned character', !!pay && pay.disabled === false,
+           pay ? `disabled=${pay.disabled} title=${pay.title}` : 'no button');
+        pay.click();
+        ok('§1.338 cures the poison', g.data.poisons.length === 0 && g.data.shards === 25,
+           `poisons=${g.data.poisons.length} shards=${g.data.shards}`);
+      }
+      {
+        const g = mk343(1);
+        g.data.shards = 50;
+        disease343(g);
+        const e = await enter343(g, 1, '338');
+        const pay = payBtn(e.cont, /25/);
+        ok('§1.338 stays poison-only: a diseased player is refused, not charged',
+           !!pay && pay.disabled === true && g.data.diseases.length === 1 && g.data.shards === 50,
+           pay ? `disabled=${pay.disabled} title=${pay.title}` : 'no button');
+      }
+
+      // The automatic `disease="*"` cures: entering clears BOTH lists and leaves curses alone,
+      // which is what "cure you of any disease or poison … but they cannot lift a curse" says.
+      {
+        for (const [book, section] of [[1, '114'], [4, '404'], [4, '500'], [4, '699']]) {
+          const g = mk343(book);
+          poison343(g); disease343(g);
+          g.addCurse({ name: 'Shadar Curse', effects: [{ ability: 'charisma', bonus: -1 }] });
+          const ch = g.ability('charisma');
+          await enter343(g, book, section);
+          ok(`§${book}.${section} cures disease AND poison on entry`,
+             g.data.diseases.length === 0 && g.data.poisons.length === 0,
+             `d=${g.data.diseases.length} p=${g.data.poisons.length}`);
+          // §4.404 lifts curses too (<lose curse="*">); the other three must not.
+          const liftsCurses = section === '404';
+          ok(`§${book}.${section} ${liftsCurses ? 'also lifts curses' : 'leaves the curse standing'}`,
+             (g.data.curses.length === 0) === liftsCurses
+             && (liftsCurses || g.ability('charisma') === ch),
+             `curses=${g.data.curses.length}`);
+        }
+      }
+
+      // A disease AND a poison with one open cure: the player names which leaves. §5.674's
+      // physician, whose cure is revealed by the 3-6 outcome of the paid roll.
+      {
+        // RESTORE, never hard-set: this suite turns instant dice on once and leaves it on, so
+        // writing `false` here would break every roll-driven test below it.
+        const prevInstant = window.__FL_INSTANT_DICE__;
+        window.__FL_INSTANT_DICE__ = true;
+        const rnd = Math.random;
+        Math.random = () => 0.9; // die 6 → the 3-6 "Cured of one disease or poison" outcome
+        const g = mk343();
+        g.data.shards = 100;
+        poison343(g); disease343(g);
+        const sanctity = g.ability('sanctity');
+        const e = await enter343(g, 5, '674');
+        payBtn(e.cont, /25/).click();
+        await new Promise((r) => setTimeout(r, 30));
+        e.cont.querySelector('.btn-roll').click();
+        await new Promise((r) => setTimeout(r, 30));
+        const picks = cureBtns(e.cont);
+        ok('§5.674 asks which affliction the cure takes when both qualify',
+           picks.length === 2 && /Ghoulbite/.test(picks[0].textContent) && /Scorpion Poison/.test(picks[1].textContent),
+           picks.map((b) => b.textContent).join('|'));
+        ok('§5.674 nothing is cured until the answer commits',
+           g.data.diseases.length === 1 && g.data.poisons.length === 1);
+        picks[1].click(); // the POISON — not the engine's first match
+        ok('§5.674 the affliction the player named is the one cured',
+           g.data.poisons.length === 0 && g.data.diseases.length === 1
+           && g.data.diseases[0].name === 'Ghoulbite',
+           `p=${g.data.poisons.length} d=${g.data.diseases.map((a) => a.name).join(',')}`);
+        ok('§5.674 the disease it spared keeps its penalty', g.ability('sanctity') === sanctity,
+           `sanctity=${g.ability('sanctity')}`);
+        Math.random = rnd;
+        window.__FL_INSTANT_DICE__ = prevInstant;
+      }
+      // §1.77 bundles its open cure inside the <group> that also charges for it, so the picker
+      // has to be the group's — and nothing moves, money included, until the pick commits.
+      {
+        const g = mk343(1);
+        g.data.shards = 100;
+        poison343(g); disease343(g);
+        const e = await enter343(g, 1, '77');
+        const grp = Array.from(e.cont.querySelectorAll('.group-action')).find((b) => /disease or poison/i.test(b.textContent));
+        ok('§1.77 offers the bundled "delete the disease or poison" action', !!grp && grp.disabled === false);
+        grp.click();
+        const picks = cureBtns(e.cont);
+        ok('§1.77 the group asks which affliction before it charges',
+           picks.length === 2 && g.data.shards === 100
+           && g.data.diseases.length === 1 && g.data.poisons.length === 1,
+           `n=${picks.length} shards=${g.data.shards}`);
+        picks[1].click(); // the poison
+        ok('§1.77 the pick commits the whole group: the named cure and its price together',
+           g.data.poisons.length === 0 && g.data.diseases.length === 1 && g.data.shards === 25,
+           `p=${g.data.poisons.length} d=${g.data.diseases.length} shards=${g.data.shards}`);
+      }
+      // A single match asks nothing — the question would have one answer.
+      {
+        const g = mk343();
+        poison343(g);
+        const cure = parse('<section name="s343"><lose disease="?">cured of a poison or a disease</lose></section>').querySelector('lose');
+        ok('task343: one match needs no picker; two do',
+           rules.needsAfflictionChoice(cure, g) === false
+           && (disease343(g), rules.needsAfflictionChoice(cure, g) === true));
+        ok('task343: a named or "*" selector is never asked about',
+           rules.needsAfflictionChoice(parse('<section><lose disease="*"/></section>').querySelector('lose'), g) === false
+           && rules.needsAfflictionChoice(parse('<section><lose disease="Ghoulbite"/></section>').querySelector('lose'), g) === false
+           && rules.afflictionSelector(parse('<section><gain curse="Shadar"/></section>').querySelector('gain')) === null);
+      }
+      // The cure survives the save round trip: the lists are ordinary persisted data, so this
+      // is a control on the sanitizer rather than on the plan.
+      {
+        const g = mk343();
+        poison343(g); disease343(g);
+        g.removeAffliction('disease', '?', (c) => [c.find((m) => m.type === 'poison')]);
+        const g2 = new GameState(sanitizeData(JSON.parse(JSON.stringify(g.data))));
+        ok('task343: a save/load keeps the cured lists exactly as the cure left them',
+           g2.data.poisons.length === 0 && g2.data.diseases.length === 1
+           && g2.data.diseases[0].name === 'Ghoulbite' && g2.hasDisease('?') === true,
+           `p=${g2.data.poisons.length} d=${g2.data.diseases.map((a) => a.name).join(',')}`);
+      }
     }
 
     // --- task 185: a wildcard affliction effect (ability="*") hits all six abilities ---
