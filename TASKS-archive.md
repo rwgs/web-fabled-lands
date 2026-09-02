@@ -15775,3 +15775,87 @@ browser `RESULT ALL PASS pass=3035 fail=0`. `stamp-version.ps1` reports "already
 is not app source.
 
 ---
+
+## 340. A saved return detour forgets which source choice was taken
+
+**Priority: MEDIUM.** This breaks the exact-visit persistence contract and re-enables an
+action the renderer deliberately crosses off. The shipped corpus has live choice-to-return
+routes, including book 1 section 220 to 411 and book 5 section 721 to 601.
+
+### What is wrong
+
+When a choice or goto opens a temporary section, `Story._captureReturnFrame` stores the
+clicked source DOM node. An in-memory `<return>` restores that frame and sets
+`ctx.usedSource`, so `isSpentSource` disables the non-`revisit` action correctly.
+
+The save round-trip does not preserve every source node. `serializeFrame` in
+`web/js/visit-state.js` can write `usedSourcePath` only by finding the node in
+`ctx.pathNodes`. `appendChildren` is the only writer of that map. A `<choice>` inside
+`<choices>` bypasses it: `renderChoices` calls `renderChoice` directly under a synthetic
+`.cN` memo path, and never records the choice node. The saved frame therefore carries
+`usedSourcePath: null`; after reload `deserializeFrame` restores no `usedSource`, and the
+choice is enabled again when the player returns.
+
+Related synthetic paths deserve the same treatment. A node that *is* recorded under a
+`.bN`/`.oN`/`.cN` path still cannot be restored by `resolveNodePath`, which parses every
+component as a numeric `childNodes` index. The source-action identity needs one canonical,
+round-trippable node path rather than relying on whichever memo path a view happened to mint.
+
+A temporary focused browser assertion reproduced the defect on current HEAD: leave a
+synthetic section A via `<choices><choice section="D">`, serialize and sanitize the visit in
+D, resume it, take D's `<return>`, then inspect A's choice. The focused actions suite reported
+`RESULT FAILURES pass=878 fail=1` with `usedSourcePath=null`; the temporary assertion was then
+removed.
+
+### Fix
+
+`nodePathIn(node, sectionEl)` in `web/js/visit-state.js` — the inverse of `resolveNodePath`,
+in the same grammar: `'r'` then the `childNodes` index at each level, read off the node's real
+DOM ancestry. `serializeFrame` and `serializeCtx` call it (the latter takes the owning section
+as a second argument, passed by `Story.serializeVisit` and by `serializeFrame` from
+`frame.sectionEl`), so the reverse lookup in `ctx.pathNodes` is gone from both.
+
+Replacing the lookup rather than teaching `renderChoices` to write into `pathNodes` is the
+point of the fix: the memo map is the wrong authority in **both** directions. A `<choice>` is
+absent from it, and a `<goto>` inside a revealed `<outcome>` is present under a `.oN` segment
+`resolveNodePath` cannot parse — so it deserialised to null just the same. One derived path
+answers for every source form and needs no cooperation from any view.
+
+`resolveNodePath` now requires each component to be a bare run of digits. `parseInt` read a
+hand-edited `'1x'` as index 1, which names a **different** node than the save meant — the one
+failure mode worse than dropping the path. The digit test rejects the synthetic segments
+(`.c2`, `.b0`, `.o1`, `.r3`) exactly as `parseInt` already did, so no real memo path changes
+meaning and `dropReArmedRolls`/`resolveFightNode` are unaffected.
+
+Step 4 of the filing needed no census: the ancestry walk is independent of how a view paths a
+node, so the `.bN`/`.oN`/`.rN` forms are covered structurally. The revealed-`<outcome>` `<goto>`
+is driven anyway, since it is the form that was recorded-but-unresolvable.
+
+### Validation
+
+Twenty-two new assertions — 14 in `suite-actions`, 8 in `suite-corpus`. The whole set was run
+against the pre-fix lookup rather than assumed to discriminate: **nine** of them fail
+(`RESULT FAILURES pass=910 fail=9`), reporting `path=null` for both `<choices>` forms and
+`path="r.1.o0.1"` for the outcome `<goto>`. The other thirteen are controls a null source also
+satisfies — worth keeping, but they prove nothing on their own.
+
+- `suite-actions` — `nodePathIn`/`resolveNodePath` as inverses; both malformed shapes failing
+  closed (a synthetic segment, `'1x'`, `'-1'`, a trailing dot, a missing `'r'` root); and two
+  driven save/sanitize/resume/return round trips over a `<choices>` table, one taking the
+  non-`revisit` choice (crossed off after the return, siblings live) and one taking a
+  `revisit="t"` control (still enabled). The reload re-parses the source section, so nothing
+  but the saved path can re-bind the node.
+- `suite-actions` — the same round trip with a `<goto>` inside a revealed `<outcome>` as the
+  source, the form whose memo path is synthetic-but-recorded.
+- `suite-corpus` — the two shipped routes the filing named, §1.220 → §411 (the high priest's
+  mission) and §5.721 → §601 (the Aku bank), driven end to end rather than shape-checked. A
+  real `<choices>` table is indented, so its buttons are not the table's first child *nodes*;
+  the whitespace text nodes are what a hand-written index gets wrong, and pinning the real
+  markup stops the synthetic fixture drifting away from it.
+
+`node web/tests/node-import.mjs` `pass=35 fail=0` (`visit-state.js` stays DOM-free). Browser
+suite `RESULT ALL PASS pass=3057 fail=0`; the focused `-Suite actions` run reports
+`pass=892 fail=0` against the filing's 878 baseline. No `books/`/`rules/` change, so
+`stamp-version.ps1` only (`26.09.02.59d9e46`) and no generated data diff.
+
+---

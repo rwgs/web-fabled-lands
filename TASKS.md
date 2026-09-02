@@ -3,10 +3,10 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-349 appears below: 207 and 326 are withdrawn as misdiagnoses, 337-349 are open,
-and all others are complete (see the Review log). File new work under the
-priority bucket that fits, and record the pass in
-the Review log. Completed detail sections are archived in
+349 appears below: 207 and 326 are withdrawn as misdiagnoses, 337-339 and
+341-349 are open, and all others are complete (see the Review log). File new
+work under the priority bucket that fits, and record the pass in the Review
+log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
 
@@ -20,7 +20,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 340. Saving inside a `<return>` detour loses a source `<choice>` because synthetic `.cN` paths are never serialised as resolvable node paths, so after reload and return the non-`revisit` choice is live again
 - [ ] 345. Mid-visit save/load restores the memo for `<tick special="weaponlock|armourlock">` but not the transient equipment lock itself, so section 6.135 can reload unlocked and let the player swap which weapon Mister Dragon breaks
 - [ ] 343. JaFL matches disease and poison as one affliction family, but a web `<lose disease="?"|"*">` only searches diseases, so shipped “poison or disease” cures can refuse or charge a poisoned player and leave the poison in place; open cures also take the first match without asking
 - [ ] 342. Cargo purchases, crew upgrades and inline cargo barters silently use the first local ship when several are docked together, while JaFL requires the player to select which vessel changes
@@ -382,6 +381,7 @@ this order.*
 - [x] 334. `release-selftest.ps1`'s `Invoke-FixtureBuild` runs the real build with `6>$null` to keep its progress lines out of the assertions, but that stream also carries the build's *diagnosis* — so when task 333's fixture failed the codeword gate, CI printed a bare `throw` from `build-data.ps1:164` with the two lines naming the offending files discarded, and the log said only "fix the source XML above" above nothing at all
 - [x] 335. `books/book1/book.ini` declares **35** of the **36** codewords printed on book 1's own codeword list, omitting `Auric` — and annotates the two it carries out of alphabetical order, `Aloft` and `Altitude`, as "printed on no inside front cover" when both are printed, in alphabetical position; task 325 made that list the authority every book's `codeword=` **value** is checked against, and the check is a union because a codeword may be *tested* in any of the six, so a name the volume prints and its own sections never use still has to be declared
 - [x] 336. the `codeword=` value check splits on `|` alone, but `matchCodewords` in `engine.js` documents and implements "comma => AND, pipe => OR" — and `<gain>`/`<tick>`/`<lose>` split on `[|,]` as well — so the AND form the engine supports reads as one long name and is reported undeclared; no shipped section writes it, which is why a gate that rejects valid markup went unnoticed
+- [x] 340. saving inside a `<return>` detour lost the source `<choice>` because `serializeFrame` named the clicked node by scanning the render memo map `ctx.pathNodes`, which `renderChoices` never writes — it mints a synthetic `.cN` path and calls `renderChoice` directly — so the frame saved `usedSourcePath: null` and the post-reload `<return>` handed the non-`revisit` choice back live; a revealed `<outcome>`'s own `<goto>` failed the mirror way, recorded under a `.oN` path `resolveNodePath` cannot parse
 
 ---
 
@@ -514,60 +514,6 @@ two cases, contradict another paragraph in the same document.
 Check every local Markdown link target, scan the living docs for the retired phrases, and
 run `git diff --check`. This is documentation-only and does not require a data rebuild or
 version stamp; the final diff must not touch generated app files.
-
----
-
-## 340. A saved return detour forgets which source choice was taken
-
-**Priority: MEDIUM.** This breaks the exact-visit persistence contract and re-enables an
-action the renderer deliberately crosses off. The shipped corpus has live choice-to-return
-routes, including book 1 section 220 to 411 and book 5 section 721 to 601.
-
-### What is wrong
-
-When a choice or goto opens a temporary section, `Story._captureReturnFrame` stores the
-clicked source DOM node. An in-memory `<return>` restores that frame and sets
-`ctx.usedSource`, so `isSpentSource` disables the non-`revisit` action correctly.
-
-The save round-trip does not preserve every source node. `serializeFrame` in
-`web/js/visit-state.js` can write `usedSourcePath` only by finding the node in
-`ctx.pathNodes`. `appendChildren` is the only writer of that map. A `<choice>` inside
-`<choices>` bypasses it: `renderChoices` calls `renderChoice` directly under a synthetic
-`.cN` memo path, and never records the choice node. The saved frame therefore carries
-`usedSourcePath: null`; after reload `deserializeFrame` restores no `usedSource`, and the
-choice is enabled again when the player returns.
-
-Related synthetic paths deserve the same treatment. A node that *is* recorded under a
-`.bN`/`.oN`/`.cN` path still cannot be restored by `resolveNodePath`, which parses every
-component as a numeric `childNodes` index. The source-action identity needs one canonical,
-round-trippable node path rather than relying on whichever memo path a view happened to mint.
-
-A temporary focused browser assertion reproduced the defect on current HEAD: leave a
-synthetic section A via `<choices><choice section="D">`, serialize and sanitize the visit in
-D, resume it, take D's `<return>`, then inspect A's choice. The focused actions suite reported
-`RESULT FAILURES pass=878 fail=1` with `usedSourcePath=null`; the temporary assertion was then
-removed.
-
-### Steps
-
-1. Give source actions a canonical path based on their real DOM ancestry from the section
-   root (or an equivalent descriptor that `deserializeFrame` can resolve), independent of
-   render memo paths and synthetic `.cN`/`.bN`/`.oN` segments.
-2. Use that representation for both `serializeFrame` and `serializeCtx`'s `usedSource` path,
-   keeping malformed/hand-edited paths fail-closed to `null`.
-3. Add a save/sanitize/resume/return regression using a non-`revisit` choice inside
-   `<choices>` and require it to be disabled after return. Add a `revisit="t"` control that
-   remains enabled.
-4. Cover any branch/outcome source form that currently serializes a synthetic path, or prove
-   by census that no such form can own a shipped `<return>` frame.
-5. Exercise the two shipped choice routes above in the corpus integration coverage so the
-   synthetic fixture cannot drift away from the real markup.
-
-### Validation
-
-Run the focused actions suite first, then the DOM-free import check and full browser suite.
-Round-trip a hand-edited invalid source path as a defensive control; it must drop the marker
-without throwing or pointing at a different node.
 
 ---
 
@@ -988,6 +934,33 @@ Run the focused engine/combat suites, the DOM-free import check and the full bro
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 340): closed **340**, filed nothing. The saved source-action path now
+comes from `nodePathIn`, which walks a node's real DOM ancestry to the section root, instead of
+from a reverse lookup in `ctx.pathNodes`. The filing named the `<choices>` hole; the pass found
+that the memo map is the wrong authority for this in **both** directions, which is why the fix
+replaces the lookup rather than adding a writer to `renderChoices`. A `<choice>` is missing from
+the map outright, and a `<goto>` inside a revealed `<outcome>` **is** in it — under a `.oN`
+segment `resolveNodePath` cannot parse, so it round-tripped to null just the same. One derived
+path answers for every source form and needs no cooperation from any view, so a future view that
+mints its own memo key cannot reintroduce the defect.
+What the pass changes about how a saved node reference is trusted: **a memo key and a persisted
+identity are different things, and only one of them may be synthetic.** `ctx.pathNodes` exists
+so a re-render can find what a node already applied; within one visit a `.cN` or `.oN` key is
+perfectly good for that, because nothing has to resolve it back. The moment such a key is
+written to disk it has to survive a re-parse, and the two purposes had been sharing one map.
+`resolveNodePath` was also loose enough to answer the wrong question rather than refuse — a
+hand-edited `1x` read as index 1 through `parseInt` — so it now requires a bare digit run per
+component and fails closed, which is the one failure mode worse than dropping the marker.
+All 22 new assertions were run against the pre-fix lookup rather than assumed to
+discriminate, and **nine** of them fail (`RESULT FAILURES pass=910 fail=9`) — `path=null` for
+the two choice forms, `path="r.1.o0.1"` for the outcome `<goto>`; the other thirteen are
+controls that a null source satisfies too. The shipped routes the
+filing named — §1.220 → §411 and §5.721 → §601 — are driven end to end in `suite-corpus`, not
+just shape-checked, because a real `<choices>` table is indented and its buttons are therefore
+not its first child *nodes*: the whitespace text nodes are exactly what a hand-written index
+would get wrong. Task 348, still open, is the same frame's other defect (an abandoned sail
+picker recording `_pendingSourceNode` before a ship is chosen) and is untouched by this.
 
 Reviewed 2026-09-02 (thirteenth full pass, begun 2026-09-01, and the first proper full pass
 since July): started clean on synchronized `main` at

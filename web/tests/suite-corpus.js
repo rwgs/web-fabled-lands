@@ -7,9 +7,10 @@
 // corpus. The two assertions below make that dependence explicit, so a published book whose
 // data never got bundled fails here instead of only in a player's browser.
 import * as data from '../js/data.js';
-import { GameState } from '../js/state.js';
+import { GameState, sanitizeData } from '../js/state.js';
 import { Story } from '../js/render.js';
 import * as gates from '../js/render-gates.js';
+import * as visit from '../js/visit-state.js';
 import { rawSections } from './corpus-text.js';
 
 export async function run(ctx) {
@@ -36,6 +37,56 @@ export async function run(ctx) {
     }
     ok('every published book has bundled section data', empty.length === 0, 'no sections for book(s) '+empty.join(','));
     ok('all sections render w/o throw ('+total+')', renderErrors===0, renderErrors+' errors; first='+firstErr);
+
+    // --- task 340: the shipped choice → detour → <return> routes, driven end to end -----------
+    // suite-actions models this with a synthetic §A340; pinning the real routes here stops that
+    // fixture drifting away from the markup it stands for. Real <choices> tables are indented,
+    // so their buttons are NOT the table's first child NODES — the whole point of deriving the
+    // saved source path from DOM ancestry rather than from a view's synthetic '.c<i>' memo key.
+    {
+      const routes = [
+        { book: 1, src: '220', det: '411', label: 'high priest', back: /turn to\s*220/ },
+        { book: 5, src: '721', det: '601', label: 'Deposit or withdraw', back: /turn back to the paragraph/ },
+      ];
+      for (const r of routes) {
+        const raw = await rawSections(r.book);
+        const at = '§' + r.book + '.' + r.src + ' → §' + r.det;
+        const pick = (el) => el.querySelector('choices > choice[section="' + r.det + '"]');
+        const secs = { [r.src]: parse(raw[r.src]), [r.det]: parse(raw[r.det]) };
+        ok('task340: ' + at + ' is still a <choices> choice into a section carrying a <return>',
+           !!pick(secs[r.src]) && !!secs[r.det].querySelector('return'));
+
+        let story;
+        const g = GameState.create({ name: 'T340c', gender: 'm', profession: 'Warrior', book: r.book, adv });
+        const cont = document.createElement('div');
+        story = new Story(cont, g, { navigate: (b, sn) => { g.goTo(b, sn); story.begin(secs[String(sn)], b, sn); }, onDeath(){}, notify(){} });
+        g.goTo(r.book, r.src); story.begin(secs[r.src], r.book, r.src);
+        Array.from(cont.querySelectorAll('.choice')).find((b) => b.textContent.includes(r.label)).click();
+        const record = story.serializeVisit();
+
+        // Reload: fresh parses, so only the saved path can re-bind the source choice.
+        const secs2 = { [r.src]: parse(raw[r.src]), [r.det]: parse(raw[r.det]) };
+        ok('task340: ' + at + ' saves the source choice as a path that names that very choice',
+           !!record && !!record.frame
+           && visit.resolveNodePath(record.frame.usedSourcePath, secs2[r.src]) === pick(secs2[r.src]),
+           'path=' + JSON.stringify(record && record.frame && record.frame.usedSourcePath));
+
+        const g2 = new GameState(sanitizeData(JSON.parse(JSON.stringify({ ...g.data, visit: record }))));
+        const cont2 = document.createElement('div');
+        let story2;
+        story2 = new Story(cont2, g2, { navigate: (b, sn) => { g2.goTo(b, sn); story2.begin(secs2[String(sn)], b, sn); }, onDeath(){}, notify(){} });
+        const frame2 = story2.deserializeFrame(g2.data.visit.frame, secs2[r.src]);
+        story2.resume(secs2[r.det], r.book, r.det, g2.data.visit, frame2);
+        Array.from(cont2.querySelectorAll('.goto')).find((b) => r.back.test(b.textContent)).click();
+        const taken = Array.from(cont2.querySelectorAll('.choice')).find((b) => b.textContent.includes(r.label));
+        ok('task340: ' + at + ' — the post-reload <return> lands back on the source section',
+           story2.section === r.src, 'sec=' + story2.section);
+        ok('task340: ' + at + ' — and crosses the taken choice off, leaving its siblings live',
+           !!taken && taken.disabled === true
+           && Array.from(cont2.querySelectorAll('.choice')).filter((b) => b !== taken).every((b) => !b.disabled),
+           'taken=' + (taken && taken.disabled));
+      }
+    }
 
     // --- task 324: the Maps modal captions each map with book.ini's Map.Title ------------------
     // The caption (and the image's alt text) comes from meta.json's per-book mapTitle, which the

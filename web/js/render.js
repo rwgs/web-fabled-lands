@@ -666,7 +666,7 @@ export class Story {
       // a reload at the retry screen must restore the retry, not strand the spent consequence
       // with no way forward (task 173). Null when no retry is armed.
       retry: this._pendingRetry ? { book: this._pendingRetry.book, section: this._pendingRetry.section } : null,
-      ctx: serializeCtx(this.ctx),
+      ctx: serializeCtx(this.ctx, this.sectionEl), // usedSource as a path in THIS section
       frame: this._returnFrame ? serializeFrame(this._returnFrame) : null,
     };
   }

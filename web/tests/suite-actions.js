@@ -3273,7 +3273,7 @@ export async function run(ctx) {
       ctx.pathNodes.set('r.0', pNode);
       ctx.usedSource = pNode;
 
-      const flat = visit.serializeCtx(ctx);
+      const flat = visit.serializeCtx(ctx, sec); // the section usedSource's path is measured against
       ok('task119: serializeCtx flattens Sets/Maps + records usedSource as a path', Array.isArray(flat.applied) && flat.applied.includes('pay@r.0') && flat.usedSourcePath === 'r.0');
 
       const back = visit.deserializeCtx(flat, sec);
@@ -3296,7 +3296,7 @@ export async function run(ctx) {
       ok('task119: rebuildVisitScaffold without state (resume) keeps a locked bet',
          gLock.isCacheLocked('bet') === true && resumeCtx.rollLockCaches.has('bet'));
 
-      const frame = { book: 2, section: '5', sectionTodock: 'Dock', vars: { x: 1 }, location: 'Loc', entryTicks: 3, usedSource: pNode, ctx };
+      const frame = { book: 2, section: '5', sectionEl: sec, sectionTodock: 'Dock', vars: { x: 1 }, location: 'Loc', entryTicks: 3, usedSource: pNode, ctx };
       const fflat = visit.serializeFrame(frame);
       ok('task119: serializeFrame flattens the frame and its ctx', fflat.book === 2 && fflat.section === '5' && fflat.usedSourcePath === 'r.0' && Array.isArray(fflat.ctx.applied));
 
@@ -3400,6 +3400,112 @@ export async function run(ctx) {
          Number.isInteger(g2.entryTickCount()) && g2.entryTickCount() >= 0, 'entryTicks=' + g2.entryTickCount());
       ok('task203: the restored location is a string, not an object',
          typeof g2.data.location === 'string', 'loc=' + JSON.stringify(g2.data.location));
+    }
+
+    // --- task 340: the source action of a save made inside a <return> detour ------------------
+    // _captureReturnFrame records the clicked node; serializeFrame used to NAME it by scanning
+    // ctx.pathNodes, and that map cannot answer for either source form the books actually use.
+    // A <choices> button is missing outright — renderChoices mints a synthetic '.c<i>' path and
+    // calls renderChoice directly, so appendChildren (pathNodes' only writer) never sees it —
+    // and the frame saved usedSourcePath: null, so the post-reload <return> handed the choice
+    // back live. A revealed <outcome>'s own <goto> fails the other way: pathNodes DOES hold it,
+    // under a '.o<i>' path resolveNodePath cannot parse. nodePathIn derives one canonical path
+    // from the real DOM ancestry, which has neither hole. Shipped routes: §1.220 → §411 (the
+    // high priest's mission) and §5.721 → §601 (the Aku bank), both driven in suite-corpus.
+    {
+      // The two directions are inverses, and both malformed shapes fail closed.
+      const secN = parse('<section name="N340"><p>Prose.</p><choices><choice section="9">A</choice>'
+        + '<choice section="8">B</choice></choices></section>');
+      const cB = secN.querySelector('choices').children[1];
+      ok('task340: nodePathIn names a <choices> button by its real DOM ancestry',
+         visit.nodePathIn(cB, secN) === 'r.1.1', 'path=' + visit.nodePathIn(cB, secN));
+      ok('task340: the path it mints resolves back to that same node',
+         visit.resolveNodePath(visit.nodePathIn(cB, secN), secN) === cB);
+      ok('task340: nodePathIn is null for the section itself, a node from another section, or no node',
+         visit.nodePathIn(secN, secN) === null
+         && visit.nodePathIn(parse('<section name="X340"><p>Elsewhere.</p></section>').querySelector('p'), secN) === null
+         && visit.nodePathIn(null, secN) === null && visit.nodePathIn(cB, null) === null);
+      ok('task340: a synthetic memo segment is not a resolvable path (why pathNodes cannot serve)',
+         visit.resolveNodePath('r.1.c1', secN) === null && visit.resolveNodePath('r.1.b0', secN) === null
+         && visit.resolveNodePath('r.1.o0', secN) === null);
+      ok('task340: a hand-edited path drops the marker rather than naming a different node',
+         visit.resolveNodePath('r.1.1x', secN) === null && visit.resolveNodePath('r.1.-1', secN) === null
+         && visit.resolveNodePath('r.1.', secN) === null && visit.resolveNodePath('1.1', secN) === null);
+
+      // Take the source action out of `srcName`, save inside the detour, reload through the
+      // storage sanitizer, resume and take the <return>. The reload re-PARSES the source
+      // section, so nothing but the saved path can re-bind the source node.
+      const xmlD340 = '<section name="D340"><p>Detour.</p><return>turn back</return></section>';
+      const detour340 = async (xmlSrc, srcName, take) => {
+        const secs = { [srcName]: parse(xmlSrc), D340: parse(xmlD340) };
+        let story;
+        const g = GameState.create({ name: 'T340', gender: 'm', profession: 'Warrior', book: 1, adv });
+        const cont = document.createElement('div');
+        story = new Story(cont, g, { navigate: (b, s) => { g.goTo(b, s); story.begin(secs[String(s)], b, s); }, onDeath(){}, notify(){} });
+        g.goTo(1, srcName); story.begin(secs[srcName], 1, srcName);
+        await take(cont);
+        const record = story.serializeVisit();
+        const secs2 = { [srcName]: parse(xmlSrc), D340: parse(xmlD340) };
+        const g2 = new GameState(sanitizeData(JSON.parse(JSON.stringify({ ...g.data, visit: record }))));
+        const cont2 = document.createElement('div');
+        let story2;
+        story2 = new Story(cont2, g2, { navigate: (b, s) => { g2.goTo(b, s); story2.begin(secs2[String(s)], b, s); }, onDeath(){}, notify(){} });
+        const frame2 = story2.deserializeFrame(g2.data.visit.frame, secs2[srcName]);
+        story2.resume(secs2.D340, 1, 'D340', g2.data.visit, frame2);
+        cont2.querySelector('.goto').click(); // the detour's <return>
+        return { record, story2, cont2 };
+      };
+
+      const xmlA340 = '<section name="A340"><p>Source.</p><choices>'
+        + '<choice section="D340">Talk to the high priest</choice>'
+        + '<choice section="D340" revisit="t">Come back later</choice>'
+        + '</choices></section>';
+      const clickChoice = (label) => (c) => Array.from(c.querySelectorAll('.choice')).find((b) => b.textContent.includes(label)).click();
+
+      const spent = await detour340(xmlA340, 'A340', clickChoice('high priest'));
+      const spentBtns = Array.from(spent.cont2.querySelectorAll('.choice'));
+      ok('task340: the saved detour frame names the <choices> button (was null before the fix)',
+         spent.record.frame.usedSourcePath === 'r.1.0', 'path=' + JSON.stringify(spent.record.frame.usedSourcePath));
+      ok('task340: the post-reload <return> restores the source section',
+         spent.story2.section === 'A340', 'sec=' + spent.story2.section);
+      ok('task340: and the taken non-revisit choice is crossed off after the reload',
+         spentBtns.length === 2 && spentBtns[0].disabled === true && /already taken/.test(spentBtns[0].title),
+         'n=' + spentBtns.length + ' disabled=' + (spentBtns[0] && spentBtns[0].disabled) + ' title=' + (spentBtns[0] && spentBtns[0].title));
+      ok('task340: the sibling choice the player never took stays live',
+         spentBtns.length === 2 && spentBtns[1].disabled === false);
+
+      const kept = await detour340(xmlA340, 'A340', clickChoice('Come back later'));
+      const keptBtns = Array.from(kept.cont2.querySelectorAll('.choice'));
+      ok('task340: a revisit="t" source is recorded by path too',
+         kept.record.frame.usedSourcePath === 'r.1.1', 'path=' + JSON.stringify(kept.record.frame.usedSourcePath));
+      ok('task340: …but stays enabled after the return (a hub action may be retaken)',
+         kept.story2.section === 'A340' && keptBtns.length === 2 && keptBtns[1].disabled === false,
+         'disabled=' + (keptBtns[1] && keptBtns[1].disabled));
+
+      // The other synthetic form: a <goto> inside a REVEALED <outcome>, whose memo path is
+      // 'r.1.o0.1' — recorded in pathNodes but unresolvable, so it deserialised to null too.
+      {
+        window.__FL_INSTANT_DICE__ = true;
+        const rnd = Math.random;
+        Math.random = () => 0; // die = 1 → the 1-6 outcome
+        const xmlR340 = '<section name="R340"><random dice="1" var="z"/><outcomes>'
+          + '<outcome range="1-6">The die is cast. Turn to <goto section="D340"/>.</outcome>'
+          + '</outcomes></section>';
+        const revealed = (c) => Array.from(c.querySelectorAll('.branch .goto')).find((b) => b.textContent.trim() === 'D340');
+        const out = await detour340(xmlR340, 'R340', async (c) => {
+          c.querySelector('.btn-roll').click();
+          await new Promise((r) => setTimeout(r, 30)); // let the instant roll settle + rerender
+          revealed(c).click();
+        });
+        Math.random = rnd;
+        window.__FL_INSTANT_DICE__ = false;
+        ok('task340: an outcome-revealed <goto> serialises as its DOM path, not its memo path',
+           out.record.frame.usedSourcePath === 'r.1.0.1', 'path=' + JSON.stringify(out.record.frame.usedSourcePath));
+        ok('task340: the reveal that carried it survived the resume', /die is cast/.test(out.cont2.textContent));
+        ok('task340: and that <goto> is crossed off on the restored section',
+           out.story2.section === 'R340' && !!revealed(out.cont2) && revealed(out.cont2).disabled === true,
+           'sec=' + out.story2.section + ' goto=' + !!revealed(out.cont2));
+      }
     }
 
     // --- task 119 (phase 3): classifyPassive — the renderPassive decision cascade ----

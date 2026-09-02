@@ -23,17 +23,50 @@ export function newCtx() {
 // always names the same node, so a saved usedSource path re-binds to the exact choice/goto
 // on load. Returns null if the path does not resolve (defensive against a hand-edited save
 // / a section that changed between builds).
+//
+// Every component must be a bare run of digits. A lax parseInt made a hand-edited '1x' read
+// as index 1 — the one failure mode worse than dropping the path, since it silently names a
+// DIFFERENT node than the save meant; the digit test fails closed instead. It rejects the
+// views' synthetic segments ('.c2', '.b0', '.o1', '.r3') exactly as parseInt already did, so
+// no real memo path changes meaning. (task 340)
 export function resolveNodePath(path, sectionEl) {
   if (typeof path !== 'string' || !sectionEl) return null;
   const parts = path.split('.');
   if (parts.shift() !== 'r') return null;
   let n = sectionEl;
   for (const p of parts) {
+    if (!/^\d+$/.test(p)) return null;
     const i = parseInt(p, 10);
     if (!n || !n.childNodes || !n.childNodes[i]) return null;
     n = n.childNodes[i];
   }
   return n === sectionEl ? null : n;
+}
+
+// The inverse: a node's canonical path within its section, in resolveNodePath's own grammar.
+// Derived from the node's REAL DOM ancestry, deliberately not from ctx.pathNodes — the render
+// memo map is the wrong source of truth for a saved node identity twice over (task 340). It is
+// incomplete: renderChoices mints a synthetic '.c<i>' path for each <choice> and calls
+// renderChoice directly, so appendChildren (pathNodes' only writer) never records the very
+// nodes a <choices> table's buttons are, and a save made inside a <return> detour wrote
+// usedSourcePath: null — after the reload the source choice was live again (§1.220's 'Talk to
+// the high priest' → §411, §5.721's Aku bank → §601). And where it IS recorded, a synthetic
+// segment ('.b<i>' for a <choices> branch row, '.o<i>' for a revealed <outcome>) is not a
+// childNodes index, so resolveNodePath could never re-bind it anyway. The ancestry walk has
+// neither hole and needs no per-view cooperation. Returns null when the node is not inside
+// this section (or IS it), so a stale/foreign node drops rather than mis-resolving.
+export function nodePathIn(node, sectionEl) {
+  if (!node || !sectionEl || node === sectionEl) return null;
+  const parts = [];
+  for (let n = node; n !== sectionEl; ) {
+    const parent = n.parentNode;
+    if (!parent || !parent.childNodes) return null; // walked out of the section: not ours
+    const i = Array.prototype.indexOf.call(parent.childNodes, n);
+    if (i < 0) return null;
+    parts.unshift(i);
+    n = parent;
+  }
+  return ['r', ...parts].join('.');
 }
 
 // The branches a roll's result reveals — the subtrees whose memos a RE-ARMED roll must
@@ -172,14 +205,12 @@ export function dropReArmedRolls(ctx, sectionEl, state) {
 
 // Flatten a ctx to a plain, JSON-safe object. Maps→entry arrays, Sets→arrays; the roll and
 // fight values are already plain data. DOM references are never stored: pathNodes is rebuilt
-// lazily on render, and usedSource is recorded as its positional path (looked up in
-// pathNodes, which was populated by the render that produced this ctx). groupLimits and
-// rollLockCaches are omitted — they are re-derived from the static section on resume.
-export function serializeCtx(ctx) {
-  let usedSourcePath = null;
-  if (ctx.usedSource && ctx.pathNodes) {
-    for (const [p, n] of ctx.pathNodes) if (n === ctx.usedSource) { usedSourcePath = p; break; }
-  }
+// lazily on render, and usedSource is recorded as nodePathIn's canonical path within
+// `sectionEl` — the section this ctx belongs to, which the caller holds (the Story's own
+// sectionEl, or the frame's for serializeFrame). groupLimits and rollLockCaches are omitted —
+// they are re-derived from the static section on resume.
+export function serializeCtx(ctx, sectionEl = null) {
+  const usedSourcePath = nodePathIn(ctx.usedSource, sectionEl);
   return {
     applied: [...ctx.applied],
     rolls: [...ctx.rolls],
@@ -313,10 +344,6 @@ export function deserializeCtx(rec, sectionEl) {
 // location, entry-tick baseline, taken source action (as a path) and its own ctx. The frame's
 // sectionEl is NOT stored — it is re-parsed from book/section on resume.
 export function serializeFrame(frame) {
-  let usedSourcePath = null;
-  if (frame.usedSource && frame.ctx && frame.ctx.pathNodes) {
-    for (const [p, n] of frame.ctx.pathNodes) if (n === frame.usedSource) { usedSourcePath = p; break; }
-  }
   return {
     book: frame.book,
     section: frame.section,
@@ -324,8 +351,8 @@ export function serializeFrame(frame) {
     vars: { ...frame.vars },
     location: frame.location ?? null,
     entryTicks: frame.entryTicks,
-    usedSourcePath,
-    ctx: serializeCtx(frame.ctx),
+    usedSourcePath: nodePathIn(frame.usedSource, frame.sectionEl),
+    ctx: serializeCtx(frame.ctx, frame.sectionEl),
   };
 }
 
