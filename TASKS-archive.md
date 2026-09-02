@@ -16160,3 +16160,76 @@ suite `RESULT ALL PASS pass=3134 fail=0` (3107 before). No `books/`/`rules/` cha
 `stamp-version.ps1` only (`26.09.02.d1ebc30`) and no generated data diff.
 
 ---
+
+## 337. Book 1 section 460 rewrites the author's sentence instead of wrapping it
+
+**Priority: MEDIUM.** The route still has the intended two alternatives, so this is not a
+gameplay lock. It does violate the project's first content requirement: the section text is
+the author's and a rules fix may add or move markup, never rewrite or re-split the prose.
+
+### What is wrong
+
+The imported section and every revision before task 262 read:
+
+> If you have the codeword Acid or a copper amulet, [go to 327] immediately.
+
+Task 262 correctly removed the invented bookkeeping codeword `1.Skabb`, but changed the
+sentence into two:
+
+> If you have the codeword Acid, [go to 327] immediately. Or if you have a copper amulet,
+> [go to 327] immediately.
+
+A tag-stripped comparison from the original `books add` commit (`7386eed`) to current HEAD
+checked all 30 numeric section files ever edited and found this as the **only** prose
+difference. The split is unnecessary: `evaluateCondition` in `web/js/engine.js` ORs the
+recognised attributes on one `<if>`, so `codeword="Acid" item="copper amulet"` expresses the
+printed "or" without changing a word.
+
+### Fix
+
+`books/book1/460.xml` now carries one gate around the printed sentence:
+
+```xml
+<if codeword="Acid" item="copper amulet">
+        If you have the codeword <i>Acid</i> or a <b>copper amulet</b>, <goto section="327"/> immediately.
+</if>
+```
+
+The `<goto>` stays where the printed direction occurs, the words are the author's, and nothing is
+replaced by a self-closing tag. No new tag, attribute or value, so `validate-source.ps1` needed
+no allowlist change (task 199).
+
+**Why the split happened is the part worth keeping.** Task 262's own note states the reason:
+"task 3 makes `codeword= item=` on one `<if>` an AND, which is wrong for an 'or'". That is
+false. `evaluateCondition`'s header comment says the opposite in as many words — every
+recognised attribute is a **disjunct**, and the condition is met as soon as any one holds — and
+the code is one `result = result || cond()` accumulator. It was confirmed by running the real
+function over the real pair rather than by re-reading the comment: Acid alone true, amulet alone
+true, both true, neither false. The mistaken belief has been corrected in the test block that
+records it, because the next reader would otherwise inherit the same reason to re-split the
+sentence.
+
+### Validation
+
+The filing's own check first: strip comments, the XML declaration and every tag from
+`7386eed:books/book1/460.xml` and from the corrected file, normalise whitespace only, and
+compare. **Identical.**
+
+Two new assertions in `suite-actions`, inside task 262's own block: the rendered text is the
+printed single sentence naming both alternatives with the →327 direction inside it, and it is
+that one sentence in every one of the block's five states (Acid, amulet, both, neither, the
+stale `1.Skabb` holder) with no "Or if you have a copper amulet" second sentence anywhere. Both
+were confirmed to fail against the pre-fix bundle — `RESULT FAILURES pass=892 fail=2`, reporting
+the old "…codeword Acid, 327 immediat[ely]" split — by checking the previous `book1.json` back in
+on its own, which exercises the assertions against the old data without touching the XML.
+
+Task 262's four routing assertions are unchanged and still pass, which is the useful property of
+how they were written: they test the four states of the gate, not the markup that expresses it.
+
+`build-data.ps1` rebuilt, and the generated diff is **one section of one bundle** — verified by
+parsing the old and new `book1.json` and diffing their keys (`sections changed: ['460']`) rather
+than by reading a 900KB textual diff. A second build reports "already at", so the tree is
+settled. Full browser suite `RESULT ALL PASS pass=3136 fail=0` (3134 before);
+`node web/tests/node-import.mjs` `pass=35 fail=0`.
+
+---

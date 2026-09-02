@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-350 appears below: 207 and 326 are withdrawn as misdiagnoses, 337-339, 341, 344
+350 appears below: 207 and 326 are withdrawn as misdiagnoses, 338, 339, 341, 344
 and 346-350 are open, and all others are complete (see the Review log). File new
 work under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -20,7 +20,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 337. Book 1 section 460 rewrites the printed "codeword Acid or a copper amulet" sentence as two separate sentences instead of changing markup only
 - [ ] 338. The codeword-value gate compares lower-cased spellings even though both the web engine and JaFL use case-sensitive keys, so `codeword="anchor"` is accepted as declared `Anchor` and can fail silently in play
 
 **LOW**
@@ -383,49 +382,7 @@ this order.*
 - [x] 345. `serializeVisit` carried task 156's `fightBonus` snapshot but no equipment-lock snapshot, so a mid-visit reload resumed §6.135 with both slots free while `ctx.applied` still said the hidden `<tick special="weaponlock">` had run — the sheet's Wield controls came back live and `<lose weapon="?" using="t">` broke whichever blade the player had swapped to instead of the one Mister Dragon had already caught
 - [x] 343. the three affliction arrays never formed the reference model's disease/poison family, so `<lose disease="?"|"*">` searched diseases alone and the 15 shipped nodes that print "poison or disease" left a poisoned character uncured — at §5.105 after paying 75 Shards for it — while an open cure took the first match with no picker
 - [x] 342. the economy layer chose the vessel by ARRAY POSITION — `cargoShipWithSpace` took the first local hull with room and `canUpgradeCrew`/`applyInlineBuy` read `currentShip()`, which at a dock is just the first local ship — so a Cargo Unit could fill a hold the player never meant to fill, and a crew upgrade that was legal on the second hull read as "Your crew must be average first" because only the first was consulted
-
----
-
-## 337. Book 1 section 460 rewrites the author's sentence instead of wrapping it
-
-**Priority: MEDIUM.** The route still has the intended two alternatives, so this is not a
-gameplay lock. It does violate the project's first content requirement: the section text is
-the author's and a rules fix may add or move markup, never rewrite or re-split the prose.
-
-### What is wrong
-
-The imported section and every revision before task 262 read:
-
-> If you have the codeword Acid or a copper amulet, [go to 327] immediately.
-
-Task 262 correctly removed the invented bookkeeping codeword `1.Skabb`, but changed the
-sentence into two:
-
-> If you have the codeword Acid, [go to 327] immediately. Or if you have a copper amulet,
-> [go to 327] immediately.
-
-A tag-stripped comparison from the original `books add` commit (`7386eed`) to current HEAD
-checked all 30 numeric section files ever edited and found this as the **only** prose
-difference. The split is unnecessary: `evaluateCondition` in `web/js/engine.js` ORs the
-recognised attributes on one `<if>`, so `codeword="Acid" item="copper amulet"` expresses the
-printed "or" without changing a word.
-
-### Steps
-
-1. In `books/book1/460.xml`, restore the original sentence byte-for-byte and wrap the whole
-   printed condition in one `<if codeword="Acid" item="copper amulet">`. Keep the existing
-   `<goto section="327"/>` in the position where the printed direction occurs.
-2. Do not replace the words with a self-closing tag and do not split the sentence again.
-3. Add focused coverage proving either Acid or a copper amulet makes the same route active,
-   and that the rendered prose retains the original single sentence.
-4. Rebuild the generated data and stamp.
-
-### Validation
-
-Strip tags and comments from `7386eed:books/book1/460.xml` and the corrected file, normalise
-only whitespace, and require identical prose. Then run `build/build-data.ps1` and the full
-`build/run-tests.ps1` gate to `RESULT ALL PASS`; confirm the generated diff is limited to the
-Book 1 bundle and the generated stamp/cache lines implied by it.
+- [x] 337. book 1 section 460 was the corpus's only prose difference from the import: task 262 replaced the invented `codeword="1.Skabb"` guard correctly but split the printed "codeword *Acid* or a **copper amulet**" into two sentences, on the mistaken belief that `codeword=` and `item=` on one `<if>` are AND'd — `evaluateCondition` documents and implements them as disjuncts, so one `<if>` states the OR and the author's sentence stands
 
 ---
 
@@ -834,6 +791,29 @@ change (task 199) and rebuild the bundled data.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 337): closed **337**, filed nothing. One `<if>` where there were two, and
+the author's sentence back. §1.460 now reads `<if codeword="Acid" item="copper amulet">` around
+the printed "If you have the codeword *Acid* or a **copper amulet**, [327] immediately.", and a
+tag-stripped comparison against the import commit `7386eed` is byte-identical again — which was
+the whole claim of the filing, and it was the corpus's only prose difference from the import
+across all 30 numeric section files ever edited.
+**What made this worth a task rather than a typo fix is why the split happened.** Task 262's own
+note gives the reason: "task 3 makes `codeword= item=` on one `<if>` an AND, which is wrong for
+an 'or'". That is false. `evaluateCondition`'s contract, stated in its own header comment, is
+that every recognised attribute is a **disjunct** — the condition holds as soon as any one of
+them does — and it was confirmed by running the real function over the real pair rather than by
+re-reading the comment: Acid alone true, amulet alone true, both true, neither false. So a belief
+about the engine, written down in a test comment and never checked against the engine, cost the
+author's sentence for four months. The comment now records that it was wrong, because the next
+reader of that block would otherwise inherit the same reason for re-splitting it.
+The routing assertions task 262 wrote needed no change, which is the useful property: they test
+the four states of the gate and are indifferent to how the markup expresses it. The two new ones
+test the thing they could not — that the rendered text is the printed sentence — and both were
+confirmed to fail against the pre-fix bundle (`pass=892 fail=2`, reporting the old "…codeword
+Acid, 327 immediat[ely]" split) by checking the old `book1.json` back in on its own, without
+touching the XML. The generated diff is one section of one bundle, verified by parsing both JSON
+blobs and diffing keys rather than by reading a 900KB textual diff.
 
 Worked 2026-09-02 (task 342): closed **342**, filed nothing. Three DOM-free plans in
 `market.js` — `cargoBuyPlan`, `crewUpgradePlan`, `cargoSellPlan` — each returning `sellPlan`'s

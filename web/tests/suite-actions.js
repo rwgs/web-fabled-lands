@@ -5124,13 +5124,20 @@ export async function run(ctx) {
 
     // --- task 262: §1.460 states the printed OR instead of a port-invented proxy ---
     // The page promises "If you have the codeword *Acid* or a **copper amulet**" and the section
-    // guarded it with `<if codeword="1.Skabb">`, a test of neither named thing. The proxy was a
-    // deliberate repair (task 3 makes `codeword= item=` on one <if> an AND, which is wrong for an
-    // "or"), and it is sound on every ordinary route: §554 kills King Skabb, hands over the amulet
-    // and ticks 1.Skabb; §384 takes the amulet back, charges 450 Shards and notes Acid. What it
-    // records is HAVING BEEN to §554, not still holding the proof — so a player who loses the amulet
-    // without reaching §384 was still sent to →327 on a condition the page says they fail. An
-    // if/elseif pair states the OR directly, and 1.Skabb now has no writer or reader in the corpus.
+    // guarded it with `<if codeword="1.Skabb">`, a test of neither named thing. The proxy was
+    // sound on every ordinary route: §554 kills King Skabb, hands over the amulet and ticks
+    // 1.Skabb; §384 takes the amulet back, charges 450 Shards and notes Acid. What it records is
+    // HAVING BEEN to §554, not still holding the proof — so a player who loses the amulet without
+    // reaching §384 was still sent to →327 on a condition the page says they fail. 1.Skabb now has
+    // no writer or reader in the corpus.
+    //
+    // Task 262 stated the OR as an if/elseif PAIR, on the belief that "task 3 makes `codeword=
+    // item=` on one <if> an AND, which is wrong for an 'or'". That belief was wrong:
+    // evaluateCondition's own contract is that every recognised attribute is a DISJUNCT, so one
+    // `<if codeword="Acid" item="copper amulet">` is the OR. Splitting it cost the author's
+    // sentence — the pair needed two of them — which task 337 restored, one `<if>` and all. The
+    // routing assertions below are unchanged by that and are the reason they could be trusted
+    // through it. (tasks 262 + 337)
     {
       const has262 = (c) => !!Array.from(c.querySelectorAll('.goto')).find((b) => b.textContent.trim() === '327' && !b.disabled && !b.closest('.cond-inactive'));
       const mk262 = async (setup) => {
@@ -5160,6 +5167,19 @@ export async function run(ctx) {
       const stale262 = await mk262((g) => g.addCodeword('1.Skabb'));
       ok('task262: §1.460 refuses →327 for a player who has lost the amulet and has no Acid',
          !has262(stale262.c), stale262.c.textContent.replace(/\s+/g, ' ').slice(0, 90));
+      // task 337: the printed sentence is the author's, so the gate must be markup around it and
+      // not a rewrite. ONE sentence naming both alternatives, with the →327 direction inside it —
+      // the if/elseif pair read "…codeword Acid, [327] immediately. Or if you have a copper
+      // amulet, [327] immediately.", two sentences the book never printed.
+      const prose337 = (c) => c.textContent.replace(/\s+/g, ' ');
+      ok('task337: §1.460 prints the author’s single sentence, both alternatives in it',
+         /If you have the codeword Acid or a copper amulet, 327 immediately\. If not, read on\./
+           .test(prose337(both262.c)),
+         prose337(both262.c).slice(0, 140));
+      ok('task337: and it is one sentence in every state, not a pair the condition splits',
+         [acid262, amulet262, both262, neither262, stale262]
+           .every((e) => !/Or if you have a copper amulet/.test(prose337(e.c))
+                      && /codeword Acid or a copper amulet/.test(prose337(e.c))));
     }
 
     // --- task 267: a ship with NO crew is expressible, so its poor-crew hire can be clicked ---

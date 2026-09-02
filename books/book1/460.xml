@@ -4,12 +4,9 @@
 		You climb down an old disused well in the poor quarter of Yellowport.
 	</p>
 	<p>
-		<if codeword="Acid">
-			If you have the codeword <i>Acid</i>, <goto section="327"/> immediately.
+		<if codeword="Acid" item="copper amulet">
+			If you have the codeword <i>Acid</i> or a <b>copper amulet</b>, <goto section="327"/> immediately.
 		</if>
-		<elseif item="copper amulet">
-			Or if you have a <b>copper amulet</b>, <goto section="327"/> immediately.
-		</elseif>
 		If not, read on.
 	</p>
 	<p>
