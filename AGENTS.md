@@ -46,7 +46,13 @@ combat, markets, ships, live adventure sheet). Plain HTML/CSS/ES modules —
   the six books use) and checks every `codeword=` VALUE in the corpus against the union
   of the six lists, because a misspelled codeword is invisible to every other check: the engine
   cannot tell one the player never earned from one the port never awards, so the `<if>` it
-  guards simply stays shut (task 325). Three things are legitimately absent from those lists
+  guards simply stays shut (task 325). **The match is on the EXACT spelling, case included**,
+  because both rule engines are case-sensitive — `GameState.hasCodeword` uses ordinary object
+  keys and JaFL's `Codewords` uses Java `Properties` keys — so a `<gain codeword="anchor">`
+  never satisfies an `<if codeword="Anchor">`. The gate's dictionaries are therefore explicitly
+  **ordinal**: a plain PowerShell `@{}` folds case, so removing a `ToLowerInvariant()` without
+  changing the container fixes nothing, which is the trap that made the check case-blind until
+  task 338. Three things are legitimately absent from those lists
   and are exempted in the gate, not in the `.ini`: section-scoped bookkeeping flags
   (`2.567.1a`, `5/520` — matched by shape), the port's own named state flags
   (`StillInYellowport`, `HydraDamage` — an explicit list), and codewords printed in the

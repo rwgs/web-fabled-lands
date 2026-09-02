@@ -226,14 +226,25 @@ $script:FL_FORWARD_CODEWORDS = @('Hill', 'Ink', 'Iota', 'Judas', 'Kink')
 # report in step 5 exists to find. (task 327)
 $script:FL_AWARD_TAGS = @('gain', 'tick', 'set', 'outcome')
 
-# Set per Test-SourceTree run: lowercased codeword -> the book that declares it, or 0 for the
-# two exemption lists above. $null means the authority could not be read and the value check
+# Set per Test-SourceTree run: codeword -> the book that declares it, or 0 for the two
+# exemption lists above. $null means the authority could not be read and the value check
 # stands down (Test-SourceTree has reported that separately) rather than failing every site.
 # SEEN is every site; AWARDED is the FL_AWARD_TAGS subset of it, so "seen but not awarded" is
 # a set difference and the two notes in step 5 are one pass apart.
+#
+# All three are ORDINAL dictionaries and the keys are the codeword's exact spelling, because
+# the game is case-SENSITIVE and the gate must be too: `GameState.hasCodeword`/`addCodeword`
+# use ordinary object keys and JaFL's `Codewords` uses Java `Properties` keys, so a
+# `<gain codeword="anchor">` does not satisfy an `<if codeword="Anchor">` — the branch simply
+# never opens, with no diagnostic, which is task 325's failure mode exactly. A plain
+# PowerShell `@{}` would defeat this on its own: hashtable keys are case-INSENSITIVE, so
+# dropping the ToLowerInvariant() calls without changing the container would have changed
+# nothing. Ordinal, not InvariantCulture: a codeword is an identifier, not text to collate.
+# (tasks 325 + 338)
 $script:FL_CODEWORDS = $null
-$script:FL_CODEWORD_SEEN = @{}
-$script:FL_CODEWORD_AWARDED = @{}
+function New-CodewordSet { [System.Collections.Generic.Dictionary[string, int]]::new([System.StringComparer]::Ordinal) }
+$script:FL_CODEWORD_SEEN = New-CodewordSet
+$script:FL_CODEWORD_AWARDED = New-CodewordSet
 
 # book.ini is Java Properties, and Codewords= leans on two features of that format: a trailing
 # backslash CONTINUES the value onto the next line (all six books wrap it across three or more),
@@ -367,12 +378,12 @@ function Test-AttrValue([string]$tag, [string]$attr, [string]$value) {
             $p = $part.Trim()
             if ($p -eq '' -or $p -eq '?' -or $p -eq '*') { continue }
             if ($p -match $script:FL_SCOPED_FLAG) { continue }
-            $k = $p.ToLowerInvariant()
-            if (-not $script:FL_CODEWORDS.ContainsKey($k)) {
+            # The EXACT spelling, case included: see the FL_CODEWORDS comment. (task 338)
+            if (-not $script:FL_CODEWORDS.ContainsKey($p)) {
                 return "codeword=`"$part`" is not declared in any book.ini Codewords= list"
             }
-            $script:FL_CODEWORD_SEEN[$k] = $true
-            if ($script:FL_AWARD_TAGS -contains $tag) { $script:FL_CODEWORD_AWARDED[$k] = $true }
+            $script:FL_CODEWORD_SEEN[$p] = 1
+            if ($script:FL_AWARD_TAGS -contains $tag) { $script:FL_CODEWORD_AWARDED[$p] = 1 }
         }
         return $null
     }
@@ -482,10 +493,11 @@ function Test-SourceTree([string]$rulesDir, [hashtable]$bookDirs) {
     #    from the missing volume as unknown. Failing loudly once beats 1,207 wrong errors, and
     #    beats the other direction - a silently empty set that passes everything. (task 325)
     $script:FL_CODEWORDS = $null
-    $script:FL_CODEWORD_SEEN = @{}
-    $script:FL_CODEWORD_AWARDED = @{}
-    $declared = @{}
-    $spelling = @{}   # lowercased key -> the casing the .ini declares, for the report in 5
+    $script:FL_CODEWORD_SEEN = New-CodewordSet
+    $script:FL_CODEWORD_AWARDED = New-CodewordSet
+    # Ordinal and exact-cased, so `anchor` is not the declared `Anchor` (task 338). The key IS
+    # the declared spelling, which is why the report in step 5 needs no separate casing map.
+    $declared = New-CodewordSet
     $authority = $true
     foreach ($b in $bookNumbers) {
         $iniPath = Join-Path $bookDirs[$b] 'book.ini'
@@ -495,10 +507,10 @@ function Test-SourceTree([string]$rulesDir, [hashtable]$bookDirs) {
             $authority = $false
             continue
         }
-        foreach ($c in $list) { $declared[$c.ToLowerInvariant()] = $b; $spelling[$c.ToLowerInvariant()] = $c }
+        foreach ($c in $list) { $declared[$c] = $b }
     }
     if ($authority) {
-        foreach ($c in ($script:FL_PORT_FLAGS + $script:FL_FORWARD_CODEWORDS)) { $declared[$c.ToLowerInvariant()] = 0 }
+        foreach ($c in ($script:FL_PORT_FLAGS + $script:FL_FORWARD_CODEWORDS)) { $declared[$c] = 0 }
         $script:FL_CODEWORDS = $declared
     }
 
@@ -628,9 +640,9 @@ function Test-SourceTree([string]$rulesDir, [hashtable]$bookDirs) {
             $dirName = Split-Path -Leaf $bookDirs[$b]
             foreach ($k in @($script:FL_CODEWORDS.Keys | Where-Object { $script:FL_CODEWORDS[$_] -eq $b } | Sort-Object)) {
                 if (-not $script:FL_CODEWORD_SEEN.ContainsKey($k)) {
-                    [void]$notes.Add("$dirName/book.ini : codeword `"$($spelling[$k])`" is declared but no section awards or tests it")
+                    [void]$notes.Add("$dirName/book.ini : codeword `"$k`" is declared but no section awards or tests it")
                 } elseif (-not $script:FL_CODEWORD_AWARDED.ContainsKey($k)) {
-                    [void]$notes.Add("$dirName/book.ini : codeword `"$($spelling[$k])`" is tested or cleared but no section awards it - a missing <gain>?")
+                    [void]$notes.Add("$dirName/book.ini : codeword `"$k`" is tested or cleared but no section awards it - a missing <gain>?")
                 }
             }
         }

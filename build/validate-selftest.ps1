@@ -254,6 +254,30 @@ $CASES = @(
        text  = '<section name="2"><if codeword="Ready,Runes"><p>Marked.</p></if></section>'
        want  = 'codeword="Runes" is not declared' }
 
+    # task 338: the game is case-SENSITIVE, so the gate is too. `GameState.hasCodeword` uses
+    # ordinary object keys and JaFL's Codewords uses Java Properties keys, so an award spelled
+    # `anchor` never satisfies a test spelled `Anchor` - the branch just stays shut, which is
+    # task 325's own failure mode reached by a different typo. The lookup used to lower-case
+    # both sides, so this pair passed.
+    @{ label = 'a lower-cased spelling of a declared codeword (task 338)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><gain codeword="ready"/><if codeword="Ready"><p>Marked.</p></if></section>'
+       want  = 'codeword="ready" is not declared' }
+
+    # …and inside a list, because the split happens BEFORE the lookup: a correctly cased first
+    # token must not carry a mis-cased second one through.
+    @{ label = 'a lower-cased codeword inside a | union (task 338)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><if codeword="Ready|relic"><p>Marked.</p></if></section>'
+       want  = 'codeword="relic" is not declared' }
+
+    # An UPPER-cased one fails for the same reason and in the same direction: the check is not
+    # "must start with a capital", it is "must be the declared spelling".
+    @{ label = 'an upper-cased spelling of a declared codeword (task 338)'
+       file  = 'books/book1/2.xml'
+       text  = '<section name="2"><tick codeword="READY"/></section>'
+       want  = 'codeword="READY" is not declared' }
+
     # A section-scoped flag that lost its separator - book 4 section 345 cleared "4457" where
     # section 457 sets "4.457". This is why the exemption needs the '.' or '/' and not just a
     # leading digit: "4457" would otherwise read as machinery and pass.
@@ -357,6 +381,19 @@ $ok336 = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2">' +
     '<lose codeword="Rune,&#201;clat"/>' +
     '</section>' }
 Assert 'a comma AND-list of codewords is accepted, as matchCodewords reads it (task 336)' ($ok336.Errors.Count -eq 0) ($ok336.Errors -join ' | ')
+# task 338's control: the exact declared spelling passes, in a singleton and in both list
+# forms, and the port flags keep their mixed casing. Without this the negative cases above
+# could be satisfied by a gate that rejected everything.
+$ok338 = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2">' +
+    '<gain codeword="Ready"/><if codeword="Ready"><p>Marked.</p></if>' +
+    '<if codeword="Ready|Relic"><p>Either.</p></if><lose codeword="Ready,Relic"/>' +
+    '<tick codeword="StillInYellowport" hidden="t"/><lose codeword="HydraDamage"/>' +
+    '</section>' }
+Assert 'the exact declared spelling still passes, singleton and in a list (task 338)' ($ok338.Errors.Count -eq 0) ($ok338.Errors -join ' | ')
+# …and the two-grade report still names the codeword in the casing the .ini declares, which is
+# now the dictionary key itself rather than a parallel casing map.
+Assert 'the unused-codeword note keeps the declared casing (task 338)' (
+    @($clean.Notes | Where-Object { $_ -like '*"Rune"*' -or $_ -like '*"Bounty"*' }).Count -eq 2) ($clean.Notes -join ' | ')
 # ...and with the authority unreadable the check stands down rather than failing every value:
 # one error naming the .ini, and no value errors behind it.
 $novac = Build-Fixture @{ 'books/book1/book.ini' = "Map=Sokara.JPG`nDeath=680`n" }

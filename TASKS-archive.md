@@ -16233,3 +16233,76 @@ settled. Full browser suite `RESULT ALL PASS pass=3136 fail=0` (3134 before);
 `node web/tests/node-import.mjs` `pass=35 fail=0`.
 
 ---
+
+## 338. The codeword-value gate is case-insensitive but the game is not
+
+**Priority: MEDIUM.** Same invisible correctness class as task 325: a spelling the gate
+accepts can be awarded under one key and tested under another, leaving the player with a
+branch that never opens and no diagnostic explaining why.
+
+### What is wrong
+
+`Test-SourceTree` in `build/validate-source.ps1` stores every declared codeword under
+`$c.ToLowerInvariant()`, and `Test-AttrValue` lower-cases every `codeword=` token before its
+lookup. Consequently `codeword="anchor"` passes against the declared `Anchor`.
+
+The two rule engines do not fold the spelling. `GameState.hasCodeword`, `addCodeword`,
+`removeCodeword` and `codewordValue` in `web/js/state.js` use ordinary object keys, and
+JaFL's `Codewords` class uses Java `Properties` keys; both are case-sensitive. A lower-case
+award therefore does not satisfy a correctly cased test. The current shipped corpus is
+internally consistent (1,225 codeword tokens, 327 case-folded names, zero case variants), so
+this is latent rather than a live bad section - exactly the kind of future typo the gate
+promises to stop.
+
+### Fix
+
+`New-CodewordSet` mints an ordinal `Dictionary[string, int]`, and the authority
+(`$declared`), `FL_CODEWORD_SEEN` and `FL_CODEWORD_AWARDED` are all built from it. Every
+`ToLowerInvariant()` on both sides of the codeword lookup is gone: the `.ini` declares
+`Anchor`, the key is `Anchor`, and `codeword="anchor"` reports undeclared.
+
+**The container was the fix, not the fold.** A plain PowerShell `@{}` is case-INSENSITIVE, so
+deleting the `ToLowerInvariant()` calls on their own would have changed nothing at all — the
+filing's step 1 says so, and it was verified rather than taken on trust (see Validation). This
+is worth remembering because the resulting diff *looks* complete either way.
+
+Dropping the fold removed a variable rather than adding one. `$spelling` — the parallel
+lowercased-key → declared-casing map the two-grade report needed in order to print `"Rune"`
+rather than `"rune"` — is gone, because the dictionary key is now the declared spelling itself.
+
+Everything the filing asked to preserve is untouched: the union-of-books rule, `Get-IniCodewords`'
+Java Properties continuations and `\uXXXX` decoding, the `FL_SCOPED_FLAG` shape exemption, the
+`FL_PORT_FLAGS` and `FL_FORWARD_CODEWORDS` lists (now registered under their own mixed casing,
+which is what the corpus writes), and the two-grade reverse report.
+
+### Validation
+
+Five new assertions in `validate-selftest.ps1` (58, from 53) — three negative and two controls:
+
+- a lower-cased spelling of a declared codeword, as a singleton (`<gain codeword="ready">`
+  beside `<if codeword="Ready">`, the whole defect in two nodes);
+- a lower-cased token inside a `|` union, because the split happens BEFORE the lookup and a
+  correctly cased first token must not carry a mis-cased second one through;
+- an UPPER-cased spelling, so the rule reads as "must be the declared spelling" rather than
+  "must start with a capital";
+- the control: the exact spelling passing as a singleton, in a `|` union and in a comma
+  AND-list, with the mixed-case port flags alongside;
+- and the report still naming a codeword in the casing the `.ini` declares, which is the
+  behaviour `$spelling` used to provide.
+
+All three negative assertions were confirmed to fail against the pre-fix behaviour by reverting
+**only the container** — `$declared = @{}`, with the lower-casing still removed —
+`RESULT FAILURES pass=55 fail=3`. That is the same evidence as the `@{}` trap above.
+
+The real corpus stays clean: `build-data.ps1` reports no errors and the same **six**
+informational notes in their current two grades (`Auric`/`Avert`/`Dark` declared-and-unused,
+`Bait`/`Beach`/`Bilge` tested-but-never-awarded), and both stamps report "already at" — `build/`
+is not app source, so there is no generated diff. `release-selftest.ps1` `pass=48 fail=0`,
+`node web/tests/node-import.mjs` `pass=35 fail=0`, full browser suite
+`RESULT ALL PASS pass=3136 fail=0`.
+
+Step 4's documentation went into `AGENTS.md`'s `Codewords=` paragraph — the exact-spelling rule,
+why both engines require it, and the `@{}` trap — since that is the maintained build
+documentation the gate's contract belongs in. The wider living-docs sweep remains task 339.
+
+---

@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-350 appears below: 207 and 326 are withdrawn as misdiagnoses, 338, 339, 341, 344
-and 346-350 are open, and all others are complete (see the Review log). File new
+350 appears below: 207 and 326 are withdrawn as misdiagnoses, 339, 341, 344 and
+346-350 are open, and all others are complete (see the Review log). File new
 work under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -20,7 +20,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 338. The codeword-value gate compares lower-cased spellings even though both the web engine and JaFL use case-sensitive keys, so `codeword="anchor"` is accepted as declared `Anchor` and can fail silently in play
 
 **LOW**
 
@@ -383,48 +382,7 @@ this order.*
 - [x] 343. the three affliction arrays never formed the reference model's disease/poison family, so `<lose disease="?"|"*">` searched diseases alone and the 15 shipped nodes that print "poison or disease" left a poisoned character uncured — at §5.105 after paying 75 Shards for it — while an open cure took the first match with no picker
 - [x] 342. the economy layer chose the vessel by ARRAY POSITION — `cargoShipWithSpace` took the first local hull with room and `canUpgradeCrew`/`applyInlineBuy` read `currentShip()`, which at a dock is just the first local ship — so a Cargo Unit could fill a hold the player never meant to fill, and a crew upgrade that was legal on the second hull read as "Your crew must be average first" because only the first was consulted
 - [x] 337. book 1 section 460 was the corpus's only prose difference from the import: task 262 replaced the invented `codeword="1.Skabb"` guard correctly but split the printed "codeword *Acid* or a **copper amulet**" into two sentences, on the mistaken belief that `codeword=` and `item=` on one `<if>` are AND'd — `evaluateCondition` documents and implements them as disjuncts, so one `<if>` states the OR and the author's sentence stands
-
----
-
-## 338. The codeword-value gate is case-insensitive but the game is not
-
-**Priority: MEDIUM.** Same invisible correctness class as task 325: a spelling the gate
-accepts can be awarded under one key and tested under another, leaving the player with a
-branch that never opens and no diagnostic explaining why.
-
-### What is wrong
-
-`Test-SourceTree` in `build/validate-source.ps1` stores every declared codeword under
-`$c.ToLowerInvariant()`, and `Test-AttrValue` lower-cases every `codeword=` token before its
-lookup. Consequently `codeword="anchor"` passes against the declared `Anchor`.
-
-The two rule engines do not fold the spelling. `GameState.hasCodeword`, `addCodeword`,
-`removeCodeword` and `codewordValue` in `web/js/state.js` use ordinary object keys, and
-JaFL's `Codewords` class uses Java `Properties` keys; both are case-sensitive. A lower-case
-award therefore does not satisfy a correctly cased test. The current shipped corpus is
-internally consistent (1,225 codeword tokens, 327 case-folded names, zero case variants), so
-this is latent rather than a live bad section - exactly the kind of future typo the gate
-promises to stop.
-
-### Steps
-
-1. Make the declaration authority and value lookup use ordinal, case-sensitive keys. A
-   normal PowerShell hashtable is case-insensitive, so use an explicitly ordinal dictionary
-   or set rather than merely removing `ToLowerInvariant()`.
-2. Preserve the current union-of-books rule, Java Properties continuation/Unicode decoding,
-   scoped-flag exemptions, port flags, forward-book codewords and the two-grade reverse
-   report. The report may keep a separate canonical-spelling map if needed.
-3. Add a validator self-test in which a lower-cased spelling of a declared codeword fails,
-   beside a correctly cased control that passes. Cover a list token as well as a singleton if
-   the implementation splits before lookup.
-4. State the exact-spelling rule in the maintained build documentation while completing the
-   sibling documentation sweep in task 339.
-
-### Validation
-
-Run `build/validate-selftest.ps1`, `build/build-data.ps1`, the DOM-free Node import check and
-the full browser suite. The real corpus must stay clean and the build's six informational
-codeword notes must remain in their current two grades.
+- [x] 338. task 325's codeword-value gate lower-cased both sides of the lookup, so `codeword="anchor"` passed against the declared `Anchor` while `GameState.hasCodeword` and JaFL's `Codewords` (Java `Properties`) both compare case-sensitively — an award under one key and a test under another, leaving a branch that never opens and no diagnostic; the dictionaries are now explicitly ORDINAL, because a plain PowerShell `@{}` folds case and dropping the `ToLowerInvariant()` alone would have changed nothing
 
 ---
 
@@ -791,6 +749,26 @@ change (task 199) and rebuild the bundled data.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 338): closed **338**, filed nothing. The codeword authority and the
+`codeword=` value lookup now compare the **exact** spelling: three ordinal
+`Dictionary[string,int]`s in place of PowerShell hashtables, and the `ToLowerInvariant()` on
+both sides of the lookup gone. `GameState.hasCodeword`/`addCodeword` use ordinary object keys
+and JaFL's `Codewords` uses Java `Properties` keys, so `<gain codeword="anchor">` never
+satisfies `<if codeword="Anchor">` — task 325's failure mode reached by a different typo, and
+just as invisible.
+**The trap the filing warned about is real and is the thing to remember: a plain PowerShell
+`@{}` is case-INSENSITIVE, so removing the lower-casing without changing the container fixes
+nothing.** That was verified, not assumed — reverting only `$declared = New-CodewordSet` to
+`$declared = @{}`, with every `ToLowerInvariant()` still absent, fails all three new negative
+assertions. A fix that had looked complete in the diff would have been a no-op.
+Dropping the fold also removed a variable rather than adding one: `$spelling`, the parallel
+lowercased-key→declared-casing map the two-grade report needed, is gone because the dictionary
+key IS the declared spelling now. The six informational notes come out byte-identical in their
+two grades, and the corpus stays clean — 1,225 codeword tokens over 327 names with no case
+variants, which is why this was latent rather than a live bad section. Documented in
+`AGENTS.md`'s `Codewords=` paragraph, including the `@{}` trap, since that is the maintained
+build documentation the gate's contract belongs in; the wider living-docs sweep stays task 339.
 
 Worked 2026-09-02 (task 337): closed **337**, filed nothing. One `<if>` where there were two, and
 the author's sentence back. §1.460 now reads `<if codeword="Acid" item="copper amulet">` around
