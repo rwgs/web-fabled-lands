@@ -354,6 +354,11 @@ img { max-width: 100%; }
 .reward-pick { margin: 0 0.15rem; padding: 0.15rem 0.5rem; font-size: 0.8rem; font-style: normal; vertical-align: baseline; }
 .items-pick-status { display: inline-block; margin: 0 0.35rem 0 0; padding: 0.1rem 0.5rem; border: 1px dashed var(--gold); border-radius: 6px; font-size: 0.8rem; font-weight: 700; font-style: normal; color: var(--gold); }
 .ability-choice { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.2rem 0; vertical-align: middle; }
+/* The which-ship picker's labels carry hull, crew and hold together, so they are long. One
+   button per row with min-width:0 is what keeps them off the edge of a phone: a plain flex
+   row lets each item keep its content width and the text runs past the viewport. (task 342) */
+.vessel-choice { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.2rem 0; }
+.vessel-choice .btn-mini { flex: 1 1 100%; min-width: 0; text-align: left; white-space: normal; }
 .ability-pick { cursor: pointer; }
 .trade-na { font-size: 0.8rem; color: #9c885f; font-style: italic; }
 

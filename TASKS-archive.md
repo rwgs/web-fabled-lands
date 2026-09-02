@@ -16046,3 +16046,117 @@ DOM-free). Full browser suite `RESULT ALL PASS pass=3107 fail=0` (3071 before). 
 data diff.
 
 ---
+
+## 342. Multi-ship cargo and crew transactions change the first vessel silently
+
+**Priority: MEDIUM.** The player can own several ships at one dock, and the app already asks
+which one to sail or sell. A purchase or upgrade can nevertheless fill or alter a different
+ship from the one the player intended, or be disabled because the first ship is ineligible
+while a later one qualifies.
+
+### What is wrong
+
+The headless economy layer selects by array position:
+
+- `cargoShipWithSpace`/`buyTrade` in `web/js/market.js` use the first local ship with room for
+  every market or inline cargo purchase;
+- `canUpgradeCrew` and `applyInlineBuy` use `state.currentShip()`, which at a dock is simply
+  the first local vessel, so two ships of different crew grades can make a valid upgrade look
+  unavailable or apply it to the wrong hull;
+- `renderInlineSell` in `web/js/render-market.js` builds an open-cargo menu from the first
+  non-empty hold only, `sellCargo` removes from the first matching ship, and a linked barter
+  reward goes back through the same first-with-space purchase path.
+
+JaFL's `TradeNode.actionPerformed` in `java-engine/flands/TradeNode.java` treats this as a
+selection boundary: when several local ships have free space, the relevant crew grade or the
+commodity being sold, it refuses to guess and tells the player to select one. This port has no
+persistent ship-table selection, so the equivalent is an inline vessel picker. The trigger is
+live rather than synthetic: the corpus has cargo markets and crew buys throughout all six
+books, and owning multiple local ships is supported (the sail and market-sale views already
+surface pickers for it).
+
+### Fix
+
+Three DOM-free plans in `market.js`, all returning `sellPlan`'s `{ candidates, needsChoice }`
+shape plus an `{ ok, reason }` verdict (unlike a sale, these offers can be refused outright, and
+the view already gated its button on that reason):
+
+- `cargoBuyPlan(state)` — the local hulls with room for one more Unit;
+- `crewUpgradePlan(state, crew)` — the local hulls whose crew is exactly one grade below the
+  target, which is the set the reference picks with `findShipsWithCrew(toCrew-1)`;
+- `cargoSellPlan(state, cargoType)` — the local hulls carrying the commodity, or any non-empty
+  hold for §3.538's open `cargo="?"`, emptiest first as `sellCandidates` already ordered cargo.
+
+`buyTrade`, `applyInlineBuy` and `sellCargo` take the named vessel through `opts.chooser`, the
+same contract `sellTrade` and `applyLose` use, so a headless caller and the view's picker speak
+one language. `canUpgradeCrew` keeps its name and its `{ ok, reason }` contract on top of the
+plan. `hasCargoSpace` is now `cargoBuyPlan(state).ok`.
+
+**The half of this that is not a picker.** `canUpgradeCrew` read `state.currentShip()`, so
+eligibility was decided by ONE hull: with a poor-crewed barque and an average-crewed brigantine
+both at Kunrir, §5.145's average→good upgrade answered *"Your crew must be average first"* — a
+legal purchase refused outright, which no amount of asking-which-ship could have fixed, because
+the button was disabled before the question. Reading the fleet is the rule fix; the picker is
+what happens once two hulls are both eligible.
+
+`showVesselPicker` lives in `render-rewards.js` beside the forfeit/ability/affliction pickers and
+is exported for `render-market.js`, which already imports from that module — so the dependency
+runs the way it already ran (task 163's no-cycle rule). Its label carries the hull, the name the
+player gave it, the crew grade and the hold with space remaining, because any of the three
+questions can turn on any of those. Each caller hands over its whole transaction as `commit`, so
+no Shards move, no Unit is loaded and no barter flag is set until a button is clicked. Four
+widgets ask: the market cargo row, the inline crew upgrade, the inline cargo buy, and the inline
+cargo sell (which asks which hold first, then the existing "give which cargo?" modal for the
+open form). A fifth path is `renderGroup`'s — §4.622's three salvage groups each bundle one free
+`<buy cargo>`, which never reaches the inline widget, so `groupBundledChoice` gained a vessel
+branch and now reads the whole group plan rather than just its effects. Market ship/cargo SALES
+keep task 134's own picker, as the filing asked.
+
+Two decisions the filing left open, both resolved here:
+
+- **The barter reward goes back into the hold that gave.** §3.538's swap has already committed
+  the give by the time the reward is applied, so a second picker could strand the barter half
+  done — and one hold is what the printed sentence describes: the captain "has a Cargo Unit of
+  minerals in his hold … in exchange for one Cargo Unit of any other commodity". The hold that
+  gave has also just freed the space, so the load cannot fail. `sellCargo` returns the hull the
+  Unit left for this.
+- **The no-prompt default follows `currentShip()`**, not plain array order, for the two buy
+  plans (`currentFirst`). At a dock they are the same hull; at sea `currentShip()` is the ship
+  under SAIL where array order could be a prize taken alongside. Without this, "the default is
+  unchanged" would be false for exactly the case the sail pointer exists to fix, and the default
+  would disagree with the `<if crew=>`/`<if cargo=>` gates reading the same section. Those
+  conditions still read `currentShip()` and are untouched.
+
+### Validation
+
+27 new assertions in `suite-economy`. Both halves of the fix were confirmed to discriminate by
+reverting them separately rather than assumed to:
+
+- selection by array position (chooser ignored, `needsChoice` forced false) fails **6**
+  (`RESULT FAILURES pass=590 fail=6`), reporting `A=spices B=` — the Unit loaded into the wrong
+  hold — and `A=average B=poor`, the grade bought for the wrong hull;
+- a `currentShip()`-only crew plan fails **6** more (`pass=594 fail=6`), including the filed
+  symptom verbatim: `{"ok":false,"reason":"Your crew must be average first."}` for an upgrade
+  that is legal on the second hull.
+
+The coverage is the two-ship shapes step 5 asked for, over the real sections: only the second
+hull eligible (a full barque) commits with no question; both eligible with different cargo and
+different crew grades asks, and the named hull alone changes with the price leaving once;
+§5.145's cargo market and crew upgrades driven end to end; §3.538's swap, where the minerals
+land in the hold that gave; §4.622's bundled salvage group; the ship berthed at another dock
+never eligible; and the at-sea default landing on the sailed vessel rather than the prize.
+
+The narrow-layout inspection was done with a throwaway probe page (removed) screenshotted at a
+360px story pane. Worth recording because the first two shots were misleading: they looked
+clipped and were not — `--window-size=360,900` gives a **500px** layout viewport under
+`--headless=new`, so a 360-wide screenshot of a 500-wide page cuts the panels off. Measured
+instead of eyeballed (`body.scrollWidth === clientWidth`, `.vessel-choice` 272px inside a 320px
+story), the picker fits: one CSS rule was needed to get there — one button per row with
+`min-width: 0` — because these labels carry hull, name, crew and hold together and a plain flex
+row lets each item keep its content width.
+
+`node web/tests/node-import.mjs` `pass=35 fail=0` (`market.js` stays DOM-free). Full browser
+suite `RESULT ALL PASS pass=3134 fail=0` (3107 before). No `books/`/`rules/` change, so
+`stamp-version.ps1` only (`26.09.02.d1ebc30`) and no generated data diff.
+
+---

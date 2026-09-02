@@ -4,7 +4,7 @@ import * as data from '../js/data.js';
 import { GameState, readSlotData, importSave, loadSlotMeta, reconcileSlotMeta, deleteSlot, makeItem, nextFreeSlot, sanitizeData, currencyAward, splitItemName } from '../js/state.js';
 import * as eng from '../js/engine.js';
 import { fightRound } from '../js/combat.js';
-import { goodsFrom, buyTrade, sellTrade, sellPlan, applyInlineBuy, sellInlineItem, canUpgradeCrew, payChoiceCost } from '../js/market.js';
+import { goodsFrom, buyTrade, sellTrade, sellPlan, applyInlineBuy, sellInlineItem, canUpgradeCrew, payChoiceCost, cargoBuyPlan, crewUpgradePlan, cargoSellPlan } from '../js/market.js';
 import { Story } from '../js/render.js';
 import { isRollGate, isChooseOne, isPricedResurrection, rewardWasteReason, ownsSoleLinkedBlessing } from '../js/render-rules.js';
 import { renderGoto } from '../js/render-choices.js';
@@ -3160,6 +3160,230 @@ export async function run(ctx) {
       const emptyBtn = Array.from(picker.querySelectorAll('button')).find((b) => !/carrying/.test(b.textContent));
       emptyBtn.click();
       ok('task134: picking the empty ship leaves the laden one', g.data.ships.length === 1 && g.data.ships[0].name === 'Laden', JSON.stringify(g.data.ships.map((s) => s.name)));
+    }
+
+    // --- task 342: which vessel a cargo buy, crew upgrade or cargo sale changes -------------
+    // The economy layer selected by ARRAY POSITION: cargoShipWithSpace took the first local
+    // hull with room, and canUpgradeCrew/applyInlineBuy read state.currentShip(), which at a
+    // dock is simply the first local vessel. So a purchase could fill a ship the player never
+    // meant to fill, and a crew upgrade that was perfectly legal on the second hull looked
+    // unavailable because the first one's grade was wrong. The reference model treats all
+    // three as a selection boundary and refuses to guess ("You have multiple ships … docked
+    // here. Select one."); with no persistent ship table here, the equivalent is a picker.
+    {
+      // Two ships at Kunrir plus one berthed elsewhere, which must never be eligible.
+      const mk342 = ({ aCrew = 'poor', bCrew = 'average', aCargo = [], bCargo = [] } = {}) => {
+        const g = GameState.create({ name: 'V342', gender: 'm', profession: 'Warrior', book: 5, adv });
+        g.ephemeral = true;
+        g.data.ships = [];
+        g.data.shards = 1000;
+        g.data.location = 'Kunrir';
+        const alpha = g.addShip({ type: 'barque', name: 'Alpha', crew: aCrew, cargo: [...aCargo], docked: 'Kunrir' });
+        const beta = g.addShip({ type: 'brigantine', name: 'Beta', crew: bCrew, cargo: [...bCargo], docked: 'Kunrir' });
+        const away = g.addShip({ type: 'galleon', name: 'Away', crew: 'good', cargo: [], docked: 'Aku' });
+        return { g, alpha, beta, away };
+      };
+      const names = (plan) => plan.candidates.map((s) => s.name).join(',');
+
+      // --- the DOM-free plans -------------------------------------------------------------
+      {
+        const e = mk342();
+        ok('task342: a cargo buy with two local holds needs a choice, and excludes the ship away',
+           cargoBuyPlan(e.g).needsChoice === true && names(cargoBuyPlan(e.g)) === 'Alpha,Beta',
+           names(cargoBuyPlan(e.g)));
+        // A barque holds 1 Unit: fill Alpha and only Beta qualifies — one candidate, no question.
+        const full = mk342({ aCargo: ['furs'] });
+        ok('task342: with only the SECOND hull eligible there is one candidate and no question',
+           cargoBuyPlan(full.g).ok === true && cargoBuyPlan(full.g).needsChoice === false
+           && names(cargoBuyPlan(full.g)) === 'Beta',
+           names(cargoBuyPlan(full.g)));
+        // Crew: Alpha is poor, Beta average — each upgrade has exactly one legal target, and
+        // BOTH are offered, where currentShip() saw only Alpha.
+        ok('task342: a poor→average upgrade names Alpha; an average→good upgrade names Beta',
+           names(crewUpgradePlan(e.g, 'average')) === 'Alpha'
+           && names(crewUpgradePlan(e.g, 'good')) === 'Beta'
+           && crewUpgradePlan(e.g, 'good').ok === true,
+           names(crewUpgradePlan(e.g, 'average')) + ' | ' + names(crewUpgradePlan(e.g, 'good')));
+        ok('task342: the average→good upgrade was REFUSED before the fix, when only Alpha was read',
+           canUpgradeCrew(e.g, 'good').ok === true, JSON.stringify(canUpgradeCrew(e.g, 'good')));
+        // Two hulls of the same grade: now there IS a question.
+        const same = mk342({ bCrew: 'poor' });
+        ok('task342: two local hulls one grade below the target need a choice',
+           crewUpgradePlan(same.g, 'average').needsChoice === true
+           && names(crewUpgradePlan(same.g, 'average')) === 'Alpha,Beta',
+           names(crewUpgradePlan(same.g, 'average')));
+        ok('task342: the refusals keep their wording, and a grade nothing can reach is still refused',
+           canUpgradeCrew(e.g, 'excellent').reason === 'Your crew must be good first.'
+           && canUpgradeCrew(e.g, 'poor').reason === 'Your crew is already at least that good.',
+           canUpgradeCrew(e.g, 'excellent').reason + ' | ' + canUpgradeCrew(e.g, 'poor').reason);
+        // Cargo sales: only the holds that carry it, emptiest first; the open "?" form takes any.
+        const laden = mk342({ aCargo: ['furs'], bCargo: ['furs', 'spices'] });
+        ok('task342: a cargo sale offers each hold carrying the commodity, emptiest first',
+           names(cargoSellPlan(laden.g, 'furs')) === 'Alpha,Beta'
+           && names(cargoSellPlan(laden.g, 'spices')) === 'Beta'
+           && cargoSellPlan(laden.g, 'spices').needsChoice === false,
+           names(cargoSellPlan(laden.g, 'furs')));
+        ok('task342: the open cargo="?" form offers every non-empty local hold',
+           names(cargoSellPlan(laden.g, '?')) === 'Alpha,Beta'
+           && cargoSellPlan(mk342().g, '?').ok === false,
+           names(cargoSellPlan(laden.g, '?')));
+      }
+
+      // --- the commits take the named vessel, and charge once -----------------------------
+      {
+        const e = mk342();
+        const res = buyTrade(e.g, { kind: 'cargo', cargoName: 'spices', name: 'spices' }, 900, null,
+          { chooser: (c) => [c.find((s) => s.name === 'Beta')] });
+        ok('task342: a named cargo buy loads that hull alone, and pays once',
+           res.ok && e.alpha.cargo.length === 0 && e.beta.cargo.join(',') === 'spices'
+           && e.g.data.shards === 100 && e.away.cargo.length === 0,
+           `A=${e.alpha.cargo} B=${e.beta.cargo} shards=${e.g.data.shards}`);
+      }
+      {
+        const e = mk342({ bCrew: 'poor' });
+        const res = applyInlineBuy(e.g, { price: 50, crew: 'average', chooser: (c) => [c.find((s) => s.name === 'Beta')] });
+        ok('task342: a named crew upgrade changes that hull alone, and pays once',
+           res.ok && e.alpha.crew === 'poor' && e.beta.crew === 'average'
+           && e.g.data.shards === 950 && e.away.crew === 'good',
+           `A=${e.alpha.crew} B=${e.beta.crew} shards=${e.g.data.shards}`);
+      }
+      {
+        // No chooser: the first candidate stands, exactly as before the fix — so a headless
+        // caller and a single-vessel dock both behave as they always did.
+        const e = mk342({ bCrew: 'poor' });
+        applyInlineBuy(e.g, { price: 50, crew: 'average' });
+        ok('task342: with no chooser the first candidate stands (unchanged default)',
+           e.alpha.crew === 'average' && e.beta.crew === 'poor');
+      }
+      {
+        // …and at sea that first candidate is the ship being SAILED, not a prize taken
+        // alongside — the vessel currentShip() names, so an unasked buy still changes the hull
+        // the rest of the section is talking about. Plain array order would pick the prize.
+        const e = mk342({ aCrew: 'poor', bCrew: 'poor' });
+        e.g.data.location = null;
+        e.alpha.docked = null; e.beta.docked = null; // both at large, Alpha first in the array
+        e.g.data.sailingShipId = e.beta.id;          // …but Beta is the one under sail
+        ok('task342: at sea the plans put the sailed vessel first, agreeing with currentShip()',
+           crewUpgradePlan(e.g, 'average').candidates[0] === e.beta
+           && cargoBuyPlan(e.g).candidates[0] === e.beta
+           && e.g.currentShip() === e.beta);
+        applyInlineBuy(e.g, { price: 50, crew: 'average' });
+        ok('task342: so an unasked upgrade at sea changes the sailed vessel',
+           e.beta.crew === 'average' && e.alpha.crew === 'poor',
+           `A=${e.alpha.crew} B=${e.beta.crew}`);
+      }
+
+      // --- the widgets ask, and nothing moves until the answer commits --------------------
+      // §5.145's harbourmaster: a cargo market and the four crew-upgrade offers, at a dock
+      // where the player keeps two ships.
+      {
+        const e = mk342({ bCrew: 'poor' });
+        const cont = document.createElement('div');
+        const st = new Story(cont, e.g, { navigate(){}, onDeath(){}, notify(){} });
+        e.g.goTo(5, '145');
+        st.begin(await data.getSection(5, '145'), 5, '145');
+        const buyBtn = Array.from(cont.querySelectorAll('.btn-mini')).find((b) => /^Buy 190/.test(b.textContent));
+        ok('§5.145 draws its cargo rows', !!buyBtn && buyBtn.disabled === false, buyBtn ? buyBtn.textContent : 'none');
+        buyBtn.click();
+        const picker = cont.querySelector('.vessel-choice');
+        ok('§5.145 a cargo buy at a two-ship dock asks which hold takes it, charging nothing yet',
+           !!picker && picker.querySelectorAll('button').length === 2
+           && /Load onto which ship/.test(picker.textContent) && e.g.data.shards === 1000
+           && e.alpha.cargo.length === 0 && e.beta.cargo.length === 0,
+           picker ? picker.textContent : 'no picker');
+        ok('§5.145 the picker names each hull, its crew and its remaining space',
+           /Barque "Alpha"/.test(picker.textContent) && /Poor crew/.test(picker.textContent)
+           && /empty \(1 free\)/.test(picker.textContent) && /Brigantine "Beta"/.test(picker.textContent),
+           picker.textContent);
+        Array.from(picker.querySelectorAll('button')).find((b) => /Beta/.test(b.textContent)).click();
+        ok('§5.145 the Unit goes into the named hold, and the price leaves once',
+           e.alpha.cargo.length === 0 && e.beta.cargo.join(',') === 'furs' && e.g.data.shards === 810,
+           `A=${e.alpha.cargo} B=${e.beta.cargo} shards=${e.g.data.shards}`);
+      }
+      {
+        const e = mk342({ bCrew: 'poor' });
+        const cont = document.createElement('div');
+        const st = new Story(cont, e.g, { navigate(){}, onDeath(){}, notify(){} });
+        e.g.goTo(5, '145');
+        st.begin(await data.getSection(5, '145'), 5, '145');
+        const hire = Array.from(cont.querySelectorAll('.btn-mini')).find((b) => /Average crew|average/i.test(b.textContent) && /50/.test(b.textContent));
+        ok('§5.145 offers the poor→average upgrade with two poor-crewed hulls here',
+           !!hire && hire.disabled === false, hire ? `${hire.textContent} disabled=${hire.disabled} ${hire.title}` : 'none');
+        hire.click();
+        const picker = cont.querySelector('.vessel-choice');
+        ok('§5.145 the crew upgrade asks which hull, charging nothing yet',
+           !!picker && picker.querySelectorAll('button').length === 2
+           && /Upgrade which ship/.test(picker.textContent) && e.g.data.shards === 1000
+           && e.alpha.crew === 'poor' && e.beta.crew === 'poor',
+           picker ? picker.textContent : 'no picker');
+        Array.from(picker.querySelectorAll('button')).find((b) => /Beta/.test(b.textContent)).click();
+        ok('§5.145 only the named hull is upgraded, and the price leaves once',
+           e.alpha.crew === 'poor' && e.beta.crew === 'average' && e.g.data.shards === 950,
+           `A=${e.alpha.crew} B=${e.beta.crew} shards=${e.g.data.shards}`);
+      }
+      // §3.538's swap: give one Unit of any commodity, receive minerals. Both hulls carry
+      // something, so the give-side asks — and the minerals arrive in the hold that gave.
+      {
+        const e = mk342({ aCargo: ['furs'], bCargo: ['spices'] });
+        e.g.data.location = null; // at sea, where the encounter happens: both ships are with you
+        e.alpha.docked = null; e.beta.docked = null;
+        const cont = document.createElement('div');
+        const st = new Story(cont, e.g, { navigate(){}, onDeath(){}, notify(){} });
+        e.g.goTo(3, '538');
+        st.begin(await data.getSection(3, '538'), 3, '538');
+        const give = Array.from(cont.querySelectorAll('.btn-mini')).find((b) => /Cargo Unit/i.test(b.textContent) && !/minerals/i.test(b.textContent));
+        ok('§3.538 offers the give side of the swap', !!give && give.disabled === false,
+           give ? `${give.textContent} disabled=${give.disabled}` : 'none');
+        give.click();
+        const picker = cont.querySelector('.vessel-choice');
+        ok('§3.538 asks which hold gives a Unit up, moving nothing yet',
+           !!picker && picker.querySelectorAll('button').length === 2
+           && /Give a Unit from which ship/.test(picker.textContent)
+           && e.alpha.cargo.join(',') === 'furs' && e.beta.cargo.join(',') === 'spices',
+           picker ? picker.textContent : 'no picker');
+        Array.from(picker.querySelectorAll('button')).find((b) => /Beta/.test(b.textContent)).click();
+        await new Promise((r) => setTimeout(r, 0)); // the give is async (the cargo="?" modal path)
+        ok('§3.538 the Unit leaves the named hold and the minerals arrive in the SAME hold',
+           e.alpha.cargo.join(',') === 'furs' && e.beta.cargo.join(',') === 'minerals',
+           `A=${e.alpha.cargo} B=${e.beta.cargo}`);
+      }
+      // §4.622's salvage: three <group>s each bundling one free <buy cargo>. The group's own
+      // picker asks which hold, since a bundled buy never reaches the inline widget.
+      {
+        const e = mk342();
+        e.g.data.location = 'Tigre Bay';
+        e.alpha.docked = 'Tigre Bay'; e.beta.docked = 'Tigre Bay';
+        const cont = document.createElement('div');
+        const st = new Story(cont, e.g, { navigate(){}, onDeath(){}, notify(){} });
+        e.g.goTo(4, '622');
+        st.begin(await data.getSection(4, '622'), 4, '622');
+        const grp = Array.from(cont.querySelectorAll('.group-action')).find((b) => /Metals/i.test(b.textContent));
+        ok('§4.622 offers the Metals salvage group', !!grp && grp.disabled === false);
+        grp.click();
+        const picker = cont.querySelector('.vessel-choice');
+        ok('§4.622 a bundled cargo buy asks which hold, loading nothing yet',
+           !!picker && picker.querySelectorAll('button').length === 2
+           && e.alpha.cargo.length === 0 && e.beta.cargo.length === 0,
+           picker ? picker.textContent : 'no picker');
+        Array.from(picker.querySelectorAll('button')).find((b) => /Beta/.test(b.textContent)).click();
+        ok('§4.622 the salvage goes into the named hold, and its codeword is ticked once',
+           e.alpha.cargo.length === 0 && e.beta.cargo.join(',') === 'metals'
+           && e.g.hasCodeword('4.622.1'),
+           `A=${e.alpha.cargo} B=${e.beta.cargo}`);
+      }
+      // One eligible vessel keeps the one-click path: no picker, and the trade completes.
+      {
+        const e = mk342({ aCargo: ['furs'] }); // Alpha (barque, cap 1) is full
+        const cont = document.createElement('div');
+        const st = new Story(cont, e.g, { navigate(){}, onDeath(){}, notify(){} });
+        e.g.goTo(5, '145');
+        st.begin(await data.getSection(5, '145'), 5, '145');
+        Array.from(cont.querySelectorAll('.btn-mini')).find((b) => /^Buy 190/.test(b.textContent)).click();
+        ok('task342: one eligible hull commits on the click, with no picker',
+           !cont.querySelector('.vessel-choice') && e.beta.cargo.join(',') === 'furs'
+           && e.alpha.cargo.join(',') === 'furs' && e.g.data.shards === 810,
+           `A=${e.alpha.cargo} B=${e.beta.cargo} shards=${e.g.data.shards}`);
+      }
     }
 
     // --- task 187: a named sale row is satisfied by its DESCRIPTOR, not just the name -----

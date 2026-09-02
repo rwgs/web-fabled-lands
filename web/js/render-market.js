@@ -7,13 +7,13 @@
 // in market.js / engine.js; this only builds the widgets and wires the clicks.
 
 import { applyEffect, applyEffectBody, boolAttr, resolveValue, applyRest, buyResurrectionDeal, readItemEffects, filterMatches, transferPlan, isKeep } from './engine.js';
-import { shopKind, goodsFrom, ownsGoods, hasCargoSpace, buyTrade, sellTrade, sellPlan, applyInlineBuy, buyOptions, sellInlineItem, sellCargo, canUpgradeCrew } from './market.js';
+import { shopKind, goodsFrom, ownsGoods, hasCargoSpace, buyTrade, sellTrade, sellPlan, applyInlineBuy, buyOptions, sellInlineItem, sellCargo, cargoBuyPlan, crewUpgradePlan, cargoSellPlan } from './market.js';
 import { normalize, parseTags, splitItemName, isShardsCurrency } from './state.js';
 import { canonCargo } from './rules.js';
 import { modal } from './ui.js';
 import { MARKET_TITLES, titleCase, escapeHtml, itemLabel, bonusSuffix } from './render-util.js';
 import { isChooseOne, isPricedResurrection } from './render-rules.js';
-import { renderChoosableReward } from './render-rewards.js';
+import { renderChoosableReward, showVesselPicker } from './render-rewards.js';
 
 export function renderMarket(story, container, node, path) {
   const box = document.createElement('div');
@@ -112,13 +112,20 @@ function renderShopRow(story, node, path, currency = null, marketSolds = [], mar
       // guard ABOVE the stall keeps reading the purse the walk passed it with (tasks 261, 263).
       // Nothing is booked when the transaction is refused, and a foreign-currency price moves
       // no Shards, so the ledger's purse-and-pack reading is untouched by it.
-      const mark = story.spendMark();
-      const res = buyTrade(story.state, goods, price, currency);
-      if (!res.ok) { if (res.note) story.notify(res.note, 'warn'); return; }
-      story.noteSpend(path, mark);
-      if (stockLimit != null && story.ctx) story.ctx.stock.set(path, bought + 1);
-      runBoughtHooks(story, node, goods, marketBoughts); // <bought> twin of the sale hook (task 219)
-      story.rerender();
+      const commit = (chooser) => {
+        const mark = story.spendMark();
+        const res = buyTrade(story.state, goods, price, currency, chooser ? { chooser } : {});
+        if (!res.ok) { if (res.note) story.notify(res.note, 'warn'); return; }
+        story.noteSpend(path, mark);
+        if (stockLimit != null && story.ctx) story.ctx.stock.set(path, bought + 1);
+        runBoughtHooks(story, node, goods, marketBoughts); // <bought> twin of the sale hook (task 219)
+        story.rerender();
+      };
+      // Several local holds with room: ask which one the Cargo Unit goes into rather than
+      // filling whichever vessel happens to be first at the dock. (task 342)
+      const vessels = kind === 'cargo' ? cargoBuyPlan(story.state) : null;
+      if (vessels && vessels.needsChoice) { b.disabled = true; showVesselPicker(story, row, vessels, commit, 'Load onto which ship?'); }
+      else commit(null);
     });
     actions.appendChild(b);
   }
@@ -268,10 +275,13 @@ export function renderInlineBuy(story, container, node, path) {
     return null;
   }
 
-  // Crew upgrade: one grade at a time (poor→average→good→excellent). The rule
-  // lives in market.canUpgradeCrew (task 34); the view just gates on its verdict.
+  // Crew upgrade: one grade at a time (poor→average→good→excellent). The rule lives in
+  // market.crewUpgradePlan (tasks 34, 342); the view gates on its verdict and, when more than
+  // one local vessel is eligible, stands a picker over its candidates.
   if (crew) {
-    const up = canUpgradeCrew(story.state, crew);
+    // The PLAN, not just canUpgradeCrew's verdict: it carries the eligible vessels the picker
+    // below needs, and `ok`/`reason` are the same two fields the button already gated on.
+    const up = crewUpgradePlan(story.state, crew);
     // The buy memo the ship/tool/item form keeps below, minted here too — but read only as
     // "this node has bought once this visit", never as a per-visit CAP. §5.145's shipyard is
     // priced and repeatable, and a grade is capped by canUpgradeCrew instead. It is what
@@ -290,12 +300,18 @@ export function renderInlineBuy(story, container, node, path) {
       // A buy runs from the CLICK, not during the walk, so it books its taking at its own node —
       // a resource guard ABOVE the offer must keep reading the purse the walk passed it with
       // (tasks 261, 263). Nothing is booked when the transaction is refused.
-      const mark = story.spendMark();
-      const res = applyInlineBuy(story.state, { price, crew });
-      if (!res.ok) { if (res.note) story.notify(res.note, 'warn'); return; }
-      story.noteSpend(path, mark);
-      story.ctx.buys.set(memo, bought + 1);
-      story.rerender();
+      const commit = (chooser) => {
+        const mark = story.spendMark();
+        const res = applyInlineBuy(story.state, { price, crew, chooser });
+        if (!res.ok) { if (res.note) story.notify(res.note, 'warn'); return; }
+        story.noteSpend(path, mark);
+        story.ctx.buys.set(memo, bought + 1);
+        story.rerender();
+      };
+      // Two local ships can both be one grade below the target (§5.145's harbourmaster serves
+      // the whole fleet): the grade is bought for the hull the player names. (task 342)
+      if (up.needsChoice) { btn.disabled = true; showVesselPicker(story, btn, up, commit, 'Upgrade which ship\u2019s crew?'); }
+      else commit(null);
     });
     container.appendChild(btn);
     return btn;
@@ -345,12 +361,18 @@ export function renderInlineBuy(story, container, node, path) {
 
   if (!reason) {
     btn.addEventListener('click', () => {
-      const mark = story.spendMark(); // the price leaves the sheet HERE (tasks 261, 263)
-      const res = applyInlineBuy(story.state, buyOptions(node, story.state)); // shared buy-node parse (task 152)
-      if (!res.ok) { if (res.note) story.notify(res.note, 'warn'); return; }
-      story.noteSpend(path, mark);
-      story.ctx.buys.set(memo, bought + 1);
-      story.rerender();
+      const commit = (chooser) => {
+        const mark = story.spendMark(); // the price leaves the sheet HERE (tasks 261, 263)
+        const opts = buyOptions(node, story.state); // shared buy-node parse (task 152)
+        const res = applyInlineBuy(story.state, chooser ? { ...opts, chooser } : opts);
+        if (!res.ok) { if (res.note) story.notify(res.note, 'warn'); return; }
+        story.noteSpend(path, mark);
+        story.ctx.buys.set(memo, bought + 1);
+        story.rerender();
+      };
+      const vessels = kind === 'cargo' ? cargoBuyPlan(story.state) : null;
+      if (vessels && vessels.needsChoice) { btn.disabled = true; showVesselPicker(story, btn, vessels, commit, 'Load onto which ship?'); }
+      else commit(null);
     });
   }
   container.appendChild(btn);
@@ -415,26 +437,34 @@ export function renderInlineSell(story, container, node, path) {
   const btn = document.createElement('button');
   btn.className = 'btn-mini';
   btn.textContent = label;
-  // Only a hold that is HERE (with you at sea / berthed at this dock) can trade (task 89).
-  const shipWithCargo = story.state.shipsHere().find((s) => (s.cargo || []).length > 0);
-  btn.disabled = !shipWithCargo;
-  btn.title = shipWithCargo ? '' : 'You have no cargo here to give.';
-  btn.addEventListener('click', async () => {
-    const ship = story.state.shipsHere().find((s) => (s.cargo || []).length > 0);
-    if (!ship) return;
+  // Only a hold that is HERE (with you at sea / berthed at this dock) can trade (task 89) —
+  // and when more than one carries what the offer wants, WHICH hold is the player's call.
+  const holds = cargoSellPlan(story.state, cargo);
+  btn.disabled = !holds.ok;
+  btn.title = holds.ok ? '' : holds.reason;
+  // Two questions in the worst case, asked in this order and committing nothing until both are
+  // answered: which hull gives a Unit up (§3.538's swap can face a two-ship flotilla), then
+  // which commodity out of that hull for the open cargo="?" form. (tasks 89 + 342)
+  const give = async (ship) => {
     let type = cargo;
     if (cargo === '?') { // give any one commodity — let the player choose which
       const kinds = [...new Set(ship.cargo)];
       type = kinds.length === 1 ? kinds[0]
         : await modal({ title: 'Give which cargo?', body: 'Choose a Cargo Unit to give up:', buttons: kinds.map((k) => ({ label: titleCase(k), value: k })) });
-      if (!type) return; // cancelled
+      if (!type) return; // cancelled — nothing has moved
     }
     // The cargo→Shards transaction now lives in market.js (task 34); the barter
     // reward (adding the linked commodity) stays here as it's view-linked.
-    if (!sellCargo(story.state, type, shardsGain).ok) return;
-    if (isFlag) applyLinkedCargoBuys(story, priceAttr);
+    const res = sellCargo(story.state, type, shardsGain, { chooser: () => [ship] });
+    if (!res.ok) return;
+    if (isFlag) applyLinkedCargoBuys(story, priceAttr, res.ship);
     story.ctx.applied.add(memo);
     story.rerender();
+  };
+  btn.addEventListener('click', () => {
+    if (!holds.ok) return;
+    if (holds.needsChoice) { btn.disabled = true; showVesselPicker(story, btn, holds, (chooser) => give(chooser()[0]), 'Give a Unit from which ship?'); }
+    else give(holds.candidates[0]);
   });
   container.appendChild(btn);
   return btn;
@@ -442,10 +472,18 @@ export function renderInlineSell(story, container, node, path) {
 
 // Apply the reward side of a barter: every [flag=key] <buy cargo> in the section
 // (the commodity received in exchange for the cargo just given up).
-function applyLinkedCargoBuys(story, key) {
+//
+// The goods received go into the hold that gave, which asks the player nothing and cannot
+// fail — that hold has just freed a Unit of space. It is also the reading §3.538 prints: the
+// captain "has a Cargo Unit of minerals in his hold that he would be willing to exchange for
+// one Cargo Unit of any other commodity", which is one swap in one hold, not two independent
+// transfers. A second picker here would be worse than redundant: the give has already
+// committed by this point, so an abandoned answer would leave the barter half done. (task 342)
+function applyLinkedCargoBuys(story, key, intoShip = null) {
   story.sectionEl.querySelectorAll(`[flag="${key}"]`).forEach((b) => {
     if (b.tagName.toLowerCase() === 'buy' && b.getAttribute('cargo') != null) {
-      buyTrade(story.state, { kind: 'cargo', cargoName: b.getAttribute('cargo'), name: b.getAttribute('cargo') }, 0);
+      const opts = intoShip ? { chooser: () => [intoShip] } : {};
+      buyTrade(story.state, { kind: 'cargo', cargoName: b.getAttribute('cargo'), name: b.getAttribute('cargo') }, 0, null, opts);
     }
   });
 }

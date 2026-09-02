@@ -9,11 +9,96 @@ import { SHIP_TYPES, CREW_LEVELS, NO_CREW, canonShipType, canonCargo } from './r
 import { resolveValue, readItemEffects } from './engine.js';
 
 const shipCap = (type) => SHIP_TYPES[canonShipType(type)]?.capacity || 1;
-const cargoShipWithSpace = (ships) => ships.find((s) => (s.cargo || []).length < shipCap(s.type));
+/** How many Cargo Units a hull of `type` holds — the view needs it to caption a vessel's
+ *  remaining space in the which-ship picker. (task 342) */
+export function shipCapacity(type) { return shipCap(type); }
+
+// ---- which vessel changes: the buy-side selection boundary (task 342) --------
+// The reference model treats this as a QUESTION, not a default. With several local ships
+// eligible, TradeNode.actionPerformed refuses to guess and says so — "You have multiple ships
+// with free space docked here. Select one.", the same for a crew grade and for the hold a
+// cargo sale comes out of. It can afford to, because its ship table carries a persistent
+// selection; this port has none, so the equivalent is an inline picker, and these three plans
+// are what it asks about.
+//
+// All three return the sellPlan shape — { candidates, needsChoice } — plus an { ok, reason }
+// verdict, because unlike a sale these offers can be refused outright (no ship here, no space,
+// no crew one grade below) and the view already gates its button on that reason.
+//
+// The two BUY plans list currentShip() first when it qualifies, so the answer a caller that
+// asks nothing gets is the vessel the rest of the section is already talking about — the same
+// hull `<if crew=>` and `<if cargo=>` read, and literally the one the old code picked. At a
+// dock that is shipsHere()[0] either way; at sea it is the ship being SAILED rather than a
+// prize taken alongside, which is the case the plain array order would have quietly changed.
+// The sell plan keeps sellCandidates' emptiest-hold-first order instead, for the reason that
+// ordering exists: the least damaging hold to trade out of.
+const currentFirst = (state, ships) => {
+  const cur = state.currentShip();
+  const at = cur ? ships.indexOf(cur) : -1;
+  return at > 0 ? [cur, ...ships.filter((s) => s !== cur)] : ships;
+};
+
+/** The vessels HERE that could take one more Cargo Unit. */
+export function cargoBuyPlan(state) {
+  const here = state.shipsHere();
+  const candidates = currentFirst(state, here.filter((s) => (s.cargo || []).length < shipCap(s.type)));
+  if (!candidates.length) {
+    return { candidates, needsChoice: false, ok: false, reason: here.length ? 'No cargo space.' : 'You have no ship here.' };
+  }
+  return { candidates, needsChoice: candidates.length > 1, ok: true, reason: null };
+}
 
 /** Whether a ship at the player's current location has room for one Cargo Unit. */
 export function hasCargoSpace(state) {
-  return !!cargoShipWithSpace(state.shipsHere());
+  return cargoBuyPlan(state).ok;
+}
+
+/** The vessels HERE whose crew is exactly one grade below `crew` — the ones this upgrade can
+ *  legally be spent on (crews improve one grade at a time, task 24; the reference picks the
+ *  same set with findShipsWithCrew(toCrew-1)). Reading the FLEET rather than currentShip() is
+ *  the fix: two local ships of different grades used to make a valid upgrade look unavailable,
+ *  because only the first vessel was consulted — and when it did apply, it applied to that
+ *  first vessel whether or not it was the eligible one. A crewless ship (NO_CREW, off the
+ *  ordinal) indexes to -1, one below `poor`, so §5.192's printed "25 Shards gets a poor crew"
+ *  is the one hire it can make. (tasks 267 + 342) */
+export function crewUpgradePlan(state, crew) {
+  const here = state.shipsHere();
+  if (!here.length) return { candidates: [], needsChoice: false, ok: false, reason: 'You have no ship.' };
+  const target = CREW_LEVELS.indexOf(canonCrew(crew));
+  if (target < 0) return { candidates: [], needsChoice: false, ok: false, reason: 'Unknown crew grade.' };
+  const candidates = currentFirst(state, here.filter((s) => CREW_LEVELS.indexOf(s.crew) === target - 1));
+  if (!candidates.length) {
+    // Both refusals keep their pre-342 wording, which stays accurate for a fleet: either every
+    // local vessel already has that grade or better, or none has yet reached the grade below.
+    const reason = here.every((s) => CREW_LEVELS.indexOf(s.crew) >= target)
+      ? 'Your crew is already at least that good.'
+      : `Your crew must be ${CREW_LEVELS[target - 1]} first.`;
+    return { candidates, needsChoice: false, ok: false, reason };
+  }
+  return { candidates, needsChoice: candidates.length > 1, ok: true, reason: null };
+}
+
+/** The vessels HERE a `<sell cargo>` could take a Unit out of: those carrying the named
+ *  commodity, or — for the open `cargo="?"` of §3.538's swap — any with a non-empty hold.
+ *  Emptier holds first, matching sellCandidates' cargo ordering. (task 342) */
+export function cargoSellPlan(state, cargoType) {
+  const open = cargoType == null || cargoType === '?' || cargoType === '';
+  const want = open ? null : canonCargo(cargoType);
+  const candidates = state.shipsHere()
+    .filter((s) => (open ? (s.cargo || []).length > 0 : (s.cargo || []).some((c) => canonCargo(c) === want)))
+    .sort((a, b) => shipLoad(a) - shipLoad(b));
+  if (!candidates.length) return { candidates, needsChoice: false, ok: false, reason: 'You have no cargo here to give.' };
+  return { candidates, needsChoice: candidates.length > 1, ok: true, reason: null };
+}
+
+// The chooser hook every one of the three commits shares, so a headless caller and the view's
+// picker speak the same contract as sellTrade's: `chooser(candidates, 1, 'ship')` returns the
+// player's answer, and with no chooser (or a single candidate) the first candidate stands.
+function chosenShip(plan, opts) {
+  if (!plan.candidates.length) return null;
+  const pick = (opts && opts.chooser && plan.candidates.length > 1)
+    ? (opts.chooser(plan.candidates.slice(), 1, 'ship') || [])[0] : null;
+  return pick || plan.candidates[0];
 }
 
 // A market's currency= (task 40): Shards is the default purse; any other name is a
@@ -112,7 +197,7 @@ function matchesNamedGoods(it, goods) {
 
 /** Buy `goods` for `price` in `currency` (Shards by default). Mutates state.
  *  Returns { ok, note? }. */
-export function buyTrade(state, goods, price, currency = null) {
+export function buyTrade(state, goods, price, currency = null, opts = {}) {
   if (walletBalance(state, currency) < price) return { ok: false };
   const { kind, name, bonus, ability, tags, effects, shipType, cargoName, initialCrew } = goods;
   if (kind === 'ship') {
@@ -121,10 +206,11 @@ export function buyTrade(state, goods, price, currency = null) {
     state.addShip({ type: canonShipType(shipType), name: 'Ship', crew: canonCrew(initialCrew, state), cargo: [], docked: state.data.location ?? null });
   } else if (kind === 'cargo') {
     // Load onto a ship HERE (berthed at this port / sailing with you) that has cargo
-    // space — never onto a vessel left at another dock (task 89).
-    const here = state.shipsHere();
-    const ship = cargoShipWithSpace(here);
-    if (!ship) return { ok: false, note: here.length ? 'No cargo space.' : 'You have no ship here.' };
+    // space — never onto a vessel left at another dock (task 89) — and onto the one the
+    // player NAMED when several qualify, rather than whichever is first (task 342).
+    const plan = cargoBuyPlan(state);
+    if (!plan.ok) return { ok: false, note: plan.reason };
+    const ship = chosenShip(plan, opts);
     walletSpend(state, currency, price);
     (ship.cargo ||= []).push(canonCargo(cargoName)); // store the canonical commodity (task 127)
     state.changed();
@@ -264,10 +350,13 @@ export function applyInlineBuy(state, opts = {}) {
   if (price > 0 && state.data.shards < price) return { ok: false, note: 'Not enough Shards.' };
 
   if (crew) {
-    const up = canUpgradeCrew(state, crew); // one-grade-at-a-time rule (task 34)
+    const up = crewUpgradePlan(state, crew); // one-grade-at-a-time rule (task 34), fleet-wide (342)
     if (!up.ok) return { ok: false, note: up.reason };
+    // The grade goes to the vessel the player named, not to currentShip() — which at a dock is
+    // simply the first local hull, and so could be a ship the upgrade was never legal on.
+    const ship = chosenShip(up, opts);
     if (price) state.adjustMoney(-price);
-    state.currentShip().crew = canonCrew(crew);
+    ship.crew = canonCrew(crew);
     state.changed();
     return { ok: true };
   }
@@ -277,7 +366,8 @@ export function applyInlineBuy(state, opts = {}) {
     return { ok: true };
   }
   if (cargo != null) {
-    return buyTrade(state, { kind: 'cargo', cargoName: cargo, name: cargo }, price); // capacity checked there
+    // capacity — and which hold, when several have room — are both settled in buyTrade
+    return buyTrade(state, { kind: 'cargo', cargoName: cargo, name: cargo }, price, null, opts);
   }
   // a carried possession: a tool (with its ability/bonus) or a plain item
   if (state.freeSlots() <= 0) return { ok: false, note: 'You can carry only 12 items.' };
@@ -286,22 +376,13 @@ export function applyInlineBuy(state, opts = {}) {
   return { ok: true };
 }
 
-/** Whether a crew upgrade to `crew` is allowed right now: you have a ship and its
- *  crew is exactly one grade below the target (crews improve one grade at a time —
- *  task 24). Returns { ok, reason } so the view can gate/tooltip the offer and
- *  applyInlineBuy can enforce it. A crewless ship (NO_CREW, off the ordinal) indexes
- *  to -1, which is one below `poor` — so §5.192's printed "25 Shards gets a poor
- *  crew" is the one hire it can make, and nothing else. (task 267) */
+/** Whether a crew upgrade to `crew` is allowed right now — the { ok, reason } verdict the view
+ *  gates and tooltips its offer on, kept as its own name because that is all most callers want.
+ *  crewUpgradePlan holds the rule (and the candidate vessels a picker needs). (tasks 24, 267,
+ *  342) */
 export function canUpgradeCrew(state, crew) {
-  const ship = state.currentShip();
-  if (!ship) return { ok: false, reason: 'You have no ship.' };
-  const target = CREW_LEVELS.indexOf(canonCrew(crew));
-  if (target < 0) return { ok: false, reason: 'Unknown crew grade.' };
-  const have = CREW_LEVELS.indexOf(ship.crew);
-  if (have === target - 1) return { ok: true };
-  const reason = have >= target ? 'Your crew is already at least that good.'
-    : `Your crew must be ${CREW_LEVELS[target - 1]} first.`;
-  return { ok: false, reason };
+  const plan = crewUpgradePlan(state, crew);
+  return plan.ok ? { ok: true } : { ok: false, reason: plan.reason };
 }
 
 /** Apply the cost of taking a paid <choice>: deduct its Shards (or foreign
@@ -333,14 +414,19 @@ export function sellInlineItem(state, name, gain) {
 }
 
 /** Give up one Cargo Unit of `cargoType` (from a ship HERE carrying it — the hold
- *  must be present to trade from, task 89), optionally for `gain` Shards. The
- *  barter-reward side stays in the view. Returns { ok }. */
-export function sellCargo(state, cargoType, gain) {
+ *  must be present to trade from, task 89), optionally for `gain` Shards. `opts.chooser`
+ *  names which hold when several carry it (task 342); the barter-reward side stays in the
+ *  view. Returns { ok, ship? } — `ship` is the hull the Unit actually left, so a barter can
+ *  put the goods received back into the same hold. */
+export function sellCargo(state, cargoType, gain, opts = {}) {
   const want = canonCargo(cargoType);
-  const ship = state.shipsHere().find((s) => (s.cargo || []).some((c) => canonCargo(c) === want));
-  if (!ship) return { ok: false };
-  ship.cargo.splice(ship.cargo.findIndex((c) => canonCargo(c) === want), 1);
+  const plan = cargoSellPlan(state, cargoType);
+  if (!plan.ok) return { ok: false };
+  const ship = chosenShip(plan, opts);
+  const at = ship.cargo.findIndex((c) => canonCargo(c) === want);
+  if (at < 0) return { ok: false }; // the named hull does not carry it (a stale/crafted pick)
+  ship.cargo.splice(at, 1);
   if (gain) state.adjustMoney(gain);
   state.changed();
-  return { ok: true };
+  return { ok: true, ship };
 }

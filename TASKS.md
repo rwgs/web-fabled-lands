@@ -3,10 +3,10 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-350 appears below: 207 and 326 are withdrawn as misdiagnoses, 337-339, 341, 342,
-344 and 346-350 are open, and all others are complete (see the Review log). File
-new work under the priority bucket that fits, and record the pass in the Review
-log. Completed detail sections are archived in
+350 appears below: 207 and 326 are withdrawn as misdiagnoses, 337-339, 341, 344
+and 346-350 are open, and all others are complete (see the Review log). File new
+work under the priority bucket that fits, and record the pass in the Review log.
+Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
 
@@ -20,7 +20,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 342. Cargo purchases, crew upgrades and inline cargo barters silently use the first local ship when several are docked together, while JaFL requires the player to select which vessel changes
 - [ ] 337. Book 1 section 460 rewrites the printed "codeword Acid or a copper amulet" sentence as two separate sentences instead of changing markup only
 - [ ] 338. The codeword-value gate compares lower-cased spellings even though both the web engine and JaFL use case-sensitive keys, so `codeword="anchor"` is accepted as declared `Anchor` and can fail silently in play
 
@@ -383,6 +382,7 @@ this order.*
 - [x] 340. saving inside a `<return>` detour lost the source `<choice>` because `serializeFrame` named the clicked node by scanning the render memo map `ctx.pathNodes`, which `renderChoices` never writes — it mints a synthetic `.cN` path and calls `renderChoice` directly — so the frame saved `usedSourcePath: null` and the post-reload `<return>` handed the non-`revisit` choice back live; a revealed `<outcome>`'s own `<goto>` failed the mirror way, recorded under a `.oN` path `resolveNodePath` cannot parse
 - [x] 345. `serializeVisit` carried task 156's `fightBonus` snapshot but no equipment-lock snapshot, so a mid-visit reload resumed §6.135 with both slots free while `ctx.applied` still said the hidden `<tick special="weaponlock">` had run — the sheet's Wield controls came back live and `<lose weapon="?" using="t">` broke whichever blade the player had swapped to instead of the one Mister Dragon had already caught
 - [x] 343. the three affliction arrays never formed the reference model's disease/poison family, so `<lose disease="?"|"*">` searched diseases alone and the 15 shipped nodes that print "poison or disease" left a poisoned character uncured — at §5.105 after paying 75 Shards for it — while an open cure took the first match with no picker
+- [x] 342. the economy layer chose the vessel by ARRAY POSITION — `cargoShipWithSpace` took the first local hull with room and `canUpgradeCrew`/`applyInlineBuy` read `currentShip()`, which at a dock is just the first local ship — so a Cargo Unit could fill a hold the player never meant to fill, and a crew upgrade that was legal on the second hull read as "Your crew must be average first" because only the first was consulted
 
 ---
 
@@ -554,57 +554,6 @@ all three say 1.
 
 Run the focused economy/actions suites, the DOM-free import check and the full browser suite.
 The shipped-corpus census must still report exactly three explicit transfer limits, all 1.
-
----
-
-## 342. Multi-ship cargo and crew transactions change the first vessel silently
-
-**Priority: MEDIUM.** The player can own several ships at one dock, and the app already asks
-which one to sail or sell. A purchase or upgrade can nevertheless fill or alter a different
-ship from the one the player intended, or be disabled because the first ship is ineligible
-while a later one qualifies.
-
-### What is wrong
-
-The headless economy layer selects by array position:
-
-- `cargoShipWithSpace`/`buyTrade` in `web/js/market.js` use the first local ship with room for
-  every market or inline cargo purchase;
-- `canUpgradeCrew` and `applyInlineBuy` use `state.currentShip()`, which at a dock is simply
-  the first local vessel, so two ships of different crew grades can make a valid upgrade look
-  unavailable or apply it to the wrong hull;
-- `renderInlineSell` in `web/js/render-market.js` builds an open-cargo menu from the first
-  non-empty hold only, `sellCargo` removes from the first matching ship, and a linked barter
-  reward goes back through the same first-with-space purchase path.
-
-JaFL's `TradeNode.actionPerformed` in `java-engine/flands/TradeNode.java` treats this as a
-selection boundary: when several local ships have free space, the relevant crew grade or the
-commodity being sold, it refuses to guess and tells the player to select one. This port has no
-persistent ship-table selection, so the equivalent is an inline vessel picker. The trigger is
-live rather than synthetic: the corpus has cargo markets and crew buys throughout all six
-books, and owning multiple local ships is supported (the sail and market-sale views already
-surface pickers for it).
-
-### Steps
-
-1. Add DOM-free plans for eligible cargo-buy, cargo-sell and crew-upgrade vessels, returning
-   whether a choice is needed and accepting the selected ship explicitly at commit time.
-2. In the view, ask which vessel when more than one eligible ship is here. Show enough identity
-   to choose safely: type/name, crew and current cargo/space. Do not deduct money, remove cargo
-   or set a barter flag until the choice commits.
-3. Route market cargo buys, inline cargo buys/rewards, crew upgrades and inline cargo sells/
-   barters through the same selection contract. Keep market ship/cargo **sales** on their
-   existing task-134 picker rather than duplicating it.
-4. With exactly one eligible vessel, retain the one-click behavior. A remote ship remains
-   ineligible, and the sailed vessel remains the default current vessel at sea.
-5. Add two-local-ship tests where only the second qualifies and where both qualify but carry
-   different cargo/crew, proving the named ship alone changes and the price is paid once.
-
-### Validation
-
-Run the focused economy and actions suites, the DOM-free import check and the full browser
-suite. Manually inspect the vessel picker at a cargo market and crew-upgrade section on a
-narrow layout; no control may be clipped or leave the transaction half-committed.
 
 ---
 
@@ -885,6 +834,40 @@ change (task 199) and rebuild the bundled data.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 342): closed **342**, filed nothing. Three DOM-free plans in
+`market.js` — `cargoBuyPlan`, `crewUpgradePlan`, `cargoSellPlan` — each returning `sellPlan`'s
+`{ candidates, needsChoice }` shape plus an `{ ok, reason }` verdict, with one shared
+`showVesselPicker` over them. The reference model already draws this boundary in words
+("You have multiple ships with free space docked here. Select one."); it can afford to refuse
+outright because its ship table carries a persistent selection, and the port's equivalent is to
+ask inline.
+**The half of this that is not a picker is the half worth recording.** `canUpgradeCrew` read
+`state.currentShip()`, so eligibility was decided by ONE hull: with a poor-crewed barque and an
+average-crewed brigantine both at Kunrir, §5.145's average→good upgrade answered "Your crew must
+be average first" — a legal purchase refused, not merely mis-targeted. That is a rule bug, and
+it is invisible from the picker's side: no amount of asking which ship helps if the offer is
+disabled before the question. The plan filters the FLEET, which is what the reference's
+`findShipsWithCrew(toCrew-1)` does.
+Two decisions the filing left open. **The barter reward goes back into the hold that gave**
+(§3.538's swap), rather than asking a second question: the give has already committed by then,
+so an abandoned second answer would strand the barter half done — and one hold is what the
+printed sentence describes ("a Cargo Unit of minerals in his hold … in exchange for one Cargo
+Unit of any other commodity"). And **the no-prompt default now follows `currentShip()`** rather
+than plain array order, for the two buy plans: at a dock they are the same hull, but at sea
+`currentShip()` is the ship under SAIL and array order could be a prize taken alongside. Without
+that, "the default is unchanged" would have been false for exactly the case the sail pointer
+exists to fix, and the default would have disagreed with the `<if crew=>` gate reading the same
+section.
+Both halves were confirmed to discriminate by reverting them separately: array-position
+selection fails 6 assertions (`A=spices B=` — the Unit in the wrong hold; `A=average B=poor` —
+the grade on the wrong hull), and a `currentShip()`-only crew plan fails 6 more, reporting the
+filed symptom verbatim. The narrow-layout inspection the task asks for was done with a
+throwaway probe page screenshotted at a 360px pane: the first shots looked clipped and were
+not — `--window-size=360` gave a 500px layout viewport, so a 360-wide screenshot of a 500-wide
+page cut the panels off. Measured rather than eyeballed, `body.scrollWidth === clientWidth` and
+each button fits its row; the picker needed one CSS rule (one button per row, `min-width: 0`) to
+get there, because these labels carry hull, name, crew and hold together.
 
 Worked 2026-09-02 (task 343): closed **343**, filed **350**. The three affliction arrays now
 form the reference model's disease/poison family through one DOM-free plan

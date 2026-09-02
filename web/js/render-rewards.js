@@ -11,7 +11,7 @@ import {
   losePaymentPlan, abilityChoiceOptions, grantChosenReward,
 } from './engine.js';
 import { makeItem, parseTags, currencyAward, splitItemName } from './state.js';
-import { applyInlineBuy, buyOptions } from './market.js';
+import { applyInlineBuy, buyOptions, cargoBuyPlan, crewUpgradePlan, shipCapacity } from './market.js';
 import {
   classifyPassive, groupPlan, groupRollDefers, ownsSoleLinkedBlessing, ITEM_FAMILY_TAGS,
   linkedRewards, isCounterReward, isChooseOne, isPricedItemAward, isPricedResurrection, hasVisiblePay,
@@ -93,7 +93,8 @@ function fixedForfeitCount(el) {
 // carries two open selectors, so chaining pickers would be machinery for a shape nobody has
 // written. An ability spec with a single eligible option is not a choice either — abilityTargets'
 // own cands[0] IS that option — so it commits on the click like a lone possession does.
-function groupBundledChoice(story, effects) {
+function groupBundledChoice(story, plan) {
+  const effects = plan.effects;
   for (const fx of effects) {
     if (fx.tagName.toLowerCase() !== 'lose' || !fixedForfeitCount(fx)) continue;
     const plan = losePaymentPlan(fx, story.state);
@@ -113,6 +114,16 @@ function groupBundledChoice(story, effects) {
   // more urgent question than the thing they get back. (task 343)
   for (const fx of effects) {
     if (needsAfflictionChoice(fx, story.state)) return { kind: 'affliction', node: fx };
+  }
+  // A bundled <buy cargo>/<buy crew> asks which local vessel changes, when more than one is
+  // eligible — §4.622's three salvage groups each load a Cargo Unit, and with two ships docked
+  // in Tigre Bay the hold that takes it is the player's call. Buy nodes are a separate list
+  // from plan.effects (the group applies them after its effects), which is why this reads the
+  // whole plan. (task 342)
+  for (const b of (plan.buyNodes || [])) {
+    const vessels = b.getAttribute('cargo') != null ? cargoBuyPlan(story.state)
+      : (b.getAttribute('crew') != null ? crewUpgradePlan(story.state, b.getAttribute('crew')) : null);
+    if (vessels && vessels.ok && vessels.needsChoice) return { kind: 'vessel', node: b, plan: vessels };
   }
   return null;
 }
@@ -141,13 +152,13 @@ export function renderGroup(story, container, node, path) {
     // the section before the choice was made. The losses still precede the awards (a recipe
     // frees the slot its reward needs), because the whole body simply moves behind the pick.
     // (tasks 229, 286)
-    const forfeit = groupBundledChoice(story, plan.effects);
+    const forfeit = groupBundledChoice(story, plan); // the chooser's target node, whichever kind asked
     const commit = (chooser) => {
       // The whole body applies on the CLICK, not during the walk, so the group books its taking
       // at its own node — the button is the position a bundled price was paid at (task 261).
       const mark = story.spendMark();
       plan.effects.forEach((fx) => applyEffect(fx, story.state, chooser && fx === forfeit.node ? { chooser } : {}));
-      plan.buyNodes.forEach((b) => runBuyNode(story, b));
+      plan.buyNodes.forEach((b) => runBuyNode(story, b, chooser && forfeit && forfeit.node === b ? chooser : null));
       plan.itemNodes.forEach((n) => grantItemNode(story, n));
       // The linked award is granted here and its flag consumed, but its own Take button is
       // still on the page (the taken branch stays rendered — that is what keeps this ☑ up),
@@ -189,6 +200,7 @@ export function renderGroup(story, container, node, path) {
       btn.disabled = true; // the pick replaces the button — never let a second click re-run it
       if (forfeit.kind === 'ability') showAbilityPicker(story, container, forfeit.node, commit);
       else if (forfeit.kind === 'affliction') showAfflictionPicker(story, container, forfeit.node, commit);
+      else if (forfeit.kind === 'vessel') showVesselPicker(story, container, forfeit.plan, commit, 'Load onto which ship?');
       else showForfeitPicker(story, container, forfeit.plan, commit);
     });
   }
@@ -285,10 +297,15 @@ export function grantItemNode(story, node) {
 // applyInlineBuy transaction as a standalone row and honours quantity=; a buy that
 // can't proceed (no Shards, no ship here for cargo) simply doesn't apply — matching
 // JaFL's GroupNode, which runs its children in sequence without gating on them. (task 126)
-function runBuyNode(story, node) {
+function runBuyNode(story, node, chooser = null) {
   const quantity = node.getAttribute('quantity') ? Math.max(1, parseInt(node.getAttribute('quantity'), 10) || 1) : 1;
   const opts = buyOptions(node, story.state); // the shared buy-node parse (task 152)
-  for (let k = 0; k < quantity; k++) { if (!applyInlineBuy(story.state, opts).ok) break; }
+  // `chooser` names the vessel a bundled cargo/crew buy changes (task 342). It answers for
+  // EVERY unit a quantity>1 buy loads, which is right for the corpus's only bundled cargo buys
+  // (§4.622's three salvage groups, quantity="1" each): one question per group action, which is
+  // the same budget groupBundledChoice gives the forfeit and ability pickers.
+  const bag = chooser ? { ...opts, chooser } : opts;
+  for (let k = 0; k < quantity; k++) { if (!applyInlineBuy(story.state, bag).ok) break; }
 }
 
 // ---- passive effects --------------------------------------------------------
@@ -753,6 +770,43 @@ function showAfflictionPicker(story, container, node, commit) {
     box.appendChild(b);
   });
   container.appendChild(box);
+}
+
+// Reveal a "which ship?" picker when a cargo buy, a crew upgrade or a cargo sale has more than
+// one eligible local vessel, so the hull the player names is the one that changes — the
+// reference model's "You have multiple ships … docked here. Select one." Exported because
+// render-market's three transaction widgets ask it too; it lives here with the other three
+// pickers, and render-market already imports from this module, so the dependency runs the way
+// it already ran (task 163's no-cycle rule). Nothing is charged, loaded or unloaded until a
+// button here is clicked: every caller hands its whole transaction over as `commit`, exactly as
+// showForfeitPicker's do. `prompt` names the decision, because the questions are not
+// interchangeable — which hold takes the cargo, which crew is upgraded, which hold gives a Unit
+// up. (task 342)
+export function showVesselPicker(story, anchorEl, plan, commit, prompt = 'Which ship?') {
+  const box = document.createElement('div');
+  box.className = 'ship-choice vessel-choice';
+  box.appendChild(document.createTextNode(prompt + ' '));
+  plan.candidates.forEach((ship) => {
+    const b = document.createElement('button');
+    b.className = 'btn-mini';
+    b.textContent = vesselLabel(ship);
+    b.addEventListener('click', () => commit(() => [ship]));
+    box.appendChild(b);
+  });
+  const parent = anchorEl.parentNode || anchorEl;
+  parent.insertBefore(box, anchorEl.nextSibling);
+  return box;
+}
+
+// Enough identity to choose safely: the hull, the name the player gave it, its crew grade, and
+// what the hold holds with the space left over — the three facts any of the questions can turn
+// on. A ship still called "Ship" contributes no name.
+function vesselLabel(ship) {
+  const named = ship.name && ship.name !== 'Ship' ? ` "${ship.name}"` : '';
+  const load = (ship.cargo || []).length ? ship.cargo.map((c) => titleCase(c)).join(', ') : 'empty';
+  const free = Math.max(0, shipCapacity(ship.type) - (ship.cargo || []).length);
+  const crew = ship.crew ? `${titleCase(ship.crew)} crew` : 'no crew';
+  return `${titleCase(ship.type)}${named} — ${crew}, ${load} (${free} free)`;
 }
 
 // Render a force="f" optional effect as a once-per-visit opt-in button (task 74). When
