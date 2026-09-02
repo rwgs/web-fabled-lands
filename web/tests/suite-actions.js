@@ -5538,6 +5538,162 @@ export async function run(ctx) {
          generic272.join(' '));
     }
 
+    // --- task 341: a limit="N" transfer collects N picks before anything moves ---------------
+    // transferPlan reports needChoice when more non-identical movers qualify than the limit, and
+    // applyTransfer calls the chooser with (movers, limit, 'transfer') — an N-selection contract.
+    // renderTransfer answered it with `chooser: () => [chosen]`, one item, then wrote the xfer@
+    // memo and rerendered the action done: for limit="2" one item moved and the rest could never
+    // be picked. Latent in the shipped corpus (all three explicit limits are 1), which is why the
+    // census control below is part of the fix rather than decoration.
+    {
+      const mk341 = (xml, items, book = 2) => {
+        const g = GameState.create({ name: 'T341', gender: 'f', profession: 'Warrior', book, adv });
+        g.data.items = items;
+        g.ephemeral = true;
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate(){}, onDeath(){}, notify(){} });
+        st.begin(parse(`<section name="X341">${xml}</section>`), book, 'X341');
+        return { g, c, st };
+      };
+      const three341 = () => [makeItem('item', 'rope'), makeItem('item', 'lantern'), makeItem('item', 'brass key')];
+      const picks341 = (c) => Array.from(c.querySelectorAll('.ability-choice .ability-pick'));
+      const stash341 = (g) => g.cacheItems('X.341').map((i) => i.name).sort().join(',');
+
+      // The DOM-free contract first: the chooser is handed the movers and the limit, and every
+      // item it names moves. This is what the view has to satisfy.
+      {
+        const g = GameState.create({ name: 'T341a', gender: 'f', profession: 'Warrior', book: 2, adv });
+        g.ephemeral = true;
+        g.data.items = three341();
+        let sawLimit = null, sawCount = null, sawKind = null;
+        eng.applyEffect(parse('<transfer item="?" limit="2" to="X.341"/>'), g, {
+          chooser: (cands, limit, kind) => {
+            sawCount = cands.length; sawLimit = limit; sawKind = kind;
+            return [cands.find((i) => i.name === 'lantern'), cands.find((i) => i.name === 'brass key')];
+          },
+        });
+        ok('task341: applyTransfer asks for the LIMIT, offering every mover',
+           sawCount === 3 && sawLimit === 2 && sawKind === 'transfer', `n=${sawCount} limit=${sawLimit} kind=${sawKind}`);
+        ok('task341: and moves every item the chooser names, not just the first',
+           stash341(g) === 'brass key,lantern' && g.data.items.length === 1 && g.data.items[0].name === 'rope',
+           `stash=${stash341(g)} kept=${g.data.items.map((i) => i.name).join(',')}`);
+      }
+
+      // The rendered limit="2" regression: the picker collects two, moves nothing until the
+      // second lands, and then moves exactly the two named.
+      {
+        const e = mk341('<transfer item="?" limit="2" to="X.341">Hand over two things</transfer>', three341());
+        ok('task341: a limit="2" transfer offers a pick per mover and counts up',
+           picks341(e.c).length === 3 && /1 of 2 chosen|Hand over two things/.test(e.c.textContent),
+           picks341(e.c).map((b) => b.textContent).join('|'));
+        picks341(e.c).find((b) => /lantern/.test(b.textContent)).click();
+        ok('task341: after ONE pick nothing has moved and the action is not done',
+           e.g.cacheItems('X.341').length === 0 && e.g.data.items.length === 3
+           && ![...e.st.ctx.applied].some((k) => k.startsWith('xfer@')),
+           `stash=${e.g.cacheItems('X.341').length} carried=${e.g.data.items.length}`);
+        const remaining = picks341(e.c);
+        ok('task341: the picker strikes the taken choice off and reports the running tally',
+           remaining.length === 2 && !remaining.some((b) => /lantern/.test(b.textContent))
+           && /1 of 2 chosen/.test(e.c.textContent),
+           remaining.map((b) => b.textContent).join('|') + ' :: ' + e.c.textContent.replace(/\s+/g, ' ').slice(0, 80));
+        remaining.find((b) => /brass key/.test(b.textContent)).click();
+        ok('task341: the second pick commits the WHOLE transfer — both named items move, once',
+           stash341(e.g) === 'brass key,lantern' && e.g.data.items.length === 1
+           && e.g.data.items[0].name === 'rope',
+           `stash=${stash341(e.g)} kept=${e.g.data.items.map((i) => i.name).join(',')}`);
+        ok('task341: and the action is then done, with no picker left standing',
+           picks341(e.c).length === 0 && !!Array.from(e.c.querySelectorAll('.pay-action')).find((b) => b.disabled),
+           `picks=${picks341(e.c).length}`);
+      }
+      // Abandoning the picker changes nothing, and the forced gate stays up while it is open —
+      // which is what lets an incomplete answer be harmless.
+      {
+        const e = mk341('<transfer item="?" limit="2" to="X.341">Hand over two things</transfer><goto section="9"/>', three341());
+        ok('task341: an open limit="2" picker holds the forced transfer gate and the onward exit',
+           e.st.pendingTransfer === true
+           && Array.from(e.c.querySelectorAll('.goto')).every((b) => b.disabled),
+           `pending=${e.st.pendingTransfer}`);
+        picks341(e.c).find((b) => /rope/.test(b.textContent)).click();
+        ok('task341: one pick of two leaves the sheet, the stash and the gate exactly as they were',
+           e.g.data.items.length === 3 && e.g.cacheItems('X.341').length === 0
+           && e.st.pendingTransfer === true,
+           `carried=${e.g.data.items.length} stash=${e.g.cacheItems('X.341').length}`);
+      }
+      // A priced limit="2" keeps its flag clear until the last pick, so a half-answered
+      // transfer cannot open the reward it pays for.
+      {
+        const e = mk341('<transfer item="?" limit="2" price="p341" to="X.341">Hand over two</transfer>'
+          + '<gain shards="10" flag="p341">10 Shards</gain>', three341());
+        picks341(e.c).find((b) => /rope/.test(b.textContent)).click();
+        ok('task341: a priced limit="2" transfer leaves its price flag clear after one pick',
+           e.g.getFlag('p341') === false && e.g.cacheItems('X.341').length === 0,
+           `flag=${e.g.getFlag('p341')}`);
+        picks341(e.c).find((b) => /lantern/.test(b.textContent)).click();
+        ok('task341: …and sets it once the whole transfer commits',
+           e.g.getFlag('p341') === true && stash341(e.g) === 'lantern,rope',
+           `flag=${e.g.getFlag('p341')} stash=${stash341(e.g)}`);
+      }
+      // The fast paths step 3 protects. limit="1" is still ONE click (this is the shape all
+      // three shipped sections use); identical movers ask nothing; and exactly-N movers move
+      // without a question because needChoice wants strictly more than the limit.
+      {
+        const one = mk341('<transfer item="?" limit="1" to="X.341">Hand one over</transfer>', three341());
+        ok('task341: limit="1" still commits on the first click, with no running tally',
+           picks341(one.c).length === 3 && !/chosen/.test(one.c.textContent));
+        picks341(one.c).find((b) => /lantern/.test(b.textContent)).click();
+        ok('task341: limit="1" moves exactly the one named', stash341(one.g) === 'lantern' && one.g.data.items.length === 2);
+
+        const same = mk341('<transfer item="?" limit="2" to="X.341">Two ropes</transfer>',
+          [makeItem('item', 'rope'), makeItem('item', 'rope'), makeItem('item', 'rope')]);
+        ok('task341: interchangeable movers are not asked about (needChoice false)',
+           picks341(same.c).length === 0 && !!Array.from(same.c.querySelectorAll('.pay-action')).find((b) => !b.disabled));
+        const exact = mk341('<transfer item="?" limit="3" to="X.341">All three</transfer>', three341());
+        ok('task341: exactly-N movers move on one click, no picker',
+           picks341(exact.c).length === 0
+           && (Array.from(exact.c.querySelectorAll('.pay-action')).find((b) => !b.disabled).click(),
+               stash341(exact.g) === 'brass key,lantern,rope'),
+           `stash=${stash341(exact.g)}`);
+      }
+      // The three shipped limit sections, driven: each is limit="1" and each moves one thing.
+      {
+        for (const [book, section, sel] of [[2, '105', 'item'], [4, '456', 'item'], [6, '635', 'weapon']]) {
+          const g = GameState.create({ name: 'T341s', gender: 'f', profession: 'Warrior', book, adv });
+          g.ephemeral = true;
+          g.data.shards = 0; // §2.105 takes money first when there is any, §4.456 needs none
+          g.data.items = [makeItem(sel === 'weapon' ? 'weapon' : 'item', 'first thing', 1),
+                          makeItem(sel === 'weapon' ? 'weapon' : 'item', 'second thing', 1)];
+          const c = document.createElement('div');
+          const st = new Story(c, g, { navigate(){}, onDeath(){}, notify(){} });
+          g.goTo(book, section);
+          st.begin(await data.getSection(book, section), book, section);
+          const picks = picks341(c);
+          ok(`task341: §${book}.${section} (limit="1") offers a pick per candidate and no tally`,
+             picks.length === 2 && !/chosen/.test(c.textContent), `picks=${picks.length}`);
+          picks.find((b) => /second thing/.test(b.textContent)).click();
+          ok(`task341: §${book}.${section} moves the ONE named possession`,
+             g.findItems('second thing').length === 0 && g.findItems('first thing').length === 1,
+             g.data.items.map((i) => i.name).join(','));
+        }
+      }
+      // The census the filing rests on, so a new limit>1 node makes this assertion — and the
+      // interaction above — the live description rather than a latent one. (task 270's rule:
+      // measure the SHIPPED corpus, and say which set was measured.)
+      {
+        const limits341 = [];
+        for (const b of data.availableBooks()) {
+          const raw = await rawSections(b);
+          for (const key of Object.keys(raw)) {
+            for (const m of raw[key].matchAll(/<transfer\b[^>]*>/gi)) {
+              const lim = m[0].match(/\blimit\s*=\s*"([^"]*)"/i);
+              if (lim) limits341.push(`${b}/${key}=${lim[1]}`);
+            }
+          }
+        }
+        ok('task341: the shipped corpus carries exactly three explicit transfer limits, all 1',
+           limits341.sort().join(' ') === '2/105=1 4/456=1 6/635=1', limits341.join(' '));
+      }
+    }
+
     // --- task 285: an open <lose blessing="?"> must ask WHICH blessing leaves ---
     // applyLose has taken a chooser for this since task 76 and no view ever supplied one, so it
     // fell back to state.data.blessings[0] — append order, i.e. the blessing held LONGEST. §4.641

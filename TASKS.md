@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-350 appears below: 207 and 326 are withdrawn as misdiagnoses, 341, 344 and
-346-350 are open, and all others are complete (see the Review log). File new
+350 appears below: 207 and 326 are withdrawn as misdiagnoses, 344 and 346-350
+are open, and all others are complete (see the Review log). File new
 work under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 341. A visible `<transfer limit="N">` with more than N non-identical candidates offers one-item buttons and marks the action done after one pick, even though the DOM-free chooser contract asks for N selections
 - [ ] 344. The build copy passes never remove a generated map/illustration whose source was deleted or renamed; for illustrations the reconciler then mistakes the orphan for a manual drop-in, so clean-rebuild CI green-lights an asset the source tree no longer ships
 - [ ] 346. The repository-root `index.html` redirects with `location.replace('web/')` and drops `?demo=`/`?seed=`, so advertised deep links fail when opened at the canonical root instead of an already-`/web/` URL
 - [ ] 347. The Adventure Sheet hides only internal codewords shaped like `1.10.1`, so slash-scoped and named engine flags such as `5/520`, `5.Aku.leaving`, `StillInYellowport` and `HydraDamage` are displayed to the player as printed codewords
@@ -383,45 +382,7 @@ this order.*
 - [x] 337. book 1 section 460 was the corpus's only prose difference from the import: task 262 replaced the invented `codeword="1.Skabb"` guard correctly but split the printed "codeword *Acid* or a **copper amulet**" into two sentences, on the mistaken belief that `codeword=` and `item=` on one `<if>` are AND'd — `evaluateCondition` documents and implements them as disjuncts, so one `<if>` states the OR and the author's sentence stands
 - [x] 338. task 325's codeword-value gate lower-cased both sides of the lookup, so `codeword="anchor"` passed against the declared `Anchor` while `GameState.hasCodeword` and JaFL's `Codewords` (Java `Properties`) both compare case-sensitively — an award under one key and a test under another, leaving a branch that never opens and no diagnostic; the dictionaries are now explicitly ORDINAL, because a plain PowerShell `@{}` folds case and dropping the `ToLowerInvariant()` alone would have changed nothing
 - [x] 339. six living documents still carried pre-task-324/327 claims: `ROADMAP.md` said nothing under `build/` reads `book.ini` and treated it as no precedent, `docs/The-Books.md`'s folder sketch contradicted its own paragraph fifteen lines later, `README.md` and `docs/Build-Pipeline.md` collapsed the two codeword-note grades into one and `README.md` called the intentionally renamed Java reference tree UNTOUCHED, `docs/Corpus-Census.md` printed the shipped-section regex without its end anchor, and `CHANGELOG.md` had no entry for task 324's player-visible map captions
-
----
-
-## 341. A multi-item transfer collects only one selection
-
-**Priority: LOW.** The selector contract is implemented incorrectly for `limit>1`, but all
-three explicit `limit=` transfers in the six published books use `limit="1"`; this is latent
-until new markup uses a larger limit.
-
-### What is wrong
-
-`transferPlan` in `web/js/engine.js` reports `needChoice` when more non-identical movers
-qualify than the effective limit, and `applyTransfer` calls a chooser with
-`(candidates, limit, 'transfer')`. That is an N-selection contract.
-
-`renderTransfer` in `web/js/render-market.js` renders one button per candidate and commits
-immediately with `chooser: () => [chosen]`. `applyTransfer` receives one item even when the
-limit is 2 or 3, then the view adds the transfer memo and rerenders it as done. The remaining
-required items can never be selected. The current corpus does not expose it: book 2 section
-105, book 4 section 456 and book 6 section 635 are the only explicit-limit transfers, and
-all three say 1.
-
-### Steps
-
-1. For a non-identical `limit=N` transfer, collect N distinct candidates before applying any
-   state change. Reuse the fixed-count forfeit collector's small interaction pattern rather
-   than inventing a second multi-select framework.
-2. Keep the forced transfer gate standing and the price flag clear until the final required
-   choice commits the whole transfer. Cancelling or leaving the picker incomplete changes
-   nothing.
-3. Preserve the current fast paths: `limit=1` remains a one-click choice; identical movers
-   need no question; fewer than or exactly N candidates move as the current plan specifies.
-4. Add a DOM-free chooser test and a rendered `limit="2"` mixed-item regression, plus controls
-   for the three shipped limit-1 sections.
-
-### Validation
-
-Run the focused economy/actions suites, the DOM-free import check and the full browser suite.
-The shipped-corpus census must still report exactly three explicit transfer limits, all 1.
+- [x] 341. `renderTransfer` answered `applyTransfer`'s N-selection chooser with `chooser: () => [chosen]`, one item, then wrote the `xfer@` memo and rerendered the action done — so a `limit="2"` transfer moved one thing and the rest could never be picked; the picker now collects the whole limit through the same fixed-count collector the possession forfeit uses, and nothing moves, no memo is written and no price flag is set until the last pick lands
 
 ---
 
@@ -702,6 +663,29 @@ change (task 199) and rebuild the bundled data.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 341): closed **341**, filed nothing. `renderTransfer`'s picker collects
+the whole `limit=` before committing, through the fixed-count collector task 226/228 already
+wrote for the possession forfeit — **extracted rather than copied**, which is what step 1 asked
+for and is the only structural decision in the pass. The two callers differ in their candidate
+shape, their markup classes and how they word a running tally, so the shared `collectPicks`
+takes those as options; the alternative was a second multi-select framework, and the repo would
+then have had two places where "nothing moves until the last pick" has to stay true.
+**Every existing assertion had to keep passing untouched, and that was the constraint that
+shaped the extraction.** The transfer picker's `.ability-choice`/`.ability-pick` classes, its
+inline `<span>` and its author-written `<span class="fx">` lead are asserted by four earlier
+tasks' tests (107, 259, 272, 285), so the collector reproduces each caller's existing DOM
+exactly rather than unifying it — for a `limit="1"` action the output is byte-identical and the
+click still commits immediately, which is the shape all three shipped sections use. The full
+suite passing unchanged before a single new assertion was written is the evidence that held.
+Three of the 22 new assertions fail against the pre-fix commit, confirmed by reverting only the
+collector's `count` to 1: `stash=1 carried=2` after one pick of two, the action captioned
+`☑ Hand over two things`, and then a FATAL where the test reaches for a picker that is no longer
+on the page — which is the defect's own shape, not a test artefact. The corpus census is part of
+the fix rather than decoration: all three explicit limits are `1` today, so the interaction is
+latent, and an assertion naming `2/105=1 4/456=1 6/635=1` is what turns a future `limit="2"`
+node into a failing test rather than a silent under-move. No changelog entry, because a latent
+fix changes nothing a player can see.
 
 Worked 2026-09-02 (task 339): closed **339**, filed nothing. Six documents corrected, no
 generated file touched, both stamps "already at". The corrections themselves are what the

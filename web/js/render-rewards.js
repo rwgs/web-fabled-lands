@@ -716,24 +716,47 @@ function renderOptionalPay(story, container, node, path, key) {
 // as INDICES, so two identical candidates (cargo Units of the same good) stay distinct.
 // (tasks 117, 226, 228)
 function showForfeitPicker(story, container, plan, commit) {
-  const box = document.createElement('div');
-  box.className = 'ship-choice forfeit-choice';
+  collectPicks(container, {
+    candidates: plan.candidates,
+    count: plan.count,
+    label: (cand) => (plan.kind === 'cargo' ? String(cand)
+      : cand.name + (cand.bonus ? ` (${cand.bonus >= 0 ? '+' : ''}${cand.bonus})` : '')),
+    heading: (n) => (plan.count > 1 ? `Give up which? (${n} of ${plan.count} chosen) ` : 'Give up which? '),
+  }, commit);
+}
+
+// The fixed-count collector both multi-select pickers are built on: collect exactly `count`
+// distinct picks, striking each choice off the remaining buttons and counting up as it goes,
+// then commit ONCE with a chooser naming them all. Nothing is applied until the last pick
+// lands, so an abandoned or incomplete picker changes nothing — which is what lets a caller
+// leave its own gate standing and its price flag clear while the question is open.
+//
+// Choices are held as INDICES, so two identical candidates (cargo Units of the same good, two
+// copies of one item) stay distinct. `heading` is a function of the count so far rather than a
+// string, because the two callers word the running tally differently; `lead` lets a caller
+// prepend its own element (the transfer's author-written label); `boxClass`/`pickClass`/
+// `inline` keep each caller's existing markup, since both are already asserted against.
+// Extracted rather than copied for task 341, which needed the same interaction over a
+// different candidate shape. (tasks 226/228 + 341)
+export function collectPicks(container, opts, commit) {
+  const { candidates, count, label, heading = null, lead = null,
+    boxClass = 'ship-choice forfeit-choice', pickClass = 'btn-mini', inline = false } = opts;
+  const box = document.createElement(inline ? 'span' : 'div');
+  box.className = boxClass;
   const chosen = [];
-  const label = (cand) => (plan.kind === 'cargo' ? String(cand)
-    : cand.name + (cand.bonus ? ` (${cand.bonus >= 0 ? '+' : ''}${cand.bonus})` : ''));
   const draw = () => {
     box.textContent = '';
-    box.appendChild(document.createTextNode(plan.count > 1
-      ? `Give up which? (${chosen.length} of ${plan.count} chosen) `
-      : 'Give up which? '));
-    plan.candidates.forEach((cand, i) => {
+    if (lead) { const el = lead(); if (el) box.appendChild(el); }
+    const head = heading ? heading(chosen.length) : '';
+    if (head) box.appendChild(document.createTextNode(head));
+    candidates.forEach((cand, i) => {
       if (chosen.includes(i)) return;
       const b = document.createElement('button');
-      b.className = 'btn-mini';
+      b.className = pickClass;
       b.textContent = label(cand);
       b.addEventListener('click', () => {
         chosen.push(i);
-        if (chosen.length >= plan.count) commit(() => chosen.map((n) => plan.candidates[n]));
+        if (chosen.length >= count) commit(() => chosen.map((n) => candidates[n]));
         else draw();
       });
       box.appendChild(b);
@@ -741,6 +764,7 @@ function showForfeitPicker(story, container, plan, commit) {
   };
   draw();
   container.appendChild(box);
+  return box;
 }
 
 // Reveal a "which ability?" picker for an open ability spec ("?" / "a|b") a payment is about

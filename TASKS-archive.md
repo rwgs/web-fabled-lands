@@ -16393,3 +16393,84 @@ The dated records were deliberately left alone (step 5): `REVIEW.md`, `TASKS-arc
 this Review log say what was true when written, which is the honest form of a record.
 
 ---
+
+## 341. A multi-item transfer collects only one selection
+
+**Priority: LOW.** The selector contract is implemented incorrectly for `limit>1`, but all
+three explicit `limit=` transfers in the six published books use `limit="1"`; this is latent
+until new markup uses a larger limit.
+
+### What is wrong
+
+`transferPlan` in `web/js/engine.js` reports `needChoice` when more non-identical movers
+qualify than the effective limit, and `applyTransfer` calls a chooser with
+`(candidates, limit, 'transfer')`. That is an N-selection contract.
+
+`renderTransfer` in `web/js/render-market.js` renders one button per candidate and commits
+immediately with `chooser: () => [chosen]`. `applyTransfer` receives one item even when the
+limit is 2 or 3, then the view adds the transfer memo and rerenders it as done. The remaining
+required items can never be selected. The current corpus does not expose it: book 2 section
+105, book 4 section 456 and book 6 section 635 are the only explicit-limit transfers, and
+all three say 1.
+
+### Fix
+
+`collectPicks` in `render-rewards.js` — the fixed-count collector `showForfeitPicker` already
+was, **extracted rather than copied**. It collects exactly `count` distinct picks, striking each
+choice off the remaining buttons and counting up, then commits ONCE with a chooser naming them
+all; choices are held as indices so two identical candidates stay distinct. The two callers
+differ in candidate shape, markup classes and how they word the running tally, so those are
+options (`label`, `heading`, `lead`, `boxClass`, `pickClass`, `inline`). A second multi-select
+framework would have left the repo with two places where "nothing moves until the last pick"
+has to stay true.
+
+`renderTransfer` now passes `count: plan.limit` and hands the engine the chooser itself
+(`{ chooser }`) instead of wrapping one item as `chooser: () => [chosen]`. Since `applyTransfer`
+slices the chooser's own array to the limit, and the `xfer@` memo and the `price=` flag are both
+written by that same commit, a one-item answer to a `limit="2"` action under-moved *and* marked
+the action done.
+
+**The constraint that shaped the extraction was that no existing assertion could change.** The
+transfer picker's `.ability-choice`/`.ability-pick` classes, its inline `<span>` and its
+author-written `<span class="fx">` lead are asserted by tasks 107, 259, 272 and 285, so the
+collector reproduces each caller's existing DOM exactly rather than unifying it. For a
+`limit="1"` action the output is byte-identical and the click still commits immediately — the
+shape all three shipped sections use. The full suite passed unchanged before a single new
+assertion was written, which is the evidence that held.
+
+Step 3's other fast paths need no code: `needChoice` already requires strictly more movers than
+the limit, so identical movers and exactly-N movers both bypass the picker entirely.
+
+### Validation
+
+22 new assertions in `suite-actions`. Three fail against the pre-fix commit, confirmed by
+reverting only the collector's `count` to 1 rather than assumed: `stash=1 carried=2` after one
+pick of two, the action captioned `☑ Hand over two things`, and then a FATAL where the test
+reaches for a picker no longer on the page — the defect's own shape.
+
+- **The DOM-free contract first**, since it is what the view has to satisfy: `applyTransfer`
+  calls the chooser with `(movers, limit, 'transfer')` — measured as `n=3 limit=2
+  kind=transfer` — and moves every item it names.
+- **The rendered `limit="2"` regression**: a pick per mover, nothing moved and no `xfer@` memo
+  after one pick, the taken choice struck off with a `1 of 2 chosen` tally, and the second pick
+  committing exactly the two named items once.
+- **Incomplete is harmless**: one pick of two leaves the sheet, the stash and
+  `story.pendingTransfer` as they were, and the section's onward `<goto>` still disabled.
+- **A priced `limit="2"`** keeps its price flag clear after one pick and sets it only when the
+  whole transfer commits, so a half-answered transfer cannot open the reward it pays for.
+- **The fast paths**: `limit="1"` commits on the first click with no tally; interchangeable
+  movers draw no picker; exactly-N movers move on one click.
+- **The three shipped sections driven** — §2.105, §4.456 and §6.635 — each offering a pick per
+  candidate with no tally and moving the one named possession.
+- **The census**: `2/105=1 4/456=1 6/635=1`, measured over the shipped corpus through
+  `availableBooks()`/`rawSections` (task 270's rule). This is part of the fix, not decoration:
+  it is what turns a future `limit="2"` node into a failing test rather than a silent
+  under-move.
+
+`node web/tests/node-import.mjs` `pass=35 fail=0`. Full browser suite
+`RESULT ALL PASS pass=3158 fail=0` (3136 before). No `books/`/`rules/` change, so
+`stamp-version.ps1` only. No `CHANGELOG.md` entry: a latent fix changes nothing a player can
+see — though the 2026-09-02 heading's build hash was moved to the stamp that now carries the
+session's changes.
+
+---

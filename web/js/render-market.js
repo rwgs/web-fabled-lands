@@ -13,7 +13,7 @@ import { canonCargo } from './rules.js';
 import { modal } from './ui.js';
 import { MARKET_TITLES, titleCase, escapeHtml, itemLabel, bonusSuffix } from './render-util.js';
 import { isChooseOne, isPricedResurrection } from './render-rules.js';
-import { renderChoosableReward, showVesselPicker } from './render-rewards.js';
+import { renderChoosableReward, showVesselPicker, collectPicks } from './render-rewards.js';
 
 export function renderMarket(story, container, node, path) {
   const box = document.createElement('div');
@@ -841,33 +841,42 @@ export function renderTransfer(story, container, node, path) {
   story.appendChildren(label, node, path);
   const text = label.textContent.trim() || 'Transfer';
 
-  const commit = (chosen) => {
+  // `chooser` is the engine's own hook: applyTransfer calls it with (movers, limit, 'transfer')
+  // and moves what it names, up to the limit. The view therefore has to hand back the WHOLE
+  // selection, not one item — for a limit>1 transfer a one-item answer moved one and marked the
+  // action done, so the rest could never be picked (task 341).
+  const commit = (chooser) => {
     // This runs on the CLICK, not during the walk, so the transfer books its own taking at its
     // own node — §2.105's `<if shards="1">` sits above the pickpocket's `<transfer shards="*">`
     // and must keep reading the purse the player walked in with (task 261).
     const mark = story.spendMark();
-    applyEffect(node, story.state, chosen ? { chooser: () => [chosen] } : {});
+    applyEffect(node, story.state, chooser ? { chooser } : {});
     story.noteSpend(path, mark);
     if (price == null) story.ctx.applied.add(memo);
     story.rerender();
   };
   const markPending = () => { if (gate && !done) story.pendingTransfer = true; };
 
-  // A real choice (more qualify than the limit and they are not interchangeable):
-  // one pick button per candidate; clicking transfers that one.
+  // A real choice (more qualify than the limit and they are not interchangeable): a pick button
+  // per candidate. A limit="1" action commits on the click, exactly as before; a limit="N" one
+  // collects N distinct picks first and commits the whole transfer once, because applyTransfer
+  // slices the chooser's own array to the limit and the memo/price flag are written by the same
+  // commit — so answering with one item where the page demands two under-moved and then marked
+  // the action done. Nothing moves and the forced gate stays up until the last pick lands.
+  // (tasks 107 + 341)
   if (!done && plan.needChoice && (price == null || plan.canPay)) {
-    const box = document.createElement('span');
-    box.className = 'ability-choice';
-    const lead = document.createElement('span'); lead.className = 'fx';
-    if (text && text !== 'Transfer') { lead.textContent = text + ': '; box.appendChild(lead); }
-    plan.movers.forEach((it) => {
-      const btn = document.createElement('button');
-      btn.className = 'btn-mini ability-pick';
-      btn.textContent = it.name + (it.bonus ? ` (${it.bonus >= 0 ? '+' : ''}${it.bonus})` : '');
-      btn.addEventListener('click', () => commit(it));
-      box.appendChild(btn);
-    });
-    container.appendChild(box);
+    const box = collectPicks(container, {
+      candidates: plan.movers,
+      count: plan.limit,
+      label: (it) => it.name + (it.bonus ? ` (${it.bonus >= 0 ? '+' : ''}${it.bonus})` : ''),
+      lead: (text && text !== 'Transfer')
+        ? () => { const s = document.createElement('span'); s.className = 'fx'; s.textContent = text + ': '; return s; }
+        : null,
+      heading: (n) => (plan.limit > 1 ? `(${n} of ${plan.limit} chosen) ` : ''),
+      boxClass: 'ability-choice',
+      pickClass: 'btn-mini ability-pick',
+      inline: true,
+    }, commit);
     markPending();
     return box;
   }
