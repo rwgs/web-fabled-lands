@@ -12,6 +12,39 @@ below is the date a set of changes reached players. Nothing here requires the pl
 take any action: saves migrate on load, and the service worker replaces a cached build on
 its own.
 
+## 2026-09-02 - build 26.09.02.02a4b49
+
+- **A healer who promises to cure "poison or disease" now cures poison.** The three arrays
+  behind curses, diseases and poisons never formed one family, so a page that says
+  "cured of a poison or a disease" only ever searched diseases - book 5 section 105 took
+  your 75 Shards and left the poison in place. Every such page now treats the two as one
+  affliction, and an unafflicted character is no longer allowed to pay for a cure with
+  nothing to remove. Book 1 section 338's healer, who "is unable to cure disease", still
+  cannot.
+- **When one cure could take either of two afflictions, you choose which.** Same for
+  "lift a curse" with more than one on the sheet.
+- **A cargo purchase, crew upgrade or cargo trade asks which of your ships changes** when
+  more than one is docked with you. Previously it silently used whichever was first, and a
+  crew upgrade that was perfectly legal on your second ship read as unavailable because
+  only the first was consulted.
+- **Reloading mid-section no longer unlocks the weapon a page has already caught.** Book 6
+  section 135's Mister Dragon snaps the weapon you are *using*; a save and reload between
+  entering and clicking let you swap to a lesser blade and have that one broken instead.
+- **A save taken during a "turn back when you are done" detour remembers which choice you
+  took.** After reloading and returning, that one action is crossed off again, as it is
+  without the reload - book 1 section 220's mission from the high priest and book 5 section
+  721's bank both use this route.
+- **Book 1 section 460 prints the author's sentence again**: "If you have the codeword
+  *Acid* or a **copper amulet**, turn to 327 immediately", where a rules fix had split it
+  into two sentences the book never printed.
+
+## 2026-08-31 - build 26.08.31.f72609a
+
+- **Each regional map is captioned with the map's own title** rather than the volume's, in
+  the Maps modal and in the image's alt text - book 3's map now reads "The Ports &
+  Anchorages of the Violet Ocean" instead of "Over the Blood-Dark Sea". A book that carries
+  no such title still falls back to the volume title.
+
 ## 2026-08-28 - build 26.08.28.ba963ea
 
 - **Checks a section says to make on your natural score no longer read the bonused one.**

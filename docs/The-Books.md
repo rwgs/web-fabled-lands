@@ -62,7 +62,7 @@ books/book1/
   New.xml                     new-character text
   Andriel.xml, Astariel.xml,  the six pregen biographies (names vary per book)
     Chalor.xml, ...
-  book.ini                    inherited metadata - only Codewords= is read (see below)
+  book.ini                    inherited metadata - Codewords= and Map.Title= are read (below)
   Sokara-Map.JPG              the regional map
   book1-cover-large.jpg       cover art
   temp/                       superseded working copies - nothing walks this
@@ -79,7 +79,9 @@ such a file reads as a second copy of a live section.
 
 `book.ini` is inherited from the reference `java-engine/` data format. **Two keys of it are
 live.** `Codewords=` is what `validate-source.ps1` reads as the authority for every `codeword=`
-value in the corpus (task 325 - see [Build Pipeline](Build-Pipeline.md#the-source-xml-gate)).
+value in the corpus (task 325 - see [Build Pipeline](Build-Pipeline.md#the-source-xml-gate)),
+matched on the **exact spelling, case included**, because both rule engines compare codewords
+case-sensitively - so `codeword="anchor"` is not the declared `Anchor` (task 338).
 `Map.Title=` is the caption the build folds into `meta.json` for the Maps modal (task 324, below).
 `Map`, `Death` and `Icon` reach neither the build nor the app.
 

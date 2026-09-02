@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-350 appears below: 207 and 326 are withdrawn as misdiagnoses, 339, 341, 344 and
+350 appears below: 207 and 326 are withdrawn as misdiagnoses, 341, 344 and
 346-350 are open, and all others are complete (see the Review log). File new
 work under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 339. The living docs still repeat pre-task-324/327 claims about `book.ini` and codeword notes, omit task 324 from the player changelog, call the intentionally renamed Java reference tree untouched, and print one shipped-corpus regex without its end anchor
 - [ ] 341. A visible `<transfer limit="N">` with more than N non-identical candidates offers one-item buttons and marks the action done after one pick, even though the DOM-free chooser contract asks for N selections
 - [ ] 344. The build copy passes never remove a generated map/illustration whose source was deleted or renamed; for illustrations the reconciler then mistakes the orphan for a manual drop-in, so clean-rebuild CI green-lights an asset the source tree no longer ships
 - [ ] 346. The repository-root `index.html` redirects with `location.replace('web/')` and drops `?demo=`/`?seed=`, so advertised deep links fail when opened at the canonical root instead of an already-`/web/` URL
@@ -383,53 +382,7 @@ this order.*
 - [x] 342. the economy layer chose the vessel by ARRAY POSITION — `cargoShipWithSpace` took the first local hull with room and `canUpgradeCrew`/`applyInlineBuy` read `currentShip()`, which at a dock is just the first local ship — so a Cargo Unit could fill a hold the player never meant to fill, and a crew upgrade that was legal on the second hull read as "Your crew must be average first" because only the first was consulted
 - [x] 337. book 1 section 460 was the corpus's only prose difference from the import: task 262 replaced the invented `codeword="1.Skabb"` guard correctly but split the printed "codeword *Acid* or a **copper amulet**" into two sentences, on the mistaken belief that `codeword=` and `item=` on one `<if>` are AND'd — `evaluateCondition` documents and implements them as disjuncts, so one `<if>` states the OR and the author's sentence stands
 - [x] 338. task 325's codeword-value gate lower-cased both sides of the lookup, so `codeword="anchor"` passed against the declared `Anchor` while `GameState.hasCodeword` and JaFL's `Codewords` (Java `Properties`) both compare case-sensitively — an award under one key and a test under another, leaving a branch that never opens and no diagnostic; the dictionaries are now explicitly ORDINAL, because a plain PowerShell `@{}` folds case and dropping the `ToLowerInvariant()` alone would have changed nothing
-
----
-
-## 339. Reconcile the living documentation with tasks 239, 324 and 327
-
-**Priority: LOW.** No runtime reads these sentences, but several sit in the documents used
-to plan the next feature or maintain the build. They contradict the current tree and, in
-two cases, contradict another paragraph in the same document.
-
-### What is wrong
-
-- `ROADMAP.md` phase 1 says nothing under `build/` reads `book.ini` and treats it as no
-  precedent. `validate-source.ps1` now reads `Codewords=` (task 325), and
-  `build-data.ps1` reads `Map.Title=` (task 324). `PLAN.md` and `AGENTS.md` already carry the
-  correct distinction: `Map=` remains inert because the filesystem derives it; the other two
-  keys are live because they hold facts the filesystem cannot answer.
-- The folder sketch in `docs/The-Books.md` says "only Codewords= is read", while the detailed
-  paragraph fifteen lines later correctly says **two** keys are live.
-- `README.md` and `docs/Build-Pipeline.md` collapse task 327's reverse codeword report into
-  one note. The build intentionally distinguishes "declared but wholly unreferenced" from
-  "tested or cleared but never awarded"; `AGENTS.md` says those grades must not be collapsed.
-- The bold "one rule" in `docs/Corpus-Census.md` prints `^\d+[a-z]?` without the terminal
-  `$`, although the commands below it and `AGENTS.md` use the actual shipped-section filter
-  `^\d+[a-z]?$`.
-- `README.md` labels `java-engine/` "UNTOUCHED" and says it is left exactly as found. The
-  reference-only rule is correct, but task 239 intentionally renamed `README.txt` to
-  `README.md` and updated `Pack.java`'s matching filename literal; `AGENTS.md` records that
-  narrow exception.
-- `CHANGELOG.md` has no 2026-08-31 entry for task 324's player-visible regional-map captions,
-  although the project keeps this file specifically for player/deployer-visible changes.
-
-### Steps
-
-1. Correct each claim above using the current symbol/key names, with no code line numbers.
-   Keep `Map=` explicitly inert and do not turn the correction into a proposal to read it.
-2. Describe both codeword-note grades and the exact-spelling rule task 338 establishes.
-3. Describe the Java reference tree as read-only with the already-completed rename/packager
-   exception, not as historically byte-identical.
-4. Add the map-caption change to the changelog under its actual deployment date/build.
-5. Sweep the sibling living documents for the same exact claims. Do not rewrite dated
-   findings in `REVIEW.md`, `TASKS-archive.md` or the Review log; those are historical records.
-
-### Validation
-
-Check every local Markdown link target, scan the living docs for the retired phrases, and
-run `git diff --check`. This is documentation-only and does not require a data rebuild or
-version stamp; the final diff must not touch generated app files.
+- [x] 339. six living documents still carried pre-task-324/327 claims: `ROADMAP.md` said nothing under `build/` reads `book.ini` and treated it as no precedent, `docs/The-Books.md`'s folder sketch contradicted its own paragraph fifteen lines later, `README.md` and `docs/Build-Pipeline.md` collapsed the two codeword-note grades into one and `README.md` called the intentionally renamed Java reference tree UNTOUCHED, `docs/Corpus-Census.md` printed the shipped-section regex without its end anchor, and `CHANGELOG.md` had no entry for task 324's player-visible map captions
 
 ---
 
@@ -749,6 +702,28 @@ change (task 199) and rebuild the bundled data.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 339): closed **339**, filed nothing. Six documents corrected, no
+generated file touched, both stamps "already at". The corrections themselves are what the
+filing describes and need no retelling; two things about the pass are worth keeping.
+**The `book.ini` correction had to change the claim's SHAPE, not just its truth value.**
+`ROADMAP.md` used "nothing under `build/` reads it" as the *reason* `places.ini` needs its own
+reader — so replacing that clause with "two keys are read" would have removed the argument and
+left the conclusion dangling. It now states the test the live keys pass and `Map=` fails (does
+the key hold something the filesystem cannot answer), which makes `places.ini` a *positive*
+precedent for the same reason `Map.Title=` is, while keeping `Map=` explicitly inert as step 1
+required. `PLAN.md` already had that distinction and needed nothing.
+**Step 4 asked for one changelog entry and the honest answer was two.** Task 324's map captions
+went in under their real build (`26.08.31.f72609a`), as filed — but this session's own four
+player-visible fixes (tasks 340, 342, 343, 345 and 337's restored sentence) were not in the
+changelog either, and adding 324's while omitting them would have reproduced the exact omission
+this task exists to fix. They are filed under the build that carries them,
+`26.09.02.02a4b49`, described in what they mean for a player rather than in task terms.
+The sweep step 5 asks for was run as five greps for the retired phrases and came back empty, and
+every local Markdown link and heading anchor across the 24 living documents was resolved
+mechanically (0 broken). `docs/Contributing.md`, `docs/FAQ-and-Troubleshooting.md` and
+`DECISIONS.md` already described the Java tree correctly as read-only with the documented rename
+exception — only `README.md` claimed it was byte-identical.
 
 Worked 2026-09-02 (task 338): closed **338**, filed nothing. The codeword authority and the
 `codeword=` value lookup now compare the **exact** spelling: three ordinal

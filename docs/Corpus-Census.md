@@ -13,7 +13,7 @@ re-checked rather than trusted.
 
 ## The one rule
 
-> The shipped corpus is the **`^\d+[a-z]?` basenames of the published books only**.
+> The shipped corpus is the **`^\d+[a-z]?$` basenames of the published books only**.
 
 That is 4,369 files today, because it is exactly the filter `build-data.ps1` bundles and
 `validate-source.ps1` checks, and it is what `data.loadBook` and `availableBooks()` can

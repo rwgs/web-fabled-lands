@@ -79,12 +79,16 @@ as they do now.
 - A gazetteer source file per book — `books/book<N>/places.ini`, sitting beside the
   book's existing `book.ini` — mapping a place name to `x,y` as **percentages** of
   the map image. Phase 1 only needs the entries for that book's dock names.
-  **`book.ini` is not a precedent to copy:** nothing under `build/` reads it, and
-  its `Map=` key is inert — the build picks each regional map by the `-Map$`
-  basename pattern instead, which is why book 3's `Map=Violet Ocean.JPG` names a
-  file that does not exist while `VioletOcean-Map.JPG` is what ships. So
-  `places.ini` needs a reader written for it, and adding one does not make `Map=`
-  live.
+  **`book.ini` is read, but its `Map=` key is not, and the difference is the
+  precedent worth copying.** `validate-source.ps1` parses `Codewords=` (task 325)
+  and `build-data.ps1` reads `Map.Title=` (task 324); `Map=` stays inert because
+  the build picks each regional map by the `-Map$` basename pattern, which is why
+  book 3's `Map=Violet Ocean.JPG` names a file that does not exist while
+  `VioletOcean-Map.JPG` is what ships. The test a live key passes is whether it
+  holds something the filesystem cannot answer — an editorial decision or a piece
+  of prose — and a marker coordinate does, so `places.ini` is the same kind of
+  source as those two. It still needs a reader written for it, and writing one
+  does not make `Map=` live.
 - Build pass-through into **`meta.json`**, not the per-book JSON: the Maps modal is
   reachable from the title screen before any book is loaded (`showTitle`'s Maps
   button, [app.js](web/js/app.js)), so the coordinates must be in the payload that

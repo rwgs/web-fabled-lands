@@ -46,7 +46,7 @@ fabled-lands/
 │   └── books.ini      Book titles + the `Published=` set this build ships
 ├── rules/            Rules.xml, QuickRules.xml
 ├── images/           world-map.jpg (+ icons). General per-section art is NOT included.
-├── java-engine/      The original Java engine (JaFL) — kept for reference, UNTOUCHED
+├── java-engine/      The original Java engine (JaFL) — reference only, never edited
 ├── build/            Build scripts (PowerShell 7 / pwsh)
 │   ├── build-data.ps1  Bundles books/ + rules/ + maps → web/data & web/assets
 │   ├── validate-source.ps1  The source-XML gate the build runs before writing anything
@@ -68,8 +68,12 @@ fabled-lands/
     └── data/          meta.json, book1.json … book6.json   (generated)
 ```
 
-The `java-engine/` Java project is the original work of Jonathan Mann and is left exactly
-as found — it was used only as the reference specification for the game rules.
+The `java-engine/` Java project is the original work of Jonathan Mann and is **reference
+only**: it is never edited, and none of its code is copied — the JS rules are a clean-room
+reimplementation (see [`NOTICE`](NOTICE)). One narrow, deliberate exception exists: task 239
+renamed `README.txt` to `README.md` so it renders on GitHub, and updated the matching filename
+literal in `Pack.java` so the reference packager stays coherent. Nothing else in that tree has
+changed.
 
 ---
 
@@ -151,11 +155,17 @@ only misbehave when the browser renders that section:
   bundled book 1–6 must name a section that book actually contains. Links into the
   unbundled books 7–12 are intentional and left alone, as are non-literal ids.
 - Every **`codeword=` value is a codeword some book declares**, checked against the union of
-  the six `books/book<N>/book.ini` `Codewords=` lists. A misspelling is invisible otherwise —
+  the six `books/book<N>/book.ini` `Codewords=` lists, on the **exact spelling, case
+  included** — both rule engines compare codewords case-sensitively, so `codeword="anchor"`
+  is not the declared `Anchor`. A misspelling is invisible otherwise —
   `<gain codeword="Anchr">` against `<if codeword="Anchor">` builds and renders clean, and the
   branch simply never opens. Section-scoped bookkeeping flags (`2.567.1a`, `5/520`), the
-  port's own named state flags and codewords printed in books 7–12 are exempt. The reverse —
-  a declared codeword no section uses — prints as a **note** and never fails the build.
+  port's own named state flags and codewords printed in books 7–12 are exempt. The reverse
+  direction prints as a **note** and never fails the build, in **two grades that are not the
+  same finding**: a declared codeword *no section mentions at all* (usually nothing to fix —
+  the printed books do list spare names), and one that sections test or clear but no
+  `<gain>`/`<tick>`/`<set>`/`<outcome>` ever gives, which means a transcription dropped an
+  award.
 - Each pregen's **biography is readable** — inline prose, or the `<FirstName>.xml` whose
   first `<p>` the build folds in.
 

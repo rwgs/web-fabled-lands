@@ -113,8 +113,24 @@ is indistinguishable from one the player has not earned, so a typo'd `<gain code
 leaves its `<if codeword="Anchor">` shut for the whole game. Three shapes are legitimately
 absent from those lists and exempt: section-scoped bookkeeping flags (`2.567.1a`, `5/520`),
 the port's own named state flags (`StillInYellowport`), and codewords printed in the
-unpublished books 7-12 (`Hill`, `Judas`). The reverse direction is reported as a **note**
-rather than a failure - the printed books really do list a codeword they never use.
+unpublished books 7-12 (`Hill`, `Judas`).
+
+The match is on the **exact spelling, case included**. `GameState.hasCodeword` uses ordinary
+object keys and the reference engine's `Codewords` uses Java `Properties` keys, so a
+`<gain codeword="anchor">` never satisfies an `<if codeword="Anchor">` - the same shut branch
+by a different typo. The gate's dictionaries are explicitly **ordinal** for this: a plain
+PowerShell hashtable folds case, so the fold cannot be removed by deleting a
+`ToLowerInvariant()` alone (task 338).
+
+The reverse direction is reported as a **note** rather than a failure, in **two grades that
+must not be collapsed**:
+
+- a declared codeword **no section mentions at all** - usually nothing to fix, since the
+  printed books really do list codewords they never use;
+- one that sections **test or clear but no `<gain>`/`<tick>`/`<set>`/`<outcome>` ever gives**,
+  which is the shape a dropped award leaves behind and is worth reading as a defect. Only
+  those four tags mark a codeword awarded; `if`, `elseif`, `lose` and `adjust` mark it merely
+  seen, and counting those as use is what hid book 2's `Beach` and `Bilge` (task 327).
 
 ---
 

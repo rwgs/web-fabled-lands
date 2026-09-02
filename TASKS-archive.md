@@ -16306,3 +16306,90 @@ why both engines require it, and the `@{}` trap — since that is the maintained
 documentation the gate's contract belongs in. The wider living-docs sweep remains task 339.
 
 ---
+
+## 339. Reconcile the living documentation with tasks 239, 324 and 327
+
+**Priority: LOW.** No runtime reads these sentences, but several sit in the documents used
+to plan the next feature or maintain the build. They contradict the current tree and, in
+two cases, contradict another paragraph in the same document.
+
+### What is wrong
+
+- `ROADMAP.md` phase 1 says nothing under `build/` reads `book.ini` and treats it as no
+  precedent. `validate-source.ps1` now reads `Codewords=` (task 325), and
+  `build-data.ps1` reads `Map.Title=` (task 324). `PLAN.md` and `AGENTS.md` already carry the
+  correct distinction: `Map=` remains inert because the filesystem derives it; the other two
+  keys are live because they hold facts the filesystem cannot answer.
+- The folder sketch in `docs/The-Books.md` says "only Codewords= is read", while the detailed
+  paragraph fifteen lines later correctly says **two** keys are live.
+- `README.md` and `docs/Build-Pipeline.md` collapse task 327's reverse codeword report into
+  one note. The build intentionally distinguishes "declared but wholly unreferenced" from
+  "tested or cleared but never awarded"; `AGENTS.md` says those grades must not be collapsed.
+- The bold "one rule" in `docs/Corpus-Census.md` prints `^\d+[a-z]?` without the terminal
+  `$`, although the commands below it and `AGENTS.md` use the actual shipped-section filter
+  `^\d+[a-z]?$`.
+- `README.md` labels `java-engine/` "UNTOUCHED" and says it is left exactly as found. The
+  reference-only rule is correct, but task 239 intentionally renamed `README.txt` to
+  `README.md` and updated `Pack.java`'s matching filename literal; `AGENTS.md` records that
+  narrow exception.
+- `CHANGELOG.md` has no 2026-08-31 entry for task 324's player-visible regional-map captions,
+  although the project keeps this file specifically for player/deployer-visible changes.
+
+### Fix
+
+Six documents, no generated file touched:
+
+- **`ROADMAP.md`** phase 1 — the claim had to change SHAPE, not just truth value. "Nothing
+  under `build/` reads it" was the *reason* `places.ini` needs its own reader, so simply
+  correcting it to "two keys are read" would have removed the argument and left the conclusion
+  dangling. It now states the test a live key passes — does it hold something the filesystem
+  cannot answer — which makes `places.ini` a **positive** precedent for the same reason
+  `Map.Title=` is, while keeping `Map=` explicitly inert with book 3's evidence intact.
+  `PLAN.md` already carried that distinction and needed nothing.
+- **`docs/The-Books.md`** — the folder sketch says `Codewords=` and `Map.Title=` are read,
+  agreeing with its own paragraph fifteen lines below, which now also carries task 338's
+  exact-spelling rule.
+- **`README.md`** and **`docs/Build-Pipeline.md`** — the reverse codeword report is described
+  in its **two grades** (declared-and-unmentioned, versus tested-or-cleared-but-never-awarded,
+  with the four award tags named), plus the exact-spelling rule and, in `Build-Pipeline.md`, the
+  ordinal-dictionary reason a `ToLowerInvariant()` could not simply be deleted.
+- **`README.md`** — `java-engine/` is "reference only, never edited" rather than "UNTOUCHED",
+  with task 239's narrow rename exception (`README.txt` → `README.md` plus `Pack.java`'s
+  matching literal) stated rather than implied. `docs/Contributing.md`,
+  `docs/FAQ-and-Troubleshooting.md` and `DECISIONS.md` already described it correctly.
+- **`docs/Corpus-Census.md`** — the bold "one rule" prints `^\d+[a-z]?$`, matching the commands
+  below it and `AGENTS.md`.
+- **`CHANGELOG.md`** — see below.
+
+**Step 4 asked for one entry and the honest answer was two.** Task 324's map captions went in
+under their real build (`2026-08-31`, `26.08.31.f72609a`), as filed. But the four
+player-visible fixes from this same session — the disease/poison family cure and its picker
+(343), the which-ship question (342), the equipment lock surviving a reload (345), the saved
+return detour remembering its choice (340) and §1.460's restored sentence (337) — were not in
+the changelog either. Adding 324's while omitting those would have reproduced the exact omission
+this task exists to fix, so they are filed under the build that carries them,
+`26.09.02.02a4b49`, written in what they mean for a player rather than in task terms.
+
+No code line numbers were introduced anywhere; every reference is a symbol, key or attribute
+name, per `AGENTS.md`'s citation rule.
+
+### Validation
+
+- **Retired phrases**: five greps across every `.md` outside the dated records
+  (`TASKS.md`/`TASKS-archive.md`/`REVIEW.md`) for "only Codewords= is read", "nothing under
+  `build/` reads", "UNTOUCHED", "left exactly" and the unanchored `^\d+[a-z]?` — all empty.
+- **Links**: every local Markdown link target across the 24 living documents resolved
+  mechanically — **0 broken** — and every heading anchor a link points at exists in its target
+  file (**0 broken**).
+- **The claims' siblings**: swept for `Map=`, `java-engine` and the codeword-note wording. Only
+  `README.md` misdescribed the Java tree; `PLAN.md`'s `Map=` paragraph, `AGENTS.md`'s and
+  `docs/The-Books.md`'s were already right.
+- `git diff --check` clean, and the diff touches **no generated app file** — both
+  `stamp-version.ps1` lines report "already at", which is the documentation-only property the
+  filing required. Full browser suite `RESULT ALL PASS pass=3136 fail=0` as a control that
+  nothing else moved.
+
+The dated records were deliberately left alone (step 5): `REVIEW.md`, `TASKS-archive.md` and
+this Review log say what was true when written, which is the honest form of a record.
+
+---
