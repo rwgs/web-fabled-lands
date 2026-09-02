@@ -3,10 +3,10 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-349 appears below: 207 and 326 are withdrawn as misdiagnoses, 337-339 and
-341-349 are open, and all others are complete (see the Review log). File new
-work under the priority bucket that fits, and record the pass in the Review
-log. Completed detail sections are archived in
+349 appears below: 207 and 326 are withdrawn as misdiagnoses, 337-339,
+341-344 and 346-349 are open, and all others are complete (see the Review
+log). File new work under the priority bucket that fits, and record the pass
+in the Review log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
 
@@ -20,7 +20,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 345. Mid-visit save/load restores the memo for `<tick special="weaponlock|armourlock">` but not the transient equipment lock itself, so section 6.135 can reload unlocked and let the player swap which weapon Mister Dragon breaks
 - [ ] 343. JaFL matches disease and poison as one affliction family, but a web `<lose disease="?"|"*">` only searches diseases, so shipped “poison or disease” cures can refuse or charge a poisoned player and leave the poison in place; open cures also take the first match without asking
 - [ ] 342. Cargo purchases, crew upgrades and inline cargo barters silently use the first local ship when several are docked together, while JaFL requires the player to select which vessel changes
 - [ ] 337. Book 1 section 460 rewrites the printed "codeword Acid or a copper amulet" sentence as two separate sentences instead of changing markup only
@@ -382,6 +381,7 @@ this order.*
 - [x] 335. `books/book1/book.ini` declares **35** of the **36** codewords printed on book 1's own codeword list, omitting `Auric` — and annotates the two it carries out of alphabetical order, `Aloft` and `Altitude`, as "printed on no inside front cover" when both are printed, in alphabetical position; task 325 made that list the authority every book's `codeword=` **value** is checked against, and the check is a union because a codeword may be *tested* in any of the six, so a name the volume prints and its own sections never use still has to be declared
 - [x] 336. the `codeword=` value check splits on `|` alone, but `matchCodewords` in `engine.js` documents and implements "comma => AND, pipe => OR" — and `<gain>`/`<tick>`/`<lose>` split on `[|,]` as well — so the AND form the engine supports reads as one long name and is reported undeclared; no shipped section writes it, which is why a gate that rejects valid markup went unnoticed
 - [x] 340. saving inside a `<return>` detour lost the source `<choice>` because `serializeFrame` named the clicked node by scanning the render memo map `ctx.pathNodes`, which `renderChoices` never writes — it mints a synthetic `.cN` path and calls `renderChoice` directly — so the frame saved `usedSourcePath: null` and the post-reload `<return>` handed the non-`revisit` choice back live; a revealed `<outcome>`'s own `<goto>` failed the mirror way, recorded under a `.oN` path `resolveNodePath` cannot parse
+- [x] 345. `serializeVisit` carried task 156's `fightBonus` snapshot but no equipment-lock snapshot, so a mid-visit reload resumed §6.135 with both slots free while `ctx.applied` still said the hidden `<tick special="weaponlock">` had run — the sheet's Wield controls came back live and `<lose weapon="?" using="t">` broke whichever blade the player had swapped to instead of the one Mister Dragon had already caught
 
 ---
 
@@ -713,47 +713,6 @@ no-op rebuild.
 
 ---
 
-## 345. Equipment locks disappear on an exact-visit resume
-
-**Priority: MEDIUM.** This is live and exploitable in book 6 section 135: save/reload between
-entry and the forced group action lets the player swap away from the weapon the page says
-Mister Dragon has already caught, so a different possession is broken.
-
-### What is wrong
-
-`GameState._equipLock` is deliberately outside persisted `data`, like `_fightBonus`.
-`Story.begin` clears it, then the hidden `<tick special="weaponlock|armourlock">` applies and
-the visit memo records that effect as done. `serializeVisit` carries `fightBonus` (task 156's
-fix) but no equipment-lock snapshot. On load a new `GameState` starts unlocked;
-`Story.resume` restores `ctx.applied`, so the hidden tick does not re-run, and nothing restores
-the missing lock.
-
-The failure is the exact task-156 shape. In book 6 section 135, `weaponlock` is applied on
-entry and the weapon is removed only when the player clicks the forced group action. Reloading
-before that click re-enables the Adventure Sheet's weapon controls, so `using="t"` removes
-whichever weapon the player swaps to. Book 2 section 290 carries the armour-lock twin; its
-current loss resolves during the walk, but it remains the control for the shared mechanism.
-
-### Steps
-
-1. Give `GameState` a small equipment-lock snapshot/restore API, or an equivalent visit-state
-   representation, containing only boolean weapon/armour locks.
-2. Serialize it with the current visit and restore it in `Story.resume` before rendering,
-   beside the existing fight-bonus restore. A fresh `begin` must still clear both locks, and
-   removing the locked possession must still release its own lock.
-3. Coerce a hand-edited snapshot to booleans; unknown keys and non-true values must not lock
-   anything.
-4. Add a full save/sanitize/resume test at section 6.135: the selected weapon stays locked
-   after reload, a swap is refused, and the forced action removes that same weapon. Add the
-   armour twin and fresh-section-release controls.
-
-### Validation
-
-Run the focused inventory/actions suites, the DOM-free import check and the full browser
-suite. Confirm the visit record remains backward-compatible when the new field is absent.
-
----
-
 ## 346. The root redirect discards deep-link query parameters
 
 **Priority: LOW.** Normal play is unaffected, and a URL already under `web/` works. The
@@ -934,6 +893,32 @@ Run the focused engine/combat suites, the DOM-free import check and the full bro
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 345): closed **345**, filed nothing. `equipLockSnapshot`/
+`restoreEquipLocks` on `GameState`, carried by the visit record and restored in `Story.resume`
+and by `resumeStale`'s probe, beside the per-fight bonus task 156 put there — the filing
+identified the shape correctly and the fix is that shape, four call sites and a sanitizer field.
+Nothing needed inventing, which is the point worth recording: **the transient-state-plus-memo
+hazard has a known form and a known remedy, and the remedy is cheap enough that the honest
+question is which other transient fields are still missing.** `GameState` keeps exactly three
+fields off `data` — `_fightBonus`, `_equipLock` and `_undo` — so with this closed, both
+game-meaningful transients are snapshotted and the third is session-only by design (a reload
+starting with an empty undo stack is correct). The near-miss worth naming is
+`clearPotionBonuses`, which `begin` calls alongside `clearEquipLocks` and which looks like the
+same mechanism: it is not. `potionBonus` lives **in** `data`, persisted and sanitized, so it
+is a per-section reset of saved state rather than a transient that a reload could drop.
+The direction the coercion fails matters here and the opposite of the usual choice is right.
+Every other field restored from an untrusted blob fails *closed*; this one fails **open** — only
+a literal `true` locks — because the lock is a gate on the player's own Adventure Sheet
+controls, so the conservative state is the one a fresh entry gives. A crafted save that locks
+its own weapon slot is self-harm, not an exploit.
+Four of the 14 new assertions fail against the pre-fix resume, confirmed by disabling the
+restore rather than assumed: the swap succeeds (`wielded=broadsword`) and the forced group then
+breaks the broadsword while the Jade Defender survives — the exploit the filing describes,
+reproduced exactly. §2.290's armour twin is the useful control because its loss resolves during
+the entry walk, so the lock is already released when the visit is saved: it pins that the
+snapshot records absence as faithfully as presence, which is the same code path a pre-345 save
+takes.
 
 Worked 2026-09-02 (task 340): closed **340**, filed nothing. The saved source-action path now
 comes from `nodePathIn`, which walks a node's real DOM ancestry to the section root, instead of

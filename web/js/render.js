@@ -661,6 +661,10 @@ export class Story {
       // The transient per-fight attack/Defence bonus (task 49) is per-visit state a reload
       // can't re-derive — its granting tick is already memoised — so it rides in the record. (task 156)
       fightBonus: this.state.fightBonusSnapshot(),
+      // The transient weapon/armour lock, for exactly that reason: the granting hidden
+      // <tick special="weaponlock|armourlock"> is already memoised, so without this a reload
+      // resumes §6.135 with the slot free and lets the player choose which weapon breaks. (task 345)
+      equipLock: this.state.equipLockSnapshot(),
       // A durable-consequence move whose target failed (task 169) left the effect applied and
       // armed a "Try again" retry. The retry target lives only on the Story, so persist it here:
       // a reload at the retry screen must restore the retry, not strand the spent consequence
@@ -695,6 +699,11 @@ export class Story {
     // granting <tick special=…> (its fx@ memo is in ctx.applied), so without this a mid-fight
     // reload would resume with the paid bonus gone / the hidden penalty shed. (task 156)
     this.state.restoreFightBonus(record && record.fightBonus);
+    // Same contract for the weapon/armour lock (task 345): the hidden lock tick is memoised
+    // in ctx.applied and will not re-fire, so the record's snapshot is the only thing that can
+    // hold §6.135's slot shut across the reload. Absent (a pre-345 record) means unlocked,
+    // which is what resuming did before.
+    this.state.restoreEquipLocks(record && record.equipLock);
     this._returnFrame = frame || null;
     // Restore a persisted durable-move retry (task 173) BEFORE render(), which checks
     // _pendingRetry first: a reload at the "Try again" screen resumes that screen (the
@@ -728,6 +737,7 @@ export class Story {
     this.ctx = probe.ctx; // memoises every entry effect (nodes are the shared, static section tree)
     this.state.data.vars = { ...probeState.data.vars }; // deterministic entry-written vars
     this.state.restoreFightBonus(probeState.fightBonusSnapshot()); // adopt the entry-derived per-fight bonus (task 156)
+    this.state.restoreEquipLocks(probeState.equipLockSnapshot());   // …and the entry-derived equipment lock (task 345)
     this.sectionTodock = probe.sectionTodock;
     this.deferredCleanups = new Map();
     this.state.setEntryTicks(probeState.entryTickCount());

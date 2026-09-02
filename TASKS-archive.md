@@ -15859,3 +15859,80 @@ suite `RESULT ALL PASS pass=3057 fail=0`; the focused `-Suite actions` run repor
 `stamp-version.ps1` only (`26.09.02.59d9e46`) and no generated data diff.
 
 ---
+
+## 345. Equipment locks disappear on an exact-visit resume
+
+**Priority: MEDIUM.** This is live and exploitable in book 6 section 135: save/reload between
+entry and the forced group action lets the player swap away from the weapon the page says
+Mister Dragon has already caught, so a different possession is broken.
+
+### What is wrong
+
+`GameState._equipLock` is deliberately outside persisted `data`, like `_fightBonus`.
+`Story.begin` clears it, then the hidden `<tick special="weaponlock|armourlock">` applies and
+the visit memo records that effect as done. `serializeVisit` carries `fightBonus` (task 156's
+fix) but no equipment-lock snapshot. On load a new `GameState` starts unlocked;
+`Story.resume` restores `ctx.applied`, so the hidden tick does not re-run, and nothing restores
+the missing lock.
+
+The failure is the exact task-156 shape. In book 6 section 135, `weaponlock` is applied on
+entry and the weapon is removed only when the player clicks the forced group action. Reloading
+before that click re-enables the Adventure Sheet's weapon controls, so `using="t"` removes
+whichever weapon the player swaps to. Book 2 section 290 carries the armour-lock twin; its
+current loss resolves during the walk, but it remains the control for the shared mechanism.
+
+### Fix
+
+`equipLockSnapshot()`/`restoreEquipLocks(snap)` on `GameState`, sitting next to
+`clearEquipLocks` and mirroring `fightBonusSnapshot`/`restoreFightBonus` exactly. The snapshot
+is `null` unless a slot is locked, so an ordinary save gains no field. `Story.serializeVisit`
+writes it as `equipLock`, `sanitizeVisit` carries it through, `Story.resume` restores it beside
+the fight bonus, and `resumeStale` adopts it from the throwaway probe that replays entry — the
+same four seams task 156 used.
+
+The coercion fails **open**, which is the opposite of this codebase's usual choice and is
+deliberate: only a literal `true` locks. Every other field restored from an untrusted blob is
+data the rules read, so the conservative reading is the strict one; this field gates the
+player's own Adventure Sheet controls, so the conservative state is the one a fresh entry
+gives. A crafted save that locks its own weapon slot is self-harm, not an exploit. Both layers
+are strict by identity (`=== true`) so an unknown key, a truthy string or `1` leaves the slot
+free.
+
+Nothing else changes. A fresh `begin` still calls `clearEquipLocks`, and `removeItemById` still
+releases the lock of a possession that leaves — both are asserted as controls.
+
+`GameState` keeps exactly three fields off `data`: `_fightBonus` (snapshotted since task 156),
+`_equipLock` (now) and `_undo`, which is session-only by design — so no transient the rules read
+is left unpersisted across a resume. `clearPotionBonuses`, which `begin` calls alongside
+`clearEquipLocks`, is **not** the same mechanism despite reading like it: `potionBonus` lives in
+`data` and is sanitized with it, so it is a per-section reset of saved state.
+
+### Validation
+
+14 new assertions in `suite-inventory`. Four of them fail against the pre-fix resume —
+confirmed by disabling `restoreEquipLocks` in `resume` rather than assumed
+(`RESULT FAILURES pass=520 fail=4`): the resumed visit reads unlocked, the swap succeeds
+(`wielded=broadsword`), the sheet re-enables the Wield controls, and the forced group then
+breaks the broadsword while the Jade Defender survives — the exploit above, reproduced exactly.
+
+- §6.135 driven end to end: the entry lock is snapshotted, survives `sanitizeData` as two
+  booleans, holds after the resume, refuses the swap, draws the Wield controls disabled **and
+  only that slot** (the fixture carries armour, so a blanket "all disabled" would have hidden a
+  slot-scoping bug), and the forced group then breaks the weapon the page says was caught.
+  Losing it still releases the lock after a resume.
+- §2.290's armour twin as the control that matters: its loss resolves during the entry walk, so
+  the lock is already released when the visit is saved. That pins absence being recorded as
+  faithfully as presence — the same path a pre-345 record takes, which is the
+  backward-compatibility check the filing asked for. The armour half of the mechanism is also
+  round-tripped directly, lock-only with no loss.
+- A fresh `begin` clears both locks and the next record drops the field.
+- A crafted snapshot locks nothing: `{ weapon: 'true', armour: 1, shield: true }` reduces to
+  two `false`s through `sanitizeVisit`, and `restoreEquipLocks` leaves both slots free for
+  `undefined`, `null`, a string, an array, and every non-`true` value.
+
+`node web/tests/node-import.mjs` `pass=35 fail=0`. Focused `-Suite inventory,actions`
+`RESULT ALL PASS pass=1416 fail=0`; full browser suite `RESULT ALL PASS pass=3071 fail=0`
+(3057 before). No `books/`/`rules/` change, so `stamp-version.ps1` only
+(`26.09.02.4647f50`) and no generated data diff.
+
+---

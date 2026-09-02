@@ -580,6 +580,27 @@ export class GameState {
   equipLocked(kind) { return !!(this._equipLock && this._equipLock[kind]); }
   setEquipLock(kind, on = true) { (this._equipLock ||= { weapon: false, armour: false })[kind] = !!on; }
   clearEquipLocks() { this._equipLock = { weapon: false, armour: false }; }
+  // The lock lives off `data`, so an ordinary save never carries it — and that is the same
+  // hole task 156 closed for the per-fight bonus. §6.135 sets the weapon lock on ENTRY and
+  // takes the weapon only when the player clicks the forced group, so a reload in between
+  // resumed with both slots free while ctx.applied still says the hidden
+  // <tick special="weaponlock"> has run and must not re-fire: the sheet's Wield controls came
+  // back live and `<lose weapon="?" using="t">` then broke whichever junk blade the player had
+  // swapped to. The visit record snapshots and restores it. Null when neither slot is locked,
+  // so an ordinary save gains no field and a record written before this still resumes. (task 345)
+  equipLockSnapshot() {
+    const w = this.equipLocked('weapon'), a = this.equipLocked('armour');
+    return (w || a) ? { weapon: w, armour: a } : null;
+  }
+  // Only a literal `true` locks. This one restores from an untrusted blob into a gate on the
+  // player's own controls, so it fails OPEN by design: an unknown key, a truthy string or a
+  // missing snapshot leaves that slot free, which is the state a fresh entry would give.
+  restoreEquipLocks(snap) {
+    this._equipLock = {
+      weapon: !!(snap && snap.weapon === true),
+      armour: !!(snap && snap.armour === true),
+    };
+  }
 
   /** Settle the equipment choice and its display flags: a stale selection — one naming an
    *  item that has left the pack — is CLEARED, and the per-item wielded/worn flags are
@@ -1389,6 +1410,12 @@ function sanitizeVisit(v, curBook, curSection) {
     // Per-fight attack/Defence bonus snapshot (task 156); null when there was none.
     fightBonus: o.fightBonus && typeof o.fightBonus === 'object'
       ? { attack: asNum(o.fightBonus.attack, 0, { int: true }), defence: asNum(o.fightBonus.defence, 0, { int: true }) }
+      : null,
+    // Transient weapon/armour lock snapshot (task 345); null when neither slot is locked.
+    // Coerced to two booleans by identity, so an unknown key or a non-`true` value locks
+    // nothing — see restoreEquipLocks for why this direction fails open.
+    equipLock: o.equipLock && typeof o.equipLock === 'object'
+      ? { weapon: o.equipLock.weapon === true, armour: o.equipLock.armour === true }
       : null,
     // Durable-move retry target (task 173); null when no retry was armed (the common case).
     retry: sanitizeRetry(o.retry),

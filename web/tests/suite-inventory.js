@@ -1760,6 +1760,136 @@ export async function run(ctx) {
       ok('§2.290 the armour branch is taken, so no Stamina is lost instead', gAcid.data.stamina === stamAcid && gAcid.wornArmour() === acidMail, `stamina=${gAcid.data.stamina}/${stamAcid}`);
     }
 
+    // --- task 345: an equipment lock survives a mid-visit save/reload ------------------
+    // The lock is deliberately off `data` (like the per-fight bonus), and `serializeVisit`
+    // carried no snapshot of it — the exact hole task 156 closed for `_fightBonus`. §6.135
+    // sets the weapon lock on ENTRY and removes the weapon only when the player clicks the
+    // forced group, so the reload window was exploitable: the resumed visit started unlocked,
+    // `ctx.applied` stopped the hidden lock tick re-firing, and the sheet's Wield controls
+    // came back live — so `<lose weapon="?" using="t">` broke whichever blade the player had
+    // just swapped to instead of the one the page says Mister Dragon already caught.
+    {
+      // §6.135 with the Jade Defender deliberately in hand and a broadsword to swap to.
+      const mk345 = async (book, section) => {
+        const g = GameState.create({ name: 'T345', gender: 'm', profession: 'Warrior', book, adv });
+        g.ephemeral = true;
+        g.data.items = g.data.items.filter((it) => it.kind !== 'weapon' && it.kind !== 'armour');
+        g.reconcileEquipment();
+        eng.applyEffect((await data.getSection(5, '628')).querySelector('weapon'), g, {}); // Jade Defender +3
+        const jade = g.data.items.find((it) => it.name === 'Jade Defender');
+        g.setEquipped('weapon', jade.id);
+        const plain = g.addItem(makeItem('weapon', 'broadsword', 4));
+        const mail = g.addItem(makeItem('armour', 'chain mail', 3));
+        const jerkin = g.addItem(makeItem('armour', 'leather jerkin', 1));
+        g.setEquipped('armour', jerkin.id);
+        const cont = document.createElement('div');
+        const st = new Story(cont, g, { navigate(){}, onDeath(){}, notify(){} });
+        g.setVisitProvider(() => st.serializeVisit());
+        g.goTo(book, section);
+        st.begin(await data.getSection(book, section), book, section);
+        return { g, st, cont, jade, plain, mail, jerkin };
+      };
+      // Reload from what the provider persisted, through the storage sanitizer, and resume.
+      const reload345 = async (e, book, section) => {
+        const record = e.st.serializeVisit();
+        const g2 = new GameState(sanitizeData(JSON.parse(JSON.stringify({ ...e.g.data, visit: record }))));
+        g2.ephemeral = true;
+        const cont2 = document.createElement('div');
+        const st2 = new Story(cont2, g2, { navigate(){}, onDeath(){}, notify(){} });
+        g2.setVisitProvider(() => st2.serializeVisit());
+        st2.resume(await data.getSection(book, section), book, section, g2.data.visit, null);
+        return { record, g2, st2, cont2 };
+      };
+
+      const e345 = await mk345(6, '135');
+      ok('task345: §6.135 locks the weapon slot on entry and the record snapshots it',
+         e345.g.equipLocked('weapon') === true
+         && !!e345.st.serializeVisit().equipLock && e345.st.serializeVisit().equipLock.weapon === true
+         && e345.st.serializeVisit().equipLock.armour === false,
+         JSON.stringify(e345.st.serializeVisit().equipLock));
+      const r345 = await reload345(e345, 6, '135');
+      ok('task345: the snapshot survives sanitizeData verbatim as two booleans',
+         !!r345.g2.data.visit.equipLock && r345.g2.data.visit.equipLock.weapon === true
+         && r345.g2.data.visit.equipLock.armour === false,
+         JSON.stringify(r345.g2.data.visit.equipLock));
+      ok('task345: the resumed visit is still locked (was unlocked before the fix)',
+         r345.g2.equipLocked('weapon') === true && r345.g2.equipLocked('armour') === false);
+      const swap345 = r345.g2.data.items.find((it) => it.name === 'broadsword');
+      ok('task345: the resumed lock refuses the weapon swap',
+         r345.g2.setEquipped('weapon', swap345.id) === false
+         && r345.g2.wieldedWeapon().name === 'Jade Defender',
+         'wielded=' + r345.g2.wieldedWeapon().name);
+      const sheet345 = document.createElement('div');
+      renderSheet(r345.g2, sheet345);
+      const equip345 = (word) => Array.from(sheet345.querySelectorAll('.item-equip')).filter((b) => b.textContent === word);
+      ok('task345: the resumed sheet disables every Wield control, and only that slot',
+         equip345('Wield').length === 2 && equip345('Wield').every((b) => b.disabled)
+         && equip345('Wield').some((b) => b.title === 'You cannot change weapons here')
+         && equip345('Wear').length === 2 && equip345('Wear').some((b) => !b.disabled),
+         'wield=' + equip345('Wield').map((b) => b.disabled).join(',') + ' wear=' + equip345('Wear').map((b) => b.disabled).join(','));
+      const grp345 = Array.from(r345.cont2.querySelectorAll('button')).find((b) => /Remove that weapon/i.test(b.textContent));
+      ok('task345: the resumed visit still offers the forced "Remove that weapon" group', !!grp345);
+      grp345.click();
+      ok('task345: and it breaks the weapon the page says was caught, not the swap target',
+         !r345.g2.data.items.some((it) => it.name === 'Jade Defender')
+         && r345.g2.data.items.some((it) => it.name === 'broadsword'),
+         r345.g2.data.items.filter((it) => it.kind === 'weapon').map((it) => it.name).join(','));
+      ok('task345: losing the locked weapon still releases its lock after a resume',
+         r345.g2.equipLocked('weapon') === false);
+
+      // The armour twin (§2.290's acid). Its loss resolves during the entry walk, so the lock
+      // is already released by the time the visit is saved — which is the control that the
+      // snapshot records ABSENCE as faithfully as presence, and the reason a saved record
+      // without the field must not lock anything.
+      const eArm = await mk345(2, '290');
+      ok('task345: §2.290 releases the armour lock with the loss it guarded, so nothing is snapshotted',
+         eArm.g.equipLocked('armour') === false && eArm.st.serializeVisit().equipLock === null,
+         JSON.stringify(eArm.st.serializeVisit().equipLock));
+      const rArm = await reload345(eArm, 2, '290');
+      ok('task345: a record with no snapshot resumes unlocked (pre-345 saves are unchanged)',
+         rArm.g2.equipLocked('armour') === false && rArm.g2.equipLocked('weapon') === false
+         && rArm.g2.setEquipped('armour', rArm.g2.data.items.find((it) => it.kind === 'armour').id) === true);
+      // The armour half of the mechanism, snapshotted directly: the lock alone, with no loss.
+      const gArm345 = GameState.create({ name: 'AL345', gender: 'm', profession: 'Warrior', book: 2, adv });
+      gArm345.ephemeral = true;
+      eng.applyEffect(parse('<tick special="armourlock" hidden="t"/>'), gArm345, {});
+      const snapArm = gArm345.equipLockSnapshot();
+      gArm345.restoreEquipLocks(null);
+      ok('task345: an armour-only snapshot round-trips through restore, weapon slot untouched',
+         !!snapArm && snapArm.armour === true && snapArm.weapon === false
+         && gArm345.equipLocked('armour') === false
+         && (gArm345.restoreEquipLocks(snapArm), gArm345.equipLocked('armour') === true && gArm345.equipLocked('weapon') === false),
+         JSON.stringify(snapArm));
+
+      // A fresh entry still clears both, so a lock cannot ride out of its own section.
+      const eFresh = await mk345(6, '135');
+      eFresh.g.goTo(6, '9345'); // serializeVisit emits nothing while position and Story disagree
+      eFresh.st.begin(parse('<section name="9345"><p>elsewhere</p></section>'), 6, '9345');
+      ok('task345: a fresh begin still clears both locks and the record drops the field',
+         eFresh.g.equipLocked('weapon') === false && eFresh.g.equipLocked('armour') === false
+         && eFresh.st.serializeVisit().equipLock === null);
+
+      // A hand-edited snapshot locks nothing unless it says exactly `true` (step 3): the
+      // restore is a gate on the player's OWN controls, so the safe direction is open.
+      const gEvil = GameState.create({ name: 'EV345', gender: 'm', profession: 'Warrior', book: 6, adv });
+      gEvil.ephemeral = true;
+      const evilVisit = (lock) => sanitizeData({ ...gEvil.data, section: '1', book: 6,
+        visit: { v: 1, book: 6, section: '1', ctx: {}, equipLock: lock } }).visit.equipLock;
+      ok('task345: sanitizeVisit reduces a crafted snapshot to two booleans by identity',
+         JSON.stringify(evilVisit({ weapon: 'true', armour: 1, shield: true })) === '{"weapon":false,"armour":false}'
+         && JSON.stringify(evilVisit({ weapon: true })) === '{"weapon":true,"armour":false}'
+         && evilVisit('locked') === null && evilVisit(null) === null,
+         JSON.stringify(evilVisit({ weapon: 'true', armour: 1, shield: true })));
+      ok('task345: restoreEquipLocks locks nothing for a non-true value or a missing snapshot',
+         (() => {
+           for (const bad of [undefined, null, 'weapon', { weapon: 'true' }, { weapon: 1 }, { shield: true }, []]) {
+             gEvil.restoreEquipLocks(bad);
+             if (gEvil.equipLocked('weapon') || gEvil.equipLocked('armour')) return false;
+           }
+           return true;
+         })());
+    }
+
     // --- task 310: the DEFAULT loadout is read, never stored -------------------------
     // reconcileEquipment used to end `eq.weapon = this.wieldedWeapon()?.id`, persisting
     // whatever the reader returned — including the "strongest of that kind" fallback. Every
