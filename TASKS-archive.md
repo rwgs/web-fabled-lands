@@ -16782,3 +16782,82 @@ an abandoned picker and an item detour, and the visible effect was one greyed ch
 the threshold the file is for.
 
 ---
+
+## 349. Natural derived-stat reads still include aura/affliction terms
+
+**Priority: LOW.** The reader contradicts its own documented mode contract, but no published
+section currently asks for `defence` under `modifier="natural"`; this is latent until new
+markup uses the supported combination.
+
+### What is wrong
+
+Two special-case derived-stat readers bypass the mode-aware helpers around them:
+
+- `GameState.defenceForMode` correctly strips the weapon/tool contribution, armour, Defence
+  aura, Defence affliction and god effect when mode is `natural`. Its final sum still adds
+  `this.rankValue()` unconditionally, so a ring of ultimate power contributes its +2 Rank to
+  "natural" Defence.
+- `evaluateCondition` in `web/js/engine.js` reads any modified Stamina condition as
+  `effectiveStaminaMax()`, and `evalExpression` does the same for any mode. Under `natural`,
+  both should read the written `data.staminaMax`; `affected` is the mode that keeps the item
+  aura/affliction-adjusted maximum. `rollDifficulty` and `<adjust>` already make that
+  distinction.
+
+These are the exact terms tasks 302/314/317 say natural mode removes. The current corpus has
+no `ability/value="defence" modifier="natural"` node and no natural Stamina condition/set;
+its one mode-qualified Stamina set is `modifier="affected"` in book 3 section 104 and is
+correct. That is why the mode tests pass without composing these cases.
+
+### Fix
+
+`defenceForMode` reads Rank through `rankForMode(m)`. That helper has existed since task 317 and
+the other four `modifier=` readers already call it; this sum walked past it, so the ring of
+ultimate power's +2 — an item **aura** — survived into "natural" Defence beside the armour,
+Defence aura, affliction and god effect the same mode strips.
+
+`GameState.staminaForMode(mode, bare)` replaces the four private copies of the Stamina mode
+rule. `<if ability="stamina">`, `<set value="stamina">`, the `<adjust>` condition, the
+`<adjust>` amount and `rollDifficulty` all call it.
+
+**The first version of that helper was wrong, and the suite caught it — which is the part worth
+recording.** Written as a single three-way reader, it flattened a distinction the four tags
+genuinely do not share: what an ABSENT modifier means. A CONDITION read is "are you above 4
+right now" and takes the wounded score; a VALUE read takes the unwounded maximum, which task
+92's bare `<adjust ability="stamina">` and task 302's `<difficulty ability="stamina">` score
+both depend on. Two existing assertions failed at once (`score=5`, `the effective max (22)`).
+`bare` is therefore the caller's to state — `'current'` or `'max'`, a word rather than a
+boolean, for task 314's reason. The generalisation: four readers of one rule is not
+automatically one rule four times. Three of the four agreed on the three-way mode part and
+disagreed on the default, so only the agreeing part could be shared.
+
+### Validation
+
+16 new assertions in `suite-engine` and 5 in `suite-corpus`. Both halves were confirmed to
+discriminate by reverting them separately:
+
+- Defence's Rank term back to `rankValue()` → 2 failures, `natural=11 (want 9)`;
+- the two Stamina readers back to their two-way form → 2 failures, `<set …>` storing `17` where
+  the written score is 10.
+
+The state coverage is step 3 and step 4's fixtures: written Rank 3 with the ring's +2 aura, a +4
+weapon and +3 armour — ordinary Defence 18, `noarmour` 15, `noweapon` 14, **natural 9** — plus a
+Defence aura and the Curse of Vulnerability stripped together with the Rank aura. Stamina
+written 10 under a +10 aura and a −3 affliction, wounded to 4: `natural` 10, `affected` 17, a
+bare condition 4, through `<if>` and `<set>` and through `childAdjustment`'s `<adjust>` amount.
+§3.104's `affected` set is retained as the shipped control.
+
+**The census (step 5) is the other half of the work.** No shipped site asks for `defence` under
+`modifier="natural"`; the only mode-qualified Stamina sites in the corpus are §2.579
+(`adjust`/`natural`, which was always correct) and §3.104 (`set`/`affected`), so the two readers
+this fix repaired have exactly ONE shipped site between them — which is why the existing mode
+tests passed without ever composing these cases. Nothing writes `modifier="current"` at all. The
+assertion measures its own sample size first, so a census that matches nothing fails instead of
+passing vacuously — which is what caught a regex whose `\b` had been mangled into a literal
+backspace.
+
+`node web/tests/node-import.mjs` `pass=35 fail=0`. Full browser suite
+`RESULT ALL PASS pass=3210 fail=0` (3189 before). No `books/`/`rules/` change, so
+`stamp-version.ps1` only. No `CHANGELOG.md` entry: with zero shipped sites for either
+combination, no player can see a difference today.
+
+---

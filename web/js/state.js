@@ -378,6 +378,35 @@ export class GameState {
     return String(mode || '').trim().toLowerCase() === 'natural' ? this.data.rank : this.rankValue();
   }
 
+  /** Stamina for a `modifier=` mode — the one reader every modifier= tag shares (task 349).
+   *
+   *  The MODES are common to all of them: `current` is the wounded score, `natural` the WRITTEN
+   *  maximum (stripping the item aura's headroom and any Stamina-cutting affliction), and
+   *  anything else — `affected`, plus the three `no-` words, none of which names a Stamina
+   *  term — the effective maximum.
+   *
+   *  `bare` is what an ABSENT modifier means, and it is the one thing the tags genuinely do NOT
+   *  agree on, so it stays the caller's to state. A CONDITION reads the wounded score when
+   *  nothing is asked for — `<if ability="stamina" greaterthan="4">` is "are you above 4 right
+   *  now" — while a VALUE read takes the unwounded maximum: `<difficulty ability="stamina">`
+   *  scores against the full total and a bare `<adjust ability="stamina">` amount is the same
+   *  (task 92). A word rather than a boolean, for task 314's reason — a boolean is what folded
+   *  five modes into natural-or-not and lost three of them.
+   *
+   *  What this helper is FOR is the three-way part, which four readers each carried a copy of:
+   *  `adjustAmount`, the `<adjust>` condition and `rollDifficulty` got it right, while
+   *  `<if ability="stamina">` and `<set value="stamina">` carried a TWO-way version — any
+   *  modifier meant the effective maximum — so `natural` read back the aura-inflated max, the
+   *  exact term that mode exists to remove. Four copies of a rule is how two of them come to
+   *  disagree. (tasks 92, 302, 314, 315, 349) */
+  staminaForMode(mode, bare = 'current') {
+    const m = String(mode || '').trim().toLowerCase();
+    if (!m) return bare === 'max' ? this.effectiveStaminaMax() : this.data.stamina;
+    if (m === 'current') return this.data.stamina;
+    if (m === 'natural') return this.data.staminaMax;
+    return this.effectiveStaminaMax();
+  }
+
   /** Passive item-effect bonus for an ability key (task 41): a `type="aura"` effect
    *  counts while the item is carried; `type="wielded"` only while it is the
    *  wielded weapon / worn armour. `ability="*"` boosts every core ability. Used for
@@ -506,7 +535,12 @@ export class GameState {
     // `defence`, which made the god path accept it too, and a parser that stores what no
     // reader sums is the shape that made the Curse of Vulnerability inert. (task 305)
     const godly = (m === 'natural') ? 0 : this.effectBonus('defence');
-    return combat + this.rankValue() + armour + aura + affliction + godly;
+    // Rank through rankForMode, not rankValue(): the ring of ultimate power's +2 is an item
+    // AURA, so `natural` strips it here for the same reason it strips the armour, the Defence
+    // aura, the affliction and the god effect above. rankForMode has existed since task 317
+    // and the other four modifier= readers already call it; this sum walked past it and
+    // handed a ring-holder two points of "natural" Defence the sheet never wrote. (task 349)
+    return combat + this.rankForMode(m) + armour + aura + affliction + godly;
   }
 
   /** Ability score for a <set value=> arithmetic read (JaFL SetVarNode.resolveIdentifier):

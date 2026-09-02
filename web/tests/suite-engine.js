@@ -1155,4 +1155,106 @@ export async function run(ctx) {
          edition.bookAvailable('2') === true && edition.bookAvailable(2) === true && edition.bookAvailable('2x') === false);
     }
 
+
+    // --- task 349: natural derived-stat reads strip the unwritten terms too ----------------
+    // Two special-case readers bypassed the mode-aware helpers around them. defenceForMode
+    // stripped the weapon, the armour, the Defence aura, the Defence affliction and the god
+    // effect for `natural` and then added rankValue() unconditionally - so the ring of ultimate
+    // power's +2 RANK aura survived into "natural" Defence. And `<if ability="stamina">` /
+    // `<set value="stamina">` were two-way (any modifier meant the effective maximum), so
+    // `natural` read the aura-inflated max: the exact term the mode exists to remove.
+    {
+      const ABIL349 = ['charisma', 'combat', 'magic', 'sanctity', 'scouting', 'thievery'];
+      const ring349 = () => makeItem('item', 'ring of ultimate power', 0, null, [], [
+        { type: 'aura', ability: 'rank', bonus: 2 },
+      ]);
+      const mk349 = () => {
+        const g = GameState.create({ name: 'T349', gender: 'f', profession: 'Warrior', book: 5, adv });
+        g.ephemeral = true;
+        g.data.items = [];
+        g.data.rank = 3;
+        g.data.abilities.combat = 6;
+        g.reconcileEquipment();
+        return g;
+      };
+
+      // Defence: written Rank 3, the ring's +2 aura, a +4 weapon and +3 armour.
+      const gD = mk349();
+      gD.addItem(ring349());
+      const sword = gD.addItem(makeItem('weapon', 'broadsword', 4));
+      const mail = gD.addItem(makeItem('armour', 'chain mail', 3));
+      gD.setEquipped('weapon', sword.id); gD.setEquipped('armour', mail.id);
+      ok('task349: the ring raises Rank for an ordinary read and not for a natural one',
+         gD.rankValue() === 5 && gD.rankForMode('natural') === 3 && gD.rankForMode(null) === 5,
+         `value=${gD.rankValue()} natural=${gD.rankForMode('natural')}`);
+      ok('task349: ordinary Defence carries Rank 5, the weapon and the armour',
+         gD.defenceForMode(null) === 6 + 5 + 3 + 4, String(gD.defenceForMode(null)));
+      ok('task349: noarmour Defence keeps Rank 5 and the weapon, drops the armour',
+         gD.defenceForMode('noarmour') === 6 + 5 + 4, String(gD.defenceForMode('noarmour')));
+      ok('task349: noweapon Defence keeps Rank 5 and the armour, drops the weapon',
+         gD.defenceForMode('noweapon') === 6 + 5 + 3, String(gD.defenceForMode('noweapon')));
+      ok('task349: NATURAL Defence carries the WRITTEN Rank 3, and no weapon, armour or aura',
+         gD.defenceForMode('natural') === 6 + 3,
+         `natural=${gD.defenceForMode('natural')} (want ${6 + 3})`);
+      // The aura-stripping controls that already worked must still: a Defence aura and a
+      // Defence-naming affliction.
+      const gD2 = mk349();
+      gD2.addItem(ring349());
+      gD2.addItem(makeItem('item', 'jade charm', 0, null, [], [{ type: 'aura', ability: 'defence', bonus: 3 }]));
+      gD2.addCurse({ name: 'Curse of Vulnerability', effects: [{ ability: 'defence', bonus: -3 }] });
+      ok('task349: natural Defence strips the Defence aura, the affliction AND the Rank aura together',
+         gD2.defenceForMode('natural') === 6 + 3 && gD2.defenceForMode(null) === 6 + 5 + 3 - 3,
+         `natural=${gD2.defenceForMode('natural')} full=${gD2.defenceForMode(null)}`);
+
+      // Stamina: written 10, a +10 aura and a -3 affliction, wounded to 4.
+      const gS = mk349();
+      gS.data.staminaMax = 10;
+      gS.addItem(makeItem('item', 'ring of vitality', 0, null, [], [{ type: 'aura', ability: 'stamina', bonus: 10 }]));
+      gS.addAffliction('poison', { name: 'Wasting', effects: [{ ability: 'stamina', bonus: -3 }] });
+      gS.data.stamina = 4;
+      ok('task349: the fixture holds written 10, effective 17 and a wounded 4',
+         gS.data.staminaMax === 10 && gS.effectiveStaminaMax() === 17 && gS.data.stamina === 4,
+         `written=${gS.data.staminaMax} effective=${gS.effectiveStaminaMax()} current=${gS.data.stamina}`);
+      ok('task349: staminaForMode answers all three modes, and a CONDITION\'s bare read is current',
+         gS.staminaForMode('natural') === 10 && gS.staminaForMode('affected') === 17
+         && gS.staminaForMode('current') === 4 && gS.staminaForMode(null) === 4,
+         [gS.staminaForMode('natural'), gS.staminaForMode('affected'), gS.staminaForMode(null)].join('/'));
+      ok('task349: …and a VALUE read\'s bare answer is the unwounded max, which is why `bare` is the caller\'s',
+         gS.staminaForMode(null, 'max') === 17 && gS.staminaForMode('current', 'max') === 4,
+         String(gS.staminaForMode(null, 'max')));
+
+      // Through <if>: natural is the written 10, affected the effective 17, bare the wounded 4.
+      const ifS = (mod, cmp, n) => eng.evaluateCondition(
+        parse(`<section><if ability="stamina"${mod ? ` modifier="${mod}"` : ''} ${cmp}="${n}"><p/></if></section>`).querySelector('if'), gS);
+      ok('task349: <if ability="stamina" modifier="natural"> reads the WRITTEN 10',
+         ifS('natural', 'equals', 10) && !ifS('natural', 'equals', 17) && !ifS('natural', 'equals', 4));
+      ok('task349: modifier="affected" reads the effective 17, and a bare read the wounded 4',
+         ifS('affected', 'equals', 17) && ifS(null, 'equals', 4) && !ifS(null, 'equals', 17));
+
+      // Through <set>: the same three answers, into a variable.
+      const setS = (mod) => {
+        const g2 = new GameState(JSON.parse(JSON.stringify(gS.data)));
+        g2.ephemeral = true;
+        eng.applyEffect(parse(`<set var="s" value="stamina"${mod ? ` modifier="${mod}"` : ''}/>`), g2, {});
+        return g2.getVar('s');
+      };
+      ok('task349: <set value="stamina" modifier="natural"> stores the WRITTEN 10',
+         setS('natural') === 10, String(setS('natural')));
+      ok('task349: modifier="affected" stores 17 and an unmodified set stores the current 4',
+         setS('affected') === 17 && setS(null) === 4, `${setS('affected')}/${setS(null)}`);
+      // §3.104 is the shipped `affected` control - it snapshots the unwounded max before a rest.
+      ok('task349: §3.104\'s affected set is unchanged by the fix', setS('affected') === gS.effectiveStaminaMax());
+      // The VALUE readers, through their public path (childAdjustment sums the <adjust>
+      // amounts of a roll node). Their BARE contract is the opposite of a condition's and is
+      // already pinned by the task-92 and task-302 assertions elsewhere in this suite - which
+      // is how a first attempt at one shared reader was caught flattening it - so what is new
+      // here is only the `natural` answer.
+      const adj349 = (mod) => eng.childAdjustment(
+        parse(`<random><adjust ability="stamina"${mod ? ` modifier="${mod}"` : ''}/></random>`), gS);
+      ok('task349: a bare <adjust ability="stamina"> amount still reads the effective 17',
+         adj349(null) === 17, String(adj349(null)));
+      ok('task349: and modifier="natural" reads the written 10 (the §2.579 shipped site)',
+         adj349('natural') === 10 && adj349('affected') === 17 && adj349('current') === 4,
+         [adj349('natural'), adj349('affected'), adj349('current')].join('/'));
+    }
 }

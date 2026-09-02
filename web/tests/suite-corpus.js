@@ -88,6 +88,42 @@ export async function run(ctx) {
       }
     }
 
+    // --- task 349: the natural derived-stat combinations have no shipped site yet -------------
+    // The two readers task 349 fixed answer combinations the corpus does not write today, which
+    // is why the mode tests passed without composing them. Pinning the census means a FIRST such
+    // site fails here and its expected behaviour gets reviewed, rather than silently inheriting
+    // whatever the reader happens to do - the failure mode that let both cases sit latent.
+    {
+      const MOD349 = /<(if|elseif|set|adjust|difficulty|rankcheck|training|random)\s[^>]*\smodifier="([^"]*)"[^>]*>/gi;
+      const TARGET349 = /\s(?:ability|value)="([^"]*)"/i;
+      const seen = [];
+      for (const b of books) {
+        const raw = await rawSections(b);
+        for (const [key, xml] of Object.entries(raw)) {
+          for (const m of xml.matchAll(MOD349)) {
+            const target = (m[0].match(TARGET349) || [])[1] || '';
+            seen.push({ at: b + '.' + key, tag: m[1].toLowerCase(), target: target.toLowerCase(), mode: m[2].toLowerCase() });
+          }
+        }
+      }
+      ok('task349: the modifier= census reads a non-trivial set of shipped sites',
+         seen.length >= 30, 'n=' + seen.length);
+      const defNat = seen.filter((x) => x.mode === 'natural' && x.target.includes('defence'));
+      ok('task349: no shipped site asks for defence under modifier="natural"',
+         defNat.length === 0, defNat.map((x) => x.at + ':' + x.tag).join(' '));
+      const stam = seen.filter((x) => x.target.includes('stamina'));
+      ok('task349: the only mode-qualified Stamina sites are §2.579 (adjust/natural) and §3.104 (set/affected)',
+         stam.map((x) => `${x.at}:${x.tag}=${x.mode}`).sort().join(' ') === '2.579:adjust=natural 3.104:set=affected',
+         stam.map((x) => `${x.at}:${x.tag}=${x.mode}`).join(' '));
+      const stamCond = stam.filter((x) => x.tag === 'if' || x.tag === 'elseif' || x.tag === 'set');
+      ok('task349: so the two readers the fix repaired have ONE shipped site between them, and it is affected',
+         stamCond.length === 1 && stamCond[0].mode === 'affected',
+         stamCond.map((x) => `${x.at}:${x.tag}=${x.mode}`).join(' '));
+      ok('task349: and nothing in the corpus writes modifier="current" at all',
+         seen.every((x) => x.mode !== 'current'),
+         seen.filter((x) => x.mode === 'current').map((x) => x.at).join(' '));
+    }
+
     // --- task 343: the corpus pattern the affliction family reading rests on -------------------
     // afflictionFamily makes `disease=` search diseases AND poisons while `poison=` searches
     // poisons alone. That asymmetry is a claim about how the transcription writes the two

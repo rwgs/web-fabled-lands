@@ -286,7 +286,10 @@ export function evaluateCondition(el, state, opts = {}) {
     let v;
     if (spec === 'rank') v = state.rankForMode(get('modifier'));
     else if (spec === 'defence') v = state.abilityForMode('defence', get('modifier'));
-    else if (spec === 'stamina') v = get('modifier') ? state.effectiveStaminaMax() : state.data.stamina;
+    // Stamina through the shared reader (task 349): this arm was two-way — ANY modifier meant
+    // the effective maximum — so `natural` handed back the aura-inflated max, the very term the
+    // mode removes. The `rank` and `defence` arms beside it already delegate.
+    else if (spec === 'stamina') v = state.staminaForMode(get('modifier'));
     // The ordinary-ability arm folded modifier= to a boolean `natural` and passed
     // abilityForCheck, so `<if ability="combat" modifier="noweapon" greaterthan="8">` compared
     // the WEAPON-BOOSTED score — the mode the gate allowed here silently dropped, exactly as
@@ -1599,8 +1602,10 @@ export function evalExpression(expr, state, mode = null, sel = null) {
       if (w === 'weapon' || w === 'armour' || w === 'tool') return setSelectorBonus(state, sel, w);
       if (w === 'shards' && sel.cache != null) return state.cacheMoney(sel.cache);
     }
-    // stamina: natural/affected → the unwounded max (incl. aura/affliction); no modifier → current.
-    if (w === 'stamina') return mode ? state.effectiveStaminaMax() : state.data.stamina;
+    // stamina: no modifier → current; `natural` → the WRITTEN max; `affected` → the effective
+    // max (incl. aura/affliction). Two-way until task 349, which is what made
+    // `<set value="stamina" modifier="natural">` read the aura headroom back in.
+    if (w === 'stamina') return state.staminaForMode(mode);
     if (w === 'shards') return state.data.shards;
     // rank: natural → the WRITTEN Rank; affected/none → rankValue() incl. the ring of
     // ultimate power's +2 aura. §2.270 sets `var rank = rank modifier="natural"` and then
@@ -1739,11 +1744,7 @@ function adjustAmount(el, state) {
     // abilityForMode already dispatches it, so this is a routing line, not a new rule; the
     // identical arm in rollDifficulty is the precedent. (tasks 302, 316)
     if (key === 'defence') return state.abilityForMode('defence', mode);
-    if (key === 'stamina') {
-      if (mode === 'natural') return state.data.staminaMax; // the written score, no aura/affliction
-      if (mode === 'current') return state.data.stamina;
-      return state.effectiveStaminaMax(); // unwounded score, incl. aura/affliction
-    }
+    if (key === 'stamina') return state.staminaForMode(mode, 'max'); // an <adjust> AMOUNT: bare = unwounded (task 92)
     if (ABILITIES.includes(key)) return state.abilityForMode(key, mode); // mode null ⇒ the full score
   }
   const nm = el.getAttribute('name');
@@ -1777,9 +1778,7 @@ function adjustApplies(el, state) {
       // adjustAmount. (tasks 92, 314, 315)
       const mode = String(get('modifier') || '').trim().toLowerCase() || null;
       v = key === 'rank' ? state.rankForMode(mode)
-        : key === 'stamina' ? (!mode || mode === 'current' ? state.data.stamina
-          : mode === 'natural' ? state.data.staminaMax
-          : state.effectiveStaminaMax())
+        : key === 'stamina' ? state.staminaForMode(mode)
         : state.abilityForMode(key, mode);
     } else if (get('name') != null) v = state.codewordValue(get('name'));
     return (gt == null || v > resolveValue(state, gt)) && (lt == null || v < resolveValue(state, lt));
@@ -1819,12 +1818,8 @@ export function rollDifficulty(state, ability, level, modifier = 0, mode = null)
   if (ab) abilityScore = state.abilityForMode(ab, mode);
   else if (key === 'rank') { abilityScore = state.rankForMode(mode); rolled = key; }
   else if (key === 'defence') { abilityScore = state.abilityForMode('defence', mode); rolled = key; }
-  else if (key === 'stamina') {
-    abilityScore = (m === 'current') ? state.data.stamina
-      : (m === 'natural') ? state.data.staminaMax
-      : state.effectiveStaminaMax();
-    rolled = key;
-  } else abilityScore = 0;
+  else if (key === 'stamina') { abilityScore = state.staminaForMode(m, 'max'); rolled = key; } // a SCORE: bare = unwounded
+  else abilityScore = 0;
   const total = r.total + abilityScore + modifier;
   return { dice: r.dice, rollTotal: r.total, abilityScore, ability: rolled, total, level, margin: total - level, success: total > level };
 }

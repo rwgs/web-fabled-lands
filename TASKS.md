@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-350 appears below: 207 and 326 are withdrawn as misdiagnoses, 349 and 350 are
-open, and all others are complete (see the Review log). File new work under the
-priority bucket that fits, and record the pass in the Review log. Completed
+350 appears below: 207 and 326 are withdrawn as misdiagnoses, 350 is the only
+open item, and all others are complete (see the Review log). File new work under
+the priority bucket that fits, and record the pass in the Review log. Completed
 detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 349. Natural derived-stat reads still include unwritten bonuses: `defenceForMode` adds aura-raised `rankValue()`, while the `<if>` and `<set>` Stamina readers return the effective aura/affliction maximum instead of the written score
 - [ ] 350. Book 5 section 180's potion of restoration says "cure you of any diseases" but is transcribed `<lose disease="*"/>`, which task 343 made read the disease/poison family, so the potion now also cures poison — more than its printed sentence promises, and unlike book 1 section 342's twin potion which says "cure poison and disease" and carries both attributes
 
 **Done**
@@ -383,53 +382,7 @@ this order.*
 - [x] 346. the repository-root `index.html` forwarded with `location.replace('web/')`, building a new relative URL with neither `location.search` nor `location.hash`, so `/?seed=42&demo=1.10` became `/web/` and `app.js` never saw either parameter — the deep links `README.md` and `docs/Playing-the-Game.md` advertise opened the plain title screen when shared from the canonical root
 - [x] 347. `renderSheet` filtered codeword keys with `/^\d+\.\d/` alone — "hide internal box-codewords" — which catches only the dot-numeric shape, so the slash-scoped (`5/520`), word-continuing (`5.Aku.leaving`) and explicitly named engine flags (`StillInYellowport`, `HydraDamage`, `CharismaBonus`) were all chipped under "Codewords" beside Anchor; the sheet now shows a codeword only when the edition declares it, from the `Codewords=` union the build folds into `meta.json`
 - [x] 348. both sail callers set `story._pendingSourceNode` BEFORE calling `sailThenGo`, but with several local ships that function stands a which-ship picker and returns having navigated nowhere — so the Story claimed the sail choice was taken while the question was open, and an item detour opened in that window (`Story.useItem` passes no source node, correctly) inherited it, its `<return>` crossing off a route no ship had sailed
-
----
-
-## 349. Natural derived-stat reads still include aura/affliction terms
-
-**Priority: LOW.** The reader contradicts its own documented mode contract, but no published
-section currently asks for `defence` under `modifier="natural"`; this is latent until new
-markup uses the supported combination.
-
-### What is wrong
-
-Two special-case derived-stat readers bypass the mode-aware helpers around them:
-
-- `GameState.defenceForMode` correctly strips the weapon/tool contribution, armour, Defence
-  aura, Defence affliction and god effect when mode is `natural`. Its final sum still adds
-  `this.rankValue()` unconditionally, so a ring of ultimate power contributes its +2 Rank to
-  "natural" Defence.
-- `evaluateCondition` in `web/js/engine.js` reads any modified Stamina condition as
-  `effectiveStaminaMax()`, and `evalExpression` does the same for any mode. Under `natural`,
-  both should read the written `data.staminaMax`; `affected` is the mode that keeps the item
-  aura/affliction-adjusted maximum. `rollDifficulty` and `<adjust>` already make that
-  distinction.
-
-These are the exact terms tasks 302/314/317 say natural mode removes. The current corpus has
-no `ability/value="defence" modifier="natural"` node and no natural Stamina condition/set;
-its one mode-qualified Stamina set is `modifier="affected"` in book 3 section 104 and is
-correct. That is why the mode tests pass without composing these cases.
-
-### Steps
-
-1. Make Defence's Rank term mode-aware (`rankForMode(mode)` or the equivalent), leaving every
-   non-natural mode on the full affected Rank.
-2. Route Stamina through one mode-aware helper shared by condition, expression, difficulty and
-   adjust reads: no modifier means current Stamina where the tag's contract says so,
-   `natural` means written maximum, and `affected` means effective maximum.
-3. Add a state test with written Rank 3 plus the ring's +2 aura: ordinary/noarmour Defence
-   includes Rank 5, natural Defence includes Rank 3 and also strips the existing weapon,
-   armour and aura controls.
-4. Test written Stamina 10 under a +10 aura and a negative affliction through `<if>` and
-   `<set>`: natural stays 10, affected reads the effective maximum, and an unmodified set keeps
-   reading current Stamina. Retain book 3 section 104 as the affected control.
-5. Add corpus census assertions documenting that the natural combinations have zero shipped
-   sites today; a future first site should force its expected behavior to be reviewed.
-
-### Validation
-
-Run the focused engine/combat suites, the DOM-free import check and the full browser suite.
+- [x] 349. two derived-stat readers bypassed the mode-aware helpers beside them: `defenceForMode` stripped the weapon, armour, Defence aura, Defence affliction and god effect for `natural` and then added `rankValue()` unconditionally, so the ring of ultimate power's +2 Rank aura survived into "natural" Defence; and `<if ability="stamina">`/`<set value="stamina">` were two-way — any modifier meant the effective maximum — so `natural` read back the aura-inflated max
 
 ---
 
@@ -489,6 +442,35 @@ change (task 199) and rebuild the bundled data.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 349): closed **349**, filed nothing. `defenceForMode` reads Rank through
+`rankForMode(m)`, and one `staminaForMode(mode, bare)` on `GameState` replaces the four private
+copies of the Stamina mode rule that `<if>`, `<set>`, `<adjust>` and `<difficulty>` each carried.
+**The first attempt at that helper was wrong in an instructive way, and the suite caught it.**
+Written as a single three-way reader, it flattened a distinction the four tags genuinely do not
+share: what an ABSENT modifier means. A condition read is "are you above 4 right now" — the
+wounded score — while a value read takes the unwounded maximum, which is what task 92's bare
+`<adjust ability="stamina">` and task 302's `<difficulty ability="stamina">` score both rely on.
+Two existing assertions failed immediately (`score=5`, `the effective max (22)`), and `bare` is
+now the caller's to state, as a word rather than a boolean for task 314's reason. The lesson is
+that "four readers of one rule" is not automatically "one rule, four times" — three of the four
+agreed on the three-way part and disagreed on the default, so only the agreeing part could be
+shared.
+The census (step 5) is the other half of the work rather than decoration: **no shipped site asks
+for `defence` under `natural`**, and the two readers the fix repaired have exactly ONE
+mode-qualified Stamina site between them (§3.104's `affected`), which is why the existing mode
+tests passed without ever composing these cases. Pinning that in `suite-corpus` means a first
+such site fails the build and gets its expected behaviour reviewed, instead of silently
+inheriting whatever the reader happens to do.
+**One tooling correction worth carrying forward: `node --check <file>` exits 0 on these ES-module
+suites without parsing them at all.** Every such check run this session was a no-op — a real
+syntax error (an unescaped apostrophe in a single-quoted string) passed it and was caught only
+by the browser run's `RESULT FATAL … SyntaxError`. `node --input-type=module --check < file`
+does parse, and every file under `web/js/` and `web/tests/` has now been checked that way.
+Separately, a bash heredoc collapsed a `\b` pair in two regexes into a literal **backspace**
+(0x08), so the census silently matched nothing (`n=0`) until the assertion that measures its own
+sample size caught it; the regexes were rewritten through a file, using `\s` — an XML attribute
+is always space-separated — and every module was swept for a stray 0x08.
 
 Worked 2026-09-02 (task 348): closed **348**, filed nothing. The prospective source node is now
 a parameter of `sailThenGo` and reaches `story.navigate` inside the chosen ship's commit,
