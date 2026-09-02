@@ -5694,6 +5694,148 @@ export async function run(ctx) {
       }
     }
 
+    // --- task 348: an abandoned sail picker must leave nothing on the Story --------------
+    // Both sail callers set story._pendingSourceNode BEFORE calling sailThenGo. With one ship
+    // that is harmless — the commit is synchronous — but with several, sailThenGo stands an
+    // inline "Sail which ship?" picker and RETURNS, having navigated nowhere, while the Story
+    // already claims the sail choice was taken. The picker has no cancel and is ordinary
+    // section DOM, so a rerender can sweep it away; and an Adventure-Sheet item whose effect
+    // opens a detour goes through Story.useItem, which passes NO sourceNode (correctly — an
+    // item action is not a section choice), so _captureReturnFrame fell back to the stale sail
+    // node. The detour's <return> then crossed off a route no ship had sailed and no payment
+    // had been made for. The node now reaches navigate inside the chosen ship's commit.
+    {
+      const twoShips348 = (g) => {
+        g.data.ships = [];
+        g.data.location = 'Kunrir';
+        g.addShip({ type: 'barque', name: 'Alpha', crew: 'poor', cargo: [], docked: 'Kunrir' });
+        g.addShip({ type: 'brigantine', name: 'Beta', crew: 'poor', cargo: [], docked: 'Kunrir' });
+      };
+      const xmlA348 = '<section name="A348" dock="Kunrir"><p>The harbour.</p><choices>'
+        + '<choice section="S348" sail="t">Set sail</choice>'
+        + '<choice section="S348" sail="t" revisit="t">Sail again later</choice>'
+        + '</choices></section>';
+      const xmlD348 = '<section name="D348"><p>Detour.</p><return>turn back</return></section>';
+      const xmlS348 = '<section name="S348"><p>At sea.</p><return>put about</return></section>';
+      const mk348 = () => {
+        const secs = { A348: parse(xmlA348), D348: parse(xmlD348), S348: parse(xmlS348) };
+        const g = GameState.create({ name: 'T348', gender: 'f', profession: 'Warrior', book: 1, adv });
+        g.ephemeral = true;
+        g.data.shards = 100;
+        twoShips348(g);
+        const cont = document.createElement('div');
+        let story;
+        story = new Story(cont, g, { navigate: (b, sn) => { g.goTo(b, sn); story.begin(secs[String(sn)], b, sn); }, onDeath(){}, notify(){} });
+        g.goTo(1, 'A348');
+        story.begin(secs.A348, 1, 'A348');
+        return { g, cont, story, secs };
+      };
+      const sailBtn348 = (c, label) => Array.from(c.querySelectorAll('.choice')).find((b) => b.textContent.includes(label));
+      const spent348 = (c, label) => { const b = sailBtn348(c, label); return !!b && b.disabled && /already taken/.test(b.title); };
+      const itemDetour348 = (story) => {
+        // A reusable Adventure-Sheet item whose effect opens a section detour: Story.useItem
+        // passes no sourceNode, which is the whole point — nothing about it should inherit one.
+        const it = { item: makeItem('item', 'map'), effect: { uses: -1, body: '<goto section="D348"/>' },
+                     body: parse('<effect><goto section="D348"/></effect>') };
+        story.useItem(it.item, it.effect, it.body);
+      };
+
+      // Opening the picker records nothing, and nothing has sailed or been paid.
+      {
+        const e = mk348();
+        sailBtn348(e.cont, 'Set sail').click();
+        ok('task348: two local ships open the which-ship picker rather than sailing',
+           !!e.cont.querySelector('.ship-choice') && e.story.section === 'A348'
+           && e.g.data.ships.every((sh) => sh.docked === 'Kunrir'),
+           'sec=' + e.story.section);
+        ok('task348: and the Story records NO source action while the question is open',
+           e.story._pendingSourceNode == null, String(e.story._pendingSourceNode));
+        // Abandon it the way a sheet mutation does: a same-section rerender sweeps the picker.
+        e.story.rerender();
+        ok('task348: a rerender sweeps the picker away, still with nothing recorded',
+           !e.cont.querySelector('.ship-choice') && e.story._pendingSourceNode == null);
+        // Now take a source-less item detour and come back.
+        itemDetour348(e.story);
+        ok('task348: the item detour opens', e.story.section === 'D348' && !!e.story._returnFrame);
+        e.cont.querySelector('.goto').click(); // the detour's <return>
+        ok('task348: the return lands back on the harbour section', e.story.section === 'A348', 'sec=' + e.story.section);
+        ok('task348: and the sail route the player never took is STILL LIVE',
+           !spent348(e.cont, 'Set sail') && sailBtn348(e.cont, 'Set sail').disabled === false,
+           'title=' + (sailBtn348(e.cont, 'Set sail') || {}).title);
+        ok('task348: nothing was paid and no ship moved (task 149 intact)',
+           e.g.data.shards === 100 && e.g.data.ships.every((sh) => sh.docked === 'Kunrir')
+           && e.g.data.sailingShipId == null);
+      }
+
+      // Choosing a ship for real DOES record the source, so the <return> crosses it off — the
+      // behaviour task 110 wants and the deferral must not have lost.
+      {
+        const e = mk348();
+        sailBtn348(e.cont, 'Set sail').click();
+        Array.from(e.cont.querySelectorAll('.ship-choice .btn-mini')).find((b) => /Beta/.test(b.textContent)).click();
+        ok('task348: picking a ship sails it and leaves the harbour',
+           e.story.section === 'S348' && e.g.data.ships.find((sh) => sh.name === 'Beta').docked === null
+           && e.g.data.ships.find((sh) => sh.name === 'Alpha').docked === 'Kunrir',
+           'sec=' + e.story.section);
+        e.cont.querySelector('.goto').click(); // the destination's <return>
+        ok('task348: the return crosses off the sail route that WAS taken',
+           e.story.section === 'A348' && spent348(e.cont, 'Set sail'),
+           'title=' + (sailBtn348(e.cont, 'Set sail') || {}).title);
+        ok('task348: and leaves the revisit="t" sibling live',
+           sailBtn348(e.cont, 'Sail again later').disabled === false);
+      }
+
+      // The two fixes compose (task 340's canonical source path): save inside the detour,
+      // reload through the sanitizer, resume, return — the untaken sail route must still be
+      // live, because the frame carries no source path at all rather than a stale one.
+      {
+        const e = mk348();
+        sailBtn348(e.cont, 'Set sail').click();
+        e.story.rerender();                 // abandon the picker
+        itemDetour348(e.story);             // source-less detour
+        const record = e.story.serializeVisit();
+        ok('task348: the saved detour frame records no source path at all',
+           !!record && !!record.frame && record.frame.usedSourcePath === null,
+           'path=' + JSON.stringify(record && record.frame && record.frame.usedSourcePath));
+        const secs2 = { A348: parse(xmlA348), D348: parse(xmlD348), S348: parse(xmlS348) };
+        const g2 = new GameState(sanitizeData(JSON.parse(JSON.stringify({ ...e.g.data, visit: record }))));
+        g2.ephemeral = true;
+        const cont2 = document.createElement('div');
+        let story2;
+        story2 = new Story(cont2, g2, { navigate: (b, sn) => { g2.goTo(b, sn); story2.begin(secs2[String(sn)], b, sn); }, onDeath(){}, notify(){} });
+        const frame2 = story2.deserializeFrame(g2.data.visit.frame, secs2.A348);
+        story2.resume(secs2.D348, 1, 'D348', g2.data.visit, frame2);
+        cont2.querySelector('.goto').click();
+        ok('task348: after a save/reload the return still leaves the untaken sail route live',
+           story2.section === 'A348' && !spent348(cont2, 'Set sail')
+           && sailBtn348(cont2, 'Set sail').disabled === false,
+           'title=' + (sailBtn348(cont2, 'Set sail') || {}).title);
+      }
+
+      // The one-ship path is unchanged: it commits synchronously and still records its source.
+      {
+        const secs = { A348: parse(xmlA348), D348: parse(xmlD348), S348: parse(xmlS348) };
+        const g = GameState.create({ name: 'T348s', gender: 'f', profession: 'Warrior', book: 1, adv });
+        g.ephemeral = true;
+        g.data.ships = [];
+        g.data.location = 'Kunrir';
+        g.addShip({ type: 'barque', name: 'Only', crew: 'poor', cargo: [], docked: 'Kunrir' });
+        const cont = document.createElement('div');
+        let story;
+        story = new Story(cont, g, { navigate: (b, sn) => { g.goTo(b, sn); story.begin(secs[String(sn)], b, sn); }, onDeath(){}, notify(){} });
+        g.goTo(1, 'A348');
+        story.begin(secs.A348, 1, 'A348');
+        sailBtn348(cont, 'Set sail').click();
+        ok('task348: one ship sails on the click, with no picker',
+           !cont.querySelector('.ship-choice') && story.section === 'S348'
+           && g.data.ships[0].docked === null, 'sec=' + story.section);
+        cont.querySelector('.goto').click();
+        ok('task348: and its <return> crosses the route off as before',
+           story.section === 'A348' && spent348(cont, 'Set sail'),
+           'title=' + (sailBtn348(cont, 'Set sail') || {}).title);
+      }
+    }
+
     // --- task 285: an open <lose blessing="?"> must ask WHICH blessing leaves ---
     // applyLose has taken a chooser for this since task 76 and no view ever supplied one, so it
     // fell back to state.data.blessings[0] — append order, i.e. the blessing held LONGEST. §4.641

@@ -16713,3 +16713,72 @@ the generated data and the stamp move with it — committed. `CHANGELOG.md` carr
 player-visible line, since what the sheet lists is something a player sees.
 
 ---
+
+## 348. An abandoned sail picker contaminates the next return frame
+
+**Priority: LOW.** No payment or ship is lost, but a route the player did not take can be
+marked spent after an unrelated item detour, contradicting the source-action contract task 110
+uses to decide whether a choice remains available.
+
+### What is wrong
+
+Both sail callers in `web/js/render-choices.js` assign `story._pendingSourceNode = node` before
+calling `sailThenGo`. With one ship, the chooser commits synchronously and that happens to be
+correct. With several ships, `sailThenGo` appends an inline "Sail which ship?" picker and
+returns; no navigation has happened, but the Story already says the sail choice was taken.
+
+The picker has no cancel control and is ordinary section DOM. A sheet mutation can rerender it
+away, or the player can simply use a reusable Adventure-Sheet item whose effect opens a section
+detour. `Story.useItem` correctly calls `navigate` without a source node - an item action is not
+a section choice - so `_captureReturnFrame` falls back to the stale pending sail node. On the
+detour's `<return>`, `ctx.usedSource` points at that sail route and `isSpentSource` disables it,
+even though no ship sailed and no sail payment was made.
+
+### Fix
+
+`sailThenGo` takes the prospective `sourceNode` as a parameter and passes it to
+`story.navigate(..., { sourceNode })` **inside the chosen ship's commit**, beside the deferred
+payment and the `sailShip` mutation. Both eager `story._pendingSourceNode = node` assignments
+are gone, so an abandoned picker leaves no Story field behind at all — a stronger property than
+leaving the right one.
+
+**This is task 149's fix applied to a second field.** 149 moved the *payment* into the commit
+because a picker that has navigated nowhere must not have charged anything; the source node is
+the same kind of claim — "this choice was taken" — made at the same wrong moment. The one-ship
+path hid it because its commit is synchronous, which is why the defect needed two ships to see.
+
+Nothing else moves: `commit` still runs inside `pay`, so task 149's guarantee that an abandoned
+picker consumes neither Shards nor a blessing nor a ship move is untouched and asserted.
+
+### Validation
+
+14 new assertions in `suite-actions`. Five fail against the eager assignment, confirmed by
+restoring it rather than assumed (`RESULT FAILURES pass=925 fail=5`): an `[object Element]` on
+the Story while the question is open, the same after a rerender, the untaken route reading
+"already taken" after the return, `usedSourcePath: "r.1.0"` in the saved frame, and the untaken
+route still spent after a reload.
+
+- opening the picker with two local ships navigates nowhere, sails nothing and records nothing;
+- a same-section rerender sweeps the picker away and still leaves nothing recorded — the
+  abandonment route the filing names, since the picker has no cancel control;
+- a source-less item detour (`Story.useItem`, which passes no `sourceNode` because an item
+  action is not a section choice) and its `<return>` leave the sail route **live**, with no
+  Shards spent, no ship moved and no `sailingShipId` set (task 149's guarantee);
+- choosing a ship for real sails **that** hull, leaves the other docked, and its `<return>`
+  does cross the route off — the task-110 behaviour the deferral must not have lost — while
+  the `revisit="t"` sibling stays live;
+- **the two fixes compose** (the filing's Validation): save inside the detour, reload through
+  the sanitizer, resume, return — the frame records no source path at all and the untaken route
+  is still live. With the eager assignment this is where the stale `"r.1.0"` shows up, because
+  task 340 made the path serialisable: before 340 the bug lasted one session, after it the bug
+  would have survived a reload;
+- and the one-ship path is unchanged — it commits on the click with no picker and still crosses
+  its route off.
+
+`node web/tests/node-import.mjs` `pass=35 fail=0`. Full browser suite
+`RESULT ALL PASS pass=3189 fail=0` (3175 before). No `books/`/`rules/` change, so
+`stamp-version.ps1` only. No `CHANGELOG.md` entry: reaching this needed two ships at one dock,
+an abandoned picker and an item detour, and the visible effect was one greyed choice — below
+the threshold the file is for.
+
+---

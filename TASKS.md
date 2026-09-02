@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-350 appears below: 207 and 326 are withdrawn as misdiagnoses, 348-350 are open,
-and all others are complete (see the Review log). File new work under the
+350 appears below: 207 and 326 are withdrawn as misdiagnoses, 349 and 350 are
+open, and all others are complete (see the Review log). File new work under the
 priority bucket that fits, and record the pass in the Review log. Completed
 detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 348. Opening a multi-ship sail picker records its choice as `_pendingSourceNode` before a ship is selected, so abandoning the picker and taking an item `<return>` detour crosses off a sail route the player never took
 - [ ] 349. Natural derived-stat reads still include unwritten bonuses: `defenceForMode` adds aura-raised `rankValue()`, while the `<if>` and `<set>` Stamina readers return the effective aura/affliction maximum instead of the written score
 - [ ] 350. Book 5 section 180's potion of restoration says "cure you of any diseases" but is transcribed `<lose disease="*"/>`, which task 343 made read the disease/poison family, so the potion now also cures poison — more than its printed sentence promises, and unlike book 1 section 342's twin potion which says "cure poison and disease" and carries both attributes
 
@@ -383,46 +382,7 @@ this order.*
 - [x] 344. asset ownership was inferred from sources that still EXIST, so a generated illustration stopped looking like output the moment its source was deleted or renamed and the reconciler preserved it as a manual drop-in; a still-published book's map survived its `-Map` source, and `web/assets/world-map.jpg` had no reconciliation path at all — a clean rebuild left every such orphan byte-for-byte unchanged and CI's rebuild-and-diff gate reported a match
 - [x] 346. the repository-root `index.html` forwarded with `location.replace('web/')`, building a new relative URL with neither `location.search` nor `location.hash`, so `/?seed=42&demo=1.10` became `/web/` and `app.js` never saw either parameter — the deep links `README.md` and `docs/Playing-the-Game.md` advertise opened the plain title screen when shared from the canonical root
 - [x] 347. `renderSheet` filtered codeword keys with `/^\d+\.\d/` alone — "hide internal box-codewords" — which catches only the dot-numeric shape, so the slash-scoped (`5/520`), word-continuing (`5.Aku.leaving`) and explicitly named engine flags (`StillInYellowport`, `HydraDamage`, `CharismaBonus`) were all chipped under "Codewords" beside Anchor; the sheet now shows a codeword only when the edition declares it, from the `Codewords=` union the build folds into `meta.json`
-
----
-
-## 348. An abandoned sail picker contaminates the next return frame
-
-**Priority: LOW.** No payment or ship is lost, but a route the player did not take can be
-marked spent after an unrelated item detour, contradicting the source-action contract task 110
-uses to decide whether a choice remains available.
-
-### What is wrong
-
-Both sail callers in `web/js/render-choices.js` assign `story._pendingSourceNode = node` before
-calling `sailThenGo`. With one ship, the chooser commits synchronously and that happens to be
-correct. With several ships, `sailThenGo` appends an inline "Sail which ship?" picker and
-returns; no navigation has happened, but the Story already says the sail choice was taken.
-
-The picker has no cancel control and is ordinary section DOM. A sheet mutation can rerender it
-away, or the player can simply use a reusable Adventure-Sheet item whose effect opens a section
-detour. `Story.useItem` correctly calls `navigate` without a source node - an item action is not
-a section choice - so `_captureReturnFrame` falls back to the stale pending sail node. On the
-detour's `<return>`, `ctx.usedSource` points at that sail route and `isSpentSource` disables it,
-even though no ship sailed and no sail payment was made.
-
-### Steps
-
-1. Keep the prospective source node local to the sail picker. Pass it to
-   `story.navigate(..., { sourceNode })` only inside the selected ship's commit, beside the
-   deferred payment and `sailShip` mutation.
-2. Remove the two eager `_pendingSourceNode` assignments. A one-ship sail must still capture
-   its source in the same commit; an abandoned picker must leave no Story field behind.
-3. Add a regression with two local ships: open the picker, abandon it via a same-section
-   rerender, take a source-less item detour, return, and require the sail choice to remain live.
-   Then choose a ship for real and require the returned non-`revisit` source to be spent.
-4. Keep task 149's guarantee that abandoning the picker consumes neither its Shards/blessing
-   nor a ship move.
-
-### Validation
-
-Run the focused actions/economy suites and the full browser suite. Include the save/load return
-round-trip once task 340 supplies a canonical source path, so the two fixes compose.
+- [x] 348. both sail callers set `story._pendingSourceNode` BEFORE calling `sailThenGo`, but with several local ships that function stands a which-ship picker and returns having navigated nowhere — so the Story claimed the sail choice was taken while the question was open, and an item detour opened in that window (`Story.useItem` passes no source node, correctly) inherited it, its `<return>` crossing off a route no ship had sailed
 
 ---
 
@@ -529,6 +489,26 @@ change (task 199) and rebuild the bundled data.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 348): closed **348**, filed nothing. The prospective source node is now
+a parameter of `sailThenGo` and reaches `story.navigate` inside the chosen ship's commit,
+beside the deferred payment and the `sailShip` mutation; both eager
+`story._pendingSourceNode = node` assignments are gone. So an abandoned picker leaves **no
+Story field behind at all**, which is a stronger property than "leaves the right one".
+**This is task 149's fix applied to a second field, and worth reading as that pattern rather
+than as a one-off.** 149 moved the *payment* into the commit because a picker that has
+navigated nowhere must not have charged anything; the source node is the same kind of
+claim — "this choice was taken" — made at the same wrong moment. Anything a sail picker
+records before a ship is chosen is a statement about a decision the player has not made, and
+the one-ship path hid it because its commit is synchronous.
+The two fixes compose, which is what the filing's Validation asked to be checked once task 340
+landed: with the eager assignment restored, the saved detour frame carries
+`usedSourcePath: "r.1.0"` — a stale source path that now *survives a reload*, because 340 made
+it serialisable. Before 340 the bug was confined to one session; the round-trip assertion is
+there so the pair cannot regress into a durable version of it. Five of the 14 new assertions
+fail against the eager assignment, confirmed by restoring it: an `[object Element]` on the
+Story while the question is open, the untaken route reading "already taken" after the return,
+and that stale path in the save.
 
 Worked 2026-09-02 (task 347): closed **347**, filed nothing. The Adventure Sheet shows a
 codeword only when the edition **declares** it: `build-data.ps1` folds the union of the

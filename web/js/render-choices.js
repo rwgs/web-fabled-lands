@@ -103,9 +103,13 @@ export function renderChoice(story, node, path) {
       // the which-ship picker never eats the cost (task 149); payChoiceCost still
       // re-validates against the live sheet (task 133) at the moment a ship is picked.
       if (gate.isSail && section != null) {
-        story._pendingSourceNode = node; // record the source action for a possible <return> (task 110)
+        // `node` is the PROSPECTIVE source: it is handed to sailThenGo and reaches
+        // story.navigate only inside the chosen ship's commit. Assigning
+        // story._pendingSourceNode here instead left the Story claiming this choice had been
+        // taken while the which-ship picker was still open, so an item detour taken in that
+        // window inherited it and its <return> crossed off a route nobody sailed. (task 348)
         sailThenGo(story, btn.parentElement || story.root, btn, targetBook, section,
-          () => payChoiceCost(story.state, gate.payment).ok);
+          () => payChoiceCost(story.state, gate.payment).ok, node);
         return;
       }
       // A cost-only choice (no destination) pays and stays — its price is immediate, with no
@@ -215,7 +219,7 @@ export function renderGoto(story, container, node, path) {
     const spend = () => { if (spendBlessing && story.state.hasBlessing(spendBlessing)) story.state.useBlessing(spendBlessing); return true; };
     // A sail goto puts a ship "at large" before leaving; prompt when more than one
     // ship is at this dock, else sail the single one. (task 73)
-    if (isSail) { story._pendingSourceNode = node; sailThenGo(story, container, link, book, section, spend); return; }
+    if (isSail) { sailThenGo(story, container, link, book, section, spend, node); return; } // sourceNode reaches navigate in the commit, not here (task 348)
     // Defer the blessing spend into the transactional navigate (task 167): a rejected or
     // interrupted target refunds the guarded blessing and leaves this goto live.
     story.navigate(book, section, { pay: spend, sourceNode: node }); // sourceNode: a possible <return> (task 110)
@@ -236,16 +240,25 @@ export function renderGoto(story, container, node, path) {
 // picked and returns whether it succeeded. It is deferred to here so an abandoned
 // which-ship chooser never eats the payment — the leak fixed by task 149; a failed
 // commit refreshes without sailing or navigating (mirrors payChoiceCost's { ok:false }).
-export function sailThenGo(story, container, link, book, section, commit) {
+//
+// `sourceNode` is the clicked choice/goto, and it travels the same deferred road for the same
+// reason (task 348): with several ships here this function stands a picker and RETURNS, having
+// navigated nowhere. Recording the source on the Story at that point made it claim the sail
+// choice had been taken while the question was still open, so an item detour opened in that
+// window — Story.useItem passes no sourceNode, correctly, since an item action is not a section
+// choice — inherited it, and the detour's <return> crossed off a route no ship had sailed. It is
+// now passed to navigate inside the chosen ship's commit, beside the payment and the sailShip
+// mutation, so an abandoned picker leaves no Story field behind at all.
+export function sailThenGo(story, container, link, book, section, commit, sourceNode = null) {
   const here = story.state.shipsHere();
   // Bundle the payment + putting the ship "at large" into the transactional navigate's
   // deferred price (task 167): they run in memory but are refunded if the destination is
   // missing/rejected, so an interrupted voyage neither eats the cost nor strands a ship at
   // sea. An unaffordable/blocked commit returns { ok:false } to refuse the move (task 149).
-  // The sail-exempt flag is set here (before the wrapper's leave hooks read it). The source
-  // node was recorded by the caller into _pendingSourceNode, which navigate keeps. (task 81)
+  // The sail-exempt flag is set here (before the wrapper's leave hooks read it). (task 81)
   const go = (ship) => {
     story.navigate(book, section, {
+      sourceNode,
       pay: () => {
         if (commit && !commit()) return { ok: false };
         const s = story.state.sailShip(ship && ship.id);

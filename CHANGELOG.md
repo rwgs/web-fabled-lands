@@ -12,7 +12,7 @@ below is the date a set of changes reached players. Nothing here requires the pl
 take any action: saves migrate on load, and the service worker replaces a cached build on
 its own.
 
-## 2026-09-02 - build 26.09.02.b166916
+## 2026-09-02 - build 26.09.02.c095ae6
 
 - **A healer who promises to cure "poison or disease" now cures poison.** The three arrays
   behind curses, diseases and poisons never formed one family, so a page that says
