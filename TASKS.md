@@ -3,10 +3,10 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-350 appears below: 207 and 326 are withdrawn as misdiagnoses, 344 and 346-350
-are open, and all others are complete (see the Review log). File new
-work under the priority bucket that fits, and record the pass in the Review log.
-Completed detail sections are archived in
+350 appears below: 207 and 326 are withdrawn as misdiagnoses, 346-350 are open,
+and all others are complete (see the Review log). File new work under the
+priority bucket that fits, and record the pass in the Review log. Completed
+detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
 
@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 344. The build copy passes never remove a generated map/illustration whose source was deleted or renamed; for illustrations the reconciler then mistakes the orphan for a manual drop-in, so clean-rebuild CI green-lights an asset the source tree no longer ships
 - [ ] 346. The repository-root `index.html` redirects with `location.replace('web/')` and drops `?demo=`/`?seed=`, so advertised deep links fail when opened at the canonical root instead of an already-`/web/` URL
 - [ ] 347. The Adventure Sheet hides only internal codewords shaped like `1.10.1`, so slash-scoped and named engine flags such as `5/520`, `5.Aku.leaving`, `StillInYellowport` and `HydraDamage` are displayed to the player as printed codewords
 - [ ] 348. Opening a multi-ship sail picker records its choice as `_pendingSourceNode` before a ship is selected, so abandoning the picker and taking an item `<return>` detour crosses off a sail route the player never took
@@ -383,56 +382,7 @@ this order.*
 - [x] 338. task 325's codeword-value gate lower-cased both sides of the lookup, so `codeword="anchor"` passed against the declared `Anchor` while `GameState.hasCodeword` and JaFL's `Codewords` (Java `Properties`) both compare case-sensitively — an award under one key and a test under another, leaving a branch that never opens and no diagnostic; the dictionaries are now explicitly ORDINAL, because a plain PowerShell `@{}` folds case and dropping the `ToLowerInvariant()` alone would have changed nothing
 - [x] 339. six living documents still carried pre-task-324/327 claims: `ROADMAP.md` said nothing under `build/` reads `book.ini` and treated it as no precedent, `docs/The-Books.md`'s folder sketch contradicted its own paragraph fifteen lines later, `README.md` and `docs/Build-Pipeline.md` collapsed the two codeword-note grades into one and `README.md` called the intentionally renamed Java reference tree UNTOUCHED, `docs/Corpus-Census.md` printed the shipped-section regex without its end anchor, and `CHANGELOG.md` had no entry for task 324's player-visible map captions
 - [x] 341. `renderTransfer` answered `applyTransfer`'s N-selection chooser with `chooser: () => [chosen]`, one item, then wrote the `xfer@` memo and rerendered the action done — so a `limit="2"` transfer moved one thing and the rest could never be picked; the picker now collects the whole limit through the same fixed-count collector the possession forfeit uses, and nothing moves, no memo is written and no price flag is set until the last pick lands
-
----
-
-## 344. Removing a source asset leaves its generated copy shipping forever
-
-**Priority: LOW.** Asset removal/rename is rare and no stale file exists today, but this
-breaks the source/generated ownership contract and defeats the clean-rebuild CI gate at the
-moment an asset is deliberately withdrawn - potentially including a licensing-driven removal.
-
-### What is wrong
-
-`build/build-data.ps1` copies the world map, each published book's regional map and its
-book-folder illustrations when a source exists. A missing source is only skipped; the old
-file under `web/assets/` is not removed.
-
-`Remove-StaleBookOutputs` in `build/release.ps1` closes only part of that gap:
-
-- a `book<N>.jpg` map is removed only when book N leaves `Published=`, not when the still-
-  published book's `-Map` source disappears;
-- an illustration is considered build-owned only if its name is found in a **current** book
-  folder. Once that source is deleted or renamed, the old generated filename is absent from
-  `$fromBooks`, so the reconciler classifies it as a manual drop-in and preserves it;
-- `web/assets/world-map.jpg` has no reconciliation path at all.
-
-A clean rebuild therefore leaves the tracked orphan byte-for-byte unchanged, and CI reports
-that generated output matches even though the declared source no longer contains it. A book
-withdrawal test passes because its fixture keeps the unpublished book folder and image in
-place, which lets the current ownership heuristic recognise the old output; deleting the
-folder exposes the same bug.
-
-### Steps
-
-1. Reconcile copied assets from a durable record of what the **previous build** owned (for
-   example the generated service-worker inventory before it is rewritten, or an explicit
-   generated manifest), not solely from source files that still exist.
-2. Remove an old generated regional map or illustration when its source is deleted/renamed,
-   and the world-map output when its source is absent. Continue preserving genuine manual
-   illustration/map drop-ins that no build inventory ever owned.
-3. Keep paths and ordering OS-neutral and deterministic; do not turn the inert `book.ini Map=`
-   key into the map source.
-4. Extend `release-selftest.ps1` with a real fixture build followed by (a) deletion/rename of
-   a published book illustration, (b) deletion of its map, (c) removal of a withdrawn book
-   folder, and (d) a manual drop-in control. Each former generated output must disappear and
-   the manual one must remain.
-
-### Validation
-
-Run the release self-test, a real build twice (second run byte-for-byte no-op), and the full
-browser suite. Confirm `git status --porcelain -- web/assets web/sw.js` is empty after the
-no-op rebuild.
+- [x] 344. asset ownership was inferred from sources that still EXIST, so a generated illustration stopped looking like output the moment its source was deleted or renamed and the reconciler preserved it as a manual drop-in; a still-published book's map survived its `-Map` source, and `web/assets/world-map.jpg` had no reconciliation path at all — a clean rebuild left every such orphan byte-for-byte unchanged and CI's rebuild-and-diff gate reported a match
 
 ---
 
@@ -663,6 +613,34 @@ change (task 199) and rebuild the bundled data.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 344): closed **344**, filed nothing. Ownership of a copied asset now
+comes from **the previous build's own inventory**, read out of `sw.js`'s generated region by
+`Get-BookInventory` before `Set-BookInventory` rewrites it. The rule is one sentence — a file
+is build-owned if a build inventory listed it, or a book folder supplies its name — and the
+first half is the fix: inferring ownership from surviving sources means a generated copy stops
+looking like output at exactly the moment its source is deleted or renamed, so the reconciler
+preserves it as though a player had dropped it in.
+**No new manifest file was needed, and that is the pass's one design decision.** Step 1 offered
+either the service-worker inventory or an explicit generated manifest; the inventory already
+exists, is already tracked, is already regenerated every build, and is already checked by CI's
+rebuild-and-diff gate — so a manifest would have been a second record of the same fact, with
+the drift that implies. Reading it back needed the inverse of `ConvertTo-UriComponent`, since a
+precache URL is escaped and an output name is not.
+**Two things the filing did not ask for, both found by writing the test.** The offline
+inventory listed `BOOK_MAPS` from the publish set, so a published book whose `-Map` source had
+gone kept a precache entry for a file the build no longer copies — the service worker would
+fetch a 404 on install. `Set-BookInventory` now takes the books whose map was really copied.
+And the world map needed its own line rather than a rule: it has no inventory entry and no
+per-book identity, but its source path is fixed and singular, so an absent
+`images/world-map.jpg` means the output is an orphan.
+All three halves were confirmed to discriminate by reverting them separately: inventory-based
+illustration ownership (2 failures — the rename and the delete), the map clause (1) and the
+world-map line (1). The scenarios deliberately delete the SOURCE rather than withdrawing the
+book, because the existing withdrawal run passes against the pre-344 reconciler — its fixture
+keeps the unpublished folder and image in place, which is precisely what let the old heuristic
+recognise the output. `README.md` and `docs/Build-Pipeline.md` now state the ownership rule, so
+the next reader does not have to re-derive it from the reconciler.
 
 Worked 2026-09-02 (task 341): closed **341**, filed nothing. `renderTransfer`'s picker collects
 the whole `limit=` before committing, through the fixed-count collector task 226/228 already

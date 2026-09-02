@@ -295,6 +295,93 @@ foreach ($n in $ADDED) {
         (Test-Path (Join-Path $tmp 'web/assets/illus/142.jpg'))
 }
 
+# ---- task 344: an output whose SOURCE went away must go with it ------------------------
+# The withdrawal run above passes even with the pre-344 reconciler, because its fixture leaves
+# the unpublished book's folder and image in place - which is exactly what let the old
+# ownership heuristic recognise the output as its own. These four scenarios remove the source
+# instead, which is the case the heuristic could not see: an illus/ file whose name no current
+# book folder supplies looked like a manual drop-in and was preserved forever, so a clean
+# rebuild left the orphan byte-for-byte unchanged and CI's rebuild-and-diff gate reported a
+# match. Ownership now comes from the previous build's own inventory in sw.js.
+New-E2EFixture 2
+Set-Published 2 '1,2'
+Invoke-FixtureBuild
+$art1  = Join-Path $tmp 'web/assets/illus/Art 1.jpg'
+$map1  = Join-Path $tmp 'web/assets/maps/book1.jpg'
+$art2  = Join-Path $tmp 'web/assets/illus/Art 2.jpg'
+$map2  = Join-Path $tmp 'web/assets/maps/book2.jpg'
+$world = Join-Path $tmp 'web/assets/world-map.jpg'
+Write-Text (Join-Path $tmp 'web/assets/illus/142.jpg') 'DROPIN'   # the (d) control
+Write-Text (Join-Path $tmp 'images/world-map.jpg') 'WORLD'
+Invoke-FixtureBuild
+Assert 'task344: the fixture build owns both books'' art, and the world map' `
+    ((Test-Path $art1) -and (Test-Path $map1) -and (Test-Path $art2) -and (Test-Path $map2) -and (Test-Path $world))
+
+# (a) RENAME a published book's illustration. Both halves matter: the old output must go
+# (its source no longer exists under that name) and the new one must arrive.
+Remove-Item -LiteralPath (Join-Path $tmp 'books/book1/Art 1.jpg') -Force
+Write-Text (Join-Path $tmp 'books/book1/Art One.jpg') 'ART1'
+Invoke-FixtureBuild
+$sw = [System.IO.File]::ReadAllText((Join-Path $tmp 'web/sw.js'))
+Assert 'task344: renaming a published illustration removes the old copy and adds the new' `
+    ((-not (Test-Path $art1)) -and (Test-Path (Join-Path $tmp 'web/assets/illus/Art One.jpg')) `
+     -and $sw -notlike '*Art%201.jpg*' -and $sw -like '*Art%20One.jpg*') $sw
+
+# ...and DELETING one outright, with nothing to replace it.
+Remove-Item -LiteralPath (Join-Path $tmp 'books/book2/Art 2.jpg') -Force
+Invoke-FixtureBuild
+$sw = [System.IO.File]::ReadAllText((Join-Path $tmp 'web/sw.js'))
+Assert 'task344: deleting a published illustration removes its generated copy' `
+    ((-not (Test-Path $art2)) -and $sw -notlike '*Art%202.jpg*') $sw
+
+# (b) DELETE a still-published book's regional map. The publish set alone cannot see this:
+# book 2 is published, so the pre-344 rule kept book2.jpg forever.
+Remove-Item -LiteralPath (Join-Path $tmp 'books/book2/Region-Map.jpg') -Force
+Invoke-FixtureBuild
+$sw = [System.IO.File]::ReadAllText((Join-Path $tmp 'web/sw.js'))
+Assert 'task344: deleting a published book''s map source removes its copied map' `
+    (-not (Test-Path $map2))
+Assert 'task344: ...and drops it from the offline inventory, keeping book 1''s' `
+    ($sw -notlike "*'./assets/maps/book2.jpg',*" -and $sw -like "*'./assets/maps/book1.jpg',*") $sw
+Assert 'task344: the still-sourced map and data are untouched' `
+    ((Test-Path $map1) -and (Test-Path (Join-Path $tmp 'web/data/book2.json')))
+
+# The world map has no inventory entry and no per-book identity, so it needs its own rule.
+Remove-Item -LiteralPath (Join-Path $tmp 'images/world-map.jpg') -Force
+Invoke-FixtureBuild
+Assert 'task344: removing images/world-map.jpg removes web/assets/world-map.jpg' `
+    (-not (Test-Path $world))
+
+# (c) WITHDRAW a book AND delete its folder - the shape the existing withdrawal run cannot
+# reach, because with the folder gone there is no source left to identify the outputs.
+Set-Published 2 '1'
+Remove-Item -LiteralPath (Join-Path $tmp 'books/book2') -Recurse -Force
+Write-Text (Join-Path $tmp 'books/books.ini') (@(
+    'Books=1', 'Published=1', '1.Path=book1', '1.Title=Base Book') -join "`n")
+Invoke-FixtureBuild
+$sw = [System.IO.File]::ReadAllText((Join-Path $tmp 'web/sw.js'))
+Assert 'task344: a withdrawn book whose FOLDER is gone still loses every generated output' `
+    ((-not (Test-Path (Join-Path $tmp 'web/data/book2.json'))) -and (-not (Test-Path $map2)) `
+     -and $sw -notlike '*book2*') $sw
+
+# (d) the control, all the way through: a manual drop-in no inventory ever listed and no
+# book folder supplies is never touched, however many reconciles run over it.
+Assert 'task344: the manual illustration drop-in survived every one of these rebuilds' `
+    (Test-Path (Join-Path $tmp 'web/assets/illus/142.jpg'))
+Assert 'task344: and book 1''s own outputs are all still in place' `
+    ((Test-Path (Join-Path $tmp 'web/data/book1.json')) -and (Test-Path $map1) `
+     -and (Test-Path (Join-Path $tmp 'web/assets/illus/Art One.jpg')))
+
+# A second build changes nothing: the reconciler is idempotent, which is what makes the
+# rebuild-and-diff gate meaningful.
+$before = @(Get-ChildItem -Path (Join-Path $tmp 'web') -Recurse -File | Sort-Object FullName |
+    ForEach-Object { "$($_.FullName)|$($_.Length)" })
+Invoke-FixtureBuild
+$after = @(Get-ChildItem -Path (Join-Path $tmp 'web') -Recurse -File | Sort-Object FullName |
+    ForEach-Object { "$($_.FullName)|$($_.Length)" })
+Assert 'task344: a second build over the reconciled tree is a no-op' `
+    (($before -join "`n") -eq ($after -join "`n")) (($before + @('---') + $after) -join "`n")
+
 # ---- the failure path: a broken fixture must say WHICH file broke ----------------------
 # A non-zero exit is not a diagnosis. Delete the book.ini task 333 added and the codeword
 # gate fires exactly as it did on CI for four commits - so this checks the thing that was

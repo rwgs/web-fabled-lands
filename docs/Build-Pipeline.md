@@ -149,6 +149,29 @@ edit. `release-selftest.ps1` drives a real build of a temp tree in both directio
 next-book transition, because a publish set that quietly stopped reaching one of those
 consumers would look exactly like today's intact six-book edition.
 
+### Which copied files the build owns
+
+`Remove-StaleBookOutputs` clears what the copy loops no longer produce, and the ownership rule
+is: **a file is build-owned if a build inventory listed it, or a book folder supplies its
+name.** The first half is why `Get-BookInventory` reads `sw.js`'s generated region *before*
+`Set-BookInventory` rewrites it — inferring ownership from surviving sources alone means a
+generated copy stops looking like output the moment its source is deleted or renamed, so the
+reconciler preserves it as though a player had dropped it in and a clean rebuild leaves the
+orphan byte-for-byte unchanged (task 344). The second half is a widening union, kept for a tree
+whose `sw.js` region was reset by hand.
+
+Two outputs need more than the publish set. A **regional map** is cleared when a
+*still-published* book's `-Map` source goes, which is why the build tells the reconciler the
+book numbers whose map it really copied rather than just which books are published — and the
+offline inventory lists only those, so the service worker never tries to precache a 404. The
+**world map** has no inventory entry and no per-book identity, so `Remove-StaleWorldMap` is its
+own line: its source path is fixed and singular, so an absent `images/world-map.jpg` means
+`web/assets/world-map.jpg` is an orphan.
+
+The general per-section art the README invites players to drop into `web/assets/illus/` is in
+neither owned set, so it survives every reconcile — the property the union has to preserve, and
+the one the self-test's `142.jpg` control follows all the way through.
+
 ---
 
 ## The build stamp

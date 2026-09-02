@@ -190,8 +190,14 @@ entry, or a published book missing its `Title=`, `Path=` or source directory, ab
 build instead of quietly producing a partial edition. Taking a book back off the line
 **removes its generated outputs** (`web/data/book<N>.json`, `web/assets/maps/book<N>.jpg`
 and its copied illustrations), so a withdrawal can't leave a stale bundle that CI's
-rebuild-and-diff gate is blind to. Manual illustration drop-ins (below) match no book
-folder's art and are never touched.
+rebuild-and-diff gate is blind to.
+
+**A file is build-owned if a build inventory listed it, or a book folder supplies its name** —
+the previous build's inventory is read out of `sw.js` before the new one is written, so a
+generated copy is still recognised as output after its *source* has been deleted or renamed.
+The same reconcile drops a still-published book's map when its `-Map` source goes and
+`web/assets/world-map.jpg` when `images/world-map.jpg` does. Manual illustration drop-ins
+(below) are in neither set and are never touched.
 
 `web/sw.js` therefore has one **generated region** — the `BOOK_DATA` / `BOOK_MAPS` /
 `BOOK_ILLUS` lists between its `BEGIN`/`END GENERATED BOOK INVENTORY` markers, spread into

@@ -16474,3 +16474,98 @@ see — though the 2026-09-02 heading's build hash was moved to the stamp that n
 session's changes.
 
 ---
+
+## 344. Removing a source asset leaves its generated copy shipping forever
+
+**Priority: LOW.** Asset removal/rename is rare and no stale file exists today, but this
+breaks the source/generated ownership contract and defeats the clean-rebuild CI gate at the
+moment an asset is deliberately withdrawn - potentially including a licensing-driven removal.
+
+### What is wrong
+
+`build/build-data.ps1` copies the world map, each published book's regional map and its
+book-folder illustrations when a source exists. A missing source is only skipped; the old
+file under `web/assets/` is not removed.
+
+`Remove-StaleBookOutputs` in `build/release.ps1` closes only part of that gap:
+
+- a `book<N>.jpg` map is removed only when book N leaves `Published=`, not when the still-
+  published book's `-Map` source disappears;
+- an illustration is considered build-owned only if its name is found in a **current** book
+  folder. Once that source is deleted or renamed, the old generated filename is absent from
+  `$fromBooks`, so the reconciler classifies it as a manual drop-in and preserves it;
+- `web/assets/world-map.jpg` has no reconciliation path at all.
+
+A clean rebuild therefore leaves the tracked orphan byte-for-byte unchanged, and CI reports
+that generated output matches even though the declared source no longer contains it. A book
+withdrawal test passes because its fixture keeps the unpublished book folder and image in
+place, which lets the current ownership heuristic recognise the old output; deleting the
+folder exposes the same bug.
+
+### Fix
+
+`Get-BookInventory` in `release.ps1` reads `sw.js`'s generated region back — the names the
+PREVIOUS build owned — before `Set-BookInventory` rewrites it, unescaping the illustration URLs
+through the inverse of `ConvertTo-UriComponent`. A missing file, missing markers or an empty
+region all yield empty lists rather than throwing: nothing to reconcile against is the right
+answer for a fresh tree, and it is also what keeps a genuine drop-in out of reach. The throw on
+missing markers stays with the writer, where it protects the thing that matters.
+
+`Remove-StaleBookOutputs` then has one rule: **a file is build-owned if a build inventory
+listed it, or a book folder supplies its name.** The first half is the fix — ownership inferred
+from surviving sources means a generated copy stops looking like output at exactly the moment
+its source is deleted or renamed. The second half is kept as a widening union, not replaced, so
+a tree whose `sw.js` region was reset by hand still behaves as it did. The general per-section
+art the README invites players to drop into `web/assets/illus/` is in neither set and survives.
+
+The regional map needed a second clause of its own: the publish set alone cannot see a
+*still-published* book whose `-Map` source has gone, so `build-data.ps1` now reports the book
+numbers whose map it really copied (`$mapBooks`) rather than assuming every published book has
+one. `Remove-StaleWorldMap` is a separate line because the world map has no inventory entry and
+no per-book identity — but its source path is fixed and singular, and the README documents the
+output as generated, so an absent source means an orphan.
+
+**No new manifest file.** Step 1 offered either the service-worker inventory or an explicit
+generated manifest; the inventory already exists, is tracked, is regenerated every build and is
+already covered by CI's rebuild-and-diff gate, so a manifest would have been a second record of
+one fact with the drift that implies.
+
+**One defect the filing did not name, found by writing the test.** `Set-BookInventory` listed
+`BOOK_MAPS` from the publish set, so a published book whose map source had gone kept a precache
+entry for a file the build no longer produces — the service worker would fetch a 404 on
+install. It now takes `$mapBooks` too, defaulting to the publish set so an un-updated caller is
+unchanged.
+
+`README.md` and `docs/Build-Pipeline.md` state the ownership rule and both extra clauses, so it
+does not have to be re-derived from the reconciler.
+
+### Validation
+
+11 new assertions in `release-selftest.ps1` (59, from 48), over a real fixture build. They
+delete the **source** rather than withdrawing the book, which is the case the existing
+withdrawal run cannot reach: that fixture keeps the unpublished folder and image in place, and
+that is exactly what let the old heuristic recognise the output as its own.
+
+- **(a)** renaming a published book's illustration — the old copy goes, the new one arrives,
+  and the offline inventory follows both ways; then deleting one outright with no replacement.
+- **(b)** deleting a still-published book's `-Map` source — the copied map goes, the inventory
+  drops it while keeping book 1's, and the still-sourced map and the bundled data are
+  untouched. Plus the world map, removed when `images/world-map.jpg` is.
+- **(c)** withdrawing a book **and deleting its folder**, so no source is left to identify the
+  outputs.
+- **(d)** the control: a manual `142.jpg` drop-in, present through every one of those rebuilds
+  and touched by none of them, with book 1's own outputs all still in place.
+- and a second build over the reconciled tree compared file-for-file as a no-op, since an
+  idempotent reconciler is what makes the rebuild-and-diff gate meaningful.
+
+All three halves of the fix were confirmed to discriminate by reverting them separately, not
+assumed: inventory-based illustration ownership (`pass=57 fail=2` — the rename and the delete),
+the map clause (`fail=1`) and the world-map line (`fail=1`).
+
+`release-selftest.ps1` `RESULT ALL PASS pass=59 fail=0`, `validate-selftest.ps1` `pass=58
+fail=0`, `node web/tests/node-import.mjs` `pass=35 fail=0`, full browser suite
+`RESULT ALL PASS pass=3158 fail=0`. A real build run twice leaves
+`git status --porcelain -- web/assets web/sw.js web/data web/js/version.js` **empty**, and both
+stamps report "already at" — `build/` is not app source, so there is no generated diff at all.
+
+---

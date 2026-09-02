@@ -227,6 +227,13 @@ $metaFile = Join-Path $out 'meta.json'
 [System.IO.File]::WriteAllText($metaFile, $metaJson, (New-Object System.Text.UTF8Encoding($false)))
 Write-Host ("meta.json -> {0:N0} bytes" -f $metaJson.Length)
 
+# ---- What the PREVIOUS build owned -------------------------------------------
+# Read before any copy or rewrite: sw.js's generated inventory is the durable record of the
+# last build's outputs, and the reconciler below needs it to recognise the generated copy of a
+# source that has since been deleted or renamed. Inferring ownership from surviving sources
+# alone left such a copy looking like a manual drop-in, so it shipped forever. (task 344)
+$prevInventory = Get-BookInventory (Join-Path $root 'web/sw.js')
+
 # ---- Copy the world map -----------------------------------------------------
 $mapSrc = Join-Path $images 'world-map.jpg'
 if (Test-Path $mapSrc) {
@@ -240,10 +247,15 @@ if (Test-Path $mapSrc) {
 # images/maps/ are copied too. (Section illustrations go in web/assets/illus/.)
 $mapsOut = Join-Path $assets 'maps'
 New-Item -ItemType Directory -Force -Path $mapsOut | Out-Null
+# The book numbers whose map this build really copied - NOT simply the publish set. A
+# published book whose `-Map` source has been deleted or renamed produces no map here, and the
+# reconciler has to know that to clear the old one. (task 344)
+$mapBooks = @()
 foreach ($b in $bundled) {
     $rmap = Get-ChildItem -Path $bookDirs[$b] -File | Where-Object { $_.BaseName -match '-Map$' } | Select-Object -First 1
     if ($rmap) {
         Copy-Item $rmap.FullName (Join-Path $mapsOut ("book{0}.jpg" -f $b)) -Force
+        $mapBooks += $b
         Write-Host ("book{0} map: {1}" -f $b, $rmap.Name)
     }
 }
@@ -270,20 +282,23 @@ foreach ($b in $bundled) {
     }
 }
 
-# ---- Reconcile build-owned outputs with the publish set ----------------------
-# The loops above overwrite what IS published; this clears what is not, so withdrawing a
-# book from Published= cannot leave a stale book<N>.json, regional map or copied
-# illustration behind (CI's rebuild-and-diff gate cannot see a file a rebuild leaves in
-# place). Manual illustration drop-ins are preserved. (task 209)
-foreach ($gone in (Remove-StaleBookOutputs $root $bundled $illusNames)) {
-    Write-Host "removed withdrawn output: $gone"
-}
+# ---- Reconcile build-owned outputs with what this build produced -------------
+# The loops above overwrite what they produce; this clears what they no longer do. Two ways
+# an output goes stale: a book leaves Published= (task 209), or a still-published book's art
+# is deleted or renamed (task 344) - the second needs $prevInventory, because the source that
+# would have identified the output as ours is exactly the thing that is gone. Manual
+# illustration drop-ins, which no inventory ever listed and no book folder supplies, are
+# preserved.
+$stale = @(Remove-StaleBookOutputs -root $root -published $bundled -keepIllus $illusNames `
+    -mapBooks $mapBooks -prev $prevInventory)
+$stale += @(Remove-StaleWorldMap $root)
+foreach ($gone in $stale) { Write-Host "removed stale output: $gone" }
 
 # ---- Regenerate the service worker's offline inventory ----------------------
 # sw.js used to hand-list six data files, six maps and three illustrations, so a newly
 # published book would have worked online and been missing from a fresh offline install.
 # (task 209)
-$swChanged = Set-BookInventory (Join-Path $root 'web/sw.js') $bundled $illusNames
+$swChanged = Set-BookInventory (Join-Path $root 'web/sw.js') $bundled $illusNames $mapBooks
 Write-Host ($swChanged ? 'sw.js: offline book inventory updated' : 'sw.js: offline book inventory already current')
 
 # ---- Refresh the build stamp shown in-game ----------------------------------
