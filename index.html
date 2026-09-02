@@ -16,6 +16,13 @@
 </head>
 <body>
   <p>Entering the <a href="web/">Fabled Lands</a>…</p>
-  <script>location.replace('web/');</script>
+  <!-- Carry the incoming query and hash across, so the documented deep links keep working
+       when the site is opened at its canonical root: `/?seed=42&demo=1.10` has to become
+       `/web/?seed=42&demo=1.10`, not `/web/`. A bare 'web/' built a new relative URL and
+       dropped both, so app.js never saw them and the link opened the title screen with
+       ordinary random dice. Relative on purpose — it must also work from a subpath. The
+       <meta refresh> and the <a> above stay as the no-script fallback; neither can preserve
+       the URL, which is why the script path is the one that carries it. (task 346) -->
+  <script>location.replace('web/' + location.search + location.hash);</script>
 </body>
 </html>

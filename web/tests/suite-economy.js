@@ -1546,6 +1546,47 @@ export async function run(ctx) {
          unreached.length === 0, 'unreached: ' + unreached.join(', '));
     }
 
+    // --- task 346: the root redirect carries the deep-link query and hash across -----------
+    // The repository-root index.html forwards a root deployment into the self-contained web/
+    // app, and its script was `location.replace('web/')` - a NEW relative URL with neither
+    // location.search nor location.hash. So `/?seed=42&demo=1.10` became `/web/`, app.js never
+    // saw either parameter, and a link README.md and docs/Playing-the-Game.md both advertise
+    // opened the title screen with ordinary random dice.
+    //
+    // Measured against the SHIPPED expression rather than a copy of it: the redirect is parsed
+    // out of the real file and evaluated with a synthetic `location`, so nothing navigates and
+    // the assertion cannot pass while index.html says something else. (task 346)
+    { // block-scoped
+      const rootSrc346 = await (await fetch('../index.html')).text();
+      const expr346 = (rootSrc346.match(/location\.replace\(([^;]+)\);/) || [])[1];
+      ok('task346: the root redirect expression parses out of the shipped index.html',
+         !!expr346, String(expr346));
+      const target346 = (search, hash) => new Function('location', `return (${expr346});`)({ search, hash });
+      ok('task346: a bare root visit still lands on web/', target346('', '') === 'web/', target346('', ''));
+      ok('task346: ?seed= and ?demo= ride across together (the documented deep link)',
+         target346('?seed=42&demo=1.10', '') === 'web/?seed=42&demo=1.10', target346('?seed=42&demo=1.10', ''));
+      ok('task346: a hash rides across too — preserving the incoming URL costs nothing',
+         target346('?demo=1.10', '#top') === 'web/?demo=1.10#top', target346('?demo=1.10', '#top'));
+      // The target stays RELATIVE, so a repository served from a subpath resolves it against the
+      // document rather than the origin — the property a hard-coded '/web/' would have lost.
+      const at346 = (base, search) => new URL(target346(search, ''), base).href;
+      ok('task346: the target resolves correctly from a subpath as well as the origin root',
+         at346('http://h/sub/dir/index.html', '?seed=7') === 'http://h/sub/dir/web/?seed=7'
+         && at346('http://h/index.html', '?seed=7') === 'http://h/web/?seed=7',
+         at346('http://h/sub/dir/index.html', '?seed=7'));
+      // The no-script fallbacks are unchanged: neither can preserve the URL, which is why the
+      // script path is the one that carries it — but a browser without JS must still get in.
+      ok('task346: the <meta refresh> and the plain link fallbacks are still there',
+         /<meta http-equiv="refresh" content="0; url=web\/" \/>/.test(rootSrc346)
+         && /<a href="web\/">/.test(rootSrc346));
+      // And app.js really does read both from location.search, which is what makes carrying it
+      // the whole fix rather than half of one.
+      const appSrc346 = await (await fetch('./js/app.js')).text();
+      ok('task346: app.js reads seed= and demo= out of location.search',
+         /new URLSearchParams\(location\.search\)/.test(appSrc346)
+         && /params\.get\('seed'\)/.test(appSrc346) && /params\.get\('demo'\)/.test(appSrc346));
+    }
+
     // --- task 201: an update must not reload away an unsaved creation draft ---------------
     // registerSW reloaded on controllerchange the moment a new build activated, which is
     // lossless while the only live state is autosaved progress. The creation screen is the

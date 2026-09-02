@@ -108,11 +108,16 @@ games live in that browser.
 ### Deep-link / preview
 
 `?demo=<book>.<section>` starts a default Warrior at that section — handy for testing or
-sharing a spot, e.g. `…/index.html?demo=1.10`.
+sharing a spot, e.g. `…/web/?demo=1.10`.
 
 `?seed=<value>` makes every dice roll deterministic for that page load (any string or
 number works), so a run is reproducible and manual testing is repeatable — e.g.
-`…/index.html?seed=42&demo=1.10`. Omit it for normal random play.
+`…/web/?seed=42&demo=1.10`. Omit it for normal random play.
+
+Either works **at the site's root too** — `https://host/?seed=42&demo=1.10`. The root
+`index.html` forwards into `web/` carrying the query and hash across, so a link shared from
+the canonical entry point arrives with its parameters intact rather than at the plain title
+screen.
 
 ---
 

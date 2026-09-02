@@ -114,6 +114,10 @@ Two query parameters are useful for testing and for sharing a spot:
 
 They combine: `?seed=42&demo=1.10` replays identically every time.
 
+Both work on the app itself (`…/web/?demo=1.10`) and at the **site's root**
+(`https://host/?demo=1.10`) — the root page forwards into `web/` carrying the query and hash
+across, so a shared link keeps its parameters.
+
 ---
 
 ## Books not in this edition

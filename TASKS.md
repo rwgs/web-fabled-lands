@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-350 appears below: 207 and 326 are withdrawn as misdiagnoses, 346-350 are open,
+350 appears below: 207 and 326 are withdrawn as misdiagnoses, 347-350 are open,
 and all others are complete (see the Review log). File new work under the
 priority bucket that fits, and record the pass in the Review log. Completed
 detail sections are archived in
@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 346. The repository-root `index.html` redirects with `location.replace('web/')` and drops `?demo=`/`?seed=`, so advertised deep links fail when opened at the canonical root instead of an already-`/web/` URL
 - [ ] 347. The Adventure Sheet hides only internal codewords shaped like `1.10.1`, so slash-scoped and named engine flags such as `5/520`, `5.Aku.leaving`, `StillInYellowport` and `HydraDamage` are displayed to the player as printed codewords
 - [ ] 348. Opening a multi-ship sail picker records its choice as `_pendingSourceNode` before a ship is selected, so abandoning the picker and taking an item `<return>` detour crosses off a sail route the player never took
 - [ ] 349. Natural derived-stat reads still include unwritten bonuses: `defenceForMode` adds aura-raised `rankValue()`, while the `<if>` and `<set>` Stamina readers return the effective aura/affliction maximum instead of the written score
@@ -383,47 +382,7 @@ this order.*
 - [x] 339. six living documents still carried pre-task-324/327 claims: `ROADMAP.md` said nothing under `build/` reads `book.ini` and treated it as no precedent, `docs/The-Books.md`'s folder sketch contradicted its own paragraph fifteen lines later, `README.md` and `docs/Build-Pipeline.md` collapsed the two codeword-note grades into one and `README.md` called the intentionally renamed Java reference tree UNTOUCHED, `docs/Corpus-Census.md` printed the shipped-section regex without its end anchor, and `CHANGELOG.md` had no entry for task 324's player-visible map captions
 - [x] 341. `renderTransfer` answered `applyTransfer`'s N-selection chooser with `chooser: () => [chosen]`, one item, then wrote the `xfer@` memo and rerendered the action done — so a `limit="2"` transfer moved one thing and the rest could never be picked; the picker now collects the whole limit through the same fixed-count collector the possession forfeit uses, and nothing moves, no memo is written and no price flag is set until the last pick lands
 - [x] 344. asset ownership was inferred from sources that still EXIST, so a generated illustration stopped looking like output the moment its source was deleted or renamed and the reconciler preserved it as a manual drop-in; a still-published book's map survived its `-Map` source, and `web/assets/world-map.jpg` had no reconciliation path at all — a clean rebuild left every such orphan byte-for-byte unchanged and CI's rebuild-and-diff gate reported a match
-
----
-
-## 346. The root redirect discards deep-link query parameters
-
-**Priority: LOW.** Normal play is unaffected, and a URL already under `web/` works. The
-repository root and deployed canonical entry point silently ignore the documented demo/seed
-feature, so a shared link opens the title screen with ordinary random dice instead.
-
-### What is wrong
-
-The root `index.html` exists to forward a repository-root deployment into the self-contained
-`web/` app. Its script is `location.replace('web/')`, which constructs a new relative URL
-without `location.search` or `location.hash`. Thus:
-
-```
-/?seed=42&demo=1.10  ->  /web/
-```
-
-`app.js` never sees either parameter. `README.md` and `docs/Playing-the-Game.md` advertise
-both for testing and sharing, and the wiki links the public site at its root. The static meta
-refresh has the same limitation, but the JavaScript path is the normal modern-browser route
-and can preserve the URL exactly.
-
-### Steps
-
-1. Build the redirect target from `web/` plus `location.search` and `location.hash`, then use
-   `location.replace` as today. Keep the plain `<a href="web/">` fallback.
-2. Add a source-level browser assertion that the root redirect preserves both parameters (and
-   a hash, since preserving the incoming URL costs nothing). Do not execute the redirect in the
-   test harness; inspect or exercise it in an isolated page.
-3. Verify the target remains correct when the repository is served from a subpath rather than
-   the origin root.
-4. Clarify the README example with the public/root form once it genuinely works; coordinate
-   that edit with task 339's living-doc sweep.
-
-### Validation
-
-Serve the repository root and open `/?seed=42&demo=1.10`; the resulting `/web/` URL must keep
-both parameters and create the preview. Run the full browser suite. Root `index.html` is
-outside the service-worker scope and app stamp inputs, so confirm no generated file changes.
+- [x] 346. the repository-root `index.html` forwarded with `location.replace('web/')`, building a new relative URL with neither `location.search` nor `location.hash`, so `/?seed=42&demo=1.10` became `/web/` and `app.js` never saw either parameter — the deep links `README.md` and `docs/Playing-the-Game.md` advertise opened the plain title screen when shared from the canonical root
 
 ---
 
@@ -613,6 +572,25 @@ change (task 199) and rebuild the bundled data.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 346): closed **346**, filed nothing. One expression —
+`location.replace('web/' + location.search + location.hash)` — plus seven assertions and the
+doc line the filing's step 4 was waiting on. The target stays **relative** on purpose, so a
+repository served from a subpath resolves it against the document; a hard-coded `/web/` would
+have fixed the deep link and broken that.
+**How the assertion is written is the part worth keeping.** The redirect is parsed out of the
+SHIPPED `index.html` and evaluated with a synthetic `location`, so nothing navigates and the
+test cannot pass while the file says something else — a test that re-implemented the expression
+would have gone green against the broken page. Step 2 asked not to execute the redirect in the
+harness; reading the real source and running only the expression satisfies that and is stronger
+than inspecting a string.
+Verified end to end as the Validation section asks, not only by assertion: served the repository
+root and opened `/?seed=42&demo=1.10`. The server log shows `GET /?seed=42&demo=1.10` followed
+by `GET /web/?seed=42&demo=1.10`, and the resulting DOM reads `The War-Torn Kingdom · 10` — the
+demo section really loaded from the root URL. Three of the seven assertions fail against the
+pre-fix page (`pass=685 fail=3`), each reporting the bare `web/`. The stamp did not move, which
+confirms the filing's own note that root `index.html` is outside the app stamp inputs and the
+service-worker scope.
 
 Worked 2026-09-02 (task 344): closed **344**, filed nothing. Ownership of a copied asset now
 comes from **the previous build's own inventory**, read out of `sw.js`'s generated region by

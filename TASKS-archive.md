@@ -16569,3 +16569,68 @@ fail=0`, `node web/tests/node-import.mjs` `pass=35 fail=0`, full browser suite
 stamps report "already at" — `build/` is not app source, so there is no generated diff at all.
 
 ---
+
+## 346. The root redirect discards deep-link query parameters
+
+**Priority: LOW.** Normal play is unaffected, and a URL already under `web/` works. The
+repository root and deployed canonical entry point silently ignore the documented demo/seed
+feature, so a shared link opens the title screen with ordinary random dice instead.
+
+### What is wrong
+
+The root `index.html` exists to forward a repository-root deployment into the self-contained
+`web/` app. Its script is `location.replace('web/')`, which constructs a new relative URL
+without `location.search` or `location.hash`. Thus:
+
+```
+/?seed=42&demo=1.10  ->  /web/
+```
+
+`app.js` never sees either parameter. `README.md` and `docs/Playing-the-Game.md` advertise
+both for testing and sharing, and the wiki links the public site at its root. The static meta
+refresh has the same limitation, but the JavaScript path is the normal modern-browser route
+and can preserve the URL exactly.
+
+### Fix
+
+`location.replace('web/' + location.search + location.hash)`. The target stays **relative** on
+purpose: a repository served from a subpath resolves it against the document, which a
+hard-coded `/web/` would have broken while fixing the deep link. The `<meta refresh>` and the
+plain `<a href="web/">` stay as the no-script fallback — neither can preserve the URL, which is
+precisely why the script path is the one that carries it, and the comment beside it says so.
+
+`README.md` and `docs/Playing-the-Game.md` now show the root form (`https://host/?demo=1.10`)
+beside the `…/web/?demo=1.10` one, which is step 4 — it was waiting on the behaviour being real,
+and task 339's sweep has already been done, so it lands here.
+
+### Validation
+
+Seven new assertions in `suite-economy`. **How they are written is the point**: the redirect is
+parsed out of the SHIPPED `index.html` and evaluated with a synthetic `location`, so nothing
+navigates and the test cannot pass while the file says something else. A test that
+re-implemented the expression would have gone green against the broken page. Step 2 asked not to
+execute the redirect in the harness; running only the expression satisfies that and is stronger
+than inspecting a string for a substring.
+
+- the expression parses out of the real file;
+- a bare root visit still lands on `web/`;
+- `?seed=42&demo=1.10` rides across, and so does a `#hash`;
+- the target resolves correctly from a subpath (`http://h/sub/dir/index.html`) as well as the
+  origin root — step 3;
+- the `<meta refresh>` and plain-link fallbacks are still present;
+- and `app.js` really does read both parameters out of `location.search`, which is what makes
+  carrying them the whole fix rather than half of one.
+
+Three of the seven fail against the pre-fix page (`RESULT FAILURES pass=685 fail=3`), each
+reporting the bare `web/`.
+
+**Verified end to end**, as the Validation section asks: served the repository root and opened
+`/?seed=42&demo=1.10`. The server log shows `GET /?seed=42&demo=1.10` followed by
+`GET /web/?seed=42&demo=1.10`, and the resulting DOM reads `The War-Torn Kingdom · 10` — the
+demo section loaded from the root URL, dice seeded.
+
+Full browser suite `RESULT ALL PASS pass=3165 fail=0` (3158 before). **No generated file
+changed** and `stamp-version.ps1` reports "already at", which confirms the filing's own note
+that the root `index.html` is outside the service-worker scope and the app stamp inputs.
+
+---
