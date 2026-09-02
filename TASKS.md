@@ -3,9 +3,9 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-336 is complete (listed under **Done** below), apart from 207 and 326, both
-withdrawn as misdiagnoses (see the Review log); **nothing is open.** File new
-work under the priority bucket that fits, and record the pass in
+349 appears below: 207 and 326 are withdrawn as misdiagnoses, 337-349 are open,
+and all others are complete (see the Review log). File new work under the
+priority bucket that fits, and record the pass in
 the Review log. Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
 records each audit pass and is where new work is filed.
@@ -20,11 +20,22 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-*(none open — file new MEDIUM work here)*
+- [ ] 340. Saving inside a `<return>` detour loses a source `<choice>` because synthetic `.cN` paths are never serialised as resolvable node paths, so after reload and return the non-`revisit` choice is live again
+- [ ] 345. Mid-visit save/load restores the memo for `<tick special="weaponlock|armourlock">` but not the transient equipment lock itself, so section 6.135 can reload unlocked and let the player swap which weapon Mister Dragon breaks
+- [ ] 343. JaFL matches disease and poison as one affliction family, but a web `<lose disease="?"|"*">` only searches diseases, so shipped “poison or disease” cures can refuse or charge a poisoned player and leave the poison in place; open cures also take the first match without asking
+- [ ] 342. Cargo purchases, crew upgrades and inline cargo barters silently use the first local ship when several are docked together, while JaFL requires the player to select which vessel changes
+- [ ] 337. Book 1 section 460 rewrites the printed "codeword Acid or a copper amulet" sentence as two separate sentences instead of changing markup only
+- [ ] 338. The codeword-value gate compares lower-cased spellings even though both the web engine and JaFL use case-sensitive keys, so `codeword="anchor"` is accepted as declared `Anchor` and can fail silently in play
 
 **LOW**
 
-*(none open — file new LOW work here)*
+- [ ] 339. The living docs still repeat pre-task-324/327 claims about `book.ini` and codeword notes, omit task 324 from the player changelog, call the intentionally renamed Java reference tree untouched, and print one shipped-corpus regex without its end anchor
+- [ ] 341. A visible `<transfer limit="N">` with more than N non-identical candidates offers one-item buttons and marks the action done after one pick, even though the DOM-free chooser contract asks for N selections
+- [ ] 344. The build copy passes never remove a generated map/illustration whose source was deleted or renamed; for illustrations the reconciler then mistakes the orphan for a manual drop-in, so clean-rebuild CI green-lights an asset the source tree no longer ships
+- [ ] 346. The repository-root `index.html` redirects with `location.replace('web/')` and drops `?demo=`/`?seed=`, so advertised deep links fail when opened at the canonical root instead of an already-`/web/` URL
+- [ ] 347. The Adventure Sheet hides only internal codewords shaped like `1.10.1`, so slash-scoped and named engine flags such as `5/520`, `5.Aku.leaving`, `StillInYellowport` and `HydraDamage` are displayed to the player as printed codewords
+- [ ] 348. Opening a multi-ship sail picker records its choice as `_pendingSourceNode` before a ship is selected, so abandoning the picker and taking an item `<return>` detour crosses off a sail route the player never took
+- [ ] 349. Natural derived-stat reads still include unwritten bonuses: `defenceForMode` adds aura-raised `rankValue()`, while the `<if>` and `<set>` Stamina readers return the effective aura/affliction maximum instead of the written score
 
 **Done**
 
@@ -374,6 +385,600 @@ this order.*
 
 ---
 
+## 337. Book 1 section 460 rewrites the author's sentence instead of wrapping it
+
+**Priority: MEDIUM.** The route still has the intended two alternatives, so this is not a
+gameplay lock. It does violate the project's first content requirement: the section text is
+the author's and a rules fix may add or move markup, never rewrite or re-split the prose.
+
+### What is wrong
+
+The imported section and every revision before task 262 read:
+
+> If you have the codeword Acid or a copper amulet, [go to 327] immediately.
+
+Task 262 correctly removed the invented bookkeeping codeword `1.Skabb`, but changed the
+sentence into two:
+
+> If you have the codeword Acid, [go to 327] immediately. Or if you have a copper amulet,
+> [go to 327] immediately.
+
+A tag-stripped comparison from the original `books add` commit (`7386eed`) to current HEAD
+checked all 30 numeric section files ever edited and found this as the **only** prose
+difference. The split is unnecessary: `evaluateCondition` in `web/js/engine.js` ORs the
+recognised attributes on one `<if>`, so `codeword="Acid" item="copper amulet"` expresses the
+printed "or" without changing a word.
+
+### Steps
+
+1. In `books/book1/460.xml`, restore the original sentence byte-for-byte and wrap the whole
+   printed condition in one `<if codeword="Acid" item="copper amulet">`. Keep the existing
+   `<goto section="327"/>` in the position where the printed direction occurs.
+2. Do not replace the words with a self-closing tag and do not split the sentence again.
+3. Add focused coverage proving either Acid or a copper amulet makes the same route active,
+   and that the rendered prose retains the original single sentence.
+4. Rebuild the generated data and stamp.
+
+### Validation
+
+Strip tags and comments from `7386eed:books/book1/460.xml` and the corrected file, normalise
+only whitespace, and require identical prose. Then run `build/build-data.ps1` and the full
+`build/run-tests.ps1` gate to `RESULT ALL PASS`; confirm the generated diff is limited to the
+Book 1 bundle and the generated stamp/cache lines implied by it.
+
+---
+
+## 338. The codeword-value gate is case-insensitive but the game is not
+
+**Priority: MEDIUM.** Same invisible correctness class as task 325: a spelling the gate
+accepts can be awarded under one key and tested under another, leaving the player with a
+branch that never opens and no diagnostic explaining why.
+
+### What is wrong
+
+`Test-SourceTree` in `build/validate-source.ps1` stores every declared codeword under
+`$c.ToLowerInvariant()`, and `Test-AttrValue` lower-cases every `codeword=` token before its
+lookup. Consequently `codeword="anchor"` passes against the declared `Anchor`.
+
+The two rule engines do not fold the spelling. `GameState.hasCodeword`, `addCodeword`,
+`removeCodeword` and `codewordValue` in `web/js/state.js` use ordinary object keys, and
+JaFL's `Codewords` class uses Java `Properties` keys; both are case-sensitive. A lower-case
+award therefore does not satisfy a correctly cased test. The current shipped corpus is
+internally consistent (1,225 codeword tokens, 327 case-folded names, zero case variants), so
+this is latent rather than a live bad section - exactly the kind of future typo the gate
+promises to stop.
+
+### Steps
+
+1. Make the declaration authority and value lookup use ordinal, case-sensitive keys. A
+   normal PowerShell hashtable is case-insensitive, so use an explicitly ordinal dictionary
+   or set rather than merely removing `ToLowerInvariant()`.
+2. Preserve the current union-of-books rule, Java Properties continuation/Unicode decoding,
+   scoped-flag exemptions, port flags, forward-book codewords and the two-grade reverse
+   report. The report may keep a separate canonical-spelling map if needed.
+3. Add a validator self-test in which a lower-cased spelling of a declared codeword fails,
+   beside a correctly cased control that passes. Cover a list token as well as a singleton if
+   the implementation splits before lookup.
+4. State the exact-spelling rule in the maintained build documentation while completing the
+   sibling documentation sweep in task 339.
+
+### Validation
+
+Run `build/validate-selftest.ps1`, `build/build-data.ps1`, the DOM-free Node import check and
+the full browser suite. The real corpus must stay clean and the build's six informational
+codeword notes must remain in their current two grades.
+
+---
+
+## 339. Reconcile the living documentation with tasks 239, 324 and 327
+
+**Priority: LOW.** No runtime reads these sentences, but several sit in the documents used
+to plan the next feature or maintain the build. They contradict the current tree and, in
+two cases, contradict another paragraph in the same document.
+
+### What is wrong
+
+- `ROADMAP.md` phase 1 says nothing under `build/` reads `book.ini` and treats it as no
+  precedent. `validate-source.ps1` now reads `Codewords=` (task 325), and
+  `build-data.ps1` reads `Map.Title=` (task 324). `PLAN.md` and `AGENTS.md` already carry the
+  correct distinction: `Map=` remains inert because the filesystem derives it; the other two
+  keys are live because they hold facts the filesystem cannot answer.
+- The folder sketch in `docs/The-Books.md` says "only Codewords= is read", while the detailed
+  paragraph fifteen lines later correctly says **two** keys are live.
+- `README.md` and `docs/Build-Pipeline.md` collapse task 327's reverse codeword report into
+  one note. The build intentionally distinguishes "declared but wholly unreferenced" from
+  "tested or cleared but never awarded"; `AGENTS.md` says those grades must not be collapsed.
+- The bold "one rule" in `docs/Corpus-Census.md` prints `^\d+[a-z]?` without the terminal
+  `$`, although the commands below it and `AGENTS.md` use the actual shipped-section filter
+  `^\d+[a-z]?$`.
+- `README.md` labels `java-engine/` "UNTOUCHED" and says it is left exactly as found. The
+  reference-only rule is correct, but task 239 intentionally renamed `README.txt` to
+  `README.md` and updated `Pack.java`'s matching filename literal; `AGENTS.md` records that
+  narrow exception.
+- `CHANGELOG.md` has no 2026-08-31 entry for task 324's player-visible regional-map captions,
+  although the project keeps this file specifically for player/deployer-visible changes.
+
+### Steps
+
+1. Correct each claim above using the current symbol/key names, with no code line numbers.
+   Keep `Map=` explicitly inert and do not turn the correction into a proposal to read it.
+2. Describe both codeword-note grades and the exact-spelling rule task 338 establishes.
+3. Describe the Java reference tree as read-only with the already-completed rename/packager
+   exception, not as historically byte-identical.
+4. Add the map-caption change to the changelog under its actual deployment date/build.
+5. Sweep the sibling living documents for the same exact claims. Do not rewrite dated
+   findings in `REVIEW.md`, `TASKS-archive.md` or the Review log; those are historical records.
+
+### Validation
+
+Check every local Markdown link target, scan the living docs for the retired phrases, and
+run `git diff --check`. This is documentation-only and does not require a data rebuild or
+version stamp; the final diff must not touch generated app files.
+
+---
+
+## 340. A saved return detour forgets which source choice was taken
+
+**Priority: MEDIUM.** This breaks the exact-visit persistence contract and re-enables an
+action the renderer deliberately crosses off. The shipped corpus has live choice-to-return
+routes, including book 1 section 220 to 411 and book 5 section 721 to 601.
+
+### What is wrong
+
+When a choice or goto opens a temporary section, `Story._captureReturnFrame` stores the
+clicked source DOM node. An in-memory `<return>` restores that frame and sets
+`ctx.usedSource`, so `isSpentSource` disables the non-`revisit` action correctly.
+
+The save round-trip does not preserve every source node. `serializeFrame` in
+`web/js/visit-state.js` can write `usedSourcePath` only by finding the node in
+`ctx.pathNodes`. `appendChildren` is the only writer of that map. A `<choice>` inside
+`<choices>` bypasses it: `renderChoices` calls `renderChoice` directly under a synthetic
+`.cN` memo path, and never records the choice node. The saved frame therefore carries
+`usedSourcePath: null`; after reload `deserializeFrame` restores no `usedSource`, and the
+choice is enabled again when the player returns.
+
+Related synthetic paths deserve the same treatment. A node that *is* recorded under a
+`.bN`/`.oN`/`.cN` path still cannot be restored by `resolveNodePath`, which parses every
+component as a numeric `childNodes` index. The source-action identity needs one canonical,
+round-trippable node path rather than relying on whichever memo path a view happened to mint.
+
+A temporary focused browser assertion reproduced the defect on current HEAD: leave a
+synthetic section A via `<choices><choice section="D">`, serialize and sanitize the visit in
+D, resume it, take D's `<return>`, then inspect A's choice. The focused actions suite reported
+`RESULT FAILURES pass=878 fail=1` with `usedSourcePath=null`; the temporary assertion was then
+removed.
+
+### Steps
+
+1. Give source actions a canonical path based on their real DOM ancestry from the section
+   root (or an equivalent descriptor that `deserializeFrame` can resolve), independent of
+   render memo paths and synthetic `.cN`/`.bN`/`.oN` segments.
+2. Use that representation for both `serializeFrame` and `serializeCtx`'s `usedSource` path,
+   keeping malformed/hand-edited paths fail-closed to `null`.
+3. Add a save/sanitize/resume/return regression using a non-`revisit` choice inside
+   `<choices>` and require it to be disabled after return. Add a `revisit="t"` control that
+   remains enabled.
+4. Cover any branch/outcome source form that currently serializes a synthetic path, or prove
+   by census that no such form can own a shipped `<return>` frame.
+5. Exercise the two shipped choice routes above in the corpus integration coverage so the
+   synthetic fixture cannot drift away from the real markup.
+
+### Validation
+
+Run the focused actions suite first, then the DOM-free import check and full browser suite.
+Round-trip a hand-edited invalid source path as a defensive control; it must drop the marker
+without throwing or pointing at a different node.
+
+---
+
+## 341. A multi-item transfer collects only one selection
+
+**Priority: LOW.** The selector contract is implemented incorrectly for `limit>1`, but all
+three explicit `limit=` transfers in the six published books use `limit="1"`; this is latent
+until new markup uses a larger limit.
+
+### What is wrong
+
+`transferPlan` in `web/js/engine.js` reports `needChoice` when more non-identical movers
+qualify than the effective limit, and `applyTransfer` calls a chooser with
+`(candidates, limit, 'transfer')`. That is an N-selection contract.
+
+`renderTransfer` in `web/js/render-market.js` renders one button per candidate and commits
+immediately with `chooser: () => [chosen]`. `applyTransfer` receives one item even when the
+limit is 2 or 3, then the view adds the transfer memo and rerenders it as done. The remaining
+required items can never be selected. The current corpus does not expose it: book 2 section
+105, book 4 section 456 and book 6 section 635 are the only explicit-limit transfers, and
+all three say 1.
+
+### Steps
+
+1. For a non-identical `limit=N` transfer, collect N distinct candidates before applying any
+   state change. Reuse the fixed-count forfeit collector's small interaction pattern rather
+   than inventing a second multi-select framework.
+2. Keep the forced transfer gate standing and the price flag clear until the final required
+   choice commits the whole transfer. Cancelling or leaving the picker incomplete changes
+   nothing.
+3. Preserve the current fast paths: `limit=1` remains a one-click choice; identical movers
+   need no question; fewer than or exactly N candidates move as the current plan specifies.
+4. Add a DOM-free chooser test and a rendered `limit="2"` mixed-item regression, plus controls
+   for the three shipped limit-1 sections.
+
+### Validation
+
+Run the focused economy/actions suites, the DOM-free import check and the full browser suite.
+The shipped-corpus census must still report exactly three explicit transfer limits, all 1.
+
+---
+
+## 342. Multi-ship cargo and crew transactions change the first vessel silently
+
+**Priority: MEDIUM.** The player can own several ships at one dock, and the app already asks
+which one to sail or sell. A purchase or upgrade can nevertheless fill or alter a different
+ship from the one the player intended, or be disabled because the first ship is ineligible
+while a later one qualifies.
+
+### What is wrong
+
+The headless economy layer selects by array position:
+
+- `cargoShipWithSpace`/`buyTrade` in `web/js/market.js` use the first local ship with room for
+  every market or inline cargo purchase;
+- `canUpgradeCrew` and `applyInlineBuy` use `state.currentShip()`, which at a dock is simply
+  the first local vessel, so two ships of different crew grades can make a valid upgrade look
+  unavailable or apply it to the wrong hull;
+- `renderInlineSell` in `web/js/render-market.js` builds an open-cargo menu from the first
+  non-empty hold only, `sellCargo` removes from the first matching ship, and a linked barter
+  reward goes back through the same first-with-space purchase path.
+
+JaFL's `TradeNode.actionPerformed` in `java-engine/flands/TradeNode.java` treats this as a
+selection boundary: when several local ships have free space, the relevant crew grade or the
+commodity being sold, it refuses to guess and tells the player to select one. This port has no
+persistent ship-table selection, so the equivalent is an inline vessel picker. The trigger is
+live rather than synthetic: the corpus has cargo markets and crew buys throughout all six
+books, and owning multiple local ships is supported (the sail and market-sale views already
+surface pickers for it).
+
+### Steps
+
+1. Add DOM-free plans for eligible cargo-buy, cargo-sell and crew-upgrade vessels, returning
+   whether a choice is needed and accepting the selected ship explicitly at commit time.
+2. In the view, ask which vessel when more than one eligible ship is here. Show enough identity
+   to choose safely: type/name, crew and current cargo/space. Do not deduct money, remove cargo
+   or set a barter flag until the choice commits.
+3. Route market cargo buys, inline cargo buys/rewards, crew upgrades and inline cargo sells/
+   barters through the same selection contract. Keep market ship/cargo **sales** on their
+   existing task-134 picker rather than duplicating it.
+4. With exactly one eligible vessel, retain the one-click behavior. A remote ship remains
+   ineligible, and the sailed vessel remains the default current vessel at sea.
+5. Add two-local-ship tests where only the second qualifies and where both qualify but carry
+   different cargo/crew, proving the named ship alone changes and the price is paid once.
+
+### Validation
+
+Run the focused economy and actions suites, the DOM-free import check and the full browser
+suite. Manually inspect the vessel picker at a cargo market and crew-upgrade section on a
+narrow layout; no control may be clipped or leave the transaction half-committed.
+
+---
+
+## 343. Disease selectors do not include poison, and open cures do not ask which affliction
+
+**Priority: MEDIUM.** This is live on paid and automatic cures across the published corpus.
+A poisoned character can be told they have nothing to cure, or can pay and win a cure whose
+effect removes nothing, leaving the ability penalty in place.
+
+### What is wrong
+
+JaFL stores curses, diseases and poisons in one `CurseList`. `Curse.matches` in
+`java-engine/flands/Curse.java` keeps magical curses separate, but deliberately makes a
+disease selector match **both disease and poison** (and vice versa). When several matches
+exist, `CurseList.findMatches` honours the player's selected entry instead of silently taking
+array position zero.
+
+The web state has three arrays and never forms that shared family:
+
+- `applyLose` in `web/js/engine.js` sends `disease=` only to `removeDisease` and `poison=`
+  only to `removePoison`;
+- `hasDisease`/`hasPoison` and `rewardWasteReason` test only the named array, so the payment
+  gate can refuse a valid cure before the effect runs;
+- `removeAffliction('?')` removes the first record with no view-level chooser. The picker
+  work for open possessions, abilities and blessings never covered afflictions.
+
+The corpus states the intended family in plain words. Book 5 sections 105 and 674 use
+`<lose disease="?">` for "a poison or a disease" / "one disease or poison effect". Book 1
+section 114 and book 4 sections 404, 500, 537, 672 and 699 use `disease="*"` while promising
+to cure poison and disease. Other pages carry both attributes explicitly, which currently
+masks the split; book 1 section 338 is a poison-only control that must stay poison-only.
+
+### Steps
+
+1. Add one DOM-free affliction match/removal plan. A disease or poison selector searches the
+   union of both lists; a curse selector searches curses only. Preserve the stored type so
+   removing a selected poison updates the poison array and a disease the disease array.
+2. Route `hasDisease`/`hasPoison`-style condition/payment checks and `applyLose` through that
+   contract where JaFL's selector semantics apply. Keep exact named condition behavior
+   covered so an unrelated poison cannot satisfy `<if disease="Ghoulbite">` unless the
+   reference's name/type match says it should.
+3. For `?`, ask which matching affliction leaves when more than one qualifies; with one,
+   commit directly. For `*`, clear every match with no picker. Do not combine magical curses
+   with the disease/poison family.
+4. Make the picker part of the flag-linked payment/reward lifecycle: no Shards or flag move
+   until the answer commits, and an unavailable cure remains visibly disabled for the right
+   reason.
+5. Add end-to-end coverage for a poisoned-only character at sections 5.105 and 5.674, a
+   disease+poison choice, the automatic disease=`*` cures above, and the poison-only healer at
+   section 1.338.
+
+### Validation
+
+Run the focused inventory/economy/actions suites, the DOM-free import check and the full
+browser suite. Confirm a cure removes the affliction's ability/Stamina effects immediately
+and that save/load retains the cured lists.
+
+---
+
+## 344. Removing a source asset leaves its generated copy shipping forever
+
+**Priority: LOW.** Asset removal/rename is rare and no stale file exists today, but this
+breaks the source/generated ownership contract and defeats the clean-rebuild CI gate at the
+moment an asset is deliberately withdrawn - potentially including a licensing-driven removal.
+
+### What is wrong
+
+`build/build-data.ps1` copies the world map, each published book's regional map and its
+book-folder illustrations when a source exists. A missing source is only skipped; the old
+file under `web/assets/` is not removed.
+
+`Remove-StaleBookOutputs` in `build/release.ps1` closes only part of that gap:
+
+- a `book<N>.jpg` map is removed only when book N leaves `Published=`, not when the still-
+  published book's `-Map` source disappears;
+- an illustration is considered build-owned only if its name is found in a **current** book
+  folder. Once that source is deleted or renamed, the old generated filename is absent from
+  `$fromBooks`, so the reconciler classifies it as a manual drop-in and preserves it;
+- `web/assets/world-map.jpg` has no reconciliation path at all.
+
+A clean rebuild therefore leaves the tracked orphan byte-for-byte unchanged, and CI reports
+that generated output matches even though the declared source no longer contains it. A book
+withdrawal test passes because its fixture keeps the unpublished book folder and image in
+place, which lets the current ownership heuristic recognise the old output; deleting the
+folder exposes the same bug.
+
+### Steps
+
+1. Reconcile copied assets from a durable record of what the **previous build** owned (for
+   example the generated service-worker inventory before it is rewritten, or an explicit
+   generated manifest), not solely from source files that still exist.
+2. Remove an old generated regional map or illustration when its source is deleted/renamed,
+   and the world-map output when its source is absent. Continue preserving genuine manual
+   illustration/map drop-ins that no build inventory ever owned.
+3. Keep paths and ordering OS-neutral and deterministic; do not turn the inert `book.ini Map=`
+   key into the map source.
+4. Extend `release-selftest.ps1` with a real fixture build followed by (a) deletion/rename of
+   a published book illustration, (b) deletion of its map, (c) removal of a withdrawn book
+   folder, and (d) a manual drop-in control. Each former generated output must disappear and
+   the manual one must remain.
+
+### Validation
+
+Run the release self-test, a real build twice (second run byte-for-byte no-op), and the full
+browser suite. Confirm `git status --porcelain -- web/assets web/sw.js` is empty after the
+no-op rebuild.
+
+---
+
+## 345. Equipment locks disappear on an exact-visit resume
+
+**Priority: MEDIUM.** This is live and exploitable in book 6 section 135: save/reload between
+entry and the forced group action lets the player swap away from the weapon the page says
+Mister Dragon has already caught, so a different possession is broken.
+
+### What is wrong
+
+`GameState._equipLock` is deliberately outside persisted `data`, like `_fightBonus`.
+`Story.begin` clears it, then the hidden `<tick special="weaponlock|armourlock">` applies and
+the visit memo records that effect as done. `serializeVisit` carries `fightBonus` (task 156's
+fix) but no equipment-lock snapshot. On load a new `GameState` starts unlocked;
+`Story.resume` restores `ctx.applied`, so the hidden tick does not re-run, and nothing restores
+the missing lock.
+
+The failure is the exact task-156 shape. In book 6 section 135, `weaponlock` is applied on
+entry and the weapon is removed only when the player clicks the forced group action. Reloading
+before that click re-enables the Adventure Sheet's weapon controls, so `using="t"` removes
+whichever weapon the player swaps to. Book 2 section 290 carries the armour-lock twin; its
+current loss resolves during the walk, but it remains the control for the shared mechanism.
+
+### Steps
+
+1. Give `GameState` a small equipment-lock snapshot/restore API, or an equivalent visit-state
+   representation, containing only boolean weapon/armour locks.
+2. Serialize it with the current visit and restore it in `Story.resume` before rendering,
+   beside the existing fight-bonus restore. A fresh `begin` must still clear both locks, and
+   removing the locked possession must still release its own lock.
+3. Coerce a hand-edited snapshot to booleans; unknown keys and non-true values must not lock
+   anything.
+4. Add a full save/sanitize/resume test at section 6.135: the selected weapon stays locked
+   after reload, a swap is refused, and the forced action removes that same weapon. Add the
+   armour twin and fresh-section-release controls.
+
+### Validation
+
+Run the focused inventory/actions suites, the DOM-free import check and the full browser
+suite. Confirm the visit record remains backward-compatible when the new field is absent.
+
+---
+
+## 346. The root redirect discards deep-link query parameters
+
+**Priority: LOW.** Normal play is unaffected, and a URL already under `web/` works. The
+repository root and deployed canonical entry point silently ignore the documented demo/seed
+feature, so a shared link opens the title screen with ordinary random dice instead.
+
+### What is wrong
+
+The root `index.html` exists to forward a repository-root deployment into the self-contained
+`web/` app. Its script is `location.replace('web/')`, which constructs a new relative URL
+without `location.search` or `location.hash`. Thus:
+
+```
+/?seed=42&demo=1.10  ->  /web/
+```
+
+`app.js` never sees either parameter. `README.md` and `docs/Playing-the-Game.md` advertise
+both for testing and sharing, and the wiki links the public site at its root. The static meta
+refresh has the same limitation, but the JavaScript path is the normal modern-browser route
+and can preserve the URL exactly.
+
+### Steps
+
+1. Build the redirect target from `web/` plus `location.search` and `location.hash`, then use
+   `location.replace` as today. Keep the plain `<a href="web/">` fallback.
+2. Add a source-level browser assertion that the root redirect preserves both parameters (and
+   a hash, since preserving the incoming URL costs nothing). Do not execute the redirect in the
+   test harness; inspect or exercise it in an isolated page.
+3. Verify the target remains correct when the repository is served from a subpath rather than
+   the origin root.
+4. Clarify the README example with the public/root form once it genuinely works; coordinate
+   that edit with task 339's living-doc sweep.
+
+### Validation
+
+Serve the repository root and open `/?seed=42&demo=1.10`; the resulting `/web/` URL must keep
+both parameters and create the preview. Run the full browser suite. Root `index.html` is
+outside the service-worker scope and app stamp inputs, so confirm no generated file changes.
+
+---
+
+## 347. Internal state flags leak into the Adventure Sheet's Codewords list
+
+**Priority: LOW.** Gameplay state is correct, but the live sheet exposes implementation
+machinery as player-facing book content, making it harder to distinguish the codewords the
+printed rules actually ask the player to use.
+
+### What is wrong
+
+`renderSheet` in `web/js/ui.js` filters codeword keys with only `/^\d+\.\d/`, described as
+"hide internal box-codewords". The corpus uses a wider bookkeeping namespace that
+`validate-source.ps1` now documents precisely:
+
+- section-scoped keys can use dot **or slash** (`2.567.1a`, `5/520`, `6/68`);
+- some scoped keys continue with words (`5.Aku.leaving`, `3.318.sold`);
+- the port has explicitly named state flags such as `StillInYellowport`, `HydraDamage`,
+  `SpiderPoison` and `YarimuraProtection`.
+
+Many are stored in `data.codewords`, so every key not matching digit-dot-digit appears under
+"Codewords" on the Adventure Sheet. The player sees engine state that is absent from the
+inside-cover lists, while genuine printed codewords such as Anchor share the same chips.
+
+### Steps
+
+1. Derive the displayable codeword set from the authoritative `Codewords=` union already read
+   by the build, preferably passing it through generated metadata rather than copying the
+   validator's exemption lists into `ui.js`.
+2. Render only official printed codewords (including legitimate cross-book ones) and hide
+   section-scoped/named machinery. Decide and document how a legacy save's unknown key is shown;
+   do not silently treat every unknown as official.
+3. Keep codeword counters available through their authored `<field>` widgets; hiding their
+   backing key from the sheet must not alter state or conditions.
+4. Add sheet tests with Anchor as the visible control and `5/520`, `5.Aku.leaving`,
+   `StillInYellowport` and `HydraDamage` hidden. Include the accented codeword decoding the
+   build already performs.
+
+### Validation
+
+Rebuild metadata, run the focused inventory suite, the DOM-free import check and the full
+browser suite. Manually inspect a Yellowport save after `StillInYellowport` is set: the printed
+codewords remain and no internal flag chip appears.
+
+---
+
+## 348. An abandoned sail picker contaminates the next return frame
+
+**Priority: LOW.** No payment or ship is lost, but a route the player did not take can be
+marked spent after an unrelated item detour, contradicting the source-action contract task 110
+uses to decide whether a choice remains available.
+
+### What is wrong
+
+Both sail callers in `web/js/render-choices.js` assign `story._pendingSourceNode = node` before
+calling `sailThenGo`. With one ship, the chooser commits synchronously and that happens to be
+correct. With several ships, `sailThenGo` appends an inline "Sail which ship?" picker and
+returns; no navigation has happened, but the Story already says the sail choice was taken.
+
+The picker has no cancel control and is ordinary section DOM. A sheet mutation can rerender it
+away, or the player can simply use a reusable Adventure-Sheet item whose effect opens a section
+detour. `Story.useItem` correctly calls `navigate` without a source node - an item action is not
+a section choice - so `_captureReturnFrame` falls back to the stale pending sail node. On the
+detour's `<return>`, `ctx.usedSource` points at that sail route and `isSpentSource` disables it,
+even though no ship sailed and no sail payment was made.
+
+### Steps
+
+1. Keep the prospective source node local to the sail picker. Pass it to
+   `story.navigate(..., { sourceNode })` only inside the selected ship's commit, beside the
+   deferred payment and `sailShip` mutation.
+2. Remove the two eager `_pendingSourceNode` assignments. A one-ship sail must still capture
+   its source in the same commit; an abandoned picker must leave no Story field behind.
+3. Add a regression with two local ships: open the picker, abandon it via a same-section
+   rerender, take a source-less item detour, return, and require the sail choice to remain live.
+   Then choose a ship for real and require the returned non-`revisit` source to be spent.
+4. Keep task 149's guarantee that abandoning the picker consumes neither its Shards/blessing
+   nor a ship move.
+
+### Validation
+
+Run the focused actions/economy suites and the full browser suite. Include the save/load return
+round-trip once task 340 supplies a canonical source path, so the two fixes compose.
+
+---
+
+## 349. Natural derived-stat reads still include aura/affliction terms
+
+**Priority: LOW.** The reader contradicts its own documented mode contract, but no published
+section currently asks for `defence` under `modifier="natural"`; this is latent until new
+markup uses the supported combination.
+
+### What is wrong
+
+Two special-case derived-stat readers bypass the mode-aware helpers around them:
+
+- `GameState.defenceForMode` correctly strips the weapon/tool contribution, armour, Defence
+  aura, Defence affliction and god effect when mode is `natural`. Its final sum still adds
+  `this.rankValue()` unconditionally, so a ring of ultimate power contributes its +2 Rank to
+  "natural" Defence.
+- `evaluateCondition` in `web/js/engine.js` reads any modified Stamina condition as
+  `effectiveStaminaMax()`, and `evalExpression` does the same for any mode. Under `natural`,
+  both should read the written `data.staminaMax`; `affected` is the mode that keeps the item
+  aura/affliction-adjusted maximum. `rollDifficulty` and `<adjust>` already make that
+  distinction.
+
+These are the exact terms tasks 302/314/317 say natural mode removes. The current corpus has
+no `ability/value="defence" modifier="natural"` node and no natural Stamina condition/set;
+its one mode-qualified Stamina set is `modifier="affected"` in book 3 section 104 and is
+correct. That is why the mode tests pass without composing these cases.
+
+### Steps
+
+1. Make Defence's Rank term mode-aware (`rankForMode(mode)` or the equivalent), leaving every
+   non-natural mode on the full affected Rank.
+2. Route Stamina through one mode-aware helper shared by condition, expression, difficulty and
+   adjust reads: no modifier means current Stamina where the tag's contract says so,
+   `natural` means written maximum, and `affected` means effective maximum.
+3. Add a state test with written Rank 3 plus the ring's +2 aura: ordinary/noarmour Defence
+   includes Rank 5, natural Defence includes Rank 3 and also strips the existing weapon,
+   armour and aura controls.
+4. Test written Stamina 10 under a +10 aura and a negative affliction through `<if>` and
+   `<set>`: natural stays 10, affected reads the effective maximum, and an unmodified set keeps
+   reading current Stamina. Retain book 3 section 104 as the affected control.
+5. Add corpus census assertions documenting that the natural combinations have zero shipped
+   sites today; a future first site should force its expected behavior to be reviewed.
+
+### Validation
+
+Run the focused engine/combat suites, the DOM-free import check and the full browser suite.
+
+---
+
 > **Completed task details (tasks 1–336) are archived** in [`TASKS-archive.md`](TASKS-archive.md) (tasks 141, 165, 211, 255, 274, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336) to keep this file focused on open work. The checklist above still carries every task's stable ID and status; a done task's detail lives in the archive under the same `## <N>.` heading. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** No completed detail remains in this file; the Review log follows.
 
 ---
@@ -383,6 +988,60 @@ this order.*
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Reviewed 2026-09-02 (thirteenth full pass, begun 2026-09-01, and the first proper full pass
+since July): started clean on synchronized `main` at
+`7c80239958fc2d6e54c9ad0c41eb4b57db743a35` and
+used the twelfth review's clean `9a511ac` as the primary boundary. That delta is **188 commits,
+112 changed files and about 28,000 added lines**. Re-read `AGENTS.md`, `SPEC.md`, `ROADMAP.md`,
+`PLAN.md`, `DECISIONS.md`, `REVIEW.md`, the backlog and the complete post-boundary history;
+then audited the cumulative current tree across source content, engine/state/combat/market,
+all view modules, navigation/visit persistence, app/UI/TTS, data/build/release/validation,
+service worker/CI/tests and the living documentation.
+
+No critical or HIGH defect was found. Filed six **MEDIUM** tasks: return-frame save/load loses
+a source choice (**340**); equipment locks lose their transient state on exact resume (**345**);
+disease selectors fail to match poison and open cures do not ask (**343**); multi-ship cargo/
+crew transactions silently alter the first vessel (**342**); section 1.460 rewrites the
+author's sentence (**337**); and the codeword gate accepts case variants the engines do not
+(**338**). Filed seven **LOW** tasks: stale living-doc claims (**339**); multi-item transfer
+selection (**341**); copied-asset deletion reconciliation (**344**); root deep-link query loss
+(**346**); internal flags shown as codewords (**347**); abandoned sail-picker source leakage
+(**348**); and incomplete natural derived-stat mode reads (**349**). The detail sections above
+carry the evidence, corpus triggers, steps and validation for each.
+
+Two findings received independent failing evidence rather than code inspection alone. A
+tag-stripped comparison from the original `books add` commit over every numeric section ever
+edited (30 files) found exactly one prose change: task 337. A temporary save/resume/return
+assertion for task 340 failed the focused actions suite exactly as predicted (`pass=878
+fail=1`, `usedSourcePath=null`); the assertion and retained failure dump were removed, and the
+unmodified actions suite then returned `RESULT ALL PASS pass=878 fail=0`. The current 1,225
+`codeword=` tokens contain 327 case-folded names and zero case variants, making task 338 a
+gate defect rather than a live bad token.
+
+Organization remains sound: keep the flat dependency-free ES modules and the current
+rule/view boundary. All 22 app modules resolve, the production import graph has no cycle,
+every module is in the service-worker inventory, the seven rule modules still import and run
+without a DOM, and an exact normalized eight-line scan found no cross-file production clone.
+No framework, directory move, broad engine/state split or build toolchain is recommended.
+The planning/backlog structure also reconciles: **349 checklist rows, 349 unique detail
+headings, no gaps/duplicates/orphans**, with 207/326 withdrawn and 337-349 open. All local
+Markdown link targets exist, and the review scan found no credential-shaped text.
+
+Validation against the reviewed HEAD: `build/build-data.ps1` validated **4,407 files** and
+generated all **4,369 sections** with no generated drift; validator self-test
+`RESULT ALL PASS pass=53 fail=0`; release self-test `pass=48 fail=0`; Windows runner self-test
+`pass=25 fail=0`; DOM-free Node import `pass=35 fail=0`; full fresh-profile Chrome suite
+`RESULT ALL PASS pass=3035 fail=0`; and the post-reproduction focused actions run
+`pass=878 fail=0`. `git diff --check 9a511ac..HEAD` is clean. Current-head GitHub Actions run
+33443272028 is green in `build-scripts`, `rules-import` and `smoke`. The runner stopped its
+server and port 8848 has no listener.
+
+Manual limitation: the in-app browser runtime reported no available browser, so this pass
+does not claim a separate screenshot, console or network-panel inspection. The real-Chrome
+headless suite is the browser evidence available. The only retained working-tree change from
+the review is this `TASKS.md` filing; `review-prose.mjs` and every other temporary diagnostic
+file are absent, and `web/tests/suite-actions.js` is byte-equivalent to HEAD.
 
 Worked 2026-08-31 (tasks 335, 336): filed and closed both. Found during conversion work on an
 unpublished book, which is why neither shows up in a run over the six: **both are ways task
