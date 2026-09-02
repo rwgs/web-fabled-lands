@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-350 appears below: 207 and 326 are withdrawn as misdiagnoses, 347-350 are open,
+350 appears below: 207 and 326 are withdrawn as misdiagnoses, 348-350 are open,
 and all others are complete (see the Review log). File new work under the
 priority bucket that fits, and record the pass in the Review log. Completed
 detail sections are archived in
@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 347. The Adventure Sheet hides only internal codewords shaped like `1.10.1`, so slash-scoped and named engine flags such as `5/520`, `5.Aku.leaving`, `StillInYellowport` and `HydraDamage` are displayed to the player as printed codewords
 - [ ] 348. Opening a multi-ship sail picker records its choice as `_pendingSourceNode` before a ship is selected, so abandoning the picker and taking an item `<return>` detour crosses off a sail route the player never took
 - [ ] 349. Natural derived-stat reads still include unwritten bonuses: `defenceForMode` adds aura-raised `rankValue()`, while the `<if>` and `<set>` Stamina readers return the effective aura/affliction maximum instead of the written score
 - [ ] 350. Book 5 section 180's potion of restoration says "cure you of any diseases" but is transcribed `<lose disease="*"/>`, which task 343 made read the disease/poison family, so the potion now also cures poison — more than its printed sentence promises, and unlike book 1 section 342's twin potion which says "cure poison and disease" and carries both attributes
@@ -383,49 +382,7 @@ this order.*
 - [x] 341. `renderTransfer` answered `applyTransfer`'s N-selection chooser with `chooser: () => [chosen]`, one item, then wrote the `xfer@` memo and rerendered the action done — so a `limit="2"` transfer moved one thing and the rest could never be picked; the picker now collects the whole limit through the same fixed-count collector the possession forfeit uses, and nothing moves, no memo is written and no price flag is set until the last pick lands
 - [x] 344. asset ownership was inferred from sources that still EXIST, so a generated illustration stopped looking like output the moment its source was deleted or renamed and the reconciler preserved it as a manual drop-in; a still-published book's map survived its `-Map` source, and `web/assets/world-map.jpg` had no reconciliation path at all — a clean rebuild left every such orphan byte-for-byte unchanged and CI's rebuild-and-diff gate reported a match
 - [x] 346. the repository-root `index.html` forwarded with `location.replace('web/')`, building a new relative URL with neither `location.search` nor `location.hash`, so `/?seed=42&demo=1.10` became `/web/` and `app.js` never saw either parameter — the deep links `README.md` and `docs/Playing-the-Game.md` advertise opened the plain title screen when shared from the canonical root
-
----
-
-## 347. Internal state flags leak into the Adventure Sheet's Codewords list
-
-**Priority: LOW.** Gameplay state is correct, but the live sheet exposes implementation
-machinery as player-facing book content, making it harder to distinguish the codewords the
-printed rules actually ask the player to use.
-
-### What is wrong
-
-`renderSheet` in `web/js/ui.js` filters codeword keys with only `/^\d+\.\d/`, described as
-"hide internal box-codewords". The corpus uses a wider bookkeeping namespace that
-`validate-source.ps1` now documents precisely:
-
-- section-scoped keys can use dot **or slash** (`2.567.1a`, `5/520`, `6/68`);
-- some scoped keys continue with words (`5.Aku.leaving`, `3.318.sold`);
-- the port has explicitly named state flags such as `StillInYellowport`, `HydraDamage`,
-  `SpiderPoison` and `YarimuraProtection`.
-
-Many are stored in `data.codewords`, so every key not matching digit-dot-digit appears under
-"Codewords" on the Adventure Sheet. The player sees engine state that is absent from the
-inside-cover lists, while genuine printed codewords such as Anchor share the same chips.
-
-### Steps
-
-1. Derive the displayable codeword set from the authoritative `Codewords=` union already read
-   by the build, preferably passing it through generated metadata rather than copying the
-   validator's exemption lists into `ui.js`.
-2. Render only official printed codewords (including legitimate cross-book ones) and hide
-   section-scoped/named machinery. Decide and document how a legacy save's unknown key is shown;
-   do not silently treat every unknown as official.
-3. Keep codeword counters available through their authored `<field>` widgets; hiding their
-   backing key from the sheet must not alter state or conditions.
-4. Add sheet tests with Anchor as the visible control and `5/520`, `5.Aku.leaving`,
-   `StillInYellowport` and `HydraDamage` hidden. Include the accented codeword decoding the
-   build already performs.
-
-### Validation
-
-Rebuild metadata, run the focused inventory suite, the DOM-free import check and the full
-browser suite. Manually inspect a Yellowport save after `StillInYellowport` is set: the printed
-codewords remain and no internal flag chip appears.
+- [x] 347. `renderSheet` filtered codeword keys with `/^\d+\.\d/` alone — "hide internal box-codewords" — which catches only the dot-numeric shape, so the slash-scoped (`5/520`), word-continuing (`5.Aku.leaving`) and explicitly named engine flags (`StillInYellowport`, `HydraDamage`, `CharismaBonus`) were all chipped under "Codewords" beside Anchor; the sheet now shows a codeword only when the edition declares it, from the `Codewords=` union the build folds into `meta.json`
 
 ---
 
@@ -572,6 +529,33 @@ change (task 199) and rebuild the bundled data.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-02 (task 347): closed **347**, filed nothing. The Adventure Sheet shows a
+codeword only when the edition **declares** it: `build-data.ps1` folds the union of the
+published books' `book.ini` `Codewords=` into `meta.json` (194 names, the accented `Élan` and
+`Élite` decoded by the same `Get-IniCodewords` the source gate uses), `data.js` publishes it as
+`officialCodewords()`, and `ui.js` filters on membership. Derived from the one authority rather
+than a second copy of the validator's exemption lists, so a book joining the edition brings its
+codewords with it and no list in the view can drift — step 1's "preferably", taken.
+**The decision the filing left open was what to do with an unknown key, and the answer is to
+hide it.** The sheet reproduces the printed Adventure Sheet, and a name no book of this edition
+declares cannot have been earned in it — including `Hill` and `Judas`, which books 8 and 10
+print and this edition only tests. Nothing is lost by hiding: the key stays in
+`data.codewords`, so every `<if codeword=>`, counter and `<field>` widget reads it exactly as
+before. It is a display filter and nothing else, which is what step 3 asks for and what the
+`CharismaBonus` assertion pins — hidden from the sheet, value still 3.
+The one guard worth naming: if `meta.json` has not loaded, `officialCodewords()` is empty and
+**cannot answer the question**, so the old shape filter stands in rather than the membership
+test. Showing one flag too many beats hiding a player's whole codeword list behind an
+unfinished fetch, and a fetch-dependent filter that fails closed would do exactly that.
+Five of the 11 new assertions fail against the pre-fix filter, confirmed by reverting it:
+`5.Aku.leaving,5/520,Anchor,HydraDamage,StillInYellowport,Élan` chipped together,
+`CharismaBonus` chipped, `Judas` and a fabricated key chipped as official, and §1.220's latch on
+the sheet. The manual inspection the filing asks for was done and is worth recording for its
+method: the first probe rendered `renderSheet` into a light `.story` card, where `.chip`'s
+`#ecdcb8` text is nearly invisible — that looked like a contrast defect and is a harness
+artefact, since the real sheet is `.sheet-pane`, always dark leather. Read from the DOM instead
+of the pixels: a character holding eight keys chips exactly three, `Acid`, `Anchor` and `Élan`.
 
 Worked 2026-09-02 (task 346): closed **346**, filed nothing. One expression —
 `location.replace('web/' + location.search + location.hash)` — plus seven assertions and the

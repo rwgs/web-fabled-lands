@@ -12,7 +12,7 @@ below is the date a set of changes reached players. Nothing here requires the pl
 take any action: saves migrate on load, and the service worker replaces a cached build on
 its own.
 
-## 2026-09-02 - build 26.09.02.36b3b6d
+## 2026-09-02 - build 26.09.02.b166916
 
 - **A healer who promises to cure "poison or disease" now cures poison.** The three arrays
   behind curses, diseases and poisons never formed one family, so a page that says
@@ -34,6 +34,11 @@ its own.
   took.** After reloading and returning, that one action is crossed off again, as it is
   without the reload - book 1 section 220's mission from the high priest and book 5 section
   721's bank both use this route.
+- **The Codewords box on your Adventure Sheet lists only printed codewords.** The port keeps
+  some of its own bookkeeping in the same place, so keys like `5/520`, `5.Aku.leaving`,
+  `StillInYellowport` and `HydraDamage` were shown as chips beside Anchor even though no
+  book's inside cover mentions them. The box now shows the codewords the printed rules
+  actually give you; nothing about your progress changes, only what the sheet displays.
 - **Book 1 section 460 prints the author's sentence again**: "If you have the codeword
   *Acid* or a **copper amulet**, turn to 327 immediately", where a rules fix had split it
   into two sentences the book never printed.

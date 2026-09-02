@@ -16634,3 +16634,82 @@ changed** and `stamp-version.ps1` reports "already at", which confirms the filin
 that the root `index.html` is outside the service-worker scope and the app stamp inputs.
 
 ---
+
+## 347. Internal state flags leak into the Adventure Sheet's Codewords list
+
+**Priority: LOW.** Gameplay state is correct, but the live sheet exposes implementation
+machinery as player-facing book content, making it harder to distinguish the codewords the
+printed rules actually ask the player to use.
+
+### What is wrong
+
+`renderSheet` in `web/js/ui.js` filters codeword keys with only `/^\d+\.\d/`, described as
+"hide internal box-codewords". The corpus uses a wider bookkeeping namespace that
+`validate-source.ps1` now documents precisely:
+
+- section-scoped keys can use dot **or slash** (`2.567.1a`, `5/520`, `6/68`);
+- some scoped keys continue with words (`5.Aku.leaving`, `3.318.sold`);
+- the port has explicitly named state flags such as `StillInYellowport`, `HydraDamage`,
+  `SpiderPoison` and `YarimuraProtection`.
+
+Many are stored in `data.codewords`, so every key not matching digit-dot-digit appears under
+"Codewords" on the Adventure Sheet. The player sees engine state that is absent from the
+inside-cover lists, while genuine printed codewords such as Anchor share the same chips.
+
+### Fix
+
+`build-data.ps1` folds the printed-codeword union into `meta.json` — the `Codewords=` list of
+every **published** book, read through the same `Get-IniCodewords` the source gate uses, so the
+`.ini` stays the one authority and its continuations and `\uXXXX` escapes are decoded once.
+194 names today, sorted ordinally for a deterministic `meta.json`. `data.js` publishes it as a
+memoised `officialCodewords()`; `ui.js` filters the sheet on membership.
+
+Passed as data rather than reimplemented in the view — step 1's "preferably" — because the
+alternative is a second copy of the validator's exemption lists in `ui.js`, which would drift.
+A book joining the edition now brings its codewords with it.
+
+**The unknown-key decision (step 2): hide it.** The sheet reproduces the printed Adventure
+Sheet, and a name no book of this edition declares cannot have been earned in it — that
+includes `Hill` and `Judas`, which books 8 and 10 print and the six only test. Nothing is lost:
+the key stays in `data.codewords`, so every `<if codeword=>`, counter and `<field>` widget reads
+it exactly as before. This is a display filter and nothing else, which is step 3.
+
+**One guard.** If `meta.json` has not loaded, `officialCodewords()` is empty and cannot answer
+the question, so the old shape filter stands in rather than the membership test. Showing one
+flag too many beats hiding a player's whole codeword list behind an unfinished fetch — a
+fetch-dependent filter that failed closed would do precisely that.
+
+### Validation
+
+11 new assertions in `suite-inventory`. Five fail against the pre-fix filter, confirmed by
+reverting it rather than assumed: `5.Aku.leaving,5/520,Anchor,HydraDamage,StillInYellowport,Élan`
+chipped together, `CharismaBonus` chipped, `Judas` and a fabricated key chipped as official, a
+machinery-only sheet drawing a Codewords heading, and §1.220's latch on the sheet.
+
+- the union reaches the app through `meta.json`, with `Élan`/`Élite` decoded and the port's own
+  flags absent from it;
+- Anchor and `Élan` are the visible controls against `5/520`, `1.10.1`, `5.Aku.leaving`,
+  `3.318.sold`, `StillInYellowport` and `HydraDamage` — step 4's list, plus the accented
+  codeword it asks for;
+- hiding changes no state: all eight keys are still held and still testable;
+- a counter flag is hidden but keeps its value (step 3);
+- an undeclared key from an imported save is hidden, not chipped as official;
+- a sheet holding only machinery draws no Codewords heading at all rather than an empty one;
+- and **§1.220 driven live** — entering the temple sets `StillInYellowport`, and the sheet then
+  shows Anchor and no latch.
+
+**Manual inspection**, as the Validation section asks, and the method is worth recording. The
+first probe rendered `renderSheet` into a light `.story` card, where `.chip`'s `#ecdcb8` text is
+nearly invisible; that looked like a contrast defect and is a **harness artefact** — the real
+sheet is `.sheet-pane`, always dark leather, so nothing was filed. Read from the DOM rather
+than the pixels: a Yellowport character holding eight keys (`5.Aku.leaving`, `5/520`, `Acid`,
+`Anchor`, `CharismaBonus`, `HydraDamage`, `StillInYellowport`, `Élan`) chips exactly three —
+`Acid`, `Anchor`, `Élan`.
+
+`validate-selftest.ps1` `pass=58 fail=0`, `release-selftest.ps1` `pass=59 fail=0`,
+`node web/tests/node-import.mjs` `pass=35 fail=0`, full browser suite
+`RESULT ALL PASS pass=3175 fail=0` (3165 before). `meta.json` gained the `codewords` array, so
+the generated data and the stamp move with it — committed. `CHANGELOG.md` carries the
+player-visible line, since what the sheet lists is something a player sees.
+
+---

@@ -216,9 +216,29 @@ foreach ($k in ($titles.Keys | Sort-Object)) { $allTitles["$k"] = $titles[$k] }
 # make a no-op rebuild (unchanged books/rules) produce a different meta.json, a
 # new version stamp, and a new service-worker cache key -- forcing every installed
 # player to re-download a byte-identical app. meta.json is now purely content. (task 144)
+# The printed codewords this edition declares: the union of every PUBLISHED book's book.ini
+# Codewords= list, read through the same Get-IniCodewords the source gate uses (so the .ini
+# stays the one authority and its continuations and \uXXXX escapes are decoded once). The
+# Adventure Sheet needs it to tell a printed codeword from the port's own bookkeeping: the
+# corpus reuses the codeword store as per-playthrough memory - section-scoped keys with a dot
+# OR a slash ('2.567.1a', '5/520'), scoped keys continuing in words ('5.Aku.leaving'), and
+# named engine flags ('StillInYellowport', 'HydraDamage') - and every one of those was being
+# chipped under "Codewords" beside Anchor. Passed as data rather than reimplemented in ui.js,
+# so the sheet cannot drift from the gate. Sorted ordinally, for a deterministic meta.json.
+# (task 347)
+$declaredCodewords = @{}
+foreach ($b in $bundled) {
+    $iniPath = Join-Path $bookDirs[$b] 'book.ini'
+    if (-not (Test-Path $iniPath)) { continue }
+    foreach ($c in (Get-IniCodewords $iniPath)) { if ($c) { $declaredCodewords[$c] = $true } }
+}
+$codewordList = @($declaredCodewords.Keys | Sort-Object -CaseSensitive)
+Write-Host ("codewords: {0} declared across the published books" -f $codewordList.Count)
+
 $meta = [ordered]@{
     books      = $bookMeta
     titles     = $allTitles
+    codewords  = $codewordList
     rules      = $rulesXml
     quickRules = $quickRulesXml
 }

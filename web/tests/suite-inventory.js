@@ -1813,6 +1813,101 @@ export async function run(ctx) {
       }
     }
 
+    // --- task 347: only PRINTED codewords belong on the Adventure Sheet ---------------------
+    // The corpus reuses the codeword store as general per-playthrough memory, so data.codewords
+    // also holds section-scoped bookkeeping keys and the port's own named engine flags. The old
+    // filter was `/^\d+\.\d/` alone - "hide internal box-codewords" - which caught only the
+    // dot-numeric shape, so `5/520`, `5.Aku.leaving`, `StillInYellowport` and `HydraDamage` were
+    // all chipped under "Codewords" beside Anchor: engine machinery presented as book content
+    // the printed rules never mention. The test is now membership of the edition's declared
+    // union, which the build folds into meta.json from the same book.ini Codewords= the source
+    // gate reads.
+    {
+      const chips347 = (c) => {
+        const heads = Array.from(c.querySelectorAll('*')).filter((e) => /^Codewords$/.test(e.textContent.trim()));
+        if (!heads.length) return [];
+        let n = heads[heads.length - 1].nextElementSibling;
+        while (n && !n.classList.contains('chips')) n = n.nextElementSibling;
+        return n ? Array.from(n.querySelectorAll('.chip')).map((e) => e.textContent) : [];
+      };
+      const sheet347 = (setup) => {
+        const g = GameState.create({ name: 'T347', gender: 'f', profession: 'Warrior', book: 1, adv });
+        g.ephemeral = true;
+        setup(g);
+        const c = document.createElement('div');
+        renderSheet(g, c, {});
+        return { g, c, chips: chips347(c) };
+      };
+
+      // The declared union reaches the app through meta.json, so the sheet reads one authority
+      // rather than a second copy of the validator's exemption lists.
+      const official347 = data.officialCodewords();
+      ok('task347: meta.json carries the published books\' declared codeword union',
+         official347.size > 150 && official347.has('Anchor') && official347.has('Bounty'),
+         'n=' + official347.size);
+      ok('task347: and the build decodes the \\uXXXX escapes in it (\u00c9lan / \u00c9lite)',
+         official347.has('\u00c9lan') && official347.has('\u00c9lite'),
+         [...official347].filter((c) => /[^\x00-\x7F]/.test(c)).join(','));
+      ok('task347: the port\'s own engine flags are NOT in it',
+         !official347.has('StillInYellowport') && !official347.has('HydraDamage')
+         && !official347.has('SpiderPoison') && !official347.has('YarimuraProtection'));
+
+      // The sheet: Anchor is the visible control, every machinery shape is hidden.
+      const mixed = sheet347((g) => {
+        g.addCodeword('Anchor');            // printed, book 1's inside cover
+        g.addCodeword('\u00c9lan');             // printed and accented
+        g.addCodeword('5/520');             // slash-scoped
+        g.addCodeword('1.10.1');            // dot-numeric (the only shape the old filter caught)
+        g.addCodeword('5.Aku.leaving');     // scoped, continuing in words
+        g.addCodeword('3.318.sold');        // the same, from a market hook
+        g.addCodeword('StillInYellowport'); // a named engine latch
+        g.addCodeword('HydraDamage');       // damage carried out of a fight
+      });
+      ok('task347: the printed codewords are chipped and every machinery key is hidden',
+         mixed.chips.sort().join(',') === 'Anchor,\u00c9lan', mixed.chips.join(','));
+      ok('task347: hiding them changes no state — every key is still held and still testable',
+         mixed.g.hasCodeword('StillInYellowport') && mixed.g.hasCodeword('5/520')
+         && mixed.g.hasCodeword('5.Aku.leaving') && mixed.g.hasCodeword('HydraDamage')
+         && Object.keys(mixed.g.data.codewords).length === 8,
+         Object.keys(mixed.g.data.codewords).join(','));
+      // A counter's backing key is machinery too, and its VALUE must survive being hidden -
+      // that is what an authored <field> widget and an <adjust name=> both read.
+      const counter = sheet347((g) => { g.addCodeword('CharismaBonus'); g.setCodewordValue('CharismaBonus', 3); });
+      ok('task347: a counter flag is hidden from the sheet but keeps its value',
+         counter.chips.length === 0 && counter.g.codewordValue('CharismaBonus') === 3,
+         `chips=${counter.chips.join(',')} value=${counter.g.codewordValue('CharismaBonus')}`);
+      // An UNKNOWN key is hidden rather than shown: the sheet reproduces the printed Adventure
+      // Sheet, and a name no book of this edition declares cannot have been earned in it. It is
+      // still held, so nothing is lost.
+      const unknown = sheet347((g) => { g.addCodeword('Anchor'); g.addCodeword('Judas'); g.addCodeword('NotAWordAnyBookPrints'); });
+      ok('task347: an undeclared key from an imported save is hidden, not chipped as official',
+         unknown.chips.join(',') === 'Anchor'
+         && unknown.g.hasCodeword('Judas') && unknown.g.hasCodeword('NotAWordAnyBookPrints'),
+         unknown.chips.join(','));
+      // With NOTHING printed held, the section is not drawn at all - a sheet of pure machinery
+      // shows no Codewords heading rather than an empty one.
+      const machineryOnly = sheet347((g) => { g.addCodeword('5/520'); g.addCodeword('StillInYellowport'); });
+      ok('task347: a sheet holding only machinery draws no Codewords section',
+         machineryOnly.chips.length === 0 && !/Codewords/.test(machineryOnly.c.textContent),
+         machineryOnly.c.textContent.replace(/\s+/g, ' ').slice(0, 80));
+      // §1.220 live, which is where StillInYellowport comes from: entering it sets the latch,
+      // and the sheet must show the printed codeword the player has and not the latch.
+      {
+        const g = GameState.create({ name: 'T347y', gender: 'f', profession: 'Warrior', book: 1, adv });
+        g.ephemeral = true;
+        g.addCodeword('Anchor');
+        const cont = document.createElement('div');
+        const st = new Story(cont, g, { navigate(){}, onDeath(){}, notify(){} });
+        g.goTo(1, '220');
+        st.begin(await data.getSection(1, '220'), 1, '220');
+        ok('§1.220 sets the StillInYellowport latch on entry', g.hasCodeword('StillInYellowport'));
+        const sheet = document.createElement('div');
+        renderSheet(g, sheet, {});
+        ok('task347: the Yellowport sheet shows Anchor and no latch chip',
+           chips347(sheet).join(',') === 'Anchor', chips347(sheet).join(','));
+      }
+    }
+
     // --- task 185: a wildcard affliction effect (ability="*") hits all six abilities ---
     // afflictionAbility() returned null for "*", so readEffects() dropped Leprosy's SOLE
     // effect and §2.136 recorded the disease with no penalty at all. It now parses, persists

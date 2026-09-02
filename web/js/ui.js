@@ -1,7 +1,7 @@
 // ui.js — reusable UI: dice animation, Adventure Sheet, modals, toasts.
 
 import { ABILITIES, ABILITY_LABEL, rankTitle, ordinal, SHIP_TYPES, NO_CREW, canonShipType } from './rules.js';
-import { parseXml } from './data.js';
+import { parseXml, officialCodewords } from './data.js';
 // The canonical string/label helpers live in the dependency-free render-util (task 170), so the
 // sheet/shell and the view modules share one titleCase/escapeHtml/bonus-text implementation
 // instead of drifting copies. escapeHtml is re-exported for app.js, which imports it from here.
@@ -344,8 +344,30 @@ export function renderSheet(state, container, opts = {}) {
   });
   container.appendChild(items);
 
-  // Codewords
-  const cws = Object.keys(d.codewords).filter((k) => !/^\d+\.\d/.test(k)); // hide internal box-codewords
+  // Codewords — the PRINTED ones only. The corpus reuses the codeword store as general
+  // per-playthrough memory, so `data.codewords` also holds section-scoped bookkeeping keys
+  // (`2.567.1a`, `5/520`, `5.Aku.leaving`) and the port's own named engine flags
+  // (`StillInYellowport`, `HydraDamage`, `SpiderPoison`). The old `/^\d+\.\d/` filter caught
+  // only the dot-numeric shape, so everything else was chipped under "Codewords" beside
+  // Anchor — engine machinery presented as book content the printed rules never mention.
+  //
+  // The test is membership of the edition's declared union, which the build folds into
+  // meta.json from the same book.ini `Codewords=` the source gate reads (task 347): derived
+  // from the one authority rather than a second copy of the validator's exemption lists, so a
+  // book joining the edition brings its codewords with it and no list here can drift.
+  //
+  // An UNKNOWN key — from a hand-edited or imported save, or a codeword only books 7-12 print
+  // (`Hill`, `Judas`: tested here, awardable nowhere) — is hidden rather than shown, since the
+  // sheet reproduces the printed Adventure Sheet and a name no book of THIS edition declares
+  // cannot have been earned in it. Nothing is lost by that: the key stays in `data.codewords`,
+  // so every
+  // `<if codeword=>`, counter and `<field>` widget reads it exactly as before — this filter
+  // decides display and nothing else. If meta.json has not loaded, `officialCodewords()` is
+  // empty and cannot answer the question, so the old shape filter stands in: showing one flag
+  // too many beats hiding a player's whole codeword list behind an unfinished fetch.
+  const official = officialCodewords();
+  const cws = Object.keys(d.codewords)
+    .filter((k) => (official.size ? official.has(k) : !/^\d+\.\d/.test(k)));
   if (cws.length) {
     container.appendChild(sectionTitle('Codewords'));
     container.appendChild(chipList(cws.sort()));

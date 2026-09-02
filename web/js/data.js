@@ -15,6 +15,7 @@ export async function loadMeta() {
   const res = await fetch(DATA_BASE + 'meta.json');
   if (!res.ok) throw new Error('Could not load meta.json');
   _meta = await res.json();
+  _officialCodewords = null; // rebuilt from the new meta on first ask
   // Publish the bundled-book list to the DOM-free registry the rule modules read, so
   // `<if book="N">` and a book-gated choice can be answered without importing this loader
   // (and its DOMParser) into the engine chain. (task 195)
@@ -23,6 +24,21 @@ export async function loadMeta() {
 }
 
 export function getMeta() { return _meta; }
+
+/** The printed codewords this edition declares — the union of the published books' book.ini
+ *  `Codewords=` lists, folded into meta.json by the build (task 347). The Adventure Sheet shows
+ *  a codeword only when it is in here, which is what keeps the port's own bookkeeping keys
+ *  (`5/520`, `5.Aku.leaving`, `StillInYellowport`) off a list the printed rules own.
+ *
+ *  Empty when meta.json has not loaded, and the caller is expected to treat that as "cannot
+ *  tell" rather than "none are official" — hiding every codeword because a fetch had not
+ *  finished would be a worse failure than showing one flag too many. Memoised, since the sheet
+ *  redraws on every state change. */
+let _officialCodewords = null;
+export function officialCodewords() {
+  if (!_officialCodewords) _officialCodewords = new Set(_meta?.codewords || []);
+  return _officialCodewords;
+}
 
 /** Which books actually have section data bundled. The registry (edition.js) owns the list;
  *  re-exported here so the app and view keep asking the data layer as before. */
