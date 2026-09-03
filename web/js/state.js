@@ -1031,10 +1031,15 @@ export class GameState {
    *  picker ONE answer rather than one per wound. Each entry's `type` is the list the record
    *  really lives in, so removing a poison that a DISEASE selector found still updates the
    *  poison array. This is the DOM-free plan every reader shares — conditions, the
-   *  reward-waste gate, applyLose and the view's which-one picker. (task 343) */
-  afflictionMatches(type, name) {
+   *  reward-waste gate, applyLose and the view's which-one picker. (task 343)
+   *
+   *  `ownOnly` narrows the search to the selector's own list, for a cure whose page denies the
+   *  rest of its family (§1.338). Every reader threads it from the same node attribute, because
+   *  a picker, a waste gate and the removal that disagreed about the pool would offer, price and
+   *  take three different afflictions. (task 351) */
+  afflictionMatches(type, name, ownOnly = false) {
     const out = [], seen = new Set();
-    for (const kind of afflictionFamily(type)) {
+    for (const kind of afflictionFamily(type, ownOnly)) {
       for (const a of this._afflictionList(kind)) {
         const nm = a.name || a.type || kind;
         if (!afflictionNameMatches(name, nm)) continue;
@@ -1088,8 +1093,12 @@ export class GameState {
   // permanent penalty. That is 184's own argument carried to the open selector, and the picker
   // requires it — a button reading "Avenger's Bite" that leaves the curse standing is
   // incoherent. afflictionMatches de-duplicates for the same reason. (task 343)
-  removeAffliction(type, name, chooser = null) {
-    const matches = this.afflictionMatches(type, name);
+  //
+  // `ownOnly` comes from the node's own `family="f"` and keeps the selector on its own list,
+  // where the page denies the rest of the family — §1.338's healer "is unable to cure disease".
+  // (task 351)
+  removeAffliction(type, name, chooser = null, ownOnly = false) {
+    const matches = this.afflictionMatches(type, name, ownOnly);
     if (!matches.length) return [];
     let take = matches;
     if (name == null || name === '' || name === '?') {
@@ -1777,20 +1786,35 @@ export function afflictionNameMatches(name, nm) {
  *  poisoned character was told there was nothing to cure — at §5.105 after paying 75 Shards
  *  for it.
  *
- *  The union here is NOT symmetric, and that is deliberate. `disease=` reads the family: of the
- *  16 shipped `<lose disease=>` nodes (13 "*", 3 "?"), 15 sit in a section that names poison in
- *  its own words — §1.77's "delete the disease or poison", §1.114's "disease or poison",
- *  §4.500's "cure you of any disease or poison", §5.674's "disease or poison effect". `poison=`
- *  reads poisons alone, because the corpus writes an OPEN one exactly once and there the book
- *  NARROWS to poison: §1.338's healer "can cure you of poison but is unable to cure disease"
- *  (its other uses are "*" beside a disease="*" twin, and two exact "Scorpion Poison" gates).
- *  Following the reference symmetrically would let §1.338 charge a diseased-only player 25
- *  Shards and cure them, which its printed sentence expressly denies — and an explicit denial
- *  outranks the reference's own hedge on this very line ("I think poisons and diseases are
- *  usually treated the same … until I'm sure, I'll leave them separated").
+ *  The union is SYMMETRIC, as the reference model's is, and a book that prints a narrower rule
+ *  says so in its own markup: `<lose … family="f">` restricts a selector to its own list
+ *  (engine.js afflictionOwnOnly). `disease=` reads the family because of what the sections
+ *  print: of the 16 shipped `<lose disease=>` nodes (13 "*", 3 "?"), 15 sit in a section that
+ *  names poison in its own words — §1.77's "delete the disease or poison", §1.114's "disease or
+ *  poison", §4.500's "cure you of any disease or poison", §5.674's "disease or poison effect".
  *
- *  **A printed DENIAL narrows a selector; printed SILENCE does not.** That is the whole rule
- *  the asymmetry rests on, and the 16th `<lose disease=>` node is what settles it (task 350).
+ *  ~~`poison=` reads poisons alone.~~ **It read poisons alone until task 351, and that was the
+ *  same rule written in the wrong place.** The corpus writes an OPEN poison selector exactly
+ *  once, and there the book NARROWS: §1.338's healer "can cure you of poison but is unable to
+ *  cure disease". Following the reference symmetrically would let that healer charge a
+ *  diseased-only player 25 Shards and cure them, which its printed sentence expressly denies —
+ *  and an explicit denial outranks the reference's own hedge on this very line ("I think poisons
+ *  and diseases are usually treated the same … until I'm sure, I'll leave them separated"). So
+ *  the denial is right; hard-coding it HERE was not. One printed sentence in one section had
+ *  bent a shared function for all six books, where the section itself is where the sentence is,
+ *  and the whole point of the rule below is that a page's own words decide. §1.338 now carries
+ *  `family="f"` and this function matches `Curse.matches` again.
+ *
+ *  Measured before it moved, because symmetry is only free if nothing else reads a poison
+ *  selector the wide way. Every `poison=` node in the shipped corpus: §1.338's open cure (now
+ *  narrowed by its own markup); §1.342, §1.574, §1.598, §4.134 and §1.650, each a `"*"` sitting
+ *  beside a `disease="*"` twin because the page prints both words, so both lists clear either
+ *  way; and §1.532/§1.657's exact `"Scorpion Poison"` gate and cure, where the only stored
+ *  disease names in seven books are Ghoulbite, Leprosy and Red Ague. So the change is inert
+ *  everywhere but §1.338, which is the one place it is supposed to act.
+ *
+ *  **A printed DENIAL narrows a selector; printed SILENCE does not.** That is the whole rule,
+ *  and the 16th `<lose disease=>` node is what settles it (task 350).
  *  §5.180's potion of restoration says "cure you of any diseases" and carries `disease="*"`
  *  alone, where §1.342's twin potion says "cure poison and disease" and carries both
  *  attributes — so the transcription really does distinguish them. But §5.180 nowhere says the
@@ -1803,11 +1827,23 @@ export function afflictionNameMatches(name, nm) {
  *
  *  Corpus assertions pin both halves — that §5.180 is still the ONLY `disease="*"` node whose
  *  section never mentions poison, and that §1.342's twin is unaffected — so a future node
- *  reaching the same silence is reviewed against this rule rather than absorbed by it. */
-export function afflictionFamily(type) {
-  if (type === 'disease') return ['disease', 'poison'];
-  if (type === 'poison') return ['poison'];
-  return ['curse'];
+ *  reaching the same silence is reviewed against this rule rather than absorbed by it. A third
+ *  pins the direction task 351 added: every `family="f"` must sit in a section that prints the
+ *  denial it narrows for, so the attribute cannot become a quiet way to re-hard-code an
+ *  exception the book never states.
+ *
+ *  Task 350 declined this same markup for §5.180 — "scaffolding whose only job is one node" —
+ *  and that objection stands where a page denies NOTHING. It does not stand here, because the
+ *  scaffolding was already built: the exception existed as a branch in this function, and the
+ *  attribute moves it to the section that prints it rather than adding a mechanism. The port
+ *  gets one fewer divergence from the reference in exchange for one declared narrowing.
+ *
+ *  The selector's OWN list comes first, then the rest of the family, so the picker order and
+ *  removeAffliction's no-chooser default both prefer the list the author named. */
+export function afflictionFamily(type, ownOnly = false) {
+  const own = type === 'disease' ? 'disease' : (type === 'poison' ? 'poison' : 'curse');
+  if (ownOnly || own === 'curse') return [own];
+  return own === 'disease' ? ['disease', 'poison'] : ['poison', 'disease'];
 }
 
 /** Are two match entries the same affliction? Compares the list and the name, so a chooser's

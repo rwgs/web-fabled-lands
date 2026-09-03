@@ -16939,3 +16939,96 @@ against the rule.
 can see changed, because nothing changed.
 
 ---
+
+## 351. One section's printed denial was hard-coded into the shared affliction family
+
+**Priority: LOW.** No shipped page behaves wrongly today, and the fix is behaviourally inert
+everywhere except the one section it is about — but the port carried a divergence from the
+reference model that no book asked for, and carried it in the one place a reader would not look.
+
+### What is wrong
+
+Task 343 formed the affliction family and made it **asymmetric on purpose**:
+
+| selector | reference `Curse.matches` | this port, before 351 |
+| --- | --- | --- |
+| `disease=` | disease + poison | disease + poison |
+| `poison=` | disease + poison | **poison only** |
+
+The whole reason for the second row is one printed sentence. §1.338's healer "can cure you of
+poison but is **unable to cure disease**", and its cure is the corpus's only OPEN poison
+selector (`<lose poison="?" flag="p">`). Following the reference symmetrically would let that
+healer charge a diseased-only player 25 Shards and cure them, against the page's own words. So
+the denial is right.
+
+Hard-coding it in `afflictionFamily` was not. Task 350 had just settled the governing rule — **a
+printed DENIAL narrows a selector; printed SILENCE does not** — and the point of that rule is
+that a page's own words decide. One section's sentence had instead bent a shared function for all
+six books, where nothing at §1.338 says so and nothing at the function says which section it is
+serving beyond a comment. Two consequences:
+
+- **The divergence is invisible from the source.** Reading §1.338 tells you nothing about why it
+  behaves differently from §5.105's identically-shaped open cure. Reading `afflictionFamily`
+  tells you about §1.338, in a file no author of a section opens.
+- **It cannot be reused.** The next page to print a narrower rule than its selector needs the
+  same treatment, and the only mechanism available was another branch in the same function.
+
+### The fix
+
+The family is symmetric again, matching `Curse.matches`, and a page that prints a narrower rule
+states it in its own markup: `<lose … family="f">` restricts a selector to its own list, read by
+`afflictionOwnOnly` in `engine.js` and threaded through `afflictionFamily`, `afflictionMatches`
+and `removeAffliction` in `state.js`, plus `afflictionSelector`, `afflictionChoiceOptions` and
+`rewardWasteReason` in `render-rules.js`. One attribute read in one place, because a picker, a
+waste gate and a removal that disagreed about the pool would offer, price and take three
+different afflictions. §1.338 carries it; nothing else does.
+
+Task 350 declined this same markup for §5.180 — "scaffolding whose only job is one node" — and
+that objection stands where a page denies **nothing**. It does not stand here, because the
+scaffolding was already built: the exception existed as a branch, and the attribute moves it to
+the section that prints it. The port trades one hidden divergence for one declared narrowing.
+
+### Why symmetry is safe, measured rather than assumed
+
+Symmetry widens `poison=` for gates as well as cures, so every `poison=` node in the shipped
+corpus was read first:
+
+- **§1.338** — the open cure, now narrowed by its own markup. The one site that changes.
+- **§1.342, §1.574, §1.598, §4.134, §1.650** — each a `poison="*"` sitting beside a
+  `disease="*"` twin, because the page prints both words ("cure you of any diseases or poisons").
+  Both lists clear either way, so the widening is a no-op.
+- **§1.532, §1.657** — the exact `poison="Scorpion Poison"` gate and cure. Symmetry would also
+  match a *disease* of that name; the only stored disease names in the corpus are Ghoulbite,
+  Leprosy and Red Ague.
+
+So the change acts at exactly one site, which is the site it is for.
+
+### Controls and evidence
+
+The load-bearing control is reverting §1.338's attribute alone, with the symmetric family in
+place: four assertions fail, and the first is the regression itself — **the 25-Shard payment
+becomes enabled for a diseased-only player**, where before it was refused. That is what makes
+the attribute a rule and not a decoration.
+
+- `suite-inventory` — the four existing §1.338 assertions are unchanged and are now the
+  regression for the move; added: the symmetric match order (own list first), `family="f"` on
+  both selectors, `afflictionFamily`'s table, the attribute reader over every false spelling the
+  gate accepts (`family="false"` reading as true would silently re-widen §1.338), the waste gate
+  and picker drawing the narrowed pool, a narrowed removal sparing the other list, and a pin on
+  §1.338's own markup read from the corpus.
+- `suite-corpus` — the census now checks **both** directions: a `family=` cure must sit in a
+  section printing a denial, and a section printing a denial must narrow its cure. Either alone
+  would let the pair drift apart.
+- `validate-source.ps1` — `family=` allowlisted on `<lose>`, its value pinned to the truth set
+  (a misspelling reads as the default and cures what the page denies, silently and in the
+  player's favour), and rejected on a `<lose>` selecting no affliction, where nothing reads it
+  and the author would have recorded a denial without applying it. Positive and negative
+  fixtures in `validate-selftest.ps1`.
+- Printed prose in §1.338 is byte-identical with tags stripped; the change is one attribute.
+- Validator fixtures `RESULT ALL PASS pass=61 fail=0` (58 before), full browser suite
+  `RESULT ALL PASS pass=3223 fail=0` (3214 before), `node web/tests/node-import.mjs`
+  `pass=35 fail=0`. `books/` changed, so the data was rebuilt and `book1.json` moves with it.
+- No `CHANGELOG.md` entry: no shipped page behaves differently, because §1.338's behaviour is
+  the same by a better route.
+
+---

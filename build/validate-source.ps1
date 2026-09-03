@@ -73,7 +73,16 @@ $script:FL_TAG_ATTRS = @{
     'failure' = 'book section var'
     # -- rewards, costs and state --
     'gain' = 'ability amount blessing codeword crew flag force hidden price shards title'
-    'lose' = 'ability amount armour blessing bonus bookchange cache cargo chance choose codeword crew curse disease fatal flag force god group hidden item itemAt multiple poison price resurrection shards ship stamina staminato tags title using weapon'
+    # family='f' narrows a CURE to its own affliction list instead of the whole family
+    # (state.js afflictionFamily makes a disease or poison selector read both lists, as the
+    # reference model's Curse.matches does). It is how a section states the narrowing its own
+    # page prints: section 338 of book 1 says the healer "can cure you of poison but is unable
+    # to cure disease", so its <lose poison='?'> may not take the disease the family would hand
+    # it. Before this attribute that one printed sentence was honoured by a hard-coded exception
+    # inside afflictionFamily, which bent a shared function for all six books; the rule is that
+    # a page's own words decide, so the words are where it belongs. Default t, so every other
+    # shipped cure is unchanged. (task 351)
+    'lose' = 'ability amount armour blessing bonus bookchange cache cargo chance choose codeword crew curse disease family fatal flag force god group hidden item itemAt multiple poison price resurrection shards ship stamina staminato tags title using weapon'
     'tick' = 'ability addbonus addtag amount blessing bonus cache cargo codeword count crew effect flag force god hidden item name permanent price profession quantity removetag shards special tags title titleAdjust titlePattern titleValue using weapon'
     'set' = 'cache codeword dock force hidden item modifier success tags value var weapon'
     'adjust' = 'ability amount codeword crew default god greaterthan item modifier name profession ship tags title titleVal value'
@@ -134,6 +143,11 @@ $script:FL_ENUMS = @{
     # armour, your best weapon"). The truth values stay legal - "t" is the explicit spelling
     # of the default, an unmarked open item/cargo forfeit asking the player.
     'choose'         = 't f true false best'
+    # family= is a boolean whose only USEFUL value is the false one, since reading the family is
+    # the default. Pinned to the truth set anyway, because the attribute exists to obey a printed
+    # denial and a misspelling would read as the default - it would cure the affliction the page
+    # says it cannot, silently, and in the direction that favours the player. (task 351)
+    'family'         = 't f true false'
     # A blessing is an opaque named token to the engine, but the set is small and fixed: a
     # misspelling would silently never be granted, tested or spent. storms/storm and
     # poison/disease are the same blessing under two spellings (state.js BLESSING_ALIASES).
@@ -450,6 +464,17 @@ function Test-XmlVocabulary($el, [string]$label, [System.Collections.ArrayList]$
         }
         if ($script:FL_ADJUST_READERS -notcontains $parent) {
             [void]$errors.Add(("{0} : <adjust> under <{1}> - an <adjust> modifies the node above it and must be a child of <{2}> (use <gain>/<tick> for an effect that writes to the sheet)" -f $label, $parent, ($script:FL_ADJUST_READERS -join '>/<')))
+        }
+    }
+    # family= narrows a CURE to its own affliction list, and only a cure selector reads it. On a
+    # <lose> selecting no affliction nothing does, so the node validates and the narrowing the
+    # author wrote is simply absent - which is worse than an ordinary no-op, because the author
+    # has recorded a printed denial and not applied it. Only disease=/poison= have a family to
+    # narrow (afflictionFamily: a curse selector never leaves its own list), so a family= beside
+    # curse= is accepted but pointless; that is a redundancy rather than a lost rule. (task 351)
+    if ($tag -eq 'lose' -and $el.GetAttribute('family')) {
+        if (-not ($el.GetAttribute('curse') -or $el.GetAttribute('disease') -or $el.GetAttribute('poison'))) {
+            [void]$errors.Add(("{0} : <lose family=> without curse=/disease=/poison= - only a cure selector reads it, so this narrows nothing" -f $label))
         }
     }
     foreach ($c in $el.ChildNodes) { Test-XmlVocabulary $c $label $errors }

@@ -1,7 +1,7 @@
 // FL test suite — adventure sheet, afflictions, items, markets, ships, blessings, RNG/expr
 // Extracted verbatim from web/_test.html run() lines 930-2036 (task 120).
 import * as data from '../js/data.js';
-import { GameState, importSave, deleteSlot, makeItem, nextFreeSlot, sanitizeData } from '../js/state.js';
+import { GameState, afflictionFamily, importSave, deleteSlot, makeItem, nextFreeSlot, sanitizeData } from '../js/state.js';
 import * as eng from '../js/engine.js';
 import { makeFight } from '../js/combat.js';
 import { goodsFrom, buyTrade, applyInlineBuy } from '../js/market.js';
@@ -1628,15 +1628,30 @@ export async function run(ctx) {
         ok('task343: a disease selector matches diseases AND poisons, in list order',
            JSON.stringify(g.afflictionMatches('disease', '?')) === '[{"type":"disease","name":"Ghoulbite"},{"type":"poison","name":"Scorpion Poison"}]',
            JSON.stringify(g.afflictionMatches('disease', '?')));
-        ok('task343: a poison selector stays on the poison list (§1.338 cannot cure disease)',
-           JSON.stringify(g.afflictionMatches('poison', '?')) === '[{"type":"poison","name":"Scorpion Poison"}]',
+        // task 351: the family is SYMMETRIC, as Curse.matches is, and the selector's own list
+        // comes first so the picker order and the no-chooser default prefer what the author
+        // named. §1.338's narrowing is no longer here — it is `family="f"` on §1.338 itself.
+        ok('task351: a poison selector reads the family too, its own list first',
+           JSON.stringify(g.afflictionMatches('poison', '?')) === '[{"type":"poison","name":"Scorpion Poison"},{"type":"disease","name":"Ghoulbite"}]',
            JSON.stringify(g.afflictionMatches('poison', '?')));
+        ok('task351: …and `family="f"` puts each selector back on its own list alone',
+           JSON.stringify(g.afflictionMatches('poison', '?', true)) === '[{"type":"poison","name":"Scorpion Poison"}]'
+           && JSON.stringify(g.afflictionMatches('disease', '?', true)) === '[{"type":"disease","name":"Ghoulbite"}]',
+           JSON.stringify(g.afflictionMatches('poison', '?', true)));
+        ok('task351: afflictionFamily says the same, and a curse is never in a family',
+           JSON.stringify(afflictionFamily('disease')) === '["disease","poison"]'
+           && JSON.stringify(afflictionFamily('poison')) === '["poison","disease"]'
+           && JSON.stringify(afflictionFamily('curse')) === '["curse"]'
+           && JSON.stringify(afflictionFamily('poison', true)) === '["poison"]'
+           && JSON.stringify(afflictionFamily('curse', true)) === '["curse"]',
+           JSON.stringify(afflictionFamily('poison')));
         ok('task343: a curse selector never sees the disease/poison family, and vice versa',
            g.afflictionMatches('curse', '?').length === 1 && g.afflictionMatches('curse', '?')[0].name === 'Shadar Curse'
-           && !g.afflictionMatches('disease', '?').some((m) => m.type === 'curse'));
+           && !g.afflictionMatches('disease', '?').some((m) => m.type === 'curse')
+           && !g.afflictionMatches('poison', '?').some((m) => m.type === 'curse'));
         ok('task343: hasDisease/hasPoison follow the same families',
            g.hasDisease('?') === true && g.hasPoison('?') === true
-           && g.hasDisease('Scorpion Poison') === true && g.hasPoison('Ghoulbite') === false,
+           && g.hasDisease('Scorpion Poison') === true && g.hasPoison('Ghoulbite') === true,
            `d?=${g.hasDisease('?')} p(Ghoulbite)=${g.hasPoison('Ghoulbite')}`);
         ok('task343: an exact name still needs the name — an unrelated poison is not Ghoulbite',
            g.hasDisease('Ghoulbite') === true && g.hasDisease('Blight of Nagil') === false);
@@ -1688,6 +1703,13 @@ export async function run(ctx) {
       // §1.338 — the poison-only healer, the control. A poisoned player is cured; a player with
       // only a disease is refused, because the printed sentence says the healer "is unable to
       // cure disease".
+      //
+      // task 351: the OUTCOME below is unchanged and the MECHANISM is not. That narrowing used to
+      // be a hard-coded branch in afflictionFamily, bending a shared function for all six books
+      // on the strength of one printed sentence; it is now `family="f"` on this section, and the
+      // family is symmetric again. So these four assertions are the real regression for the move
+      // — if the attribute were dropped, misspelled or read the wrong way round, the refusal
+      // below turns into a 25-Shard charge that cures a disease the page says it cannot.
       {
         const g = mk343(1);
         g.data.shards = 50;
@@ -1709,6 +1731,44 @@ export async function run(ctx) {
         ok('§1.338 stays poison-only: a diseased player is refused, not charged',
            !!pay && pay.disabled === true && g.data.diseases.length === 1 && g.data.shards === 50,
            pay ? `disabled=${pay.disabled} title=${pay.title}` : 'no button');
+        // …and it is the section's own markup that says so, read straight from the corpus. The
+        // narrowing is one attribute; a pin on the source is what makes its loss a test failure
+        // rather than a silent widening.
+        const x338 = (await rawSections(1))['338'];
+        ok('task351: §1.338 carries the narrowing in its own markup',
+           /<lose\b[^>]*\bpoison="\?"[^>]*\bfamily="f"/.test(x338)
+           && /unable to cure disease/i.test(x338),
+           x338.match(/<lose\b[^>]*poison[^>]*>/)?.[0] || 'no poison lose');
+      }
+      // The attribute reader itself: default is the family, and every false spelling the source
+      // gate accepts narrows. `family="false"` reading as TRUE would silently re-widen §1.338.
+      {
+        const sel = (attrs) => rules.afflictionSelector(parse(`<section><lose poison="?" ${attrs}/></section>`).querySelector('lose'));
+        ok('task351: an unqualified cure reads the family; f/false/0/no narrow it',
+           sel('').ownOnly === false && sel('family="t"').ownOnly === false
+           && sel('family="f"').ownOnly === true && sel('family="false"').ownOnly === true
+           && sel('family="0"').ownOnly === true && sel('family="no"').ownOnly === true,
+           `absent=${sel('').ownOnly} false=${sel('family="false"').ownOnly}`);
+        // The waste gate and the picker must draw the same narrowed pool as the removal, or the
+        // three disagree about what a payment buys.
+        const g = mk343(1);
+        disease343(g);
+        const narrow = parse('<section><lose poison="?" family="f">cured</lose></section>').querySelector('lose');
+        const wide = parse('<section><lose poison="?">cured</lose></section>').querySelector('lose');
+        ok('task351: the waste gate reads family=, so a diseased-only sheet wastes a narrowed cure',
+           rules.rewardWasteReason(g, narrow) === "You don't have that affliction."
+           && rules.rewardWasteReason(g, wide) === null,
+           `narrow=${rules.rewardWasteReason(g, narrow)} wide=${rules.rewardWasteReason(g, wide)}`);
+        poison343(g);
+        ok('task351: …and the picker draws from the narrowed pool too',
+           rules.afflictionChoiceOptions(narrow, g).length === 1
+           && rules.afflictionChoiceOptions(wide, g).length === 2,
+           `narrow=${rules.afflictionChoiceOptions(narrow, g).length} wide=${rules.afflictionChoiceOptions(wide, g).length}`);
+        // And the removal: a narrowed poison cure leaves the disease exactly where it was.
+        ok('task351: a narrowed removal takes only its own list',
+           g.removeAffliction('poison', '*', null, true).length === 1
+           && g.data.poisons.length === 0 && g.data.diseases.length === 1,
+           `p=${g.data.poisons.length} d=${g.data.diseases.length}`);
       }
 
       // The automatic `disease="*"` cures: entering clears BOTH lists and leaves curses alone,

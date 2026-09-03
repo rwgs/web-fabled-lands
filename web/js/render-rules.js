@@ -7,7 +7,7 @@
 // attributes / running querySelectorAll on it is fine (the same thing engine.js does);
 // only DOM *construction* belongs in the view. Unit-tested headlessly.
 
-import { boolAttr, isDiceExpr, resolveValue, matchRange, losePaymentPlan, PASSIVE_BODY_TAGS } from './engine.js';
+import { afflictionOwnOnly, boolAttr, isDiceExpr, resolveValue, matchRange, losePaymentPlan, PASSIVE_BODY_TAGS } from './engine.js';
 import { normalize, canonBlessing, currencyAward, isShardsCurrency, splitItemName } from './state.js';
 import { bookAvailable } from './edition.js'; // the DOM-free registry, never data.js (task 195)
 import { blessingLabel } from './render-util.js'; // pure label formatting, no DOM (task 218)
@@ -255,12 +255,17 @@ export function rewardWasteReason(state, node) {
   const bl = tag === 'lose' ? null : node.getAttribute('blessing');
   if (bl && state.hasBlessing(bl)) return 'You already have this blessing.';
   if (tag === 'lose') {
+    // afflictionMatches rather than hasCurse/hasDisease/hasPoison, so the gate reads the same
+    // pool the cure will: a `family="f"` node over a sheet holding only what it may NOT take
+    // buys nothing, and the payment has to be refused for the same reason an unafflicted one is
+    // — §1.338 must not charge 25 Shards to a diseased-only player. (task 351)
+    const own = afflictionOwnOnly(node);
     const c = node.getAttribute('curse');
-    if (c != null && !state.hasCurse(c)) return "You don't have that curse.";
+    if (c != null && !state.afflictionMatches('curse', c, own).length) return "You don't have that curse.";
     const d = node.getAttribute('disease');
-    if (d != null && !state.hasDisease(d)) return "You don't have that affliction.";
+    if (d != null && !state.afflictionMatches('disease', d, own).length) return "You don't have that affliction.";
     const p = node.getAttribute('poison');
-    if (p != null && !state.hasPoison(p)) return "You don't have that affliction.";
+    if (p != null && !state.afflictionMatches('poison', p, own).length) return "You don't have that affliction.";
   }
   return null;
 }
@@ -835,12 +840,15 @@ export function openAbilityNode(costNode, rewards = []) {
 // attributes are checked in this order, so a node carrying two (§1.574's `poison="*"
 // disease="*"`) reports the first — harmless, because no shipped node writes two OPEN
 // selectors, and only an open one is ever asked about.
+// `ownOnly` rides along so the picker, the waste gate and applyLose all draw the same pool: a
+// `family="f"` cure searches its own list alone, because its page denies the rest of the family
+// (§1.338). Read here rather than at each call site for that reason. (task 351)
 const AFFLICTION_SELECTORS = ['curse', 'disease', 'poison'];
 export function afflictionSelector(node) {
   if (!node || node.tagName.toLowerCase() !== 'lose') return null;
   for (const type of AFFLICTION_SELECTORS) {
     const name = node.getAttribute(type);
-    if (name != null) return { type, name };
+    if (name != null) return { type, name, ownOnly: afflictionOwnOnly(node) };
   }
   return null;
 }
@@ -851,7 +859,7 @@ export function afflictionSelector(node) {
 export function afflictionChoiceOptions(node, state) {
   const sel = afflictionSelector(node);
   if (!sel || (sel.name !== '?' && sel.name !== '')) return [];
-  return state.afflictionMatches(sel.type, sel.name);
+  return state.afflictionMatches(sel.type, sel.name, sel.ownOnly);
 }
 
 // Does this cure ask the player WHICH affliction leaves? Only an open "?" with more than one

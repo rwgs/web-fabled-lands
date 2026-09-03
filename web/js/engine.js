@@ -444,6 +444,19 @@ export function boolAttr(v, def = false) {
   return v === 't' || v === 'true' || v === 'yes' || v === '1';
 }
 
+/** Does a cure read only its OWN affliction list rather than its whole family
+ *  (state.afflictionFamily)? `family="f"` is how a section states the narrowing its own page
+ *  prints, which is the vocabulary the "a printed DENIAL narrows a selector, printed SILENCE
+ *  does not" rule needed and did not have: §1.338's healer "can cure you of poison but is
+ *  unable to cure disease", so its `<lose poison="?">` may not take the disease the family
+ *  would hand it, while §5.180's silent potion still clears both. Default t, because every
+ *  other shipped cure wants the family and a page that does not mention the rest of it has not
+ *  denied it. Through boolAttr, so every false spelling the source gate accepts stays false.
+ *  (task 351) */
+export function afflictionOwnOnly(el) {
+  return el != null && !boolAttr(el.getAttribute('family'), true);
+}
+
 // ---- passive effect application -------------------------------------------
 // Applies a state-changing node. Returns a short human note (or '') describing
 // what changed, for optional UI feedback. `opts.chooser` may be provided to
@@ -645,15 +658,18 @@ function applyLose(el, state, opts) {
   // Lift a standing <bookchange> rule by name — book5/587's "You can no longer receive 20
   // Shards every time you travel to another book", the cancel half of the family. (task 299)
   if (get('bookchange') != null) { if (state.removeBookChange(get('bookchange'))) notes.push('rule lifted'); }
-  // A cure reads its whole affliction FAMILY (state.afflictionFamily): a disease selector sees
-  // diseases AND poisons, which is what the sections writing `<lose disease="?">` print, while a
-  // curse or poison selector stays on its own list. An open "?" asks opts.chooser which one
-  // leaves when several qualify — the view stands the picker — and the note names what ACTUALLY
-  // left, so a disease selector that cured a poison does not report "cured disease". (task 343)
+  // A cure reads its whole affliction FAMILY (state.afflictionFamily): a disease or poison
+  // selector sees BOTH lists, which is what the sections writing them print, while a curse
+  // selector stays on its own. An open "?" asks opts.chooser which one leaves when several
+  // qualify — the view stands the picker — and the note names what ACTUALLY left, so a disease
+  // selector that cured a poison does not report "cured disease". (task 343)
+  // `family="f"` narrows a selector to its own list where the page denies the rest of the
+  // family — §1.338's healer, "unable to cure disease". (task 351)
   const cured = new Set();
+  const ownOnly = afflictionOwnOnly(el);
   for (const sel of ['curse', 'disease', 'poison']) {
     if (get(sel) == null) continue;
-    for (const gone of state.removeAffliction(sel, get(sel), opts.chooser)) cured.add(gone.type);
+    for (const gone of state.removeAffliction(sel, get(sel), opts.chooser, ownOnly)) cured.add(gone.type);
   }
   for (const kind of cured) notes.push(kind === 'curse' ? 'curse lifted' : ('cured ' + kind));
   if (get('title') != null) { state.removeTitle(get('title')); }

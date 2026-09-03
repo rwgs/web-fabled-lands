@@ -161,6 +161,29 @@ export async function run(ctx) {
       ok('task343: the corpus writes ONE open poison cure, and its section denies curing disease',
          openPoison.join(',') === '1.338' && openPoisonLoose.length === 0,
          'open=' + openPoison.join(',') + ' loose=' + openPoisonLoose.join(','));
+      // task 351: that denial is now MARKUP rather than a branch in afflictionFamily, so the
+      // census checks the pair. A section printing "unable to cure disease" whose cure does not
+      // carry family= would silently cure the disease it denies - the exact regression the move
+      // makes possible - and a family= in a section printing no denial would re-hard-code an
+      // exception no book states, which is the direction task 350 refused for §5.180.
+      const narrowed = [], narrowedQuiet = [], deniedWide = [];
+      for (const b of books) {
+        const raw = await rawSections(b);
+        for (const [key, xml] of Object.entries(raw)) {
+          const at = b + '.' + key;
+          const denies = /unable to cure|cannot cure|will not cure|no effect on poison|has no effect on poisons/i.test(xml);
+          for (const m of xml.matchAll(/<lose\b[^>]*\b(?:disease|poison)="[^"]*"[^>]*>/g)) {
+            const narrow = /\bfamily="/.test(m[0]);
+            if (narrow) { narrowed.push(at); if (!denies) narrowedQuiet.push(at); }
+            if (denies && !narrow) deniedWide.push(at + ':' + m[0].slice(0, 40));
+          }
+        }
+      }
+      ok('task351: every narrowed cure sits in a section that prints the denial it narrows for',
+         narrowed.join(',') === '1.338' && narrowedQuiet.length === 0,
+         'narrowed=' + narrowed.join(',') + ' silent=' + narrowedQuiet.join(','));
+      ok('task351: …and every section that prints a denial narrows its cure',
+         deniedWide.length === 0, deniedWide.join(' | '));
     }
 
     // --- task 324: the Maps modal captions each map with book.ini's Map.Title ------------------

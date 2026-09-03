@@ -278,6 +278,14 @@ $CASES = @(
        text  = '<section name="2"><tick codeword="READY"/></section>'
        want  = 'codeword="READY" is not declared' }
 
+    # family= narrows a cure, and only a cure selector reads it - so on any other <lose> the
+    # narrowing the author wrote is simply absent. That fails in the worst direction available:
+    # the author has recorded a printed denial and not applied it. (task 351)
+    @{ label = 'a <lose family="f"> on a node that selects no affliction (task 351)'
+       file  = 'books/book2/1.xml'
+       text  = '<section name="1"><lose item="?" family="f">Hand it over</lose></section>'
+       want  = 'without curse=/disease=/poison=' }
+
     # A section-scoped flag that lost its separator - book 4 section 345 cleared "4457" where
     # section 457 sets "4.457". This is why the exemption needs the '.' or '/' and not just a
     # leading digit: "4457" would otherwise read as machinery and pass.
@@ -400,6 +408,18 @@ $novac = Build-Fixture @{ 'books/book1/book.ini' = "Map=Sokara.JPG`nDeath=680`n"
 Assert 'an unreadable Codewords= list disarms the value check instead of failing all of them (task 325)' (
     @($novac.Errors | Where-Object { $_ -like '*is not declared*' }).Count -eq 0 -and
     $novac.Notes.Count -eq 0) ($novac.Errors -join ' | ')
+
+# The narrowed cure (section 338 of book 1). Both live spellings are accepted beside an
+# unqualified family cure, so the gate refuses the inert placements alone and not the attribute;
+# and the value is pinned to the truth set, because a misspelling reads as the DEFAULT - it would
+# cure the affliction the page denies, silently, in the direction that favours the player.
+$okFam = Build-Fixture @{ 'books/book2/1.xml' = '<section name="1">' +
+    '<lose poison="?" family="f">restore your abilities</lose>' +
+    '<lose disease="*" family="false">cured</lose><lose disease="?">a poison or disease</lose>' +
+    '</section>' }
+Assert 'a narrowed cure and an unqualified family cure are both accepted (task 351)' ($okFam.Errors.Count -eq 0) ($okFam.Errors -join ' | ')
+$badFam = Build-Fixture @{ 'books/book2/1.xml' = '<section name="1"><lose poison="?" family="poisononly">x</lose></section>' }
+Assert 'an unknown family= value is rejected (task 351)' ($badFam.Errors.Count -eq 1 -and $badFam.Errors[0] -match 'family') ($badFam.Errors -join ' | ')
 
 if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
 

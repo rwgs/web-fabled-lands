@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-350 appears below: 207 and 326 are withdrawn as misdiagnoses and **all others are
+351 appears below: 207 and 326 are withdrawn as misdiagnoses and **all others are
 complete** — the backlog carries no open item (see the Review log). File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -385,6 +385,7 @@ this order.*
 - [x] 348. both sail callers set `story._pendingSourceNode` BEFORE calling `sailThenGo`, but with several local ships that function stands a which-ship picker and returns having navigated nowhere — so the Story claimed the sail choice was taken while the question was open, and an item detour opened in that window (`Story.useItem` passes no source node, correctly) inherited it, its `<return>` crossing off a route no ship had sailed
 - [x] 349. two derived-stat readers bypassed the mode-aware helpers beside them: `defenceForMode` stripped the weapon, armour, Defence aura, Defence affliction and god effect for `natural` and then added `rankValue()` unconditionally, so the ring of ultimate power's +2 Rank aura survived into "natural" Defence; and `<if ability="stamina">`/`<set value="stamina">` were two-way — any modifier meant the effective maximum — so `natural` read back the aura-inflated max
 - [x] 350. §5.180's potion of restoration says "cure you of any diseases" and carries `disease="*"` alone, where §1.342's twin says "cure poison and disease" and carries both — so task 343's family reading makes it clear poison too; **resolved as correct**, because a printed DENIAL narrows a selector (§1.338) while printed SILENCE does not, and §5.180 nowhere says the potion cannot cure poison
+- [x] 351. task 343's affliction family was deliberately asymmetric — `disease=` read both lists, `poison=` read poisons alone — and the sole reason was §1.338's printed "can cure you of poison but is unable to cure disease", so one section's sentence bent a shared function for all six books while task 350's own rule says a page's words decide; the family is now symmetric like the reference `Curse.matches`, the denial is `<lose … family="f">` on §1.338 itself, and the census checks both directions (a denial without the attribute, and the attribute without a denial)
 
 ---
 
