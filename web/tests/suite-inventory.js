@@ -1596,9 +1596,10 @@ export async function run(ctx) {
     // (`Curse.matches`); the web state kept three arrays and never formed the family, so
     // `<lose disease="?">` searched diseases only. Every shipped node that writes it prints
     // "poison or disease", so a poisoned character was told there was nothing to cure — at
-    // §5.105 *after* paying 75 Shards for it. The union is asymmetric on purpose: `poison=`
-    // stays on its own list, because the corpus writes it only where the book narrows to
-    // poison (§1.338's healer "is unable to cure disease"). See afflictionFamily.
+    // §5.105 *after* paying 75 Shards for it. ~~The union is asymmetric on purpose: `poison=`
+    // stays on its own list.~~ **Symmetric since task 351**, as `Curse.matches` is: the one
+    // section that narrows says so itself, in `family="f"` on §1.338's cure. See
+    // afflictionFamily, whose comment carries the reasoning and the measurement.
     {
       const mk343 = (book = 5) => {
         const g = GameState.create({ name: 'T343', gender: 'm', profession: 'Warrior', book, adv });
@@ -1620,7 +1621,7 @@ export async function run(ctx) {
       const payBtn = (cont, re) => Array.from(cont.querySelectorAll('.pay-action')).find((b) => re.test(b.textContent));
       const cureBtns = (cont) => Array.from(cont.querySelectorAll('.affliction-choice .btn-mini'));
 
-      // The family plan itself, and the asymmetry it encodes.
+      // The family plan itself, symmetric, and the narrowing that replaced its exception.
       {
         const g = mk343();
         poison343(g); disease343(g);

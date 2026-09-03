@@ -125,11 +125,13 @@ export async function run(ctx) {
     }
 
     // --- task 343: the corpus pattern the affliction family reading rests on -------------------
-    // afflictionFamily makes `disease=` search diseases AND poisons while `poison=` searches
-    // poisons alone. That asymmetry is a claim about how the transcription writes the two
-    // attributes, not a taste, so it is MEASURED here: a new node breaking the pattern fails
-    // this assertion instead of silently curing the wrong list. The evidence is the section's
-    // own printed words, which is why the check reads the raw XML rather than a node list.
+    // afflictionFamily makes `disease=` and `poison=` each search BOTH lists (symmetric since
+    // task 351, as the reference model is), and a section printing a narrower rule says so in
+    // `family="f"`. Which attribute a section writes, and whether its own words promise the whole
+    // family, is a claim about the transcription rather than a taste, so it is MEASURED here: a
+    // new node breaking the pattern fails this assertion instead of silently curing the wrong
+    // list. The evidence is the section's own printed words, which is why the check reads the raw
+    // XML rather than a node list.
     {
       const star = [], starQuiet = [], openDisease = [], openDiseaseQuiet = [], openPoison = [], openPoisonLoose = [];
       for (const b of books) {
