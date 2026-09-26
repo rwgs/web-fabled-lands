@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-357 appears below: 207 and 326 are withdrawn as misdiagnoses, 355–357 are open, and
+357 appears below: 207 and 326 are withdrawn as misdiagnoses, 356–357 are open, and
 all others are complete (see the Review log). File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -24,7 +24,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 355. `docs/Testing.md` states a "Current baseline" pass count (3032) that the suite has outgrown (3223) — the derivable-count rot AGENTS.md forbids
 - [ ] 356. AGENTS.md's closing "Behavioral Guidelines" are generic, non-ASCII boilerplate that partly repeats the task workflow — condense to what this repo needs
 - [ ] 357. AGENTS.md's step 4 files new work "at the bottom of `TASKS.md`" where `TASKS.md` files it under a priority bucket and logs the pass, and no step says a closed task's detail moves to `TASKS-archive.md`
 
@@ -391,28 +390,9 @@ this order.*
 - [x] 352. two AGENTS.md notes still pointed at "step 2's `cmd /c` line", which step 2 has not carried since task 235 made it `run-tests.ps1`; both now describe a by-hand `cmd /c` launch and say the runner is immune
 - [x] 353. AGENTS.md's task workflow stopped at "take the first open task" with nowhere to go when the backlog is empty, which it is; step 1 now searches for `- [ ]` and sends the empty case to `ROADMAP.md`/`PLAN.md`, as `TASKS.md`'s header does
 - [x] 354. AGENTS.md was ~38 KB loaded into every session, most of it incident history `docs/` already held; it is now ~19 KB of rules, each linking the doc with the why, after moving what the docs lacked (line endings into `Contributing.md`, two by-hand traps into `Testing.md`)
+- [x] 355. `docs/Testing.md` stated a "Current baseline" pass count (3032) the suite had outgrown (3223); it now says to note and compare the count and records no figure
 
 ---
-
-## 355. `docs/Testing.md` restates a pass count that has rotted
-
-**Priority: LOW.** Documentation only.
-
-### What is wrong
-
-`docs/Testing.md` says "Current baseline: **`RESULT ALL PASS pass=3032 fail=0`**". The suite now
-reports `pass=3223`. This is exactly the derivable figure AGENTS.md's documentation rule says not
-to restate (task 329): it reads as freshly verified and nothing re-checks it.
-
-### Steps
-
-Replace the figure with the rule that makes it useful — note the count a green run prints, and
-compare it against the next run, since a short count is the only tell of a stale bundle — and
-leave the number out.
-
-### Validation
-
-No `pass=` figure in `docs/` or `README.md` is offered as the current expected count.
 
 ## 356. AGENTS.md closes with generic boilerplate
 
@@ -473,6 +453,9 @@ AGENTS.md's workflow and `TASKS.md`'s header describe the same filing place and 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-26 (task 355): closed **355**, filed nothing. `docs/Testing.md` no longer records
+a pass count; it says how to use one. No other living document offers a current figure.
 
 Worked 2026-09-26 (task 354): closed **354**, filed nothing here — but the pass surfaced a
 further workflow inconsistency, filed next as **357**. AGENTS.md halves to ~19 KB of rules

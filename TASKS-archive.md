@@ -17123,3 +17123,24 @@ line — in the `docs/Build-Pipeline.md` and `docs/Testing.md` sections it links
 anchor exists. Full browser suite `RESULT ALL PASS pass=3223 fail=0`.
 
 ---
+
+## 355. `docs/Testing.md` restates a pass count that has rotted
+
+**Priority: LOW.** Documentation only.
+
+### What is wrong
+
+`docs/Testing.md` said "Current baseline: **`RESULT ALL PASS pass=3032 fail=0`**". The suite
+reports `pass=3223`. This is exactly the derivable figure AGENTS.md's documentation rule says not
+to restate (task 329): it reads as freshly verified and nothing re-checks it.
+
+### The fix
+
+The sentence now shows the verdict's shape (`pass=N fail=0`) and says what to do with `N` —
+note it and compare the next run's, because a count that drops without a suite change is the
+only tell of a stale bundle — and records no figure. A search of `README.md`, `docs/` and the
+other living documents for a non-zero `pass=` finds only the historical `pass=476` instance
+quoted as evidence in `docs/Testing.md` and `DECISIONS.md`, which is a record, not an
+expectation. Full browser suite `RESULT ALL PASS pass=3223 fail=0`.
+
+---

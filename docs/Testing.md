@@ -13,8 +13,10 @@ only on `RESULT ALL PASS`** - so a caller can branch on the exit code instead of
 dump. On failure it prints the first 25 `FAIL`/`FATAL` lines and keeps the dump, naming its
 path.
 
-Current baseline: **`RESULT ALL PASS pass=3032 fail=0`**. Chrome's USB and GCM chatter on
-stderr is unrelated noise.
+A healthy run prints **`RESULT ALL PASS pass=N fail=0`**. Note `N` and compare it with the
+next run's: the count grows with the suite, so it is not recorded here, but a count that
+*drops* without a suite change is the only tell of a stale bundle (see trap 1 below).
+Chrome's USB and GCM chatter on stderr is unrelated noise.
 
 ---
 
