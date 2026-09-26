@@ -17144,3 +17144,29 @@ quoted as evidence in `docs/Testing.md` and `DECISIONS.md`, which is a record, n
 expectation. Full browser suite `RESULT ALL PASS pass=3223 fail=0`.
 
 ---
+
+## 356. AGENTS.md closes with generic boilerplate
+
+**Priority: LOW.** Documentation only.
+
+### What is wrong
+
+The "Behavioral Guidelines" section (~2.3 KB) was a generic, personal guideline set pasted into
+a checked-in file that other agent tools also read. It was written with non-ASCII arrows in a
+repo that keeps its scripts ASCII, and its "Goal-Driven Execution" and "Surgical Changes" parts
+repeated what the task workflow and the rest of AGENTS.md already require.
+
+### The fix
+
+Four ASCII bullets under the same heading — think before coding, simplicity first, surgical
+changes, goal-driven execution — carrying each distinct rule once: state assumptions, present
+competing readings, stop and ask when unclear, push back on a simpler approach; nothing
+speculative, rewrite when much shorter, no multiple agents without asking and saying why; every
+line traces to the request, no drive-by improvement or refactor, match style, remove your own
+orphans, mention (don't delete) unrelated dead code unless asked; turn the task into a check
+that can fail and give each step of a plan its check. Dropped as restatement rather than rule:
+the "would a senior engineer…" prompt, the worked `→` examples (folded into the check wording)
+and the closing "working if" metric. "Plan Mode" is unchanged. The section has no non-ASCII
+character; AGENTS.md is 17.9 KB. Full browser suite `RESULT ALL PASS pass=3223 fail=0`.
+
+---
