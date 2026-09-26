@@ -203,8 +203,9 @@ Notes:
     binaries: launched directly from PowerShell they inherit no stdout handle, so
     `$dump = & chrome.exe … --dump-dom …` yields an empty string and any
     `Select-String 'RESULT'` over it finds nothing — while the suites run and pass perfectly
-    well (the static server logs the full request set). Redirecting through `cmd` as in
-    step 2 gives the process a real handle. This is **not** a browser difference: Chrome and
+    well (the static server logs the full request set). A by-hand launch redirected through
+    `cmd` gets a real handle, and the runner gets one from `Start-Process
+    -RedirectStandardOutput`. This is **not** a browser difference: Chrome and
     Edge behave identically both ways — direct from PowerShell both print nothing, and
     through `cmd` both produce the same dump and the same verdict (task 208's run: a
     135,029-byte dump reading `RESULT ALL PASS pass=2100 fail=0`; both numbers move as suites
@@ -225,8 +226,8 @@ Notes:
     help. `--screenshot` is the discriminator because it is the one output that never travels
     over stdout: a screenshot written beside an empty dump is the capture failure above; no
     screenshot either means the browser did nothing.
-- **Step 2's `cmd /c` line is written for a POSIX shell that does not mangle it — from an
-  MSYS/Git-Bash prompt it silently runs nothing and leaves an OLD dump in place.** Two
+- **A by-hand `cmd /c chrome … > out.html` launch silently runs nothing from an MSYS/Git-Bash
+  prompt and leaves an OLD dump in place.** (Step 2 no longer uses one — the runner is immune.) Two
   independent hazards, and the first is the dangerous one. (a) MSYS argument conversion
   rewrites the leading `/c` as a path, so `cmd` never sees a switch: it opens interactively,
   prints its banner and prompt, **exits 0**, and writes no file. (b) Even with the switch
@@ -236,7 +237,7 @@ Notes:
   reads whichever file the last run left at that path, which has a plausible size and a
   plausible `RESULT ALL PASS` for a *different* page. That defeats the "check the dump's size
   first" guard above, which only catches an empty capture, never a stale one. Two fixes, both
-  verified: run step 2 from a **PowerShell** prompt as written, or skip `cmd` altogether with
+  verified: run the `cmd /c` line from a **PowerShell** prompt, or skip `cmd` altogether with
   `Start-Process chrome.exe -ArgumentList … -RedirectStandardOutput "$env:TEMP\fl-dump.html"
   -NoNewWindow -Wait`, which hands the process a real handle directly. Either way **delete the
   target first and check its `LastWriteTime` after** — a missing file is unambiguous where a

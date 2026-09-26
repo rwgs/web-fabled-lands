@@ -17032,3 +17032,27 @@ the attribute a rule and not a decoration.
   the same by a better route.
 
 ---
+
+## 352. Two AGENTS.md notes cite a `cmd /c` step that no longer exists
+
+**Priority: LOW.** Documentation only; nothing behaves wrongly.
+
+### What is wrong
+
+Task 235 replaced step 2 of AGENTS.md's build + test loop with `build/run-tests.ps1`. Two notes
+below it still read as if step 2 were the old raw `cmd /c chrome … > out.html` line: the
+empty-dump note said "Redirecting through `cmd` as in step 2 gives the process a real handle",
+and the MSYS note opened "Step 2's `cmd /c` line is written for a POSIX shell…" and ended "run
+step 2 from a PowerShell prompt as written". A reader following either went looking for a
+command the file no longer holds.
+
+### The fix
+
+Both notes now describe a **by-hand** `cmd /c` launch, and say the runner gets its handle from
+`Start-Process -RedirectStandardOutput` and is immune to the MSYS hazard. `docs/Testing.md` and
+`docs/FAQ-and-Troubleshooting.md` carried no such reference — `docs/Testing.md` already
+described the raw commands as by-hand ones. `grep -n 'step 2' AGENTS.md docs/*.md README.md`
+now finds only the note saying step 2 no longer uses `cmd`. Full browser suite
+`RESULT ALL PASS pass=3223 fail=0`; no `web/`, `books/` or `rules/` change.
+
+---

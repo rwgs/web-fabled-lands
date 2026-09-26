@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-356 appears below: 207 and 326 are withdrawn as misdiagnoses, 352–356 are open, and
+356 appears below: 207 and 326 are withdrawn as misdiagnoses, 353–356 are open, and
 all others are complete (see the Review log). File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -24,7 +24,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 352. Two AGENTS.md notes still point at "step 2's `cmd /c` line", which step 2 has not carried since task 235 made it `run-tests.ps1`
 - [ ] 353. AGENTS.md's task workflow stops at "take the first open task" and has nowhere to go when the backlog is empty, which it is — while `TASKS.md` itself sends the next worker to `ROADMAP.md`
 - [ ] 354. AGENTS.md is ~38 KB loaded into every session, and most of it is incident history `docs/` already holds — slim it to the rules and point at the docs for the why
 - [ ] 355. `docs/Testing.md` states a "Current baseline" pass count (3032) that the suite has outgrown (3223) — the derivable-count rot AGENTS.md forbids
@@ -390,31 +389,9 @@ this order.*
 - [x] 349. two derived-stat readers bypassed the mode-aware helpers beside them: `defenceForMode` stripped the weapon, armour, Defence aura, Defence affliction and god effect for `natural` and then added `rankValue()` unconditionally, so the ring of ultimate power's +2 Rank aura survived into "natural" Defence; and `<if ability="stamina">`/`<set value="stamina">` were two-way — any modifier meant the effective maximum — so `natural` read back the aura-inflated max
 - [x] 350. §5.180's potion of restoration says "cure you of any diseases" and carries `disease="*"` alone, where §1.342's twin says "cure poison and disease" and carries both — so task 343's family reading makes it clear poison too; **resolved as correct**, because a printed DENIAL narrows a selector (§1.338) while printed SILENCE does not, and §5.180 nowhere says the potion cannot cure poison
 - [x] 351. task 343's affliction family was deliberately asymmetric — `disease=` read both lists, `poison=` read poisons alone — and the sole reason was §1.338's printed "can cure you of poison but is unable to cure disease", so one section's sentence bent a shared function for all six books while task 350's own rule says a page's words decide; the family is now symmetric like the reference `Curse.matches`, the denial is `<lose … family="f">` on §1.338 itself, and the census checks both directions (a denial without the attribute, and the attribute without a denial)
+- [x] 352. two AGENTS.md notes still pointed at "step 2's `cmd /c` line", which step 2 has not carried since task 235 made it `run-tests.ps1`; both now describe a by-hand `cmd /c` launch and say the runner is immune
 
 ---
-
-## 352. Two AGENTS.md notes cite a `cmd /c` step that no longer exists
-
-**Priority: LOW.** Documentation only; nothing behaves wrongly.
-
-### What is wrong
-
-Task 235 replaced step 2 of AGENTS.md's build + test loop with `build/run-tests.ps1`. Two notes
-below it still read as if step 2 were the old raw `cmd /c chrome … > out.html` line: the
-empty-dump note says "Redirecting through `cmd` as in step 2 gives the process a real handle",
-and the MSYS note opens "Step 2's `cmd /c` line is written for a POSIX shell…" and ends "run step
-2 from a PowerShell prompt as written". A reader following either goes looking for a command
-the file no longer holds.
-
-### Steps
-
-1. Reword both so they describe a **by-hand** `cmd /c` launch, and say the runner avoids the
-   problem with `Start-Process -RedirectStandardOutput`.
-2. Check `docs/Testing.md` and `docs/FAQ-and-Troubleshooting.md` for the same stale reference.
-
-### Validation
-
-`grep -n 'step 2' AGENTS.md docs/*.md` finds no claim that step 2 contains a `cmd` line.
 
 ## 353. The task workflow has no step for an empty backlog
 
@@ -520,6 +497,10 @@ characters.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-26 (task 352): closed **352**, filed nothing. Both notes now describe a by-hand
+`cmd /c` launch rather than a step that no longer holds one; `docs/` never carried the stale
+reference.
 
 Reviewed 2026-09-26 (agent guide): filed **352–356**. A pass over AGENTS.md and the documents it
 points at, asking whether they still work as agent instructions. **Every fact checked held**: the
