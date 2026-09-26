@@ -147,7 +147,9 @@ where a stale one is not.
 **The browser did no work.** A Chromium mid-update - a staged installer binary sitting beside
 the running one - can exit 0 from every headless launch, create a complete `--user-data-dir`
 profile, and write nothing at all. No redirection fix reaches it; use another browser with
-`-Browser <path>`.
+`-Browser <path>`. The runner's `Find-Browser` takes the first browser that *exists* (Chrome,
+then Edge) without probing it, so a working Chrome hides a wedged Edge, while the reverse
+looks like a repo failure.
 
 `chrome.exe --version` printing nothing does **not** separate the two - it is silent under
 both. The discriminator is `--screenshot`, the one output that never travels over stdout: a
@@ -157,7 +159,10 @@ browser did nothing. `run-tests.ps1` runs exactly that probe before it names a c
 A Git-Bash caller has it worse: MSYS argument conversion rewrites the `cmd` switch into a
 path, so `cmd` opens interactively, **exits 0**, and writes no file - leaving whichever
 dump the last run left at that path, with a plausible size and a plausible `RESULT ALL
-PASS` for a *different* page. Run the raw commands from a **PowerShell** prompt.
+PASS` for a *different* page. Even with the switch intact (`//c`, or `MSYS_NO_PATHCONV=1`), a
+`"%TEMP%\out.html"` redirect target fails there, where a literal `C:\...\out.html` works. Run
+the raw commands from a **PowerShell** prompt, or skip `cmd` with `Start-Process chrome.exe
+-ArgumentList ... -RedirectStandardOutput "$env:TEMP\fl-dump.html" -NoNewWindow -Wait`.
 
 ### A virtual-time budget that runs out fails in the wrong suite's name
 

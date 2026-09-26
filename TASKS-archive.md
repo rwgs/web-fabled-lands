@@ -17078,3 +17078,48 @@ citing `TASKS.md`'s header as the rule's owner rather than restating it elsewher
 document carried a copy of step 1. Full browser suite `RESULT ALL PASS pass=3223 fail=0`.
 
 ---
+
+## 354. AGENTS.md carries the incident history `docs/` already holds
+
+**Priority: LOW.** Documentation only, but it costs every session: AGENTS.md is loaded whole into
+each agent's context.
+
+### What is wrong
+
+AGENTS.md was ~38 KB (~5,700 words). About 15.7 KB of that was the build + test loop's notes,
+which the section itself said describe "every trap … the runner now closes mechanically", and
+`docs/Testing.md` already documents each one with a *Closed by* line. The `book.ini` paragraph
+(~3 KB) repeated `docs/The-Books.md` and `docs/Build-Pipeline.md`; the shipped-corpus paragraph
+repeated `docs/Corpus-Census.md`; the line-ending subsection (~2 KB) was recorded nowhere else
+but was mostly history. The rules an agent needs were buried in the stories of how each was
+learned.
+
+### The fix
+
+AGENTS.md is now 19.1 KB (2,765 words), from 37.8 KB (5,766), measured LF-normalised. Each
+section keeps its rules and links the doc that holds the why; the overview says so once, up
+front. The architecture invariant, the task workflow, Plan Mode and the Behavioral Guidelines
+are byte-identical (the last is task 356's).
+
+What the docs lacked was moved first:
+
+- `docs/Contributing.md` gains a **Line endings** section — the two tool families, why it is
+  cosmetic, the two ways autocrlf kept CRLF before task 321, and the `git show` / `grep -c`
+  measurement traps.
+- `docs/Testing.md` gains `Find-Browser`'s unprobed pick (a working Chrome hides a wedged Edge)
+  and the Git-Bash `"%TEMP%\out.html"` redirect failure with the `Start-Process` alternative.
+
+Two facts were corrected in passing, because the slimmed text would otherwise have restated
+them: `java-engine/`'s exception now says `Pack.java`'s literal **was** updated (task 239 is
+closed; the old text said it "may" be), and the ASCII-only rule for `build/*.ps1` — enforced by
+CI and the cause of commit 04238e7, but absent from AGENTS.md — now sits beside the OS-neutral
+one. The corpus paragraph no longer restates its counts; it points at `docs/Corpus-Census.md`,
+which prints the commands.
+
+**Validation.** The old file's 53 imperative sentences were listed mechanically (sentences
+containing never / do not / must / always / prefer / keep / stop) and each checked: all are in
+the new AGENTS.md, or — for the two codeword-note grades and the meanings of a missing RESULT
+line — in the `docs/Build-Pipeline.md` and `docs/Testing.md` sections it links. Every linked
+anchor exists. Full browser suite `RESULT ALL PASS pass=3223 fail=0`.
+
+---

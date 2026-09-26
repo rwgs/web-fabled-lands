@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-356 appears below: 207 and 326 are withdrawn as misdiagnoses, 354–356 are open, and
+357 appears below: 207 and 326 are withdrawn as misdiagnoses, 355–357 are open, and
 all others are complete (see the Review log). File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -24,9 +24,9 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 354. AGENTS.md is ~38 KB loaded into every session, and most of it is incident history `docs/` already holds — slim it to the rules and point at the docs for the why
 - [ ] 355. `docs/Testing.md` states a "Current baseline" pass count (3032) that the suite has outgrown (3223) — the derivable-count rot AGENTS.md forbids
 - [ ] 356. AGENTS.md's closing "Behavioral Guidelines" are generic, non-ASCII boilerplate that partly repeats the task workflow — condense to what this repo needs
+- [ ] 357. AGENTS.md's step 4 files new work "at the bottom of `TASKS.md`" where `TASKS.md` files it under a priority bucket and logs the pass, and no step says a closed task's detail moves to `TASKS-archive.md`
 
 **Done**
 
@@ -390,36 +390,9 @@ this order.*
 - [x] 351. task 343's affliction family was deliberately asymmetric — `disease=` read both lists, `poison=` read poisons alone — and the sole reason was §1.338's printed "can cure you of poison but is unable to cure disease", so one section's sentence bent a shared function for all six books while task 350's own rule says a page's words decide; the family is now symmetric like the reference `Curse.matches`, the denial is `<lose … family="f">` on §1.338 itself, and the census checks both directions (a denial without the attribute, and the attribute without a denial)
 - [x] 352. two AGENTS.md notes still pointed at "step 2's `cmd /c` line", which step 2 has not carried since task 235 made it `run-tests.ps1`; both now describe a by-hand `cmd /c` launch and say the runner is immune
 - [x] 353. AGENTS.md's task workflow stopped at "take the first open task" with nowhere to go when the backlog is empty, which it is; step 1 now searches for `- [ ]` and sends the empty case to `ROADMAP.md`/`PLAN.md`, as `TASKS.md`'s header does
+- [x] 354. AGENTS.md was ~38 KB loaded into every session, most of it incident history `docs/` already held; it is now ~19 KB of rules, each linking the doc with the why, after moving what the docs lacked (line endings into `Contributing.md`, two by-hand traps into `Testing.md`)
 
 ---
-
-## 354. AGENTS.md carries the incident history `docs/` already holds
-
-**Priority: LOW.** Documentation only, but it costs every session: AGENTS.md is loaded whole into
-each agent's context.
-
-### What is wrong
-
-AGENTS.md is ~38 KB (~5,700 words). About 15.7 KB of that is the build + test loop's notes,
-which the section itself says describe "every trap … the runner now closes mechanically", and
-`docs/Testing.md` already documents each one with a *Closed by* line. The `book.ini` paragraph
-(~3 KB) repeats `docs/The-Books.md` and `docs/Build-Pipeline.md`; the shipped-corpus paragraph
-repeats `docs/Corpus-Census.md`; the line-ending subsection (~2 KB) is recorded nowhere else but
-is mostly history. The rules an agent needs are buried in the stories of how each was learned.
-
-### Steps
-
-1. Reduce each AGENTS.md section to its rules, each with a pointer to the doc that holds the why.
-   Keep every rule: nothing an agent must do or avoid may exist only in the removed text.
-2. Move anything the docs lack into them before deleting it from AGENTS.md — at least the
-   line-ending measurement traps (`git cat-file blob`, lone CR, `grep -c $'\r$'`), which go in
-   `docs/Contributing.md`.
-3. Keep `docs/` free of new line-number citations and restated counts (AGENTS.md's own rules).
-
-### Validation
-
-Every imperative ("never", "do not", "must", "always") in the old AGENTS.md is still in the new
-one or in the doc it points at. The build + test loop passes.
 
 ## 355. `docs/Testing.md` restates a pass count that has rotted
 
@@ -463,6 +436,32 @@ no subagents without asking). Keep "Plan Mode" as it stands.
 Every distinct rule in the old section survives in the new one; the section has no non-ASCII
 characters.
 
+## 357. The task workflow disagrees with `TASKS.md` about filing and closing
+
+**Priority: LOW.** Documentation only.
+
+### What is wrong
+
+AGENTS.md's step 4 says to add a finding "as a new `- [ ]` task at the bottom of `TASKS.md`".
+`TASKS.md`'s header says the opposite: "File new work under the priority bucket that fits, and
+record the pass in the Review log" — and the bottom of the file is the Review log. Nor does any
+step describe how a task is closed here, though every recent close does the same four things:
+the checklist line moves to **Done** as `- [x]`, the detail section moves to the end of
+`TASKS-archive.md` with what was done, the header's open range is updated, and a *Worked* entry
+heads the Review log. An agent following AGENTS.md alone files in the wrong place and leaves
+closed detail in `TASKS.md`.
+
+### Steps
+
+1. Reword step 4 to file under the priority bucket that fits, with a `## <N>.` detail section,
+   and record the pass in the Review log — citing `TASKS.md`'s header as the rule's owner.
+2. Add the close to step 3 or 5: checklist line to Done, detail to `TASKS-archive.md`, a Review
+   log entry.
+
+### Validation
+
+AGENTS.md's workflow and `TASKS.md`'s header describe the same filing place and the same close.
+
 ---
 
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The backlog currently has no open item, so no detail section remains in this file; the Review log follows.
@@ -474,6 +473,13 @@ characters.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-26 (task 354): closed **354**, filed nothing here — but the pass surfaced a
+further workflow inconsistency, filed next as **357**. AGENTS.md halves to ~19 KB of rules
+linking `docs/` for the why, with every old imperative accounted for. Two stale facts fell out
+of the rewrite and were corrected rather than carried: task 239 is closed (the old text said
+`Pack.java` "may" be updated), and the ASCII-only rule for `build/*.ps1` that CI enforces was
+missing from AGENTS.md altogether.
 
 Worked 2026-09-26 (task 353): closed **353**, filed nothing. AGENTS.md's step 1 now finds open
 items by search and names the empty-backlog case, pointing at `ROADMAP.md`/`PLAN.md` the way this

@@ -156,6 +156,47 @@ expected and safe to run. What trips Bitdefender's heuristics is *suspicious aut
 
 ---
 
+## Line endings
+
+A shell-driven bulk edit can split a file's line endings, and `git diff` will not show it.
+On a CRLF file `sed`, `awk` and `grep` strip the CR while `head`, `tail`, `cut`, `tr` and
+`cat` keep it, so a pipeline mixing the two families writes LF-only lines into a CRLF file.
+Task 318 moved a 2,814-line block that way and the diff still read a balanced
+`2814 insertions(+), 2814 deletions(-)` with no line-ending noise; the only tells were git's
+"LF will be replaced by CRLF" warning and a byte count.
+
+**It is cosmetic.** `core.autocrlf=true` normalises the index, every tracked text blob is LF
+(task 321), the build LF-normalises the bundled section text, and `TASKS.md` is read by no
+script. `$(...)` drops a trailing CR under Git Bash, so shell assertions are not at risk
+either. So:
+
+- use **one tool family per pipeline**, so a file you rewrite wholesale comes out uniform;
+- **never "fix" a file's endings as a drive-by**, and do not read git's warning as a defect;
+- verify with a terminator count over the whole file (CRLF against LF), not with the diff,
+  which cannot answer the question.
+
+Before task 321, two tracked files kept CRLF in the index, for two reasons worth
+recognising if it recurs:
+
+- **One lone CR** (a CR not followed by LF) anywhere makes git classify the whole file as
+  binary, and a binary file is never converted in either direction.
+- **Once a text file's index blob contains CRLF, git keeps CRLF** on every later staging
+  instead of normalising, so it never heals and `git status` stays clean.
+
+Two measurement traps report the reassuring answer:
+
+- `git show` applies eol conversion, so it shows the opposite of what the blob holds. Read the
+  blob with `git cat-file blob`, or list every file's index and worktree endings with
+  `git ls-files --eol`.
+- Under Git Bash, `grep -c $'\r$'` returns **0 for a fully-CRLF file**, because grep strips
+  the CR before the pattern sees it. Count bytes instead.
+
+The whole-file diffs this once caused were never git's staging path normalising: they came
+from an editing tool writing LF into a CRLF worktree file, after which every line read as
+changed.
+
+---
+
 ## Before you commit
 
 ```
