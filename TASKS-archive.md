@@ -17056,3 +17056,25 @@ now finds only the note saying step 2 no longer uses `cmd`. Full browser suite
 `RESULT ALL PASS pass=3223 fail=0`; no `web/`, `books/` or `rules/` change.
 
 ---
+
+## 353. The task workflow has no step for an empty backlog
+
+**Priority: LOW.** Documentation only.
+
+### What is wrong
+
+AGENTS.md's task workflow said "Read `TASKS.md` and take the **first open (`- [ ]`) task**". The
+backlog has been empty since task 351, and `TASKS.md`'s own header says the next work comes from
+`ROADMAP.md`'s phases ("pick up a phase from there once the buckets below are clear"), with
+`PLAN.md` holding the plan for the current one. AGENTS.md mentioned neither, so an agent told to
+follow it found nothing to do. Step 1 also meant reading a ~360 KB file of which ~305 KB is the
+Review log, when a search for `- [ ]` answers the question.
+
+### The fix
+
+Step 1 now says to search for `- [ ]` rather than read the file whole, and names the empty case:
+the first unfinished phase of `ROADMAP.md`, planned in `PLAN.md` where that file covers it —
+citing `TASKS.md`'s header as the rule's owner rather than restating it elsewhere. No other
+document carried a copy of step 1. Full browser suite `RESULT ALL PASS pass=3223 fail=0`.
+
+---

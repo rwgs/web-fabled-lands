@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-356 appears below: 207 and 326 are withdrawn as misdiagnoses, 353–356 are open, and
+356 appears below: 207 and 326 are withdrawn as misdiagnoses, 354–356 are open, and
 all others are complete (see the Review log). File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -24,7 +24,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 353. AGENTS.md's task workflow stops at "take the first open task" and has nowhere to go when the backlog is empty, which it is — while `TASKS.md` itself sends the next worker to `ROADMAP.md`
 - [ ] 354. AGENTS.md is ~38 KB loaded into every session, and most of it is incident history `docs/` already holds — slim it to the rules and point at the docs for the why
 - [ ] 355. `docs/Testing.md` states a "Current baseline" pass count (3032) that the suite has outgrown (3223) — the derivable-count rot AGENTS.md forbids
 - [ ] 356. AGENTS.md's closing "Behavioral Guidelines" are generic, non-ASCII boilerplate that partly repeats the task workflow — condense to what this repo needs
@@ -390,31 +389,9 @@ this order.*
 - [x] 350. §5.180's potion of restoration says "cure you of any diseases" and carries `disease="*"` alone, where §1.342's twin says "cure poison and disease" and carries both — so task 343's family reading makes it clear poison too; **resolved as correct**, because a printed DENIAL narrows a selector (§1.338) while printed SILENCE does not, and §5.180 nowhere says the potion cannot cure poison
 - [x] 351. task 343's affliction family was deliberately asymmetric — `disease=` read both lists, `poison=` read poisons alone — and the sole reason was §1.338's printed "can cure you of poison but is unable to cure disease", so one section's sentence bent a shared function for all six books while task 350's own rule says a page's words decide; the family is now symmetric like the reference `Curse.matches`, the denial is `<lose … family="f">` on §1.338 itself, and the census checks both directions (a denial without the attribute, and the attribute without a denial)
 - [x] 352. two AGENTS.md notes still pointed at "step 2's `cmd /c` line", which step 2 has not carried since task 235 made it `run-tests.ps1`; both now describe a by-hand `cmd /c` launch and say the runner is immune
+- [x] 353. AGENTS.md's task workflow stopped at "take the first open task" with nowhere to go when the backlog is empty, which it is; step 1 now searches for `- [ ]` and sends the empty case to `ROADMAP.md`/`PLAN.md`, as `TASKS.md`'s header does
 
 ---
-
-## 353. The task workflow has no step for an empty backlog
-
-**Priority: LOW.** Documentation only.
-
-### What is wrong
-
-AGENTS.md's task workflow says "Read `TASKS.md` and take the **first open (`- [ ]`) task**". The
-backlog has been empty since task 351, and `TASKS.md`'s own header says the next work comes from
-`ROADMAP.md`'s phases ("pick up a phase from there once the buckets below are clear"), with
-`PLAN.md` holding the plan for the current one. AGENTS.md mentions neither, so an agent told to
-follow it finds nothing to do. Step 1 also means reading a ~360 KB file of which ~305 KB is the
-Review log, when a search for `- [ ]` answers the question.
-
-### Steps
-
-1. Tell step 1 to find open items by searching for `- [ ]`, not by reading the whole file.
-2. Add the empty-backlog case: take the next unfinished phase from `ROADMAP.md`, working from
-   `PLAN.md` where it covers that phase.
-
-### Validation
-
-The workflow names both `ROADMAP.md` and `PLAN.md`, and matches `TASKS.md`'s header.
 
 ## 354. AGENTS.md carries the incident history `docs/` already holds
 
@@ -497,6 +474,10 @@ characters.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-26 (task 353): closed **353**, filed nothing. AGENTS.md's step 1 now finds open
+items by search and names the empty-backlog case, pointing at `ROADMAP.md`/`PLAN.md` the way this
+file's header already did.
 
 Worked 2026-09-26 (task 352): closed **352**, filed nothing. Both notes now describe a by-hand
 `cmd /c` launch rather than a step that no longer holds one; `docs/` never carried the stale
