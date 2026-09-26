@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-351 appears below: 207 and 326 are withdrawn as misdiagnoses and **all others are
-complete** — the backlog carries no open item (see the Review log). File new work
+356 appears below: 207 and 326 are withdrawn as misdiagnoses, 352–356 are open, and
+all others are complete (see the Review log). File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -24,7 +24,11 @@ there once the buckets below are clear.
 
 **LOW**
 
-*(none open — file new LOW work here)*
+- [ ] 352. Two AGENTS.md notes still point at "step 2's `cmd /c` line", which step 2 has not carried since task 235 made it `run-tests.ps1`
+- [ ] 353. AGENTS.md's task workflow stops at "take the first open task" and has nowhere to go when the backlog is empty, which it is — while `TASKS.md` itself sends the next worker to `ROADMAP.md`
+- [ ] 354. AGENTS.md is ~38 KB loaded into every session, and most of it is incident history `docs/` already holds — slim it to the rules and point at the docs for the why
+- [ ] 355. `docs/Testing.md` states a "Current baseline" pass count (3032) that the suite has outgrown (3223) — the derivable-count rot AGENTS.md forbids
+- [ ] 356. AGENTS.md's closing "Behavioral Guidelines" are generic, non-ASCII boilerplate that partly repeats the task workflow — condense to what this repo needs
 
 **Done**
 
@@ -389,6 +393,124 @@ this order.*
 
 ---
 
+## 352. Two AGENTS.md notes cite a `cmd /c` step that no longer exists
+
+**Priority: LOW.** Documentation only; nothing behaves wrongly.
+
+### What is wrong
+
+Task 235 replaced step 2 of AGENTS.md's build + test loop with `build/run-tests.ps1`. Two notes
+below it still read as if step 2 were the old raw `cmd /c chrome … > out.html` line: the
+empty-dump note says "Redirecting through `cmd` as in step 2 gives the process a real handle",
+and the MSYS note opens "Step 2's `cmd /c` line is written for a POSIX shell…" and ends "run step
+2 from a PowerShell prompt as written". A reader following either goes looking for a command
+the file no longer holds.
+
+### Steps
+
+1. Reword both so they describe a **by-hand** `cmd /c` launch, and say the runner avoids the
+   problem with `Start-Process -RedirectStandardOutput`.
+2. Check `docs/Testing.md` and `docs/FAQ-and-Troubleshooting.md` for the same stale reference.
+
+### Validation
+
+`grep -n 'step 2' AGENTS.md docs/*.md` finds no claim that step 2 contains a `cmd` line.
+
+## 353. The task workflow has no step for an empty backlog
+
+**Priority: LOW.** Documentation only.
+
+### What is wrong
+
+AGENTS.md's task workflow says "Read `TASKS.md` and take the **first open (`- [ ]`) task**". The
+backlog has been empty since task 351, and `TASKS.md`'s own header says the next work comes from
+`ROADMAP.md`'s phases ("pick up a phase from there once the buckets below are clear"), with
+`PLAN.md` holding the plan for the current one. AGENTS.md mentions neither, so an agent told to
+follow it finds nothing to do. Step 1 also means reading a ~360 KB file of which ~305 KB is the
+Review log, when a search for `- [ ]` answers the question.
+
+### Steps
+
+1. Tell step 1 to find open items by searching for `- [ ]`, not by reading the whole file.
+2. Add the empty-backlog case: take the next unfinished phase from `ROADMAP.md`, working from
+   `PLAN.md` where it covers that phase.
+
+### Validation
+
+The workflow names both `ROADMAP.md` and `PLAN.md`, and matches `TASKS.md`'s header.
+
+## 354. AGENTS.md carries the incident history `docs/` already holds
+
+**Priority: LOW.** Documentation only, but it costs every session: AGENTS.md is loaded whole into
+each agent's context.
+
+### What is wrong
+
+AGENTS.md is ~38 KB (~5,700 words). About 15.7 KB of that is the build + test loop's notes,
+which the section itself says describe "every trap … the runner now closes mechanically", and
+`docs/Testing.md` already documents each one with a *Closed by* line. The `book.ini` paragraph
+(~3 KB) repeats `docs/The-Books.md` and `docs/Build-Pipeline.md`; the shipped-corpus paragraph
+repeats `docs/Corpus-Census.md`; the line-ending subsection (~2 KB) is recorded nowhere else but
+is mostly history. The rules an agent needs are buried in the stories of how each was learned.
+
+### Steps
+
+1. Reduce each AGENTS.md section to its rules, each with a pointer to the doc that holds the why.
+   Keep every rule: nothing an agent must do or avoid may exist only in the removed text.
+2. Move anything the docs lack into them before deleting it from AGENTS.md — at least the
+   line-ending measurement traps (`git cat-file blob`, lone CR, `grep -c $'\r$'`), which go in
+   `docs/Contributing.md`.
+3. Keep `docs/` free of new line-number citations and restated counts (AGENTS.md's own rules).
+
+### Validation
+
+Every imperative ("never", "do not", "must", "always") in the old AGENTS.md is still in the new
+one or in the doc it points at. The build + test loop passes.
+
+## 355. `docs/Testing.md` restates a pass count that has rotted
+
+**Priority: LOW.** Documentation only.
+
+### What is wrong
+
+`docs/Testing.md` says "Current baseline: **`RESULT ALL PASS pass=3032 fail=0`**". The suite now
+reports `pass=3223`. This is exactly the derivable figure AGENTS.md's documentation rule says not
+to restate (task 329): it reads as freshly verified and nothing re-checks it.
+
+### Steps
+
+Replace the figure with the rule that makes it useful — note the count a green run prints, and
+compare it against the next run, since a short count is the only tell of a stale bundle — and
+leave the number out.
+
+### Validation
+
+No `pass=` figure in `docs/` or `README.md` is offered as the current expected count.
+
+## 356. AGENTS.md closes with generic boilerplate
+
+**Priority: LOW.** Documentation only.
+
+### What is wrong
+
+The "Behavioral Guidelines" section (~2.3 KB) is a generic, personal guideline set pasted into a
+checked-in file that other agent tools also read. It is written with non-ASCII arrows in a repo
+that keeps its scripts ASCII, and its "Goal-Driven Execution" and "Surgical Changes" parts repeat
+what the task workflow and the rest of AGENTS.md already require.
+
+### Steps
+
+Condense it to a short ASCII list keeping each distinct rule once (ask when unclear, minimum
+change, touch only what the task needs, clean up your own orphans, define a check that can fail,
+no subagents without asking). Keep "Plan Mode" as it stands.
+
+### Validation
+
+Every distinct rule in the old section survives in the new one; the section has no non-ASCII
+characters.
+
+---
+
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The backlog currently has no open item, so no detail section remains in this file; the Review log follows.
 
 ---
@@ -398,6 +520,16 @@ this order.*
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Reviewed 2026-09-26 (agent guide): filed **352–356**. A pass over AGENTS.md and the documents it
+points at, asking whether they still work as agent instructions. **Every fact checked held**: the
+4,369/4,437/20/48 census, `Published=1,2,3,4,5,6`, the seven suites, the eol figures (4,643
+`i/lf`, 32 `i/-text`, 8 `i/none`), every script symbol and flag the file names, and the build +
+test loop itself (`RESULT ALL PASS pass=3223 fail=0`). What did not hold is the shape: two notes
+point at a step that was rewritten (352), the task workflow has no case for the empty backlog it
+now faces (353), the file has grown to ~38 KB mostly of history `docs/` already carries (354),
+`docs/Testing.md` restates a rotted pass count (355), and the file closes with generic
+boilerplate (356).
 
 Worked 2026-09-02 (task 350): closed **350**, filed nothing. **The backlog is now empty.** The
 task asked for a decision and the decision is that §5.180's potion is right as it stands: it
