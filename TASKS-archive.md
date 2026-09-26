@@ -17170,3 +17170,27 @@ and the closing "working if" metric. "Plan Mode" is unchanged. The section has n
 character; AGENTS.md is 17.9 KB. Full browser suite `RESULT ALL PASS pass=3223 fail=0`.
 
 ---
+
+## 357. The task workflow disagrees with `TASKS.md` about filing and closing
+
+**Priority: LOW.** Documentation only.
+
+### What is wrong
+
+AGENTS.md's step 4 said to add a finding "as a new `- [ ]` task at the bottom of `TASKS.md`".
+`TASKS.md`'s header says the opposite: "File new work under the priority bucket that fits, and
+record the pass in the Review log" — and the bottom of the file is the Review log. Nor did any
+step describe how a task is closed here, though every recent close does the same four things:
+the checklist line moves to **Done** as `- [x]`, the detail section moves to the end of
+`TASKS-archive.md` with what was done, the header's open range is updated, and a *Worked* entry
+heads the Review log. An agent following AGENTS.md alone would file in the wrong place and leave
+closed detail in `TASKS.md`.
+
+### The fix
+
+Step 4 now files under the priority bucket that fits, with a `## <N>.` detail section, and
+records the pass in the Review log, citing `TASKS.md`'s header as the owner. Step 3 names the
+four-part close. Tasks 352–357 were each filed and closed that way, so the wording describes
+the practice rather than a proposal. Full browser suite `RESULT ALL PASS pass=3223 fail=0`.
+
+---

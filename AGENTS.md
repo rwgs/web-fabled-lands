@@ -222,10 +222,14 @@ how two separate passes (tasks 274 and 326) both mis-measured task 207.
 2. Follow its steps exactly — each task is self-contained. Don't skip steps and
    don't combine tasks unless explicitly instructed.
 3. Run the build + test loop and confirm `RESULT ALL PASS` **before** marking the
-   task `- [x]`. Update `README.md` if the task instructs it.
+   task `- [x]`. Update `README.md` if the task instructs it. **Closing** a task means:
+   its checklist line moves to **Done** as `- [x]`, its `## <N>.` detail section moves to
+   the end of `TASKS-archive.md` with what was done, the header's open range is updated,
+   and a *Worked* entry heads the Review log.
 4. If you identify a model error, missing assumption, or undocumented
-   simplification, add it as a new `- [ ]` task at the bottom of `TASKS.md` before
-   continuing. Do not leave findings only in conversation.
+   simplification, file it as a new `- [ ]` task before continuing — under the priority
+   bucket that fits, with a `## <N>.` detail section, and record the pass in the Review
+   log, as `TASKS.md`'s header says. Do not leave findings only in conversation.
 5. Commit after every completed task.
 
 ---

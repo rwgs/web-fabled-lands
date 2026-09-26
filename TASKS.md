@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-357 appears below: 207 and 326 are withdrawn as misdiagnoses, 357 is open, and
-all others are complete (see the Review log). File new work
+357 appears below: 207 and 326 are withdrawn as misdiagnoses and **all others are
+complete** — the backlog carries no open item (see the Review log). File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -24,7 +24,7 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 357. AGENTS.md's step 4 files new work "at the bottom of `TASKS.md`" where `TASKS.md` files it under a priority bucket and logs the pass, and no step says a closed task's detail moves to `TASKS-archive.md`
+*(none open — file new LOW work here)*
 
 **Done**
 
@@ -391,34 +391,7 @@ this order.*
 - [x] 354. AGENTS.md was ~38 KB loaded into every session, most of it incident history `docs/` already held; it is now ~19 KB of rules, each linking the doc with the why, after moving what the docs lacked (line endings into `Contributing.md`, two by-hand traps into `Testing.md`)
 - [x] 355. `docs/Testing.md` stated a "Current baseline" pass count (3032) the suite had outgrown (3223); it now says to note and compare the count and records no figure
 - [x] 356. AGENTS.md's closing "Behavioral Guidelines" were generic, non-ASCII boilerplate that partly repeated the task workflow; now four ASCII bullets carrying each distinct rule once
-
----
-
-## 357. The task workflow disagrees with `TASKS.md` about filing and closing
-
-**Priority: LOW.** Documentation only.
-
-### What is wrong
-
-AGENTS.md's step 4 says to add a finding "as a new `- [ ]` task at the bottom of `TASKS.md`".
-`TASKS.md`'s header says the opposite: "File new work under the priority bucket that fits, and
-record the pass in the Review log" — and the bottom of the file is the Review log. Nor does any
-step describe how a task is closed here, though every recent close does the same four things:
-the checklist line moves to **Done** as `- [x]`, the detail section moves to the end of
-`TASKS-archive.md` with what was done, the header's open range is updated, and a *Worked* entry
-heads the Review log. An agent following AGENTS.md alone files in the wrong place and leaves
-closed detail in `TASKS.md`.
-
-### Steps
-
-1. Reword step 4 to file under the priority bucket that fits, with a `## <N>.` detail section,
-   and record the pass in the Review log — citing `TASKS.md`'s header as the rule's owner.
-2. Add the close to step 3 or 5: checklist line to Done, detail to `TASKS-archive.md`, a Review
-   log entry.
-
-### Validation
-
-AGENTS.md's workflow and `TASKS.md`'s header describe the same filing place and the same close.
+- [x] 357. AGENTS.md's step 4 filed new work "at the bottom of `TASKS.md`" where `TASKS.md` files it under a priority bucket and logs the pass, and no step said how a task is closed; the workflow now files and closes the way `TASKS.md` does
 
 ---
 
@@ -431,6 +404,12 @@ AGENTS.md's workflow and `TASKS.md`'s header describe the same filing place and 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-26 (task 357): closed **357**, filed nothing. **The backlog is empty again.**
+AGENTS.md's workflow now files new work where this file's header says to and spells out the
+four-part close every task since the archive split has used. With 352–357 the agent guide is
+~18 KB of rules linking `docs/` for the reasons, and its workflow can be followed from an empty
+backlog to the next roadmap phase without reading this file whole.
 
 Worked 2026-09-26 (task 356): closed **356**, filed nothing. The Behavioral Guidelines are four
 ASCII bullets; every distinct rule of the old section survives once.
