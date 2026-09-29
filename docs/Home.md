@@ -56,20 +56,19 @@ the thing to fix.
 
 ---
 
-## Project facts, as measured
+## Project facts, and where each is measured
 
-Figures below were taken from the working tree on 2026-08-31 and will move. The commands
-that produce them are in [Corpus Census](Corpus-Census.md), so they can always be re-checked
-rather than trusted.
+These figures move, so this page names the file or command that owns each one rather than
+copying a number that rots (AGENTS.md, "Don't restate a count another file owns").
 
 | | |
 |---|---|
-| Books shipped | 6 of 12 (`Published=1,2,3,4,5,6`) |
-| Section files bundled | 4,369 |
-| Bundled data | ~2.8 MB of JSON across `meta.json` + `book1..6.json` |
-| App modules | 22 ES modules in `web/js/` |
-| Test assertions | 3,032, all passing |
-| Backlog | 318 tasks closed, none open |
+| Books shipped | the `Published=` line of [`books/books.ini`](../books/books.ini) (six of the twelve planned) |
+| Section files bundled | [Corpus Census](Corpus-Census.md#sections-per-book), with the command |
+| Bundled data | `meta.json` + one `book<N>.json` per shipped book in `web/data/` (a few MB, cached once for offline use) |
+| App modules | the ES modules in `web/js/`, listed in [`README.md`](../README.md)'s module table |
+| Test assertions | the `pass=` count `build/run-tests.ps1` prints; see [Testing](Testing.md) for how to use it |
+| Backlog | the open `- [ ]` lines of [`TASKS.md`](../TASKS.md) |
 | Runtime dependencies | none |
 
 ---

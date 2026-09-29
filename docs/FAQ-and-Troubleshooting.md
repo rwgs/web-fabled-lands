@@ -150,8 +150,9 @@ No. It is reference only. The JS rules are a clean-room reimplementation, and th
 in [`NOTICE`](../NOTICE) is why that matters.
 
 **My census number disagrees with a documented one.**
-Check your filter before filing. `books/**/*.xml` returns 4,437; the shipped corpus is
-4,369. See [Corpus Census](Corpus-Census.md), which exists because two tasks were filed
+Check your filter before filing: a `books/**/*.xml` glob also counts the `temp/` copies and
+the non-section files, so it reads well above the shipped corpus. [Corpus Census](Corpus-Census.md)
+gives both figures and the commands that measure them. It exists because two tasks were filed
 with inflated counts.
 
 **A command was blocked by antivirus.**

@@ -1,6 +1,6 @@
 # A pin at the port you are docked at
 
-**Status: not started.** Nothing is in flight as of 2026-08-31, and the next feature is
+**Status: not started** (change this line when the first step lands). This is
 `ROADMAP.md`'s phase 1, planned here so the work can begin without rederiving it. For the
 state of the defect backlog, read `TASKS.md`'s open `- [ ]` items — this file deliberately
 does not restate a count that file owns, because a figure copied into a document that is
@@ -19,8 +19,8 @@ own position from the prose - which the printed books support with a paper map a
 and this port currently does not support at all.
 
 The blocker is data rather than code. Nothing in the corpus carries a position: the maps are
-hand-drawn label illustrations with no grid or section numbers, none of the 4,369 shipped
-section files has a location attribute, and the reference `java-engine/` has no map data
+hand-drawn label illustrations with no grid or section numbers, no shipped section file has
+a location attribute, and the reference `java-engine/` has no map data
 either.
 
 One positional fact does exist. `state.data.location` is the current dock - declared in
@@ -99,7 +99,8 @@ Reuse rather than re-derive: `arriveAtDock` is already the single writer of
 Automated:
 
 - `pwsh -File build/build-data.ps1`, then `build/run-tests.ps1` to `RESULT ALL PASS`, with
-  an assertion count no lower than today's **3,032**.
+  an assertion count no lower than the one noted before the change began (see
+  [docs/Testing.md](docs/Testing.md) on using the pass count).
 - A `suite-corpus` assertion that **every** dock value in the corpus resolves to a gazetteer
   entry. It must census **all four** dock-bearing attributes - `<section dock=>`,
   `<section todock=>`, `<set dock=>`, `<if docked=>`, as `ROADMAP.md`'s phase 1 table lists

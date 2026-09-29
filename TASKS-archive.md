@@ -374,6 +374,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 364. `sanitizeData` keeps malformed resurrection deals and defaults their book to 1
 - [x] 365. `GameState.adjustStaminaMax` is dead and clamps to the wrong ceiling
 - [x] 366. README's deploy guidance and file tree disagree with the repository
+- [x] 367. Living documents restate the shipped-section count `docs/Corpus-Census.md` owns
 
 ---
 
@@ -17539,5 +17540,50 @@ unchanged, as a deletion with no caller should.
   the short module list.
 
 Documentation only; no build or test change.
+
+---
+
+## 367. Living documents restate the shipped-section count `docs/Corpus-Census.md` owns
+
+**Priority: LOW.** Documentation only; every copy is correct today.
+
+### What is wrong
+
+AGENTS.md: "Don't restate a count another file owns … point at the file that owns the fact — or,
+if the figure has to be stated, print the command that measures it." Task 355 applied that to the
+pass count. `4,369` still appears, without the command, in:
+
+- `ROADMAP.md`
+- `PLAN.md`
+- `SPEC.md` ("4,369 today")
+- `docs/Home.md` (the "Section files bundled" row)
+- `docs/The-Books.md` (the per-book table's total)
+- `docs/FAQ-and-Troubleshooting.md`
+
+`PLAN.md`'s "Nothing is in flight as of 2026-08-31" is the dated-status sentence the same rule
+warns about. `CHANGELOG.md` and `REVIEW.md` are dated records and are exempt.
+
+### The fix
+
+- `ROADMAP.md`, `PLAN.md`: "no shipped section file has a location attribute", with no figure.
+- `SPEC.md`: the render-every-section requirement points at Corpus Census for the count and
+  its command.
+- `docs/FAQ-and-Troubleshooting.md`: says why a broad glob over-counts and points at Corpus
+  Census for both figures.
+- `docs/The-Books.md`: the per-book table drops its Sections column and total, and points at
+  Corpus Census, which owns the per-book counts (step 2's decision: it is the page with the
+  commands). That page's "Sections per book" table gained the command that reproduces it,
+  re-run today with unchanged figures.
+- `docs/Home.md`: "Project facts, as measured" was a dated snapshot, and its 4,369 row was not
+  its only stale one: it also said "3,032, all passing" and "318 tasks closed, none open". It
+  now names the file or command that owns each fact instead of copying the number.
+- `PLAN.md`'s status no longer carries "as of 2026-08-31": it is "not started (change this line
+  when the first step lands)".
+- Same class, found by the sweep: `docs/Corpus-Census.md`'s "Other measurements" and `PLAN.md`'s
+  Verification both still quoted the 3,032 pass count task 355 retired from `docs/Testing.md`.
+  Both now point at the runner's `pass=` count and Testing.
+
+Validation: `grep -rn "4,369" --include=*.md . | grep -v "TASKS\|CHANGELOG\|REVIEW\|review-claude"`
+lists `docs/Corpus-Census.md` only. Documentation only; no build or test change.
 
 ---

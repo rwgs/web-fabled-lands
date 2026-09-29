@@ -6,8 +6,9 @@ Real counts over the shipped corpus, and - more importantly - **how to measure t
 without inflating the total**. This page exists because two tasks were filed with wrong
 numbers taken from an over-broad glob.
 
-Figures were measured on 2026-08-31. Every one has its command below, so it can be
-re-checked rather than trusted.
+Figures were first measured on 2026-08-31, and the section and tag counts re-measured on
+2026-09-29 (task 367). Every one has its command below, so it can be re-checked rather than
+trusted.
 
 ---
 
@@ -72,6 +73,15 @@ find books/book1 books/book2 books/book3 books/book4 books/book5 books/book6 \
 | 5 | The Court of Hidden Faces | 724 |
 | 6 | Lords of the Rising Sun | 752 |
 | | **Total** | **4,369** |
+
+This page owns these counts; other pages point here rather than restating them. Reproduce with:
+
+```
+for b in 1 2 3 4 5 6; do
+  printf 'book%s ' "$b"
+  find "books/book$b" -maxdepth 1 -type f -regextype posix-extended -regex '.*/[0-9]+[a-z]?\.xml' | wc -l
+done
+```
 
 ---
 
@@ -173,7 +183,7 @@ is why these files are large and why there is no lossy conversion step to debug.
 |---|---|
 | App modules in `web/js/` | 22 |
 | Test suites in `web/tests/` | 7 (plus the Node import check) |
-| Test assertions | 3,032 |
+| Test assertions | the `pass=` count `build/run-tests.ps1` prints; it grows with the suite, so it is not recorded here ([Testing](Testing.md)) |
 | Build scripts in `build/` | 8 PowerShell + 1 Python |
 | Sections with an `<image>` tag | 3 (four references; section 3.75 has two) |
 | Save slots | 20 |

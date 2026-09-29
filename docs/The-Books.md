@@ -11,22 +11,22 @@ are what this port ships. The registry is [`books/books.ini`](../books/books.ini
 
 ## Shipped
 
-| # | Title | Region | Sections | Regional map |
-|---|---|---|---|---|
-| 1 | The War-Torn Kingdom | Sokara | 680 | `Sokara-Map.JPG` |
-| 2 | Cities of Gold and Glory | Golnir | 786 | `Golnir-Map.JPG` |
-| 3 | Over the Blood-Dark Sea | The Violet Ocean | 718 | `VioletOcean-Map.JPG` |
-| 4 | Devils & Howling Darkness | The Great Steppes | 709 | `GreatSteppes-Map.JPG` |
-| 5 | The Court of Hidden Faces | Uttaku | 724 | `Uttaku-Map.JPG` |
-| 6 | Lords of the Rising Sun | Akatsurai | 752 | `Akatsurai-Map.JPG` |
-| | | | **4,369** | |
+| # | Title | Region | Regional map |
+|---|---|---|---|
+| 1 | The War-Torn Kingdom | Sokara | `Sokara-Map.JPG` |
+| 2 | Cities of Gold and Glory | Golnir | `Golnir-Map.JPG` |
+| 3 | Over the Blood-Dark Sea | The Violet Ocean | `VioletOcean-Map.JPG` |
+| 4 | Devils & Howling Darkness | The Great Steppes | `GreatSteppes-Map.JPG` |
+| 5 | The Court of Hidden Faces | Uttaku | `Uttaku-Map.JPG` |
+| 6 | Lords of the Rising Sun | Akatsurai | `Akatsurai-Map.JPG` |
 
 All six are fully playable end to end, and every section of every one of them is rendered
 on each test run (see [Testing](Testing.md)).
 
-Section counts are the `^\d+[a-z]?\.xml` files in each book folder. The lettered suffixes
+A book's sections are the `^\d+[a-z]?\.xml` files in its folder. The lettered suffixes
 are real - the books contain sections such as `12a` - and any census that assumes plain
-integers will undercount.
+integers will undercount. The per-book counts, and the command that measures them, are in
+[Corpus Census](Corpus-Census.md#sections-per-book), which owns them.
 
 ---
 

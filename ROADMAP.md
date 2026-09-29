@@ -21,8 +21,8 @@ from the prose. The three phases below put a marker on the map, each one shippin
 something usable on its own.
 
 The blocker is data, not code. Nothing in the corpus carries a position: the
-maps are hand-drawn label illustrations with no grid or section numbers, the
-4,369 shipped section files have no location attribute, and the reference `java-engine/`
+maps are hand-drawn label illustrations with no grid or section numbers, no
+shipped section file has a location attribute, and the reference `java-engine/`
 has no map data either. The only positional state that exists is
 `state.data.location` — the current dock, written on every section entry by
 `arriveAtDock` ([state.js](web/js/state.js)) from that section's `dock=`

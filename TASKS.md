@@ -24,7 +24,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 367. `ROADMAP.md`, `PLAN.md`, `SPEC.md` and three `docs/` pages restate the 4,369 shipped-section count `docs/Corpus-Census.md` owns, and `PLAN.md` carries a dated status sentence
 - [ ] 368. the Review log is nine-tenths of `TASKS.md`, mostly re-telling closed tasks whose detail is already archived — archive the older entries (owner's call)
 
 **Done**
@@ -401,6 +400,7 @@ this order.*
 - [x] 364. `sanitizeData` kept a resurrection deal with no section (a phantom deal that loops the death prompt), and defaulted a missing deal or extra-choice `book` to `out.book` before `out.book` was assigned, so always to book 1; the position is now assigned first and a section-less deal dropped
 - [x] 365. `GameState.adjustStaminaMax` had no caller, and clamped to the written maximum that task 158 replaced with the effective one in its sibling; deleted
 - [x] 366. README said to "set Pages to serve `/web`", which is not a Pages option and not how this site is deployed (root `CNAME` + root redirect); its file tree omitted `edition.js`, and its DOM-free module list omitted `state.js` and `visit-state.js`; the deploy section now describes the root-served Pages site behind Cloudflare, and both lists are complete
+- [x] 367. `ROADMAP.md`, `PLAN.md`, `SPEC.md` and three `docs/` pages restated the 4,369 shipped-section count `docs/Corpus-Census.md` owns, and `PLAN.md` carried a dated status sentence; each now points at the owner (which gained its per-book command), and two stale 3,032 pass counts found by the same sweep were retired too
 
 ---
 
@@ -442,41 +442,6 @@ owner's call.
 
 ---
 
-## 367. Living documents restate the shipped-section count `docs/Corpus-Census.md` owns
-
-**Priority: LOW.** Documentation only; every copy is correct today.
-
-### What is wrong
-
-AGENTS.md: "Don't restate a count another file owns … point at the file that owns the fact — or,
-if the figure has to be stated, print the command that measures it." Task 355 applied that to the
-pass count. `4,369` still appears, without the command, in:
-
-- `ROADMAP.md`
-- `PLAN.md`
-- `SPEC.md` ("4,369 today")
-- `docs/Home.md` (the "Section files bundled" row)
-- `docs/The-Books.md` (the per-book table's total)
-- `docs/FAQ-and-Troubleshooting.md`
-
-`PLAN.md`'s "Nothing is in flight as of 2026-08-31" is the dated-status sentence the same rule
-warns about. `CHANGELOG.md` and `REVIEW.md` are dated records and are exempt.
-
-### Steps
-
-1. Replace each copy with a pointer to `docs/Corpus-Census.md`, or keep the figure with the
-   census command beside it.
-2. Decide whether `docs/The-Books.md`'s per-book table or `Corpus-Census.md` owns the per-book
-   counts, and make the other point at it.
-3. Rephrase `PLAN.md`'s status so it does not carry a date that reads as a fresh verification.
-
-### Validation
-
-- `grep -rn "4,369" --include=*.md . | grep -v "TASKS\|CHANGELOG\|REVIEW\|review-claude"` lists
-  only the owning file, or copies with their command.
-
----
-
 ## 368. The Review log is nine-tenths of `TASKS.md`
 
 **Priority: LOW. Owner's call.** Nothing is wrong; it is a size and focus proposal.
@@ -510,6 +475,12 @@ file pays for history twice.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-29 (task 367): closed **367**, filed nothing. The six copies of the shipped
+section count now point at `docs/Corpus-Census.md`, which owns the per-book counts and now
+prints the command for them. `docs/Home.md`'s dated fact table names each fact's owner, and
+`PLAN.md`'s status carries no date. The sweep also retired two more copies of the 3,032 pass
+count that task 355 missed. Documentation only.
 
 Worked 2026-09-29 (task 366): closed **366**, filed nothing. README's deploy section now
 describes the Pages site served from the repository root behind Cloudflare, checked against

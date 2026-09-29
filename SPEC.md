@@ -118,8 +118,9 @@ no backend, no API and no third-party service at runtime.
   modules - no framework, no bundler, no npm.
 - **Bundle budget:** the full six-book payload is about 2.8 MB of JSON, cached once for
   offline use.
-- **Every section of every published book must render without throwing** - 4,369 today,
-  verified on every test run.
+- **Every section of every published book must render without throwing**, verified on
+  every test run. The count, and the command that measures it, are in
+  [Corpus Census](docs/Corpus-Census.md).
 - **The build requires PowerShell 7 and Python 3**, but only offline; neither is needed to
   serve or play the app.
 
