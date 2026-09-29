@@ -34,11 +34,25 @@ function Read-Xml([string]$path) {
 }
 
 # ---- The vocabulary --------------------------------------------------------------------
+# Every table keyed by a tag or attribute NAME is an ORDINAL dictionary, and every name
+# comparison is case-sensitive (-cne, -cnotcontains), because the engine is: XML-DOM
+# getAttribute and querySelectorAll are exact-case, so <fight playerfirst="f"> is not
+# playerFirst= and <goto Section="5"/> goes nowhere. A plain `@{}` folds case and let exactly
+# those validate - the shape of task 37's safeAddGodd, arriving through case instead of
+# spelling. The literals below stay `@{}` for readability and are copied into an ordinal
+# dictionary (a case-colliding pair of keys would already fail the literal). Attribute VALUES
+# are still folded where the engine folds them. (task 362)
+function ConvertTo-OrdinalMap([hashtable]$table) {
+    $map = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
+    foreach ($k in $table.Keys) { $map[$k] = $table[$k] }
+    return $map
+}
+
 # tag -> every attribute that tag may carry, across all four kinds of source file (book
 # sections, Adventurers.xml, the rules prose, and the pregen biographies). A union rather
 # than one table per kind: the root check below already separates the kinds, and a stray
 # <gold> in a section file is harmless, while a MISSPELLED tag or attribute is not.
-$script:FL_TAG_ATTRS = @{
+$script:FL_TAG_ATTRS = ConvertTo-OrdinalMap @{
     # -- prose / structure (the rules files add h3/h4/table/tr/td) --
     'p' = ''; 'b' = ''; 'i' = ''; 'h3' = ''; 'h4' = ''; 'table' = ''; 'tr' = ''; 'td' = ''
     'desc' = ''; 'text' = ''; 'flee' = ''; 'reroll' = ''; 'else' = ''; 'choices' = ''
@@ -133,7 +147,7 @@ $script:FL_BOOL_VALUES = @('t', 'f', 'true', 'false')
 # Closed value sets, mirroring the engine's own canonical lists (web/js/rules.js ABILITIES /
 # SHIP_TYPES + aliases / CREW_LEVELS / CARGO_TYPES, and state.js's blessing names). A value
 # may be a '|'-separated union, and '?'/'*' are JaFL's match-any wildcards.
-$script:FL_ENUMS = @{
+$script:FL_ENUMS = ConvertTo-OrdinalMap @{
     'ability'        = 'charisma combat magic sanctity scouting thievery rank stamina defence'
     'abilityDamaged' = 'charisma combat magic sanctity scouting thievery rank stamina defence'
     # choose= is this port's own marker on an open <lose>: it names WHICH possession leaves
@@ -298,7 +312,7 @@ function Get-IniCodewords([string]$path) {
 $script:FL_ADJUST_READERS = @('random', 'difficulty', 'rankcheck', 'gain', 'lose')
 
 # `type` means something different on each tag that carries it.
-$script:FL_TYPE_VALUES = @{
+$script:FL_TYPE_VALUES = ConvertTo-OrdinalMap @{
     'effect'      = 'ability aura use wielded'
     'fightdamage' = 'add replace'
     'header'      = 'armour cargo magic other ship ships shipsale weapon'
@@ -318,7 +332,7 @@ function Test-XmlDoc([string]$xml, [string]$label, [string]$expectRoot, [string[
     } catch {
         return "$label : not well-formed XML - $($_.Exception.Message)"
     }
-    if ($expectRoot -and $doc.DocumentElement.get_Name() -ne $expectRoot) {
+    if ($expectRoot -and $doc.DocumentElement.get_Name() -cne $expectRoot) {   # exact case (task 362)
         return "$label : root is <$($doc.DocumentElement.get_Name())>, expected <$expectRoot>"
     }
     # A section file's <section name> must match its filename key (task 78). A purely
@@ -440,7 +454,7 @@ function Test-XmlVocabulary($el, [string]$label, [System.Collections.ArrayList]$
     $allowed = $script:FL_TAG_ATTRS[$tag] -split ' '
     foreach ($a in $el.Attributes) {
         $name = $a.get_Name()
-        if ($allowed -notcontains $name) {
+        if ($allowed -cnotcontains $name) {   # exact case, like getAttribute (task 362)
             [void]$errors.Add("$label : unknown attribute $name= on <$tag>")
             continue
         }

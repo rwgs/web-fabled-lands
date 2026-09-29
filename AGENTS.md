@@ -44,7 +44,8 @@ relevant page before changing the area it covers.
   [Build Pipeline](docs/Build-Pipeline.md#the-source-xml-gate).
   - `Codewords=` is the authority for every `codeword=` value in the corpus, matched on the
     **exact spelling, case included** (both rule engines are case-sensitive). Keep the gate's
-    dictionaries **ordinal** — a plain PowerShell `@{}` folds case (task 338). The legitimate
+    dictionaries **ordinal** — a plain PowerShell `@{}` folds case (task 338), and so do `-ne`
+    and `-notcontains` on tag and attribute names (task 362). The legitimate
     absences (section-scoped flags, the port's named state flags, codewords from the
     unpublished books 7–12) are exempted **in the gate, not in the `.ini`**. Only
     `<gain>`/`<tick>`/`<set>`/`<outcome>` mark a codeword awarded (task 327).

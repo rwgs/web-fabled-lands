@@ -24,7 +24,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 362. the source gate folds case on tag and attribute names (`FL_TAG_ATTRS` is a plain `@{}`, the root check is `-ne`, the attribute check `-notcontains`), so a mis-cased camelCase attribute validates and is then ignored by the exact-case engine; `books/book3/207.xml` ships `<SECTION>`/`<P>`
 - [ ] 363. `walkEffectBody` drops `<difficulty modifier=>` and never infers `<random>` dice, and `groupFightRound` ignores `playerFirst=`, `<fightround>` and a `<fightdamage>` redirect — zero shipped sites, but the gate accepts every such shape
 - [ ] 364. `sanitizeData` keeps a resurrection deal with no section (a phantom deal that loops the death prompt), and defaults a missing deal or extra-choice `book` to `out.book` before `out.book` is assigned, so always to book 1
 - [ ] 365. `GameState.adjustStaminaMax` has no caller, and clamps to the written maximum that task 158 replaced with the effective one in its sibling
@@ -401,6 +400,7 @@ this order.*
 - [x] 358. `TASKS-archive.md`'s header said "stable IDs 1–336" and its Contents list ended at 336 while the file held sections to 357, because the close never added a Contents line; the header and intro no longer state a range, 337–358 are listed, and AGENTS.md's close step names the Contents line
 - [x] 359. the service worker precached through the browser's HTTP cache and the CDN (Cloudflare, `max-age=14400` on `web/js`), so a new build's cache could be filled with the previous build's files — a stale or mixed shell kept under the new version key until the next deploy; `FLCache.precache` now fetches every entry at a build-unique `?v=` URL with `cache: 'reload'` and stores it under the plain URL, and the worker registers with `updateViaCache: 'none'`
 - [x] 360. the header's 💾 "Save & quit to title" called `state.save(true)`, which returns true for an ephemeral `?demo=` preview without writing, so the preview was discarded while the button said it saved; the header and the menu now share `saveOrKeep`, which keeps a preview (labelled "Keep this adventure") and only saves-and-quits a real slot
+- [x] 362. the source gate folded case on tag and attribute names (`FL_TAG_ATTRS` was a plain `@{}`, the root check `-ne`, the attribute check `-notcontains`), so a mis-cased camelCase attribute validated and was then ignored by the exact-case engine; `books/book3/207.xml` shipped `<SECTION>`/`<P>`. The name tables are ordinal dictionaries, the checks `-cne`/`-cnotcontains`, §3.207 is lower-cased, and three selftest fixtures pin it
 
 ---
 
@@ -439,53 +439,6 @@ owner's call.
 ### Validation
 
 - A pushed run is green in all three jobs, with no Node-20 deprecation annotation.
-
----
-
-## 362. The source gate folds case on tag and attribute names
-
-**Priority: LOW.** The shipped corpus has only one affected file, and it renders correctly. But the
-gate exists to catch exactly this class of typo before it ships, and here it cannot.
-
-### What is wrong
-
-`validate-source.ps1` compares names case-insensitively in three places:
-
-- `FL_TAG_ATTRS` is a plain PowerShell `@{}`, whose keys fold case.
-- `Test-XmlDoc` checks the root element with `-ne`.
-- `Test-XmlVocabulary` checks each attribute against its allowlist with `-notcontains`.
-
-The engine does not fold case. XML-DOM `getAttribute` and `querySelectorAll` are exact-case, and
-16 attribute names are camelCase (`abilityDamaged`, `attackDice`, `initialCrew`, `itemAt`,
-`playerDefence`, `playerFirst`, `preDamage`, `safeAddGod`, `staminaLost`, `titleAdjust`,
-`titlePattern`, `titleVal`, `titleValue`, `useCache`, `withdrawCharge`). So
-`<fight playerfirst="f">` or `<goto Section="5"/>` validates cleanly and is then silently ignored:
-task 37's `safeAddGodd` shape, and the class task 338 closed for codeword *values*.
-
-Census of the shipped corpus, 2026-09-29, grouping every tag and `tag@attribute` spelling
-case-insensitively: the only collisions are `books/book3/207.xml`'s root `<SECTION>` and its three
-`<P>`. That file works only because `renderElement` lowercases `tagName`, and its game tags
-(`<difficulty>`, `<outcomes>`) are lower case. `docs/Corpus-Census.md` already notes the file and
-explains that the gate lets it through.
-
-### Steps
-
-1. Make every name comparison ordinal. `FL_TAG_ATTRS`, and any other table keyed by a tag or
-   attribute name, becomes a `Dictionary` with `[StringComparer]::Ordinal`, as
-   `New-CodewordSet` already is. The root check becomes `-cne` and the attribute check
-   `-cnotcontains`.
-2. Lower-case `books/book3/207.xml`'s `SECTION` and `P` tags. This is markup only: stripping tags
-   from the old and new file must leave byte-identical prose. Then rebuild, which changes
-   `web/data/book3.json`, and commit the output.
-3. Add `validate-selftest.ps1` fixtures for a mis-cased tag and a mis-cased attribute.
-4. Update `docs/Corpus-Census.md`'s note on the file, including its "`section` counts 4,368, not
-   4,369" line.
-
-### Validation
-
-- The selftest fixtures fail under the old comparisons and pass under the new ones.
-- The prose diff for §3.207 is empty.
-- `RESULT ALL PASS`.
 
 ---
 
@@ -688,6 +641,13 @@ file pays for history twice.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-29 (task 362): closed **362**, filed nothing. The source gate compares tag and
+attribute names exact-case, as the engine reads them, and §3.207's `<SECTION>`/`<P>` are
+lower-cased (markup only). The three new selftest fixtures fail against the old gate and pass
+against the new one. Re-running `docs/Corpus-Census.md`'s census command found four tag counts
+there had drifted after earlier tasks, and I corrected them with this task's two.
+`RESULT ALL PASS pass=3235 fail=0`. Task 361 stays open, waiting on a push, and work moves past it.
 
 Worked 2026-09-29 (task 360): closed **360**, filed nothing. The header's 💾 and the menu's
 entry now share `saveOrKeep` in `app.js`: a `?demo=` preview is kept and play continues (the

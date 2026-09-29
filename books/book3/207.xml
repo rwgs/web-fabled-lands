@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<SECTION name="207" image="207.jpg">
-	<P>
+<section name="207" image="207.jpg">
+	<p>
 		The Master&#8217;s lodgings are in a fine, old, stone house at the back of a lawn just inside the college gates. His lugubrious butler Mantel admits you into a study that smells of old books, pipe smoke and armchair leather.
-	</P>
-	<P>&#8216;Who&#8217;s this?&#8217; demands the Master, looking up from his chair.</P>
-	<P>&#8216;One of the students, I&#8217;m afraid, sir,&#8217; says Mantel.</P>
+	</p>
+	<p>&#8216;Who&#8217;s this?&#8217; demands the Master, looking up from his chair.</p>
+	<p>&#8216;One of the students, I&#8217;m afraid, sir,&#8217; says Mantel.</p>
 	<p>
 		<difficulty ability="charisma" level="14">
 			Make a CHARISMA roll at a Difficulty of 14
@@ -14,4 +14,4 @@
 		<success section="560"/>
 		<failure section="578"/>
 	</outcomes>
-</SECTION>
+</section>

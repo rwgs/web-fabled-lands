@@ -369,6 +369,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 358. The archive's header and Contents stop at task 336
 - [x] 359. The service worker can install a stale or mixed shell under a new version key
 - [x] 360. The header's "Save & quit" discards a `?demo=` preview while saying it saved
+- [x] 362. The source gate folds case on tag and attribute names
 
 ---
 
@@ -17344,6 +17345,55 @@ saved and no warning.
   ephemeral `GameState`), drives `saveOrKeep` through kept / keep-failed / saved / save-failed,
   and pins that the header and menu share it. Task 191's header source pin now matches the
   new 💾 line.
+
+Full browser suite `RESULT ALL PASS pass=3235 fail=0`.
+
+---
+
+## 362. The source gate folds case on tag and attribute names
+
+**Priority: LOW.** The shipped corpus has only one affected file, and it renders correctly. But the
+gate exists to catch exactly this class of typo before it ships, and here it cannot.
+
+### What is wrong
+
+`validate-source.ps1` compares names case-insensitively in three places:
+
+- `FL_TAG_ATTRS` is a plain PowerShell `@{}`, whose keys fold case.
+- `Test-XmlDoc` checks the root element with `-ne`.
+- `Test-XmlVocabulary` checks each attribute against its allowlist with `-notcontains`.
+
+The engine does not fold case. XML-DOM `getAttribute` and `querySelectorAll` are exact-case, and
+16 attribute names are camelCase (`abilityDamaged`, `attackDice`, `initialCrew`, `itemAt`,
+`playerDefence`, `playerFirst`, `preDamage`, `safeAddGod`, `staminaLost`, `titleAdjust`,
+`titlePattern`, `titleVal`, `titleValue`, `useCache`, `withdrawCharge`). So
+`<fight playerfirst="f">` or `<goto Section="5"/>` validates cleanly and is then silently ignored:
+task 37's `safeAddGodd` shape, and the class task 338 closed for codeword *values*.
+
+Census of the shipped corpus, 2026-09-29, grouping every tag and `tag@attribute` spelling
+case-insensitively: the only collisions are `books/book3/207.xml`'s root `<SECTION>` and its three
+`<P>`. That file works only because `renderElement` lowercases `tagName`, and its game tags
+(`<difficulty>`, `<outcomes>`) are lower case. `docs/Corpus-Census.md` already notes the file and
+explains that the gate lets it through.
+
+### The fix
+
+- `validate-source.ps1`: `FL_TAG_ATTRS`, `FL_ENUMS` and `FL_TYPE_VALUES` (every table keyed by
+  a tag or attribute name) are now ordinal dictionaries, built from their `@{}` literals by a
+  new `ConvertTo-OrdinalMap`. `Test-XmlDoc`'s root check is `-cne`, and
+  `Test-XmlVocabulary`'s attribute check is `-cnotcontains`. Attribute *values* are still
+  folded where the engine folds them. Step 2b's non-section-file scan keeps its folding `-ne`
+  on purpose: it detects a stray file claiming a section id, and folding catches more there.
+- `books/book3/207.xml`: `SECTION` and `P` lower-cased. Markup only: the tag-stripped old and
+  new files compare byte-identical. The rebuild changed only §207 in `web/data/book3.json`.
+- `validate-selftest.ps1`: three fixtures (`playerfirst=` on `<fight>`, a `<P>` tag, a
+  `<SECTION>` root). Against the old gate the self-test reads `pass=61 fail=3`, exactly those
+  three. Against the new one it reads `RESULT ALL PASS pass=64 fail=0`.
+- `docs/Corpus-Census.md`: the "`section` counts 4,368, not 4,369" note now records the fix.
+  Re-running the page's own census command, I also brought six drifted rows of the tag table
+  to the live figures: `p` 8,273, `section` 4,369 (both this task), and `goto` 3,385, `lose`
+  1,498, `tick` 837 and `elseif` 54 (earlier tasks' edits, never re-counted).
+- AGENTS.md's ordinal-dictionary rule now also names `-ne`/`-notcontains` on names.
 
 Full browser suite `RESULT ALL PASS pass=3235 fail=0`.
 

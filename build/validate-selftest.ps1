@@ -147,6 +147,23 @@ $CASES = @(
        text  = '<section name="1"><item name="rope" tag="tool"/></section>'
        want  = 'unknown attribute tag= on <item>' }
 
+    # task 362: the engine reads names exact-case (getAttribute, querySelectorAll), so a
+    # mis-cased name is as silent there as a misspelled one, and must fail here the same way.
+    @{ label = 'a mis-cased camelCase attribute (task 362)'
+       file  = 'books/book1/1.xml'
+       text  = '<section name="1"><fight name="Rat" combat="1" defence="2" stamina="3" playerfirst="f"/></section>'
+       want  = 'unknown attribute playerfirst= on <fight>' }
+
+    @{ label = 'a mis-cased tag (task 362)'
+       file  = 'books/book1/1.xml'
+       text  = '<section name="1"><P>Text.</P></section>'
+       want  = 'unknown tag <P>' }
+
+    @{ label = 'a mis-cased root element (task 362)'
+       file  = 'books/book1/2.xml'
+       text  = '<SECTION name="2"><p>Text.</p></SECTION>'
+       want  = 'expected <section>' }
+
     @{ label = 'a bad enumerated ability'
        file  = 'books/book1/2.xml'
        text  = '<section name="2"><difficulty ability="scouting|thievry" level="10"/></section>'

@@ -81,15 +81,15 @@ Every element occurrence across the 4,369 shipped section files.
 
 | Tag | Count | | Tag | Count |
 |---|---|---|---|---|
-| `p` | 8,270 | | `rest` | 146 |
-| `section` | 4,368 | | `buy` | 106 |
+| `p` | 8,273 | | `rest` | 146 |
+| `section` | 4,369 | | `buy` | 106 |
 | `choice` | 4,042 | | `effect` | 95 |
-| `goto` | 3,386 | | `market` | 89 |
-| `lose` | 1,499 | | `adjustmoney` | 89 |
+| `goto` | 3,385 | | `market` | 89 |
+| `lose` | 1,498 | | `adjustmoney` | 89 |
 | `if` | 1,394 | | `training` | 62 |
 | `outcome` | 1,351 | | `resurrection` | 60 |
-| `choices` | 1,266 | | `elseif` | 55 |
-| `tick` | 839 | | `rankcheck` | 54 |
+| `choices` | 1,266 | | `elseif` | 54 |
+| `tick` | 837 | | `rankcheck` | 54 |
 | `outcomes` | 789 | | `itemcache` | 31 |
 | `random` | 587 | | `moneycache` | 25 |
 | `b` | 572 | | `transfer` | 23 |
@@ -116,12 +116,14 @@ Every element occurrence across the 4,369 shipped section files.
 
 Two things in that table are worth reading twice:
 
-- **`section` counts 4,368, not 4,369.** One file - [`books/book3/207.xml`](../books/book3/207.xml)
-  - spells its root element `<SECTION>` in upper case, and carries the three `<P>` tags for
-  the same reason. XML is case-sensitive, so any grep-based census that assumes lower case
-  will miss them. The build gate accepts the file because PowerShell compares strings and
-  looks up hashtable keys **case-insensitively** by default, so both the root check and the
-  tag allowlist match. Your `grep` will not be so forgiving.
+- **Every tag is lower case, and the gate now enforces it.** Until task 362,
+  [`books/book3/207.xml`](../books/book3/207.xml) spelled its root `<SECTION>` and three
+  `<P>` in upper case, so `section` counted one short of the section-file total and a
+  lower-case grep missed four tags. The build gate let it through because PowerShell compares
+  strings and looks up `@{}` keys **case-insensitively** by default. The engine does not:
+  `getAttribute` and `querySelectorAll` are exact-case, so a mis-cased attribute such as
+  `playerfirst=` would have validated and then been ignored. `validate-source.ps1` now
+  compares tag and attribute names ordinally, and the file is lower-cased.
 - **The long tail is where the bugs are.** Nine tags appear five times or fewer, and one
   (`<bookchange>`) appears exactly once - in section 5.681. A rule with a single call site
   in the whole corpus is easy to break and hard to notice, which is why `suite-corpus`
