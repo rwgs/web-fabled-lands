@@ -224,7 +224,8 @@ how two separate passes (tasks 274 and 326) both mis-measured task 207.
 3. Run the build + test loop and confirm `RESULT ALL PASS` **before** marking the
    task `- [x]`. Update `README.md` if the task instructs it. **Closing** a task means:
    its checklist line moves to **Done** as `- [x]`, its `## <N>.` detail section moves to
-   the end of `TASKS-archive.md` with what was done, the header's open range is updated,
+   the end of `TASKS-archive.md` with what was done (plus a line in that file's Contents
+   list), the header's open range is updated,
    and a *Worked* entry heads the Review log.
 4. If you identify a model error, missing assumption, or undocumented
    simplification, file it as a new `- [ ]` task before continuing — under the priority

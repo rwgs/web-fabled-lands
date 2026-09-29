@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-357 appears below: 207 and 326 are withdrawn as misdiagnoses and **all others are
+358 appears below: 207 and 326 are withdrawn as misdiagnoses and **all others are
 complete** — the backlog carries no open item (see the Review log). File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -392,6 +392,7 @@ this order.*
 - [x] 355. `docs/Testing.md` stated a "Current baseline" pass count (3032) the suite had outgrown (3223); it now says to note and compare the count and records no figure
 - [x] 356. AGENTS.md's closing "Behavioral Guidelines" were generic, non-ASCII boilerplate that partly repeated the task workflow; now four ASCII bullets carrying each distinct rule once
 - [x] 357. AGENTS.md's step 4 filed new work "at the bottom of `TASKS.md`" where `TASKS.md` files it under a priority bucket and logs the pass, and no step said how a task is closed; the workflow now files and closes the way `TASKS.md` does
+- [x] 358. `TASKS-archive.md`'s header said "stable IDs 1–336" and its Contents list ended at 336 while the file held sections to 357, because the close never added a Contents line; the header and intro no longer state a range, 337–358 are listed, and AGENTS.md's close step names the Contents line
 
 ---
 
@@ -404,6 +405,12 @@ this order.*
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-29 (task 358): filed and closed **358** together, on request. `TASKS-archive.md`'s
+header and Contents list had stopped at 336 while the file held sections to 357 — the close
+moved each section but never indexed it, and task 357's wording of the close in AGENTS.md
+repeated the gap. Neither the header nor the Contents intro states a range any more, 337–358
+are listed, and the close step now names the Contents line. The backlog is empty.
 
 Worked 2026-09-26 (task 357): closed **357**, filed nothing. **The backlog is empty again.**
 AGENTS.md's workflow now files new work where this file's header says to and spells out the

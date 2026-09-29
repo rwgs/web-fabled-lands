@@ -1,12 +1,12 @@
 # Fabled Lands — Web Edition · Completed Task Archive
 
-Detail sections for completed tasks (stable IDs 1–336), moved verbatim out of [`TASKS.md`](TASKS.md) by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274), task 318 (IDs 275–318), task 319 (ID 319), task 320 (ID 320), task 321 (ID 321), task 322 (ID 322), task 325 (ID 325), task 323 (ID 323), task 324 (ID 324), task 326 (ID 326), task 327 (ID 327), task 328 (ID 328), task 329 (ID 329), task 330 (ID 330), task 331 (ID 331), task 332 (ID 332), task 333 (ID 333), task 334 (ID 334), task 335 (ID 335) and task 336 (ID 336). Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
+Detail sections for every completed task, moved out of [`TASKS.md`](TASKS.md) — verbatim in six batches, by task 141 (IDs 1–114), task 165 (IDs 115–165), task 211 (IDs 166–211), task 255 (IDs 212–255), task 274 (IDs 256–274) and task 318 (IDs 275–318), and since task 319 by each task as it closes, with what was done. Each section keeps its original `## <N>.` heading and stable task number; sections remain in their original filed order, not numeric order — 325 was completed before the lower-numbered 323, 324 and 326. The live checklist, any open-task details and the Review log stay in `TASKS.md`.
 
 ---
 
 ## Contents
 
-The completed tasks archived in this file (stable IDs 1–336). Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
+Every task archived in this file, in numeric order — one line per `## <N>.` section, added as each task closes. Detail sections follow below in their original filed order; find one by its `## <N>.` heading. Two rows are `- [~]` rather than `- [x]` — 207 and 326, both withdrawn as misdiagnoses — so a census over this list must match both markers, not `- [x]` alone.
 
 - [x] 1. Gate combat progression / model fight outcomes
 - [x] 2. Finish the logic/view split (combat/market/rest)
@@ -345,6 +345,28 @@ The completed tasks archived in this file (stable IDs 1–336). Detail sections 
 - [x] 334. The release self-test discards the build's diagnosis, leaving CI a bare `throw`
 - [x] 335. Book 1 declares 35 of its 36 printed codewords, and mislabels two of the 35
 - [x] 336. The codeword value check splits on `|` alone, rejecting the engine's comma AND-form
+- [x] 337. Book 1 section 460 rewrites the author's sentence instead of wrapping it
+- [x] 338. The codeword-value gate is case-insensitive but the game is not
+- [x] 339. Reconcile the living documentation with tasks 239, 324 and 327
+- [x] 340. A saved return detour forgets which source choice was taken
+- [x] 341. A multi-item transfer collects only one selection
+- [x] 342. Multi-ship cargo and crew transactions change the first vessel silently
+- [x] 343. Disease selectors do not include poison, and open cures do not ask which affliction
+- [x] 344. Removing a source asset leaves its generated copy shipping forever
+- [x] 345. Equipment locks disappear on an exact-visit resume
+- [x] 346. The root redirect discards deep-link query parameters
+- [x] 347. Internal state flags leak into the Adventure Sheet's Codewords list
+- [x] 348. An abandoned sail picker contaminates the next return frame
+- [x] 349. Natural derived-stat reads still include aura/affliction terms
+- [x] 350. §5.180's potion cures more than its printed sentence promises
+- [x] 351. One section's printed denial was hard-coded into the shared affliction family
+- [x] 352. Two AGENTS.md notes cite a `cmd /c` step that no longer exists
+- [x] 353. The task workflow has no step for an empty backlog
+- [x] 354. AGENTS.md carries the incident history `docs/` already holds
+- [x] 355. `docs/Testing.md` restates a pass count that has rotted
+- [x] 356. AGENTS.md closes with generic boilerplate
+- [x] 357. The task workflow disagrees with `TASKS.md` about filing and closing
+- [x] 358. The archive's header and Contents stop at task 336
 
 ---
 
@@ -17192,5 +17214,34 @@ Step 4 now files under the priority bucket that fits, with a `## <N>.` detail se
 records the pass in the Review log, citing `TASKS.md`'s header as the owner. Step 3 names the
 four-part close. Tasks 352–357 were each filed and closed that way, so the wording describes
 the practice rather than a proposal. Full browser suite `RESULT ALL PASS pass=3223 fail=0`.
+
+---
+
+## 358. The archive's header and Contents stop at task 336
+
+**Priority: LOW.** Documentation only.
+
+### What is wrong
+
+This file holds a detail section for every task 1–357, but its header said "stable IDs 1–336"
+and listed the moving task for each ID up to 336 only, and its Contents list ended at 336 — so
+the 21 sections for 337–357 were reachable only by searching for their headings. The close each
+task performs moved the section to the end of this file but never added its Contents line, and
+the header's range was a restated count of exactly the kind that rots (task 329). Task 357's
+wording of the close in AGENTS.md repeated the omission.
+
+### The fix
+
+- The header no longer states a range: it names the six batch moves and says that since task 319
+  each task moves its own section as it closes.
+- The Contents intro says the list has one line per `## <N>.` section, in numeric order, added
+  as each task closes — rather than "stable IDs 1–336".
+- Contents lines for 337–358 were added, each taken from its section's heading.
+- AGENTS.md's close step now includes the Contents line.
+
+Checked mechanically: the `## <N>.` headings are 1–358 with no gap and no duplicate, and every
+one has exactly one Contents line with the same number (older headings carry a `— **done**`
+or priority suffix their Contents line omits, as they always have). Full browser suite
+`RESULT ALL PASS pass=3223 fail=0`.
 
 ---
