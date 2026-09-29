@@ -486,7 +486,8 @@ and a browser refuses a redirected response as the answer to a navigation, so op
 5. *(Owner.)* Add the repository secrets `CLOUDFLARE_API_TOKEN` (the "Edit Cloudflare
    Workers" template) and `CLOUDFLARE_ACCOUNT_ID`, remove the old DNS record for the hostname
    (done 2026-09-29), push, and turn Pages off.
-6. Delete the root `CNAME` and README's "Task 370 is still open" sentence, then close.
+6. Delete the root `CNAME` (the owner did, `ef568b4`), then close once the Validation below
+   holds.
 
 **Status 2026-09-29:** steps 1–3 are done. Under `wrangler dev`, `/`, `/?demo=1.10`, `/web/`,
 the data, the illustrations and `web/tests/` answer 200. `/web/_test.html`, `README.md`,

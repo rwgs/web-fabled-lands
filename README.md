@@ -112,8 +112,6 @@ redirects into `web/`, carrying the query string and hash, so the deep links bel
 the bare domain. Keeping the app at `/web/` keeps the address that installed copies were
 registered at. The asset server redirects `…/index.html` to `…/`, and the service worker's
 precache strips that redirect, because a browser refuses a redirected response for a page load.
-*Task 370 is still open: the root `CNAME` (the old GitHub Pages domain setting) stays until
-the first Worker deploy is confirmed.*
 
 To preview the Worker locally, run `npx wrangler dev --persist-to <a folder outside the repo>`.
 Wrangler watches the assets directory, which is the repository root here, so its default
