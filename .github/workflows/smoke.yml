@@ -81,6 +81,11 @@ jobs:
   # rebuild left a stale bundle that CI then happily green-lit by testing the OLD sections).
   # pwsh 7 is preinstalled on the GitHub ubuntu images, so this adds no toolchain to the app
   # itself — the shipped web/ is still dependency-free.
+  # Image (task 369): ubuntu-latest moves to Ubuntu 26.04 from 2026-10-19
+  # (actions/runner-images#14748). Its software list still preinstalls all three tools the
+  # jobs here call by name (PowerShell 7.6.6, Google Chrome 153 and Python 3.14; 24.04 has
+  # 7.6.6, 153 and 3.12), so every job stays on ubuntu-latest. If a later image drops one,
+  # pin `ubuntu-24.04` on that job and name the tool here.
   smoke:
     runs-on: ubuntu-latest
     # A wall clock on the browser, which nothing else here provides (task 332).

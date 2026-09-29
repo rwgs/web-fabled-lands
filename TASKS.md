@@ -440,6 +440,13 @@ environment error, not a code one.
    ubuntu-24.04` with a comment naming the missing tool, or install it in the job.
 3. Record the decision in the workflow comment beside the `smoke` job.
 
+**Status 2026-09-29:** steps 1–3 are done. The issue gives the rollout as 2026-10-19 to
+2026-11-19. The Ubuntu 26.04 image's software list (`images/ubuntu/Ubuntu2604-Readme.md`)
+preinstalls PowerShell 7.6.6, Google Chrome 153.0.8010.52 and Python 3.14.4, where 24.04 has
+7.6.6, the same Chrome and 3.12.3. Nothing the jobs call by name is dropped, so every job stays
+on `ubuntu-latest`, and the comment beside `smoke` records that. The task stays open until a
+pushed run on the new image validates it.
+
 ### Validation
 
 - A pushed run on or after 2026-10-19 is green in all three jobs.
