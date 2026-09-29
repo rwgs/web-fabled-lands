@@ -24,7 +24,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 365. `GameState.adjustStaminaMax` has no caller, and clamps to the written maximum that task 158 replaced with the effective one in its sibling
 - [ ] 366. README says to "set Pages to serve `/web`", which is not a Pages option and not how this site is deployed (root `CNAME` + root redirect); its file tree omits `edition.js`, and its DOM-free module list omits `state.js` and `visit-state.js`
 - [ ] 367. `ROADMAP.md`, `PLAN.md`, `SPEC.md` and three `docs/` pages restate the 4,369 shipped-section count `docs/Corpus-Census.md` owns, and `PLAN.md` carries a dated status sentence
 - [ ] 368. the Review log is nine-tenths of `TASKS.md`, mostly re-telling closed tasks whose detail is already archived — archive the older entries (owner's call)
@@ -401,6 +400,7 @@ this order.*
 - [x] 362. the source gate folded case on tag and attribute names (`FL_TAG_ATTRS` was a plain `@{}`, the root check `-ne`, the attribute check `-notcontains`), so a mis-cased camelCase attribute validated and was then ignored by the exact-case engine; `books/book3/207.xml` shipped `<SECTION>`/`<P>`. The name tables are ordinal dictionaries, the checks `-cne`/`-cnotcontains`, §3.207 is lower-cased, and three selftest fixtures pin it
 - [x] 363. `walkEffectBody` dropped `<difficulty modifier=>` and never inferred `<random>` dice, and `groupFightRound` ignores `playerFirst=`, `<fightround>` and a `<fightdamage>` redirect — zero shipped sites, but the gate accepted every such shape; the walk now shares `difficultyModifier` with the page, the gate refuses the other shapes (`Test-HeadlessShapes`), and `suite-corpus` pins today's sites by name
 - [x] 364. `sanitizeData` kept a resurrection deal with no section (a phantom deal that loops the death prompt), and defaulted a missing deal or extra-choice `book` to `out.book` before `out.book` was assigned, so always to book 1; the position is now assigned first and a section-less deal dropped
+- [x] 365. `GameState.adjustStaminaMax` had no caller, and clamped to the written maximum that task 158 replaced with the effective one in its sibling; deleted
 
 ---
 
@@ -439,30 +439,6 @@ owner's call.
 ### Validation
 
 - A pushed run is green in all three jobs, with no Node-20 deprecation annotation.
-
----
-
-## 365. `GameState.adjustStaminaMax` is dead and clamps to the wrong ceiling
-
-**Priority: LOW.** Dead code, but a trap for its first future caller.
-
-### What is wrong
-
-Nothing in `web/js` or `web/tests` calls `adjustStaminaMax` in `state.js`. Its clamp,
-`Math.min(stamina + max(0, delta), staminaMax)`, is against the *written* maximum. Task 158
-replaced exactly that ceiling with `effectiveStaminaMax()` in `adjustAbilityStamina`, because it
-shed a ring-holder's aura headroom. A caller who finds this method first would reintroduce that
-bug.
-
-### Steps
-
-1. Delete `adjustStaminaMax`. `adjustAbilityStamina` is the permanent-Stamina path.
-
-### Validation
-
-- `grep -rn adjustStaminaMax web` finds nothing.
-- `node web/tests/node-import.mjs` passes.
-- `RESULT ALL PASS`.
 
 ---
 
@@ -569,6 +545,9 @@ file pays for history twice.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-29 (task 365): closed **365**, filed nothing. Deleted the dead
+`adjustStaminaMax`. `RESULT ALL PASS pass=3246 fail=0`, unchanged.
 
 Worked 2026-09-29 (task 364): closed **364**, filed nothing. `sanitizeData` assigns the save's
 book and section before the lists that default to them, and drops a resurrection deal naming

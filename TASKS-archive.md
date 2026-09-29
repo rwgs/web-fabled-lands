@@ -372,6 +372,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 362. The source gate folds case on tag and attribute names
 - [x] 363. Two engine paths ignore attributes the corpus has not used yet, and nothing pins that
 - [x] 364. `sanitizeData` keeps malformed resurrection deals and defaults their book to 1
+- [x] 365. `GameState.adjustStaminaMax` is dead and clamps to the wrong ceiling
 
 ---
 
@@ -17477,5 +17478,26 @@ book and non-empty section.
   fail (`-Suite economy`: `pass=701 fail=4`); the position check is the control.
 
 Full browser suite `RESULT ALL PASS pass=3246 fail=0`.
+
+---
+
+## 365. `GameState.adjustStaminaMax` is dead and clamps to the wrong ceiling
+
+**Priority: LOW.** Dead code, but a trap for its first future caller.
+
+### What is wrong
+
+Nothing in `web/js` or `web/tests` calls `adjustStaminaMax` in `state.js`. Its clamp,
+`Math.min(stamina + max(0, delta), staminaMax)`, is against the *written* maximum. Task 158
+replaced exactly that ceiling with `effectiveStaminaMax()` in `adjustAbilityStamina`, because it
+shed a ring-holder's aura headroom. A caller who finds this method first would reintroduce that
+bug.
+
+### The fix
+
+`adjustStaminaMax` was deleted from `state.js`; `adjustAbilityStamina` stays the one
+permanent-Stamina path. A search of `web/` finds no reference, `node web/tests/node-import.mjs`
+passes (`pass=35`), and the full browser suite reads `RESULT ALL PASS pass=3246 fail=0`,
+unchanged, as a deletion with no caller should.
 
 ---

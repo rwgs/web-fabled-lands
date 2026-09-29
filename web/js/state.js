@@ -831,11 +831,6 @@ export class GameState {
     this.data.stamina = Math.min(this.effectiveStaminaMax(), this.data.stamina + amount);
     this.changed();
   }
-  adjustStaminaMax(delta) {
-    this.data.staminaMax = Math.max(1, this.data.staminaMax + delta);
-    this.data.stamina = Math.min(this.data.stamina + Math.max(0, delta), this.data.staminaMax);
-    this.changed();
-  }
   isDead() { return this.data.stamina <= 0; }
 
   adjustRank(delta, fatal = false) {
