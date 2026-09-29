@@ -99,8 +99,12 @@ python -m http.server 8848
 `web/` is a self-contained static site, and it is all a player needs.
 
 **How this site is deployed.** A Cloudflare Worker with static assets and no script
-(`wrangler.jsonc`) serves `webfl.rwgs.net`. Cloudflare's Workers Builds redeploys it on every
-push to `main`, so the repository needs no npm and no deploy workflow. The Worker publishes the
+(`wrangler.jsonc`) serves `webfl.rwgs.net`. The `deploy` job in
+`.github/workflows/smoke.yml` redeploys it on every push to `main`, but only after the other
+CI jobs pass. It runs a pinned `npx wrangler deploy`, so the repository still has no
+`package.json`. It needs two repository secrets, `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID`. The custom-domain route in `wrangler.jsonc` creates the hostname's
+DNS record, which fails while another record holds that name. The Worker publishes the
 **repository root**, trimmed by the root `.assetsignore` (`.gitignore` syntax) to the root
 `index.html` and `web/`, less `web/_test.html`. Nothing else is public: `books/`,
 `java-engine/`, the task files and the config itself all return 404. The root `index.html`
@@ -108,8 +112,8 @@ redirects into `web/`, carrying the query string and hash, so the deep links bel
 the bare domain. Keeping the app at `/web/` keeps the address that installed copies were
 registered at. The asset server redirects `…/index.html` to `…/`, and the service worker's
 precache strips that redirect, because a browser refuses a redirected response for a page load.
-*Until task 370 closes, GitHub Pages (the root `CNAME`) still serves the site: the cutover is
-done in the Cloudflare and GitHub dashboards.*
+*Task 370 is still open: the root `CNAME` (the old GitHub Pages domain setting) stays until
+the first Worker deploy is confirmed.*
 
 To preview the Worker locally, run `npx wrangler dev --persist-to <a folder outside the repo>`.
 Wrangler watches the assets directory, which is the repository root here, so its default
