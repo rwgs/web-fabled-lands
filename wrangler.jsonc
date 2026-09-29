@@ -1,0 +1,11 @@
+// Cloudflare Workers deployment (task 370): an assets-only Worker, no script.
+// It publishes the repository root, so the root index.html's redirect into web/ and the
+// /web/ URLs installed copies are registered at keep working; .assetsignore limits the
+// upload to those two. Workers Builds deploys it on every push to main.
+{
+  "name": "web-fabled-lands",
+  "compatibility_date": "2026-09-29",
+  "assets": {
+    "directory": "."
+  }
+}

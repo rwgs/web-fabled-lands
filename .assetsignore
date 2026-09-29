@@ -1,0 +1,7 @@
+# What the Cloudflare Worker publishes (task 370), in .gitignore syntax: only the root
+# index.html (the redirect into web/) and web/. GitHub Pages published the whole repository.
+/*
+!/index.html
+!/web/
+# Jekyll kept underscore-prefixed files off the Pages site; keep the test harness off too.
+/web/_test.html

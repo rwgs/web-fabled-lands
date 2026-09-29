@@ -12,7 +12,7 @@ below is the date a set of changes reached players. Nothing here requires the pl
 take any action: saves migrate on load, and the service worker replaces a cached build on
 its own.
 
-## 2026-09-29 - build 26.09.29.6b57fe7
+## 2026-09-29 - build 26.09.29.5dad0b8
 
 - **The 💾 button no longer throws away a preview.** On a `?demo=` link it went straight to
   the title screen as if it had saved, and the preview was gone. It now keeps the adventure
@@ -24,6 +24,9 @@ its own.
   version number until the next release. Every file is now fetched fresh.
 - **For maintainers deploying elsewhere:** if a CDN sits in front, don't let it serve `sw.js`
   from a long-lived cache, and keep the query string in its cache key (see `README.md`).
+- **For maintainers: the repository can deploy as a Cloudflare Worker.** `wrangler.jsonc`
+  and `.assetsignore` publish only the root `index.html` and `web/`. The offline copy now
+  also works on a host that redirects `index.html` to its folder, as Cloudflare's does.
 
 ## 2026-09-02 - build 26.09.02.dd4e67f
 

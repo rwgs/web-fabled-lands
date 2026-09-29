@@ -62,10 +62,17 @@ self.FLCache = (() => {
   const fetchFresh = (fetchFn, url, version) =>
     fetchFn(url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(version), { cache: 'reload' });
 
+  // Cloudflare's asset server answers ./index.html with a 307 to ./ (task 370), and the browser
+  // refuses a redirected response as the answer to a navigation. The page would then fail to
+  // load from the cache, so a redirected response is stored as a fresh copy with no redirect.
+  const unredirect = (res) => res.redirected
+    ? new Response(res.body, { status: res.status, statusText: res.statusText, headers: res.headers })
+    : res;
+
   const fetchOk = async (fetchFn, url, version) => {
     const res = await fetchFresh(fetchFn, url, version);
     if (!res.ok) throw new TypeError('precache ' + url + ': HTTP ' + res.status);
-    return res;
+    return unredirect(res);
   };
 
   // All-or-nothing, like the addAll() it replaces: every response is fetched and checked

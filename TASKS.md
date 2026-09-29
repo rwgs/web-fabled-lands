@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-369 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
+370 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
 the buckets below are open, and **all others are complete**. File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -28,6 +28,7 @@ there once the buckets below are clear.
 **LOW**
 
 - [ ] 369. `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19 (CI notice); the `smoke` and `build-scripts` jobs rely on the image's preinstalled `pwsh` 7, `google-chrome` and `python3`, so the move could stop CI with no change here
+- [ ] 370. Move hosting from GitHub Pages to a Cloudflare Worker (owner's request), keeping the root layout and the `/web/` URLs; the Worker's asset server 307s `index.html` to `./`, which the service worker's precache stored as a redirected response that a navigation refuses
 
 **Done**
 
@@ -453,11 +454,65 @@ pushed run on the new image validates it.
 
 ---
 
+## 370. Host the site on a Cloudflare Worker instead of GitHub Pages
+
+**Priority: LOW.** This is the owner's request (2026-09-29), not a defect. Pages works, but it
+publishes the whole repository, and Cloudflare already sits in front of it.
+
+### What is wrong
+
+GitHub Pages serves `main` from the repository root under the root `CNAME`, so `books/`,
+`java-engine/` and the task files are public, and only Jekyll's `_`-prefix rule keeps
+`web/_test.html` off the site. The move has to keep the root layout and `/web/`. Installed
+copies are registered at `/web/`, and a service worker whose script moves or redirects can no
+longer update.
+
+Checked under `wrangler dev` (4.144.0), the asset server differs from Pages in one way that
+matters. It answers `/web/index.html` (and `?v=`) with a 307 to `/web/`. `FLCache.precache`
+fetched `./index.html` through that redirect and cached the response still marked redirected,
+and a browser refuses a redirected response as the answer to a navigation, so opening
+`/web/index.html` from the cache would fail.
+
+### Steps
+
+1. Add `wrangler.jsonc` (an assets-only Worker over `.`) and a root `.assetsignore` that
+   publishes only `index.html` and `web/`, less `web/_test.html`.
+2. Make `FLCache.precache` store a redirected response as a non-redirected copy, with a
+   `suite-economy` test that fails without it.
+3. Update README's deploy section; ignore `.wrangler/`.
+4. *(Owner, dashboards.)* Create the Worker from the GitHub repository in Workers Builds,
+   confirm the first deploy on its `workers.dev` URL, then add `webfl.rwgs.net` as the
+   Worker's Custom Domain, which replaces the DNS record pointing at Pages. Then turn Pages
+   off.
+5. Delete the root `CNAME` and README's "Until task 370 closes" sentence, then close.
+
+**Status 2026-09-29:** steps 1–3 are done. Under `wrangler dev`, `/`, `/?demo=1.10`, `/web/`,
+the data, the illustrations and `web/tests/` answer 200. `/web/_test.html`, `README.md`,
+`books/`, `java-engine/`, `.git/`, `CNAME`, `wrangler.jsonc` and `.assetsignore` answer 404,
+and `sw.js` is sent with `public, max-age=0, must-revalidate` and an ETag. So `.assetsignore`
+honours `!` negation. Running wrangler with its default `.wrangler/` state inside the assets
+directory reloads in a loop, and `--persist-to` outside the repository fixes that (README says
+so). `RESULT ALL PASS pass=3248 fail=0`. The new test fails on the old `precache`.
+
+### Validation
+
+- `https://webfl.rwgs.net/web/` is served by the Worker (a `/README.md` request answers 404).
+  An installed copy updates to the next build, and it opens `/web/index.html` offline.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-29 (task 370): filed and worked **370** on the owner's request: steps 1–3
+done, and it stays open until the owner does the dashboard cutover. An assets-only
+`wrangler.jsonc` and the root `.assetsignore` publish only `index.html` and `web/`. Checking
+under `wrangler dev` found the one real difference from Pages: the asset server 307s
+`index.html` to `./`. `FLCache.precache` now stores a redirected response without the redirect.
+`RESULT ALL PASS pass=3248 fail=0`.
 
 Worked 2026-09-29 (task 368): closed **368** on the owner's go-ahead, filed nothing. The 123
 Review-log entries below the 2026-09-29 `Reviewed` pass now live, verbatim and newest first,

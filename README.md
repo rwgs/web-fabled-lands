@@ -98,21 +98,32 @@ python -m http.server 8848
 
 `web/` is a self-contained static site, and it is all a player needs.
 
-**How this site is deployed.** GitHub Pages serves the `main` branch from the **repository
-root** ("Deploy from a branch", `/`), under the custom domain in the root `CNAME`
-(`webfl.rwgs.net`), with Cloudflare in front. The root `index.html` redirects into `web/`,
-carrying the query string and hash, so the deep links below work from the bare domain. Serving
-the root means the whole repository is public on the site, `books/`, `java-engine/` and the task
-files included. The one exception is files whose names start with `_`, such as `web/_test.html`:
-there is no `.nojekyll`, so Pages' Jekyll build leaves them out.
+**How this site is deployed.** A Cloudflare Worker with static assets and no script
+(`wrangler.jsonc`) serves `webfl.rwgs.net`. Cloudflare's Workers Builds redeploys it on every
+push to `main`, so the repository needs no npm and no deploy workflow. The Worker publishes the
+**repository root**, trimmed by the root `.assetsignore` (`.gitignore` syntax) to the root
+`index.html` and `web/`, less `web/_test.html`. Nothing else is public: `books/`,
+`java-engine/`, the task files and the config itself all return 404. The root `index.html`
+redirects into `web/`, carrying the query string and hash, so the deep links below work from
+the bare domain. Keeping the app at `/web/` keeps the address that installed copies were
+registered at. The asset server redirects `…/index.html` to `…/`, and the service worker's
+precache strips that redirect, because a browser refuses a redirected response for a page load.
+*Until task 370 closes, GitHub Pages (the root `CNAME`) still serves the site: the cutover is
+done in the Cloudflare and GitHub dashboards.*
+
+To preview the Worker locally, run `npx wrangler dev --persist-to <a folder outside the repo>`.
+Wrangler watches the assets directory, which is the repository root here, so its default
+`.wrangler/` state folder inside the repository makes it reload in a loop.
 
 **Another host.** Publish the `web/` folder as the site root (Netlify, Cloudflare Pages and
 Vercel all take a directory), or publish the repository root as above.
 
 **A CDN in front** must not serve `sw.js` from a long-lived cache, or the deploy must purge it.
-Otherwise players won't notice a new build until that cache expires. The service worker
-itself precaches each file at a build-unique `?v=` URL with `cache: 'reload'`, so it gets the
-new bytes, provided the CDN's cache key keeps the query string (Cloudflare's default).
+Otherwise players won't notice a new build until that cache expires. The Worker's asset server
+sends every file with `Cache-Control: public, max-age=0, must-revalidate` and an ETag, which
+meets this. The service worker also precaches each file at a build-unique `?v=` URL with
+`cache: 'reload'`, so it gets the new bytes, provided the CDN's cache key keeps the query
+string (Cloudflare's default).
 
 Once loaded on a phone or tablet, use the browser's **“Add to Home Screen”** to install
 it as an app. Thanks to the service worker it then runs entirely offline; your saved

@@ -1600,6 +1600,26 @@ export async function run(ctx) {
          /serviceWorker\.register\('sw\.js', \{ updateViaCache: 'none' \}\)/.test(appSrc359));
     }
 
+    // --- task 370: a redirected precache response is stored without its redirect ---
+    // On Cloudflare Workers ./index.html is a 307 to ./, and a cached response that still reads
+    // as redirected is refused as the answer to a navigation. serve.py (Python's static server)
+    // 301s the slash-less directory ./tests to ./tests/, so this fetch really is redirected.
+    { // block-scoped
+      await import('../js/sw-cache.js');
+      const FLCache = self.FLCache;
+      const puts = [];
+      const cache370 = { async put(url, res) { puts.push([url, res]); } };
+      const realFetch = (url, init) => fetch(url.replace(/\?v=.*$/, ''), init);
+      const probe = await realFetch('./tests', { cache: 'reload' });
+      await FLCache.precache(cache370, ['./tests'], 'fl-x', realFetch);
+      const stored = puts.length === 1 ? puts[0][1] : null;
+      ok('task370: the test fetch is really redirected (serve.py 301s ./tests)', probe.redirected === true);
+      ok('task370: a redirected precache response is stored as a non-redirected copy, body intact',
+         stored && stored.redirected === false && stored.status === 200
+         && (await stored.text()).length > 0,
+         stored ? 'redirected=' + stored.redirected + ' status=' + stored.status : 'puts=' + puts.length);
+    }
+
     // --- task 206: REQUIRED must list every module the app actually loads ---
     // The precache list is hand-maintained, and edition.js (added by task 195) was missing from
     // it. That is not a missed nicety: install's addAll(REQUIRED) succeeds, then activate judges
