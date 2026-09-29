@@ -12,7 +12,11 @@ below is the date a set of changes reached players. Nothing here requires the pl
 take any action: saves migrate on load, and the service worker replaces a cached build on
 its own.
 
-## 2026-09-29 - build 26.09.29.97b01bb
+## 2026-09-29 - build 26.09.29.d80d7d7
+
+- **The 💾 button no longer throws away a preview.** On a `?demo=` link it went straight to
+  the title screen as if it had saved, and the preview was gone. It now keeps the adventure
+  in a save slot and lets you play on, as the menu's "Keep this adventure" always did.
 
 - **An update now installs the build it says it is.** When the offline copy was refreshed, the
   files could come from your browser's cache or the site's CDN, so an installed game could

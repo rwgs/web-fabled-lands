@@ -11,7 +11,7 @@ import { renderGoto } from '../js/render-choices.js';
 import { renderMarket, renderRest } from '../js/render-market.js';
 // app.js only auto-boots when a #app element exists (task 65), so importing its exported
 // new-adventure recovery contract here is side-effect free. (task 189)
-import { openNewAdventure, installSheetDrawer, releaseSheetDrawer, toggleSheet, syncSheetBreakpoint, keepSheetFocus, makeUpdateGate } from '../js/app.js';
+import { openNewAdventure, saveOrKeep, installSheetDrawer, releaseSheetDrawer, toggleSheet, syncSheetBreakpoint, keepSheetFocus, makeUpdateGate } from '../js/app.js';
 import { Narrator } from '../js/tts.js';
 import { renderSheet, renderStatic, modal } from '../js/ui.js';
 
@@ -1120,6 +1120,42 @@ export async function run(ctx) {
       ok('§189 backing out returns to the title screen', r189title.result === false && r189title.titles === 1 && r189title.saves === 0);
     }
 
+    // --- task 360: "Save & quit" must not discard a ?demo= preview ---------------------
+    // save(true) reports success for an ephemeral preview without writing, so the header's
+    // 💾 quit to the title on that "success" and the preview was gone. saveOrKeep() is the one
+    // decision behind the header and the menu: a preview is kept (and play continues), a real
+    // slot saves and quits or warns.
+    {
+      const g360 = GameState.create({ name: 'Preview360', gender: 'm', profession: 'Warrior', book: 1, adv });
+      g360.ephemeral = true;
+      ok('task360: the precondition — save(true) claims success for a preview it never writes',
+         g360.save(true) === true && g360.ephemeral === true);
+      const run360 = (state, kept, saved) => {
+        const log = [];
+        const r = saveOrKeep({
+          state: { ephemeral: state.ephemeral, save: () => { log.push('save'); return saved; } },
+          keep: () => { log.push('keep'); return kept; },
+          quit: () => log.push('quit'),
+          fail: () => log.push('fail'),
+        });
+        return { r, log: log.join(',') };
+      };
+      const kept360 = run360({ ephemeral: true }, true, true);
+      ok('task360: a preview is kept, not saved-and-quit', kept360.r === 'kept' && kept360.log === 'keep', JSON.stringify(kept360));
+      const unkept360 = run360({ ephemeral: true }, false, true);
+      ok('task360: a preview whose keep fails never reaches quit', unkept360.r === 'unkept' && unkept360.log === 'keep', JSON.stringify(unkept360));
+      const quit360 = run360({ ephemeral: false }, true, true);
+      ok('task360: a real slot still saves and quits', quit360.r === 'quit' && quit360.log === 'save,quit', JSON.stringify(quit360));
+      const fail360 = run360({ ephemeral: false }, true, false);
+      ok('task360: a failed save warns and does not quit', fail360.r === 'failed' && fail360.log === 'save,fail', JSON.stringify(fail360));
+      // Source contract: the header and the menu both go through it, labelled by what it does.
+      const appSrc360 = await (await fetch('./js/app.js')).text();
+      ok('task360: the header and the menu share saveAndQuit and its label',
+         appSrc360.includes("saveBtn = iconBtn('💾', saveLabel(), () => saveAndQuit());")
+         && appSrc360.includes("add('💾', saveLabel(), () => saveAndQuit());")
+         && !appSrc360.includes('if (state.save(true)) showTitle()'));
+    }
+
     // --- task 12: focused unit tests for the extracted rules --------------
     // The every-section scan catches throws; these assert combat/economy/rest
     // OUTCOMES on the DOM-free modules. Scoped to the gaps not already covered
@@ -1893,7 +1929,7 @@ export async function run(ctx) {
       ok('task191: the four essential controls carry no in-menu marker',
          hdrSrc.includes("iconBtn('☰', 'More…', showGameMenu)")
          && hdrSrc.includes("iconBtn('🔊', 'Read aloud', () => narrator.toggle(currentFlow()))")
-         && hdrSrc.includes("iconBtn('💾', 'Save & quit to title'")
+         && hdrSrc.includes("iconBtn('💾', saveLabel(), () => saveAndQuit())") // task 360
          && hdrSrc.includes("() => toggleSheet(), 'sheet-toggle')")
          && !/'sheet-toggle in-menu'/.test(hdrSrc));
       // Nothing the narrow header drops may become unreachable: the More menu carries the four

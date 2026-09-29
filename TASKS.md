@@ -20,7 +20,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 360. the header's 💾 "Save & quit to title" calls `state.save(true)`, which returns true for an ephemeral `?demo=` preview without writing, so the preview is discarded while the button says it saved
 - [ ] 361. `smoke.yml` pins `actions/checkout@v4`, `actions/setup-node@v4` and `node-version: '20'`; GitHub removed Node 20 from its runners on 2026-09-23, and no run has happened since
 
 **LOW**
@@ -401,47 +400,11 @@ this order.*
 - [x] 357. AGENTS.md's step 4 filed new work "at the bottom of `TASKS.md`" where `TASKS.md` files it under a priority bucket and logs the pass, and no step said how a task is closed; the workflow now files and closes the way `TASKS.md` does
 - [x] 358. `TASKS-archive.md`'s header said "stable IDs 1–336" and its Contents list ended at 336 while the file held sections to 357, because the close never added a Contents line; the header and intro no longer state a range, 337–358 are listed, and AGENTS.md's close step names the Contents line
 - [x] 359. the service worker precached through the browser's HTTP cache and the CDN (Cloudflare, `max-age=14400` on `web/js`), so a new build's cache could be filled with the previous build's files — a stale or mixed shell kept under the new version key until the next deploy; `FLCache.precache` now fetches every entry at a build-unique `?v=` URL with `cache: 'reload'` and stores it under the plain URL, and the worker registers with `updateViaCache: 'none'`
+- [x] 360. the header's 💾 "Save & quit to title" called `state.save(true)`, which returns true for an ephemeral `?demo=` preview without writing, so the preview was discarded while the button said it saved; the header and the menu now share `saveOrKeep`, which keeps a preview (labelled "Keep this adventure") and only saves-and-quits a real slot
 
 ---
 
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The open tasks' detail sections follow, in filed order; the Review log comes after them.
-
----
-
-## 360. The header's "Save & quit" discards a `?demo=` preview while saying it saved
-
-**Priority: MEDIUM.** The player loses the preview they were playing, after pressing a button that
-promised to save it.
-
-### What is wrong
-
-`buildGameScreen` in `app.js` builds the header's 💾 "Save & quit to title" as
-`if (state.save(true)) showTitle(); else surfaceSaveError(true);`. `GameState.save` returns
-`true` for an ephemeral game before it ever looks at `explicit`: "preview game: not persisted
-until kept". So on a `?demo=` link the button goes to the title screen, no save card exists, and
-the preview is gone. `showGameMenu` gets this right, offering "Keep this adventure" (`keepDemo`)
-when `state.ephemeral` is set. The header button is one of the four controls task 191's
-narrow-chrome policy keeps on a phone, so it is the one a mobile player uses.
-
-Repro: open `/web/?demo=1.10`, take a choice, press 💾. You land on the title screen with nothing
-saved and no warning.
-
-### Steps
-
-1. Give the header and the menu one shared save-and-quit handler that branches on
-   `state.ephemeral` exactly as the menu does. For a preview, that means keep it (`keepDemo`,
-   whose failure path already offers an export) or ask first. Do not quit silently.
-2. Label the header button to match what it will do for a preview, as the menu's entry already
-   does.
-3. Export the decision the way `openNewAdventure` is exported (injected collaborators), so the
-   suite can drive it without the screens.
-
-### Validation
-
-- A `suite-economy` test (persistence lives there): an ephemeral state through the shared handler
-  never reaches the quit callback without being kept or explicitly declined, and a real slot
-  still saves and quits.
-- `RESULT ALL PASS`.
 
 ---
 
@@ -719,6 +682,11 @@ file pays for history twice.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-29 (task 360): closed **360**, filed nothing. The header's 💾 and the menu's
+entry now share `saveOrKeep` in `app.js`: a `?demo=` preview is kept and play continues (the
+header button says "Keep this adventure" until it is), and only a real slot saves and quits.
+`RESULT ALL PASS pass=3235 fail=0`.
 
 Worked 2026-09-29 (task 359): closed **359**, filed nothing. The install now precaches through
 `FLCache.precache`/`precacheOptional` in `sw-cache.js`, which fetch each entry at a build-unique

@@ -368,6 +368,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 357. The task workflow disagrees with `TASKS.md` about filing and closing
 - [x] 358. The archive's header and Contents stop at task 336
 - [x] 359. The service worker can install a stale or mixed shell under a new version key
+- [x] 360. The header's "Save & quit" discards a `?demo=` preview while saying it saved
 
 ---
 
@@ -17310,3 +17311,40 @@ its cache key.
 
 ---
 
+## 360. The header's "Save & quit" discards a `?demo=` preview while saying it saved
+
+**Priority: MEDIUM.** The player loses the preview they were playing, after pressing a button that
+promised to save it.
+
+### What is wrong
+
+`buildGameScreen` in `app.js` builds the header's 💾 "Save & quit to title" as
+`if (state.save(true)) showTitle(); else surfaceSaveError(true);`. `GameState.save` returns
+`true` for an ephemeral game before it ever looks at `explicit`: "preview game: not persisted
+until kept". So on a `?demo=` link the button goes to the title screen, no save card exists, and
+the preview is gone. `showGameMenu` gets this right, offering "Keep this adventure" (`keepDemo`)
+when `state.ephemeral` is set. The header button is one of the four controls task 191's
+narrow-chrome policy keeps on a phone, so it is the one a mobile player uses.
+
+Repro: open `/web/?demo=1.10`, take a choice, press 💾. You land on the title screen with nothing
+saved and no warning.
+
+
+### The fix
+
+- `saveOrKeep({ state, keep, quit, fail })` in `app.js` is the one decision behind the header's
+  💾 and the menu's entry, exported with injected collaborators like `openNewAdventure`. A
+  preview goes to `keep` (`keepDemo`, whose failure path still offers an export) and play
+  continues, exactly as the menu's "Keep this adventure" did; it never reaches `quit`. A real
+  slot saves and quits, or warns through `surfaceSaveError`.
+- Both controls are built from `saveAndQuit()` and `saveLabel()`, so the header button is
+  labelled "Keep this adventure" for a preview. `keepDemo` now returns whether it kept, and
+  on success `syncSaveBtn` relabels the header button "Save & quit to title".
+- `suite-economy`: a task-360 block pins the precondition (`save(true)` is `true` for an
+  ephemeral `GameState`), drives `saveOrKeep` through kept / keep-failed / saved / save-failed,
+  and pins that the header and menu share it. Task 191's header source pin now matches the
+  new 💾 line.
+
+Full browser suite `RESULT ALL PASS pass=3235 fail=0`.
+
+---

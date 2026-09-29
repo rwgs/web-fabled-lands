@@ -83,11 +83,13 @@ function slotsFullModal() {
   }).then((v) => { if (v === 'saves') showSaves(); });
 }
 
-/** Persist the current ephemeral (preview) game into a real save slot. */
+/** Persist the current ephemeral (preview) game into a real save slot. True once kept. */
 function keepDemo() {
   try {
     state.keep();
     toast('Adventure saved.');
+    syncSaveBtn();
+    return true;
   } catch (e) {
     // keep() reverts to an ephemeral preview on failure, so the adventure is
     // still in memory and can be exported; offer that alongside the message.
@@ -96,7 +98,29 @@ function keepDemo() {
       body: `<p>${escapeHtml(e && e.message ? e.message : String(e))}</p>`,
       buttons: [{ label: 'Export now', value: 'export', primary: true }, { label: 'Continue', value: null }],
     }).then((v) => { if (v === 'export') exportSave(null, null); });
+    return false;
   }
+}
+
+/** The one save-and-quit decision behind the header's 💾 and the menu's entry (task 360).
+ *  save() reports success for a ?demo= preview without writing, so quitting on that
+ *  "success" discarded the preview. A preview is kept instead and play continues, as the
+ *  menu's "Keep this adventure" always did; a real slot saves and quits, or warns. The
+ *  collaborators are injected so the suite drives it without the screens. Returns what it
+ *  did: 'kept', 'unkept', 'quit' or 'failed'. */
+export function saveOrKeep({ state, keep, quit, fail }) {
+  if (state.ephemeral) return keep() ? 'kept' : 'unkept';
+  if (state.save(true)) { quit(); return 'quit'; }
+  fail();
+  return 'failed';
+}
+const saveAndQuit = () => saveOrKeep({ state, keep: keepDemo, quit: showTitle, fail: () => surfaceSaveError(true) });
+const saveLabel = () => (state && state.ephemeral ? 'Keep this adventure' : 'Save & quit to title');
+let saveBtn = null;
+function syncSaveBtn() {
+  if (!saveBtn) return;
+  saveBtn.title = saveLabel();
+  saveBtn.setAttribute('aria-label', saveBtn.title);
 }
 
 // ---- Theme (light / dark) --------------------------------------------------
@@ -621,7 +645,8 @@ function buildGameScreen() {
     syncSpeedBtn();
     actions.appendChild(speedBtn);
   }
-  actions.appendChild(iconBtn('💾', 'Save & quit to title', () => { if (state.save(true)) showTitle(); else surfaceSaveError(true); }));
+  saveBtn = iconBtn('💾', saveLabel(), () => saveAndQuit());
+  actions.appendChild(saveBtn);
   actions.appendChild(sheetBtn); // sheet drawer toggle (mobile only)
   header.appendChild(actions);
   app.appendChild(header);
@@ -1070,8 +1095,7 @@ async function showGameMenu() {
   if (narrator.supported) add('⚙️', 'Narration settings', () => showNarrationSettings()); // [TTS]
   add('📤', 'Export this save', () => exportSave(null, null));
   add('📥', 'Import a save', () => importSaveFile());
-  if (state.ephemeral) add('💾', 'Keep this adventure', () => keepDemo());
-  else add('💾', 'Save & quit to title', () => { if (state.save(true)) showTitle(); else surfaceSaveError(true); });
+  add('💾', saveLabel(), () => saveAndQuit());
   const menuCredits = el('div', 'menu-credits');
   menuCredits.innerHTML = creditsHtml();
   body.appendChild(menuCredits);
