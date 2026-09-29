@@ -3,8 +3,8 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-358 appears below: 207 and 326 are withdrawn as misdiagnoses and **all others are
-complete** — the backlog carries no open item (see the Review log). File new work
+368 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
+the buckets below are open, and **all others are complete**. File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
 [`TASKS-archive.md`](TASKS-archive.md); the Review log at the end of this file
@@ -16,15 +16,22 @@ there once the buckets below are clear.
 
 **HIGH**
 
-*(none open — file new HIGH work here)*
+- [ ] 359. the service worker precaches through the browser's HTTP cache and the CDN (Cloudflare, `max-age=14400` on `web/js`), so a new build's cache can be filled with the previous build's files — a stale or mixed shell kept under the new version key until the next deploy
 
 **MEDIUM**
 
-*(none open — file new MEDIUM work here)*
+- [ ] 360. the header's 💾 "Save & quit to title" calls `state.save(true)`, which returns true for an ephemeral `?demo=` preview without writing, so the preview is discarded while the button says it saved
+- [ ] 361. `smoke.yml` pins `actions/checkout@v4`, `actions/setup-node@v4` and `node-version: '20'`; GitHub removed Node 20 from its runners on 2026-09-23, and no run has happened since
 
 **LOW**
 
-*(none open — file new LOW work here)*
+- [ ] 362. the source gate folds case on tag and attribute names (`FL_TAG_ATTRS` is a plain `@{}`, the root check is `-ne`, the attribute check `-notcontains`), so a mis-cased camelCase attribute validates and is then ignored by the exact-case engine; `books/book3/207.xml` ships `<SECTION>`/`<P>`
+- [ ] 363. `walkEffectBody` drops `<difficulty modifier=>` and never infers `<random>` dice, and `groupFightRound` ignores `playerFirst=`, `<fightround>` and a `<fightdamage>` redirect — zero shipped sites, but the gate accepts every such shape
+- [ ] 364. `sanitizeData` keeps a resurrection deal with no section (a phantom deal that loops the death prompt), and defaults a missing deal or extra-choice `book` to `out.book` before `out.book` is assigned, so always to book 1
+- [ ] 365. `GameState.adjustStaminaMax` has no caller, and clamps to the written maximum that task 158 replaced with the effective one in its sibling
+- [ ] 366. README says to "set Pages to serve `/web`", which is not a Pages option and not how this site is deployed (root `CNAME` + root redirect); its file tree omits `edition.js`, and its DOM-free module list omits `state.js` and `visit-state.js`
+- [ ] 367. `ROADMAP.md`, `PLAN.md`, `SPEC.md` and three `docs/` pages restate the 4,369 shipped-section count `docs/Corpus-Census.md` owns, and `PLAN.md` carries a dated status sentence
+- [ ] 368. the Review log is nine-tenths of `TASKS.md`, mostly re-telling closed tasks whose detail is already archived — archive the older entries (owner's call)
 
 **Done**
 
@@ -396,7 +403,381 @@ this order.*
 
 ---
 
-> **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The backlog currently has no open item, so no detail section remains in this file; the Review log follows.
+> **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The open tasks' detail sections follow, in filed order; the Review log comes after them.
+
+---
+
+## 359. The service worker can install a stale or mixed shell under a new version key
+
+**Priority: HIGH.** Nothing is known to have gone wrong yet, but every precondition is confirmed
+on the live host, and the failure is the worst this app can have: an installed game that is
+silently the wrong build, or that does not start offline at all, until the *next* deploy.
+
+### What is wrong
+
+`sw.js`'s `install` listener precaches with `cache.addAll(REQUIRED)` and `cache.add(url)` for
+`OPTIONAL`. Both issue requests in the default cache mode, so each can be answered by the
+browser's HTTP cache or by the CDN rather than by the deployed file. The site
+(`webfl.rwgs.net`, root `CNAME`) is Cloudflare in front of GitHub Pages. Measured 2026-09-29 with
+`curl -sI`:
+
+| URL | `Cache-Control` | `cf-cache-status` |
+|---|---|---|
+| `web/js/engine.js` | `max-age=14400` | `HIT` |
+| `web/js/version.js`, `web/sw.js` | `max-age=14400` | `MISS` |
+| `web/data/book1.json` | `max-age=600` | `DYNAMIC` |
+
+The browser re-fetches the worker *script* past its own cache, so a deploy is noticed. The new
+worker's precache, though, can be filled with the previous build's bytes for up to four hours,
+from either layer. Then:
+
+- **The new cache holds old files.** `FLCache.prune` in `sw-cache.js` deletes the previous cache,
+  because the new one "verifiably holds every required asset". It holds every URL, not the new
+  bytes, so the player runs the old build (or a mix of two) labelled with the new stamp until
+  another deploy.
+- **A mix of modules can fail at module link.** A new `app.js` importing an export a stale
+  `engine.js` lacks throws a `SyntaxError` before anything runs, and offline there is no network
+  fallback.
+- **`importScripts('./js/sw-cache.js')` has the same exposure** under the default
+  `updateViaCache: 'imports'`.
+
+No earlier task considered this: tasks 8, 64, 138, 179, 190 and 206 all assume `addAll` fetches
+the deployed bytes. `DECISIONS.md` records no-cache serving for the *test* server only.
+
+### Steps
+
+1. Precache with a request neither layer can answer from cache. `cache: 'reload'` is not enough
+   on its own, because it bypasses the browser's cache but not Cloudflare's. Fetch each entry at
+   a build-unique URL (for example `url + '?v=' + VERSION`, also with `cache: 'reload'`) and
+   `cache.put` the response under the plain URL the app requests, since the precache URL is the
+   cache key (see the `BOOK_ILLUS` note in `sw.js`).
+2. Keep `REQUIRED` all-or-nothing: fetch everything, reject the install if any response is not
+   `ok`, and only then write. Keep `OPTIONAL` best-effort, as it is now.
+3. Put the precache routine in `sw-cache.js` (for example `FLCache.precache(cache, urls, version,
+   fetchFn)`), so the suite can drive it with an injected fetch the way it already drives
+   `prune` and `match`.
+4. Register the worker with `updateViaCache: 'none'` (`registerSW` in `app.js`), so
+   `sw-cache.js` is not read from the browser's cache either.
+5. Replace the task-190 assertion in `suite-economy` that pins the literal
+   `await cache.addAll(REQUIRED);` with assertions on the new contract.
+6. In `README.md`'s deploy section (with task 366), say that a CDN in front must not serve
+   `sw.js` from a long-lived cache, or that the deploy purges it. Cloudflare's configuration is
+   outside the repository.
+
+### Validation
+
+- A `suite-economy` test drives the precache with a fake fetch. Every request carries the build's
+  version and `cache: 'reload'`, every response is stored under the plain URL, and one non-`ok`
+  `REQUIRED` response rejects without writing anything.
+- `RESULT ALL PASS`.
+- By hand after the next deploy: in an installed copy, the new cache's `js/version.js` matches
+  the stamp in its cache key.
+
+---
+
+## 360. The header's "Save & quit" discards a `?demo=` preview while saying it saved
+
+**Priority: MEDIUM.** The player loses the preview they were playing, after pressing a button that
+promised to save it.
+
+### What is wrong
+
+`buildGameScreen` in `app.js` builds the header's 💾 "Save & quit to title" as
+`if (state.save(true)) showTitle(); else surfaceSaveError(true);`. `GameState.save` returns
+`true` for an ephemeral game before it ever looks at `explicit`: "preview game: not persisted
+until kept". So on a `?demo=` link the button goes to the title screen, no save card exists, and
+the preview is gone. `showGameMenu` gets this right, offering "Keep this adventure" (`keepDemo`)
+when `state.ephemeral` is set. The header button is one of the four controls task 191's
+narrow-chrome policy keeps on a phone, so it is the one a mobile player uses.
+
+Repro: open `/web/?demo=1.10`, take a choice, press 💾. You land on the title screen with nothing
+saved and no warning.
+
+### Steps
+
+1. Give the header and the menu one shared save-and-quit handler that branches on
+   `state.ephemeral` exactly as the menu does. For a preview, that means keep it (`keepDemo`,
+   whose failure path already offers an export) or ask first. Do not quit silently.
+2. Label the header button to match what it will do for a preview, as the menu's entry already
+   does.
+3. Export the decision the way `openNewAdventure` is exported (injected collaborators), so the
+   suite can drive it without the screens.
+
+### Validation
+
+- A `suite-economy` test (persistence lives there): an ephemeral state through the shared handler
+  never reaches the quit callback without being kept or explicitly declined, and a real slot
+  still saves and quits.
+- `RESULT ALL PASS`.
+
+---
+
+## 361. CI pins the Node 20 runtime GitHub removed on 2026-09-23
+
+**Priority: MEDIUM.** CI is the drift gate (a stale bundle, a non-ASCII build script, a
+browser-touching rule import). If it cannot start, all of those merge unchecked.
+
+### What is wrong
+
+`.github/workflows/smoke.yml` uses `actions/checkout@v4` in all three jobs and
+`actions/setup-node@v4` with `node-version: '20'` in `rules-import`. GitHub's changelog
+"Deprecation of Node 20 on GitHub Actions runners" (2025-09-19) moved runners to Node 24 by
+default on 2026-06-16 and removed Node 20 on 2026-09-23. Node 20 itself reached end of life on
+2026-04-30. The last CI run was 2026-09-03 and passed. `main` is 8 commits ahead of
+`origin/main`, so the next push is the first run on runners without Node 20.
+
+### Steps
+
+1. Bump `actions/checkout` and `actions/setup-node` to their current majors that run on Node 24.
+   Read each action's releases page; don't guess the number.
+2. Set `node-version` to an LTS line still in support (22 or 24), and run
+   `node web/tests/node-import.mjs` under it locally.
+3. Record the chosen versions in the workflow comment beside the `rules-import` job.
+
+### Validation
+
+- A pushed run is green in all three jobs, with no Node-20 deprecation annotation.
+
+---
+
+## 362. The source gate folds case on tag and attribute names
+
+**Priority: LOW.** The shipped corpus has only one affected file, and it renders correctly. But the
+gate exists to catch exactly this class of typo before it ships, and here it cannot.
+
+### What is wrong
+
+`validate-source.ps1` compares names case-insensitively in three places:
+
+- `FL_TAG_ATTRS` is a plain PowerShell `@{}`, whose keys fold case.
+- `Test-XmlDoc` checks the root element with `-ne`.
+- `Test-XmlVocabulary` checks each attribute against its allowlist with `-notcontains`.
+
+The engine does not fold case. XML-DOM `getAttribute` and `querySelectorAll` are exact-case, and
+16 attribute names are camelCase (`abilityDamaged`, `attackDice`, `initialCrew`, `itemAt`,
+`playerDefence`, `playerFirst`, `preDamage`, `safeAddGod`, `staminaLost`, `titleAdjust`,
+`titlePattern`, `titleVal`, `titleValue`, `useCache`, `withdrawCharge`). So
+`<fight playerfirst="f">` or `<goto Section="5"/>` validates cleanly and is then silently ignored:
+task 37's `safeAddGodd` shape, and the class task 338 closed for codeword *values*.
+
+Census of the shipped corpus, 2026-09-29, grouping every tag and `tag@attribute` spelling
+case-insensitively: the only collisions are `books/book3/207.xml`'s root `<SECTION>` and its three
+`<P>`. That file works only because `renderElement` lowercases `tagName`, and its game tags
+(`<difficulty>`, `<outcomes>`) are lower case. `docs/Corpus-Census.md` already notes the file and
+explains that the gate lets it through.
+
+### Steps
+
+1. Make every name comparison ordinal. `FL_TAG_ATTRS`, and any other table keyed by a tag or
+   attribute name, becomes a `Dictionary` with `[StringComparer]::Ordinal`, as
+   `New-CodewordSet` already is. The root check becomes `-cne` and the attribute check
+   `-cnotcontains`.
+2. Lower-case `books/book3/207.xml`'s `SECTION` and `P` tags. This is markup only: stripping tags
+   from the old and new file must leave byte-identical prose. Then rebuild, which changes
+   `web/data/book3.json`, and commit the output.
+3. Add `validate-selftest.ps1` fixtures for a mis-cased tag and a mis-cased attribute.
+4. Update `docs/Corpus-Census.md`'s note on the file, including its "`section` counts 4,368, not
+   4,369" line.
+
+### Validation
+
+- The selftest fixtures fail under the old comparisons and pass under the new ones.
+- The prose diff for §3.207 is empty.
+- `RESULT ALL PASS`.
+
+---
+
+## 363. Two engine paths ignore attributes the corpus has not used yet, and nothing pins that
+
+**Priority: LOW.** No shipped site is affected. The risk is a future node that validates cleanly
+and then behaves differently in a headless body than it would on the page.
+
+### What is wrong
+
+- **The headless effect-body walk.** `walkEffectBody` in `engine.js` runs `<fightdamage>`,
+  `<fightround>`, `<flee>`, item Use effects and `<bookchange>`. It calls `rollDifficulty` with no
+  mode and ignores a numeric `modifier=`, where `renderDifficulty` honours all six mode words and
+  the addend. It also rolls a `<random>` with no `dice=` on 2 dice, where `renderRandom` infers
+  1 die from a following 1–6 outcomes table (`inferDice`).
+- **Group fights.** `groupFightRound` in `combat.js` ignores `playerFirst=`, never runs a
+  `<fightround>`, and keeps enemies striking after a `<fightdamage>` has recorded
+  `fight.roundGoto`. `fightRound` handles all three.
+
+Census, 2026-09-29. Eight roll nodes sit inside an effect body: book2/770, book5/24, 356, 383,
+489, 565, 631 and 689. All carry `dice=` where they need it, and none carries `modifier=`. The
+four group fights (book6/192, 273, 291, 618) carry only `combat defence group name stamina`, and
+their sections hold no `<fightround>` or `<fightdamage>`.
+
+### Steps
+
+1. Route `<difficulty modifier=>` in `walkEffectBody` through the same mode and addend rule
+   `renderDifficulty` uses. Moving that rule into `engine.js` shares it and keeps it DOM-free.
+2. Make `validate-source.ps1` refuse the shapes the headless paths cannot honour: a dice-less
+   `<random>` under a body tag, and a group `<fight>` carrying `playerFirst=` or sharing its
+   section with a `<fightround>` or `<fightdamage>`. Add a selftest fixture for each.
+3. Add a `suite-corpus` assertion pinning the census above, so the first such site fails loudly
+   and gets reviewed.
+
+### Validation
+
+- The selftest fixtures fail as intended.
+- A headless `walkEffectBody` test rolls a `modifier="noweapon"` difficulty against the unarmed
+  score.
+- `RESULT ALL PASS`.
+
+---
+
+## 364. `sanitizeData` keeps malformed resurrection deals and defaults their book to 1
+
+**Priority: LOW.** Only a hand-edited or imported save reaches it, but a loaded save is exactly
+what `sanitizeData` exists to distrust ("wrong array/object shapes must never reach rendering").
+
+### What is wrong
+
+- **Phantom deals.** `sanitizeData` maps `d.resurrections` without dropping anything, so an
+  imported `[{}]` or `[1]` becomes a deal with `section: null`. On death, `handleDeath` offers
+  "Use resurrection". The move reaches no section, the transaction refunds the deal, and the
+  death prompt returns with the same phantom deal offered again.
+- **The book default is always 1.** The `resurrections` and `extraChoices` entries default a
+  missing `book` to `out.book`, but `out.book` is assigned further down the function. At that
+  point it is still `freshData()`'s `1`.
+
+`sanitizeRetry` already shows the intended shape: drop an entry that names no positive-integer
+book and non-empty section.
+
+### Steps
+
+1. Drop a resurrection whose section is missing or blank.
+2. Assign `out.book` and `out.section` before the lists that default to them.
+3. Add an import test (the suite that owns import hardening): a `[{}]` deal is dropped, and a
+   deal missing `book` takes the save's book.
+
+### Validation
+
+- The new tests fail on the current code and pass after the fix.
+- `RESULT ALL PASS`.
+
+---
+
+## 365. `GameState.adjustStaminaMax` is dead and clamps to the wrong ceiling
+
+**Priority: LOW.** Dead code, but a trap for its first future caller.
+
+### What is wrong
+
+Nothing in `web/js` or `web/tests` calls `adjustStaminaMax` in `state.js`. Its clamp,
+`Math.min(stamina + max(0, delta), staminaMax)`, is against the *written* maximum. Task 158
+replaced exactly that ceiling with `effectiveStaminaMax()` in `adjustAbilityStamina`, because it
+shed a ring-holder's aura headroom. A caller who finds this method first would reintroduce that
+bug.
+
+### Steps
+
+1. Delete `adjustStaminaMax`. `adjustAbilityStamina` is the permanent-Stamina path.
+
+### Validation
+
+- `grep -rn adjustStaminaMax web` finds nothing.
+- `node web/tests/node-import.mjs` passes.
+- `RESULT ALL PASS`.
+
+---
+
+## 366. README's deploy guidance and file tree disagree with the repository
+
+**Priority: LOW.** Documentation only.
+
+### What is wrong
+
+- **The Pages instruction does not exist.** "On the web" says: "GitHub Pages — publish the `web/`
+  folder (or set Pages to serve `/web`)." Pages serves a branch root, `/docs` or an Actions
+  artifact, not `/web`, and this site is not deployed that way. The repository root is served:
+  the root `CNAME` names `webfl.rwgs.net`, and the root `index.html` redirects into `web/`,
+  carrying the query (task 346). So everything in the repository is published too, including
+  `books/`, `java-engine/` and the task files. That may be intended, but it should be stated.
+- **The file tree omits `edition.js`.** The repository tree's `web/js/` list leaves it out,
+  although the module table below lists it.
+- **The DOM-free module list is short.** "The rules were deliberately split out of the renderer"
+  names `engine.js`, `combat.js`, `market.js`, `render-rules.js` and `render-gates.js`, and omits
+  `state.js` and `visit-state.js`, both in AGENTS.md's architecture invariant.
+
+### Steps
+
+1. Describe the deployment that is actually used (repository root on Pages, custom domain, CDN in
+   front), keep a short generic note for other hosts, and add the CDN caching caveat from
+   task 359.
+2. Add `edition.js` to the tree, and complete the DOM-free list.
+3. Re-check for repeats before closing, per AGENTS.md's "fix the claim everywhere". A search of
+   `docs/` on 2026-09-29 found neither the Pages instruction nor the short module list repeated
+   there.
+
+### Validation
+
+- README's deploy section no longer offers a Pages "serve /web" setting.
+- Every file in `web/js/` appears in README's tree.
+
+---
+
+## 367. Living documents restate the shipped-section count `docs/Corpus-Census.md` owns
+
+**Priority: LOW.** Documentation only; every copy is correct today.
+
+### What is wrong
+
+AGENTS.md: "Don't restate a count another file owns … point at the file that owns the fact — or,
+if the figure has to be stated, print the command that measures it." Task 355 applied that to the
+pass count. `4,369` still appears, without the command, in:
+
+- `ROADMAP.md`
+- `PLAN.md`
+- `SPEC.md` ("4,369 today")
+- `docs/Home.md` (the "Section files bundled" row)
+- `docs/The-Books.md` (the per-book table's total)
+- `docs/FAQ-and-Troubleshooting.md`
+
+`PLAN.md`'s "Nothing is in flight as of 2026-08-31" is the dated-status sentence the same rule
+warns about. `CHANGELOG.md` and `REVIEW.md` are dated records and are exempt.
+
+### Steps
+
+1. Replace each copy with a pointer to `docs/Corpus-Census.md`, or keep the figure with the
+   census command beside it.
+2. Decide whether `docs/The-Books.md`'s per-book table or `Corpus-Census.md` owns the per-book
+   counts, and make the other point at it.
+3. Rephrase `PLAN.md`'s status so it does not carry a date that reads as a fresh verification.
+
+### Validation
+
+- `grep -rn "4,369" --include=*.md . | grep -v "TASKS\|CHANGELOG\|REVIEW\|review-claude"` lists
+  only the owning file, or copies with their command.
+
+---
+
+## 368. The Review log is nine-tenths of `TASKS.md`
+
+**Priority: LOW. Owner's call.** Nothing is wrong; it is a size and focus proposal.
+
+### What is wrong
+
+`TASKS.md` is 4,165 lines, and 3,763 of them are the Review log (123 `Worked`/`Reviewed`
+entries). Measure with `awk '/^## Review log/{f=1} f' TASKS.md | wc -l`. AGENTS.md already works
+around this ("search for `- [ ]` rather than reading the file whole"). But most entries re-tell a
+closed task whose detail section is already in `TASKS-archive.md`, so an agent that does open the
+file pays for history twice.
+
+### Steps (if taken)
+
+1. Move all but the most recent passes (for example, everything before the last `Reviewed` entry)
+   into a "Review log (archived)" section of `TASKS-archive.md`, with a Contents line, keeping
+   entry order.
+2. Leave a one-line pointer at the head of `TASKS.md`'s Review log, and state the rule in the
+   file's header so later closes know where old entries go.
+3. Don't edit the moved entries: they are dated records.
+
+### Validation
+
+- Every moved entry is byte-identical in its new home. Diff the concatenation.
+- The header's workflow reads correctly for the next close.
 
 ---
 
@@ -405,6 +786,16 @@ this order.*
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Reviewed 2026-09-29 (whole repository): filed **359–368**. The full write-up is in
+[`review-claude.md`](review-claude.md), which holds review text from this pass on. Baseline: the
+rebuild is a byte-for-byte no-op and `RESULT ALL PASS pass=3223 fail=0`. The rules layer held up
+under reading, and three suspicions were cleared (recorded in that file). The one HIGH is in the
+deployment path, not the rules: the service worker's precache can be served by the browser's
+cache or Cloudflare's edge (`max-age=14400`, `HIT`), so a new build can install the previous
+build's files (359). The two MEDIUMs are the header's "Save & quit" dropping a `?demo=` preview
+(360) and CI still pinning the Node 20 runtime GitHub removed on 2026-09-23 (361). `main` is 8
+commits ahead of `origin`, so the next push is also the first run on the new runners.
 
 Worked 2026-09-29 (task 358): filed and closed **358** together, on request. `TASKS-archive.md`'s
 header and Contents list had stopped at 336 while the file held sections to 357 — the close
