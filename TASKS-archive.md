@@ -373,6 +373,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 363. Two engine paths ignore attributes the corpus has not used yet, and nothing pins that
 - [x] 364. `sanitizeData` keeps malformed resurrection deals and defaults their book to 1
 - [x] 365. `GameState.adjustStaminaMax` is dead and clamps to the wrong ceiling
+- [x] 366. README's deploy guidance and file tree disagree with the repository
 
 ---
 
@@ -17499,5 +17500,44 @@ bug.
 permanent-Stamina path. A search of `web/` finds no reference, `node web/tests/node-import.mjs`
 passes (`pass=35`), and the full browser suite reads `RESULT ALL PASS pass=3246 fail=0`,
 unchanged, as a deletion with no caller should.
+
+---
+
+## 366. README's deploy guidance and file tree disagree with the repository
+
+**Priority: LOW.** Documentation only.
+
+### What is wrong
+
+- **The Pages instruction does not exist.** "On the web" says: "GitHub Pages — publish the `web/`
+  folder (or set Pages to serve `/web`)." Pages serves a branch root, `/docs` or an Actions
+  artifact, not `/web`, and this site is not deployed that way. The repository root is served:
+  the root `CNAME` names `webfl.rwgs.net`, and the root `index.html` redirects into `web/`,
+  carrying the query (task 346). So everything in the repository is published too, including
+  `books/`, `java-engine/` and the task files. That may be intended, but it should be stated.
+- **The file tree omits `edition.js`.** The repository tree's `web/js/` list leaves it out,
+  although the module table below lists it.
+- **The DOM-free module list is short.** "The rules were deliberately split out of the renderer"
+  names `engine.js`, `combat.js`, `market.js`, `render-rules.js` and `render-gates.js`, and omits
+  `state.js` and `visit-state.js`, both in AGENTS.md's architecture invariant.
+
+### The fix
+
+- "On the web" now describes the deployment in use, checked against the repository's Pages
+  settings (`gh api repos/{owner}/{repo}/pages`: legacy build, `main`, path `/`, CNAME
+  `webfl.rwgs.net`) and the live site. The repository root is served behind Cloudflare, and the
+  root `index.html` forwards into `web/` with the query and hash. The whole repository is public
+  on the site (`books/books.ini` and `TASKS.md` answer 200), except underscore-prefixed files
+  such as `web/_test.html` (404), which Pages' Jekyll build drops because there is no
+  `.nojekyll`. A short note covers other hosts (publish `web/` as the root), and task 359's CDN
+  caveat sits beside it.
+- The file tree lists `edition.js`. A check that every `web/js/` filename appears between
+  "Repository layout" and "Running it" finds none missing.
+- The DOM-free list in "How it works" adds `state.js` and `visit-state.js`, matching AGENTS.md's
+  architecture invariant.
+- Re-checked for repeats: no other living document offers a Pages "serve `/web`" setting or
+  the short module list.
+
+Documentation only; no build or test change.
 
 ---

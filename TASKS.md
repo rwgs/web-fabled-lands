@@ -24,7 +24,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 366. README says to "set Pages to serve `/web`", which is not a Pages option and not how this site is deployed (root `CNAME` + root redirect); its file tree omits `edition.js`, and its DOM-free module list omits `state.js` and `visit-state.js`
 - [ ] 367. `ROADMAP.md`, `PLAN.md`, `SPEC.md` and three `docs/` pages restate the 4,369 shipped-section count `docs/Corpus-Census.md` owns, and `PLAN.md` carries a dated status sentence
 - [ ] 368. the Review log is nine-tenths of `TASKS.md`, mostly re-telling closed tasks whose detail is already archived — archive the older entries (owner's call)
 
@@ -401,6 +400,7 @@ this order.*
 - [x] 363. `walkEffectBody` dropped `<difficulty modifier=>` and never inferred `<random>` dice, and `groupFightRound` ignores `playerFirst=`, `<fightround>` and a `<fightdamage>` redirect — zero shipped sites, but the gate accepted every such shape; the walk now shares `difficultyModifier` with the page, the gate refuses the other shapes (`Test-HeadlessShapes`), and `suite-corpus` pins today's sites by name
 - [x] 364. `sanitizeData` kept a resurrection deal with no section (a phantom deal that loops the death prompt), and defaulted a missing deal or extra-choice `book` to `out.book` before `out.book` was assigned, so always to book 1; the position is now assigned first and a section-less deal dropped
 - [x] 365. `GameState.adjustStaminaMax` had no caller, and clamped to the written maximum that task 158 replaced with the effective one in its sibling; deleted
+- [x] 366. README said to "set Pages to serve `/web`", which is not a Pages option and not how this site is deployed (root `CNAME` + root redirect); its file tree omitted `edition.js`, and its DOM-free module list omitted `state.js` and `visit-state.js`; the deploy section now describes the root-served Pages site behind Cloudflare, and both lists are complete
 
 ---
 
@@ -439,41 +439,6 @@ owner's call.
 ### Validation
 
 - A pushed run is green in all three jobs, with no Node-20 deprecation annotation.
-
----
-
-## 366. README's deploy guidance and file tree disagree with the repository
-
-**Priority: LOW.** Documentation only.
-
-### What is wrong
-
-- **The Pages instruction does not exist.** "On the web" says: "GitHub Pages — publish the `web/`
-  folder (or set Pages to serve `/web`)." Pages serves a branch root, `/docs` or an Actions
-  artifact, not `/web`, and this site is not deployed that way. The repository root is served:
-  the root `CNAME` names `webfl.rwgs.net`, and the root `index.html` redirects into `web/`,
-  carrying the query (task 346). So everything in the repository is published too, including
-  `books/`, `java-engine/` and the task files. That may be intended, but it should be stated.
-- **The file tree omits `edition.js`.** The repository tree's `web/js/` list leaves it out,
-  although the module table below lists it.
-- **The DOM-free module list is short.** "The rules were deliberately split out of the renderer"
-  names `engine.js`, `combat.js`, `market.js`, `render-rules.js` and `render-gates.js`, and omits
-  `state.js` and `visit-state.js`, both in AGENTS.md's architecture invariant.
-
-### Steps
-
-1. Describe the deployment that is actually used (repository root on Pages, custom domain, CDN in
-   front), keep a short generic note for other hosts, and add the CDN caching caveat from
-   task 359.
-2. Add `edition.js` to the tree, and complete the DOM-free list.
-3. Re-check for repeats before closing, per AGENTS.md's "fix the claim everywhere". A search of
-   `docs/` on 2026-09-29 found neither the Pages instruction nor the short module list repeated
-   there.
-
-### Validation
-
-- README's deploy section no longer offers a Pages "serve /web" setting.
-- Every file in `web/js/` appears in README's tree.
 
 ---
 
@@ -545,6 +510,12 @@ file pays for history twice.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-29 (task 366): closed **366**, filed nothing. README's deploy section now
+describes the Pages site served from the repository root behind Cloudflare, checked against
+the Pages API and the live site. That includes what it publishes: everything except
+underscore-prefixed files, since there is no `.nojekyll`. The file tree and the DOM-free module
+list are complete. Documentation only.
 
 Worked 2026-09-29 (task 365): closed **365**, filed nothing. Deleted the dead
 `adjustStaminaMax`. `RESULT ALL PASS pass=3246 fail=0`, unchanged.

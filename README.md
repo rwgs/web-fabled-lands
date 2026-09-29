@@ -59,7 +59,7 @@ fabled-lands/
     ├── index.html
     ├── manifest.webmanifest, sw.js       PWA shell + offline service worker
     ├── css/style.css
-    ├── js/            app.js, data.js, state.js, rules.js, engine.js,
+    ├── js/            app.js, data.js, edition.js, state.js, rules.js, engine.js,
     │                  combat.js, market.js, render.js, render-rules.js, render-gates.js,
     │                  visit-state.js, render-util.js, render-rolls.js, render-rewards.js,
     │                  render-choices.js, render-combat.js, render-market.js, ui.js, tts.js,
@@ -96,15 +96,23 @@ python -m http.server 8848
 
 ### On the web (recommended for mobile/tablet)
 
-`web/` is a self-contained static site. Deploy it to any static host:
+`web/` is a self-contained static site, and it is all a player needs.
 
-- **GitHub Pages** — publish the `web/` folder (or set Pages to serve `/web`).
-- **Netlify / Cloudflare Pages / Vercel** — drag-and-drop or point at the `web/` directory.
+**How this site is deployed.** GitHub Pages serves the `main` branch from the **repository
+root** ("Deploy from a branch", `/`), under the custom domain in the root `CNAME`
+(`webfl.rwgs.net`), with Cloudflare in front. The root `index.html` redirects into `web/`,
+carrying the query string and hash, so the deep links below work from the bare domain. Serving
+the root means the whole repository is public on the site, `books/`, `java-engine/` and the task
+files included. The one exception is files whose names start with `_`, such as `web/_test.html`:
+there is no `.nojekyll`, so Pages' Jekyll build leaves them out.
 
-If a CDN sits in front, it must not serve `sw.js` from a long-lived cache (or the deploy must
-purge it), or players won't notice a new build until that cache expires. The service worker
-itself precaches each file at a build-unique `?v=` URL with `cache: 'reload'`, so it gets
-the new bytes, provided the CDN's cache key keeps the query string (Cloudflare's default).
+**Another host.** Publish the `web/` folder as the site root (Netlify, Cloudflare Pages and
+Vercel all take a directory), or publish the repository root as above.
+
+**A CDN in front** must not serve `sw.js` from a long-lived cache, or the deploy must purge it.
+Otherwise players won't notice a new build until that cache expires. The service worker
+itself precaches each file at a build-unique `?v=` URL with `cache: 'reload'`, so it gets the
+new bytes, provided the CDN's cache key keeps the query string (Cloudflare's default).
 
 Once loaded on a phone or tablet, use the browser's **“Add to Home Screen”** to install
 it as an app. Thanks to the service worker it then runs entirely offline; your saved
@@ -303,7 +311,7 @@ structure of the books is preserved exactly.
 
 The rules were deliberately split **out of the renderer**: `render.js` builds DOM and
 handles clicks, while all game logic lives in DOM-free modules (`engine.js`, `combat.js`,
-`market.js`, `render-rules.js`, `render-gates.js`). This keeps the rules unit-testable in isolation — `web/_test.html` exercises
+`market.js`, `state.js`, `render-rules.js`, `render-gates.js`, `visit-state.js`). This keeps the rules unit-testable in isolation — `web/_test.html` exercises
 combat, economy, rolls and effects directly, without touching the DOM.
 
 ### The rendering model
