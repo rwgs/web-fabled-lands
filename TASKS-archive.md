@@ -367,6 +367,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 356. AGENTS.md closes with generic boilerplate
 - [x] 357. The task workflow disagrees with `TASKS.md` about filing and closing
 - [x] 358. The archive's header and Contents stop at task 336
+- [x] 359. The service worker can install a stale or mixed shell under a new version key
 
 ---
 
@@ -17245,3 +17246,67 @@ or priority suffix their Contents line omits, as they always have). Full browser
 `RESULT ALL PASS pass=3223 fail=0`.
 
 ---
+
+## 359. The service worker can install a stale or mixed shell under a new version key
+
+**Priority: HIGH.** Nothing is known to have gone wrong yet, but every precondition is confirmed
+on the live host, and the failure is the worst this app can have: an installed game that is
+silently the wrong build, or that does not start offline at all, until the *next* deploy.
+
+### What is wrong
+
+`sw.js`'s `install` listener precaches with `cache.addAll(REQUIRED)` and `cache.add(url)` for
+`OPTIONAL`. Both issue requests in the default cache mode, so each can be answered by the
+browser's HTTP cache or by the CDN rather than by the deployed file. The site
+(`webfl.rwgs.net`, root `CNAME`) is Cloudflare in front of GitHub Pages. Measured 2026-09-29 with
+`curl -sI`:
+
+| URL | `Cache-Control` | `cf-cache-status` |
+|---|---|---|
+| `web/js/engine.js` | `max-age=14400` | `HIT` |
+| `web/js/version.js`, `web/sw.js` | `max-age=14400` | `MISS` |
+| `web/data/book1.json` | `max-age=600` | `DYNAMIC` |
+
+The browser re-fetches the worker *script* past its own cache, so a deploy is noticed. The new
+worker's precache, though, can be filled with the previous build's bytes for up to four hours,
+from either layer. Then:
+
+- **The new cache holds old files.** `FLCache.prune` in `sw-cache.js` deletes the previous cache,
+  because the new one "verifiably holds every required asset". It holds every URL, not the new
+  bytes, so the player runs the old build (or a mix of two) labelled with the new stamp until
+  another deploy.
+- **A mix of modules can fail at module link.** A new `app.js` importing an export a stale
+  `engine.js` lacks throws a `SyntaxError` before anything runs, and offline there is no network
+  fallback.
+- **`importScripts('./js/sw-cache.js')` has the same exposure** under the default
+  `updateViaCache: 'imports'`.
+
+No earlier task considered this: tasks 8, 64, 138, 179, 190 and 206 all assume `addAll` fetches
+the deployed bytes. `DECISIONS.md` records no-cache serving for the *test* server only.
+
+### The fix
+
+- `sw-cache.js` gained `FLCache.precache(cache, urls, version, fetchFn)` and
+  `FLCache.precacheOptional(…, onMiss)`. Each entry is fetched at `url + '?v=' + VERSION` with
+  `cache: 'reload'`, so neither the browser's cache nor the CDN can answer it, and is `put` under
+  the plain URL the app requests. `precache` fetches and checks every response before writing
+  any, so one non-`ok` response rejects the install with nothing stored; `precacheOptional`
+  reports a miss and never rejects.
+- `sw.js`'s `install` listener calls both instead of `cache.addAll`/`cache.add`.
+- `registerSW` in `app.js` registers with `updateViaCache: 'none'`, so the update check reads
+  neither `sw.js` nor its `importScripts('./js/sw-cache.js')` from the browser's cache.
+- `suite-economy`: task 190's assertion no longer pins `await cache.addAll(REQUIRED);`. A new
+  task-359 block drives both routines with an injected fetch and an in-memory cache (every
+  request carries the version and `cache: 'reload'`; every response is stored under the plain
+  URL; one `REQUIRED` 404 rejects with no writes; an `OPTIONAL` miss is reported and the rest
+  stored), and pins the `sw.js`/`app.js` source contract.
+- `README.md`'s deploy section says a CDN in front must not serve `sw.js` from a long-lived
+  cache (or the deploy must purge it), and that the `?v=` precache relies on the CDN's cache
+  key keeping the query string. Task 366 rewrites the rest of that section.
+
+Full browser suite `RESULT ALL PASS pass=3229 fail=0`. Still to do by hand after the next
+deploy: in an installed copy, check that the new cache's `js/version.js` matches the stamp in
+its cache key.
+
+---
+

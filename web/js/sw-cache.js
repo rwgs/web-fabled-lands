@@ -1,4 +1,5 @@
-// sw-cache.js - the Fabled Lands cache-namespace policy (task 190).
+// sw-cache.js - the Fabled Lands cache-namespace policy (task 190) and the
+// install-time precache (task 359).
 //
 // CacheStorage is shared per *origin*, not per service-worker scope, so any other
 // app hosted on this origin has its caches visible to us (and ours to it). Every
@@ -52,5 +53,33 @@ self.FLCache = (() => {
     return doomed;
   }
 
-  return { PREFIX, isFl, obsolete, match, prune };
+  // Precache past every cache layer between the worker and the deployed file (task 359).
+  // cache.addAll()/add() fetch in the default cache mode, so the browser's HTTP cache or
+  // the CDN in front of the site (Cloudflare, max-age=14400 on js/) could fill a new
+  // build's cache with the previous build's bytes. cache: 'reload' skips the browser's
+  // cache but not the CDN's, so each entry is also fetched at a build-unique URL -- and
+  // stored under the plain URL the app requests, because the precache URL is the key.
+  const fetchFresh = (fetchFn, url, version) =>
+    fetchFn(url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(version), { cache: 'reload' });
+
+  const fetchOk = async (fetchFn, url, version) => {
+    const res = await fetchFresh(fetchFn, url, version);
+    if (!res.ok) throw new TypeError('precache ' + url + ': HTTP ' + res.status);
+    return res;
+  };
+
+  // All-or-nothing, like the addAll() it replaces: every response is fetched and checked
+  // before anything is written, so one miss rejects (failing the install) with nothing put.
+  async function precache(cache, urls, version, fetchFn) {
+    const responses = await Promise.all(urls.map((url) => fetchOk(fetchFn, url, version)));
+    await Promise.all(urls.map((url, i) => cache.put(url, responses[i])));
+  }
+
+  // Best-effort: a miss is reported to onMiss and never rejects.
+  async function precacheOptional(cache, urls, version, fetchFn, onMiss) {
+    await Promise.all(urls.map((url) =>
+      fetchOk(fetchFn, url, version).then((res) => cache.put(url, res)).catch((e) => onMiss(url, e))));
+  }
+
+  return { PREFIX, isFl, obsolete, match, prune, precache, precacheOptional };
 })();

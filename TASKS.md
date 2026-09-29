@@ -16,7 +16,7 @@ there once the buckets below are clear.
 
 **HIGH**
 
-- [ ] 359. the service worker precaches through the browser's HTTP cache and the CDN (Cloudflare, `max-age=14400` on `web/js`), so a new build's cache can be filled with the previous build's files — a stale or mixed shell kept under the new version key until the next deploy
+*(none open — file new HIGH work here)*
 
 **MEDIUM**
 
@@ -400,78 +400,11 @@ this order.*
 - [x] 356. AGENTS.md's closing "Behavioral Guidelines" were generic, non-ASCII boilerplate that partly repeated the task workflow; now four ASCII bullets carrying each distinct rule once
 - [x] 357. AGENTS.md's step 4 filed new work "at the bottom of `TASKS.md`" where `TASKS.md` files it under a priority bucket and logs the pass, and no step said how a task is closed; the workflow now files and closes the way `TASKS.md` does
 - [x] 358. `TASKS-archive.md`'s header said "stable IDs 1–336" and its Contents list ended at 336 while the file held sections to 357, because the close never added a Contents line; the header and intro no longer state a range, 337–358 are listed, and AGENTS.md's close step names the Contents line
+- [x] 359. the service worker precached through the browser's HTTP cache and the CDN (Cloudflare, `max-age=14400` on `web/js`), so a new build's cache could be filled with the previous build's files — a stale or mixed shell kept under the new version key until the next deploy; `FLCache.precache` now fetches every entry at a build-unique `?v=` URL with `cache: 'reload'` and stores it under the plain URL, and the worker registers with `updateViaCache: 'none'`
 
 ---
 
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The open tasks' detail sections follow, in filed order; the Review log comes after them.
-
----
-
-## 359. The service worker can install a stale or mixed shell under a new version key
-
-**Priority: HIGH.** Nothing is known to have gone wrong yet, but every precondition is confirmed
-on the live host, and the failure is the worst this app can have: an installed game that is
-silently the wrong build, or that does not start offline at all, until the *next* deploy.
-
-### What is wrong
-
-`sw.js`'s `install` listener precaches with `cache.addAll(REQUIRED)` and `cache.add(url)` for
-`OPTIONAL`. Both issue requests in the default cache mode, so each can be answered by the
-browser's HTTP cache or by the CDN rather than by the deployed file. The site
-(`webfl.rwgs.net`, root `CNAME`) is Cloudflare in front of GitHub Pages. Measured 2026-09-29 with
-`curl -sI`:
-
-| URL | `Cache-Control` | `cf-cache-status` |
-|---|---|---|
-| `web/js/engine.js` | `max-age=14400` | `HIT` |
-| `web/js/version.js`, `web/sw.js` | `max-age=14400` | `MISS` |
-| `web/data/book1.json` | `max-age=600` | `DYNAMIC` |
-
-The browser re-fetches the worker *script* past its own cache, so a deploy is noticed. The new
-worker's precache, though, can be filled with the previous build's bytes for up to four hours,
-from either layer. Then:
-
-- **The new cache holds old files.** `FLCache.prune` in `sw-cache.js` deletes the previous cache,
-  because the new one "verifiably holds every required asset". It holds every URL, not the new
-  bytes, so the player runs the old build (or a mix of two) labelled with the new stamp until
-  another deploy.
-- **A mix of modules can fail at module link.** A new `app.js` importing an export a stale
-  `engine.js` lacks throws a `SyntaxError` before anything runs, and offline there is no network
-  fallback.
-- **`importScripts('./js/sw-cache.js')` has the same exposure** under the default
-  `updateViaCache: 'imports'`.
-
-No earlier task considered this: tasks 8, 64, 138, 179, 190 and 206 all assume `addAll` fetches
-the deployed bytes. `DECISIONS.md` records no-cache serving for the *test* server only.
-
-### Steps
-
-1. Precache with a request neither layer can answer from cache. `cache: 'reload'` is not enough
-   on its own, because it bypasses the browser's cache but not Cloudflare's. Fetch each entry at
-   a build-unique URL (for example `url + '?v=' + VERSION`, also with `cache: 'reload'`) and
-   `cache.put` the response under the plain URL the app requests, since the precache URL is the
-   cache key (see the `BOOK_ILLUS` note in `sw.js`).
-2. Keep `REQUIRED` all-or-nothing: fetch everything, reject the install if any response is not
-   `ok`, and only then write. Keep `OPTIONAL` best-effort, as it is now.
-3. Put the precache routine in `sw-cache.js` (for example `FLCache.precache(cache, urls, version,
-   fetchFn)`), so the suite can drive it with an injected fetch the way it already drives
-   `prune` and `match`.
-4. Register the worker with `updateViaCache: 'none'` (`registerSW` in `app.js`), so
-   `sw-cache.js` is not read from the browser's cache either.
-5. Replace the task-190 assertion in `suite-economy` that pins the literal
-   `await cache.addAll(REQUIRED);` with assertions on the new contract.
-6. In `README.md`'s deploy section (with task 366), say that a CDN in front must not serve
-   `sw.js` from a long-lived cache, or that the deploy purges it. Cloudflare's configuration is
-   outside the repository.
-
-### Validation
-
-- A `suite-economy` test drives the precache with a fake fetch. Every request carries the build's
-  version and `cache: 'reload'`, every response is stored under the plain URL, and one non-`ok`
-  `REQUIRED` response rejects without writing anything.
-- `RESULT ALL PASS`.
-- By hand after the next deploy: in an installed copy, the new cache's `js/version.js` matches
-  the stamp in its cache key.
 
 ---
 
@@ -786,6 +719,14 @@ file pays for history twice.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-29 (task 359): closed **359**, filed nothing. The install now precaches through
+`FLCache.precache`/`precacheOptional` in `sw-cache.js`, which fetch each entry at a build-unique
+`?v=` URL with `cache: 'reload'` and store it under the plain URL, so neither the browser's
+cache nor Cloudflare's edge can put the previous build's bytes into the new cache; the worker
+registers with `updateViaCache: 'none'`. `RESULT ALL PASS pass=3229 fail=0`. What remains is
+the by-hand check after the next deploy (an installed copy's `js/version.js` matches its cache
+key), which the suite cannot run.
 
 Reviewed 2026-09-29 (whole repository): filed **359–368**. The full write-up is in
 [`review-claude.md`](review-claude.md), which holds review text from this pass on. Baseline: the

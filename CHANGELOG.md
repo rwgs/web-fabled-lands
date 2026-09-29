@@ -12,6 +12,15 @@ below is the date a set of changes reached players. Nothing here requires the pl
 take any action: saves migrate on load, and the service worker replaces a cached build on
 its own.
 
+## 2026-09-29 - build 26.09.29.97b01bb
+
+- **An update now installs the build it says it is.** When the offline copy was refreshed, the
+  files could come from your browser's cache or the site's CDN, so an installed game could
+  run the previous build (or a mix of two, which may not start offline) under the new
+  version number until the next release. Every file is now fetched fresh.
+- **For maintainers deploying elsewhere:** if a CDN sits in front, don't let it serve `sw.js`
+  from a long-lived cache, and keep the query string in its cache key (see `README.md`).
+
 ## 2026-09-02 - build 26.09.02.dd4e67f
 
 - **A healer who promises to cure "poison or disease" now cures poison.** The three arrays

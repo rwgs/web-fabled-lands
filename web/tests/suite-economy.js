@@ -1482,10 +1482,70 @@ export async function run(ctx) {
       ok('task190: sw.js no longer calls the origin-global caches.match() or deletes non-fl- keys',
          !/caches\.match\(/.test(swSrc190) && !/caches\.delete\(/.test(swSrc190),
          (swSrc190.match(/caches\.(match|delete)\([^\n]*/) || ['(none)'])[0]);
-      ok('task190: sw-cache.js is precached and the required/optional install policy is unchanged',
-         /'\.\/js\/sw-cache\.js',/.test(swSrc190)
-         && /await cache\.addAll\(REQUIRED\);/.test(swSrc190)
-         && /OPTIONAL\.map\(\(url\) => cache\.add\(url\)\.catch\(/.test(swSrc190));
+      // (The install paths this also pinned moved to FLCache.precache — task 359 below.)
+      ok('task190: sw-cache.js is precached',
+         /'\.\/js\/sw-cache\.js',/.test(swSrc190));
+    }
+
+    // --- task 359: the precache must fetch past the browser's HTTP cache and the CDN ---
+    // addAll()/add() fetched in the default cache mode, so the browser's HTTP cache or the CDN
+    // (Cloudflare, max-age=14400 on js/) could fill a new build's cache with the previous
+    // build's bytes, which prune() then treated as complete. FLCache.precache fetches each
+    // entry with cache: 'reload' at a build-unique URL and stores it under the plain URL.
+    // Driven with an injected fetch and an in-memory cache (live CacheStorage I/O hangs
+    // under headless Chrome, task 138).
+    { // block-scoped
+      await import('../js/sw-cache.js');
+      const FLCache = self.FLCache;
+      const fakeCache = () => {
+        const puts = [];
+        return { puts, async put(url, res) { puts.push([url, await res.text()]); } };
+      };
+      const fakeFetch = (missing = []) => {
+        const calls = [];
+        const fn = async (url, init) => {
+          calls.push({ url, init });
+          const plain = url.replace(/[?&]v=[^&]*$/, '');
+          return missing.includes(plain) ? new Response('nope', { status: 404 }) : new Response('BODY ' + plain);
+        };
+        return { calls, fn };
+      };
+      const urls = ['./', './js/app.js', './data/book1.json'];
+
+      const okCache = fakeCache(), okFetch = fakeFetch();
+      await FLCache.precache(okCache, urls, 'fl-26.09.29.abc', okFetch.fn);
+      ok('task359: every precache request carries the build version and cache: reload',
+         okFetch.calls.length === 3
+         && okFetch.calls.every((c) => c.init && c.init.cache === 'reload')
+         && JSON.stringify(okFetch.calls.map((c) => c.url)) === JSON.stringify(urls.map((u) => u + '?v=fl-26.09.29.abc')),
+         JSON.stringify(okFetch.calls));
+      ok('task359: every response is stored under the plain URL the app requests',
+         JSON.stringify(okCache.puts) === JSON.stringify(urls.map((u) => [u, 'BODY ' + u])),
+         JSON.stringify(okCache.puts));
+
+      const badCache = fakeCache();
+      let rejected = false;
+      try { await FLCache.precache(badCache, urls, 'fl-x', fakeFetch(['./js/app.js']).fn); } catch (e) { rejected = true; }
+      ok('task359: one non-ok REQUIRED response rejects the precache without writing anything',
+         rejected && badCache.puts.length === 0, 'rejected=' + rejected + ' puts=' + badCache.puts.length);
+
+      const optCache = fakeCache(), misses = [];
+      await FLCache.precacheOptional(optCache, urls, 'fl-x', fakeFetch(['./js/app.js']).fn, (url) => misses.push(url));
+      ok('task359: an OPTIONAL miss is reported, never rejects, and the rest are still stored',
+         JSON.stringify(misses) === '["./js/app.js"]'
+         && JSON.stringify(optCache.puts.map((p) => p[0])) === '["./","./data/book1.json"]',
+         JSON.stringify(misses) + ' ' + JSON.stringify(optCache.puts));
+
+      // Source contract: the worker installs through the routine, and the page registers it
+      // so sw.js and its importScripts are not read from the browser's cache either.
+      const swSrc359 = await (await fetch('./sw.js')).text();
+      const appSrc359 = await (await fetch('./js/app.js')).text();
+      ok('task359: sw.js installs REQUIRED and OPTIONAL through FLCache, not addAll/add',
+         /await FLCache\.precache\(cache, REQUIRED, VERSION, /.test(swSrc359)
+         && /await FLCache\.precacheOptional\(cache, OPTIONAL, VERSION, /.test(swSrc359)
+         && !/cache\.add(All)?\(/.test(swSrc359));
+      ok('task359: the worker is registered with updateViaCache: none',
+         /serviceWorker\.register\('sw\.js', \{ updateViaCache: 'none' \}\)/.test(appSrc359));
     }
 
     // --- task 206: REQUIRED must list every module the app actually loads ---
@@ -1510,7 +1570,7 @@ export async function run(ctx) {
       ok('task206: the entry points are index.html\'s module script and sw.js\'s importScripts',
          entryScript === 'js/app.js' && swImport === './js/sw-cache.js', `${entryScript} | ${swImport}`);
 
-      // REQUIRED only, never OPTIONAL: addAll is all-or-nothing over that array and prune()
+      // REQUIRED only, never OPTIONAL: precache is all-or-nothing over that array and prune()
       // judges completeness against it.
       const reqBlock = (swSrc206.match(/const REQUIRED = \[([\s\S]*?)\];/) || [])[1] || '';
       const required = [...reqBlock.matchAll(/'([^']+)'/g)].map((m) => m[1]);

@@ -158,7 +158,9 @@ function registerSW() {
   if (navigator.serviceWorker.controller) {
     navigator.serviceWorker.addEventListener('controllerchange', () => swUpdateGate.apply());
   }
-  navigator.serviceWorker.register('sw.js').then((reg) => {
+  // updateViaCache 'none': the update check reads neither sw.js nor its
+  // importScripts('./js/sw-cache.js') from the browser's HTTP cache (task 359).
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
     reg.addEventListener('updatefound', () => {
       const nw = reg.installing;
       if (!nw) return;

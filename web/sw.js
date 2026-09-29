@@ -8,7 +8,7 @@
 // lives in one dependency-free file so the tests can drive it directly. (task 190)
 importScripts('./js/sw-cache.js');
 
-const VERSION = 'fl-26.09.02.f307e30';
+const VERSION = 'fl-26.09.29.97b01bb';
 
 // The published edition's data, maps and section illustrations. GENERATED from
 // books/books.ini's Published= line by build/build-data.ps1 — do not hand-edit.
@@ -44,8 +44,8 @@ const BOOK_ILLUS = [
 
 // REQUIRED = the app shell + all book data. Without every one of these the game
 // can't run offline, so the install must FAIL (and the previous complete cache
-// must be kept) if any of them can't be fetched. addAll() is all-or-nothing: it
-// rejects if any single request fails.
+// must be kept) if any of them can't be fetched. FLCache.precache() is
+// all-or-nothing: it rejects, having written nothing, if any single request fails.
 const REQUIRED = [
   './',
   './index.html',
@@ -95,11 +95,14 @@ const OPTIONAL = [
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(VERSION);
-    // All-or-nothing: if any required asset fails, addAll rejects, the install
+    // Every entry is fetched past the browser's HTTP cache and the CDN, so the new
+    // cache holds this build's bytes, not the previous build's. (task 359)
+    const fetchFn = (url, init) => fetch(url, init);
+    // All-or-nothing: if any required asset fails, precache rejects, the install
     // fails, and we never activate an incomplete shell (the old cache lives on).
-    await cache.addAll(REQUIRED);
+    await FLCache.precache(cache, REQUIRED, VERSION, fetchFn);
     // Best-effort for the big optional assets — a miss must not fail the install.
-    await Promise.all(OPTIONAL.map((url) => cache.add(url).catch((e) => console.warn('optional precache miss', url, e))));
+    await FLCache.precacheOptional(cache, OPTIONAL, VERSION, fetchFn, (url, e) => console.warn('optional precache miss', url, e));
     await self.skipWaiting();
   })());
 });

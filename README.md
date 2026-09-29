@@ -101,6 +101,11 @@ python -m http.server 8848
 - **GitHub Pages** — publish the `web/` folder (or set Pages to serve `/web`).
 - **Netlify / Cloudflare Pages / Vercel** — drag-and-drop or point at the `web/` directory.
 
+If a CDN sits in front, it must not serve `sw.js` from a long-lived cache (or the deploy must
+purge it), or players won't notice a new build until that cache expires. The service worker
+itself precaches each file at a build-unique `?v=` URL with `cache: 'reload'`, so it gets
+the new bytes, provided the CDN's cache key keeps the query string (Cloudflare's default).
+
 Once loaded on a phone or tablet, use the browser's **“Add to Home Screen”** to install
 it as an app. Thanks to the service worker it then runs entirely offline; your saved
 games live in that browser.
