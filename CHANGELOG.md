@@ -12,7 +12,7 @@ below is the date a set of changes reached players. Nothing here requires the pl
 take any action: saves migrate on load, and the service worker replaces a cached build on
 its own.
 
-## 2026-09-29 - build 26.09.29.d80d7d7
+## 2026-09-29 - build 26.09.29.6b57fe7
 
 - **The 💾 button no longer throws away a preview.** On a `?demo=` link it went straight to
   the title screen as if it had saved, and the preview was gone. It now keeps the adventure
