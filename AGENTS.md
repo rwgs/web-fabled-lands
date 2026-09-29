@@ -217,7 +217,7 @@ reconciles the checklist against the detail headings must match all three marker
 matching only `- [x]` drops the withdrawn rows and reports them as missing, which is
 how two separate passes (tasks 274 and 326) both mis-measured task 207.
 1. Take the **first open (`- [ ]`) task** in `TASKS.md` — search for `- [ ]` rather than
-   reading the file whole; most of it is the Review log. **If none is open**, the next work is
+   reading the file whole; most of it is the Done list. **If none is open**, the next work is
    the first unfinished phase of `ROADMAP.md`, planned in `PLAN.md` where that file covers
    the phase — as `TASKS.md`'s own header says.
 2. Follow its steps exactly — each task is self-contained. Don't skip steps and
