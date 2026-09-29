@@ -430,6 +430,12 @@ default on 2026-06-16 and removed Node 20 on 2026-09-23. Node 20 itself reached 
    `node web/tests/node-import.mjs` under it locally.
 3. Record the chosen versions in the workflow comment beside the `rules-import` job.
 
+**Status 2026-09-29:** steps 1–3 are done. Both actions are on `@v7`, whose `action.yml` runs
+on `node24` (checkout v7.0.1 and setup-node v7.0.0 are the latest releases, and their notes
+list nothing this workflow relies on), and `node-version` is `'24'`. `node web/tests/node-import.mjs` passes
+under local Node 24.21. The task stays open until a pushed run validates it: pushing is the
+owner's call.
+
 ### Validation
 
 - A pushed run is green in all three jobs, with no Node-20 deprecation annotation.

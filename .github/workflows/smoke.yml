@@ -20,7 +20,7 @@ jobs:
   build-scripts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build scripts stay ASCII-only and pin pwsh 7
         run: |
           set -euo pipefail
@@ -59,13 +59,17 @@ jobs:
   # Node; a single stray import of a browser-touching module breaks that without failing the
   # browser suite, which has a DOM either way. Runs on Node's stdlib only — no npm install,
   # no DOM shim (a shim here would hide exactly what is being checked).
+  # Versions (task 361): GitHub removed Node 20 from its runners on 2026-09-23, so every job
+  # uses actions/checkout@v7 and this one actions/setup-node@v7 (both run on node24), and the
+  # modules are imported under Node 24, the LTS line in support. Bump these when a major
+  # moves off the runners' runtime.
   rules-import:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
       - name: Rule modules import cleanly in Node (no DOM)
         run: node web/tests/node-import.mjs
 
@@ -87,7 +91,7 @@ jobs:
     # day. (run-tests.ps1 bounds its own launch with -BrowserTimeoutSeconds.)
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Also stamps web/js/version.js and web/sw.js's cache key (it calls stamp-version.ps1).
       # Aborts here, naming the file, if any source XML is malformed or its <section name>
