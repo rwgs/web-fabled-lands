@@ -543,6 +543,22 @@ export async function run(ctx) {
     ok('sanitize: GameState from junk has clean items', gdirty.itemCount() === 1 && gdirty.data.items[0].name === 'sword');
     ok('sanitize: derived stats compute without throwing', Number.isFinite(gdirty.defence()) && Number.isFinite(gdirty.ability('combat')));
 
+    // --- task 364: resurrection deals and extra choices, from an untrusted save ---
+    // A deal naming no section reached nowhere on death, was refunded and offered again; and a
+    // missing `book` defaulted to out.book before out.book was assigned, so always to book 1.
+    const res364 = sanitizeData({ abilities: { combat: 5 }, stamina: 9, book: 5, section: '100',
+      resurrections: [{}, 1, { section: '  ' }, { section: '640', text: 'Temple' }, { book: 2, section: '12' }],
+      extraChoices: [{ section: '77', text: 'Back' }] });
+    ok('task364: a resurrection deal with no section is dropped',
+       res364.resurrections.length === 2 && res364.resurrections.every((r) => r.section),
+       JSON.stringify(res364.resurrections));
+    ok('task364: a deal missing book= takes the save\'s own book, not book 1',
+       res364.resurrections[0].book === 5 && res364.resurrections[0].section === '640', JSON.stringify(res364.resurrections[0]));
+    ok('task364: a deal that names its book keeps it', res364.resurrections[1].book === 2);
+    ok('task364: an extra choice missing book= takes the save\'s own book too',
+       res364.extraChoices.length === 1 && res364.extraChoices[0].book === 5, JSON.stringify(res364.extraChoices));
+    ok('task364: the save\'s position itself is unchanged by the reorder', res364.book === 5 && res364.section === '100');
+
     // importSave rejects non-save shapes (array, missing abilities object)
     let arrThrew = false; try { importSave([1,2,3]); } catch { arrThrew = true; }
     ok('import rejects a JSON array', arrThrew === true);

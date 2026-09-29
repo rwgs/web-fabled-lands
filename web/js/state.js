@@ -1604,10 +1604,18 @@ export function sanitizeData(raw) {
   out.location = d.location == null || d.location === '' ? null : asStr(d.location);
   // Keep the sailing-ship pointer only if it names a ship that is actually at large. (task 81)
   out.sailingShipId = (d.sailingShipId != null && out.ships.some((s) => s.id === asStr(d.sailingShipId) && s.docked == null)) ? asStr(d.sailingShipId) : null;
+  // The save's own position, assigned before the two lists below that default a missing
+  // `book` to it — read any later, out.book was still freshData()'s 1. (task 364)
+  out.book = asNum(d.book, base.book, { min: 1, int: true });
+  out.section = d.section == null ? null : asStr(d.section);
+  // A deal naming no section is dropped, as sanitizeRetry drops a target without one: kept, it
+  // was offered on death, reached nowhere, was refunded and offered again. (task 364)
   out.resurrections = asArr(d.resurrections).map((r) => {
     const o = asObj(r);
-    return { book: asNum(o.book, out.book, { min: 1, int: true }), section: o.section == null ? null : asStr(o.section), text: asStr(o.text), god: o.god == null ? null : asStr(o.god), supplemental: asBool(o.supplemental) };
-  });
+    const section = o.section == null ? '' : asStr(o.section).trim();
+    if (!section) return null;
+    return { book: asNum(o.book, out.book, { min: 1, int: true }), section, text: asStr(o.text), god: o.god == null ? null : asStr(o.god), supplemental: asBool(o.supplemental) };
+  }).filter(Boolean);
   out.abilityFlags = {};
   for (const [k, v] of Object.entries(asObj(d.abilityFlags))) { const o = asObj(v); const f = {}; if (o.fixed) f.fixed = true; if (o.cursed) f.cursed = true; if (Object.keys(f).length) out.abilityFlags[k] = f; }
 
@@ -1643,8 +1651,6 @@ export function sanitizeData(raw) {
     return { name, once: asBool(o.once), body: asStr(o.body) || null };
   }).filter(Boolean);
 
-  out.book = asNum(d.book, base.book, { min: 1, int: true });
-  out.section = d.section == null ? null : asStr(d.section);
   // The current-visit execution record (task 116). Kept only when it names the current
   // section — the renderer re-checks this on load and resume() is wrapped in a fallback,
   // so the deep contents pass through largely verbatim (they are our own serialised memo).

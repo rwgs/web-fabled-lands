@@ -24,7 +24,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 364. `sanitizeData` keeps a resurrection deal with no section (a phantom deal that loops the death prompt), and defaults a missing deal or extra-choice `book` to `out.book` before `out.book` is assigned, so always to book 1
 - [ ] 365. `GameState.adjustStaminaMax` has no caller, and clamps to the written maximum that task 158 replaced with the effective one in its sibling
 - [ ] 366. README says to "set Pages to serve `/web`", which is not a Pages option and not how this site is deployed (root `CNAME` + root redirect); its file tree omits `edition.js`, and its DOM-free module list omits `state.js` and `visit-state.js`
 - [ ] 367. `ROADMAP.md`, `PLAN.md`, `SPEC.md` and three `docs/` pages restate the 4,369 shipped-section count `docs/Corpus-Census.md` owns, and `PLAN.md` carries a dated status sentence
@@ -401,6 +400,7 @@ this order.*
 - [x] 360. the header's 💾 "Save & quit to title" called `state.save(true)`, which returns true for an ephemeral `?demo=` preview without writing, so the preview was discarded while the button said it saved; the header and the menu now share `saveOrKeep`, which keeps a preview (labelled "Keep this adventure") and only saves-and-quits a real slot
 - [x] 362. the source gate folded case on tag and attribute names (`FL_TAG_ATTRS` was a plain `@{}`, the root check `-ne`, the attribute check `-notcontains`), so a mis-cased camelCase attribute validated and was then ignored by the exact-case engine; `books/book3/207.xml` shipped `<SECTION>`/`<P>`. The name tables are ordinal dictionaries, the checks `-cne`/`-cnotcontains`, §3.207 is lower-cased, and three selftest fixtures pin it
 - [x] 363. `walkEffectBody` dropped `<difficulty modifier=>` and never inferred `<random>` dice, and `groupFightRound` ignores `playerFirst=`, `<fightround>` and a `<fightdamage>` redirect — zero shipped sites, but the gate accepted every such shape; the walk now shares `difficultyModifier` with the page, the gate refuses the other shapes (`Test-HeadlessShapes`), and `suite-corpus` pins today's sites by name
+- [x] 364. `sanitizeData` kept a resurrection deal with no section (a phantom deal that loops the death prompt), and defaulted a missing deal or extra-choice `book` to `out.book` before `out.book` was assigned, so always to book 1; the position is now assigned first and a section-less deal dropped
 
 ---
 
@@ -439,38 +439,6 @@ owner's call.
 ### Validation
 
 - A pushed run is green in all three jobs, with no Node-20 deprecation annotation.
-
----
-
-## 364. `sanitizeData` keeps malformed resurrection deals and defaults their book to 1
-
-**Priority: LOW.** Only a hand-edited or imported save reaches it, but a loaded save is exactly
-what `sanitizeData` exists to distrust ("wrong array/object shapes must never reach rendering").
-
-### What is wrong
-
-- **Phantom deals.** `sanitizeData` maps `d.resurrections` without dropping anything, so an
-  imported `[{}]` or `[1]` becomes a deal with `section: null`. On death, `handleDeath` offers
-  "Use resurrection". The move reaches no section, the transaction refunds the deal, and the
-  death prompt returns with the same phantom deal offered again.
-- **The book default is always 1.** The `resurrections` and `extraChoices` entries default a
-  missing `book` to `out.book`, but `out.book` is assigned further down the function. At that
-  point it is still `freshData()`'s `1`.
-
-`sanitizeRetry` already shows the intended shape: drop an entry that names no positive-integer
-book and non-empty section.
-
-### Steps
-
-1. Drop a resurrection whose section is missing or blank.
-2. Assign `out.book` and `out.section` before the lists that default to them.
-3. Add an import test (the suite that owns import hardening): a `[{}]` deal is dropped, and a
-   deal missing `book` takes the save's book.
-
-### Validation
-
-- The new tests fail on the current code and pass after the fix.
-- `RESULT ALL PASS`.
 
 ---
 
@@ -601,6 +569,11 @@ file pays for history twice.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-29 (task 364): closed **364**, filed nothing. `sanitizeData` assigns the save's
+book and section before the lists that default to them, and drops a resurrection deal naming
+no section. Four of the five new import tests fail on the old code.
+`RESULT ALL PASS pass=3246 fail=0`.
 
 Worked 2026-09-29 (task 363): closed **363**, filed nothing. A `<difficulty>` in an effect body
 now reads `modifier=` through `engine.js`'s `difficultyModifier`, the rule the page widget

@@ -371,6 +371,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 360. The header's "Save & quit" discards a `?demo=` preview while saying it saved
 - [x] 362. The source gate folds case on tag and attribute names
 - [x] 363. Two engine paths ignore attributes the corpus has not used yet, and nothing pins that
+- [x] 364. `sanitizeData` keeps malformed resurrection deals and defaults their book to 1
 
 ---
 
@@ -17442,5 +17443,39 @@ their sections hold no `<fightround>` or `<fightdamage>`.
 The dice-less `<random>` gap was closed at the gate rather than by teaching `walkEffectBody` to
 infer dice, which is the step the task prescribed: the walk has no section to look in, and no
 shipped site needs it. Full browser suite `RESULT ALL PASS pass=3241 fail=0`.
+
+---
+
+## 364. `sanitizeData` keeps malformed resurrection deals and defaults their book to 1
+
+**Priority: LOW.** Only a hand-edited or imported save reaches it, but a loaded save is exactly
+what `sanitizeData` exists to distrust ("wrong array/object shapes must never reach rendering").
+
+### What is wrong
+
+- **Phantom deals.** `sanitizeData` maps `d.resurrections` without dropping anything, so an
+  imported `[{}]` or `[1]` becomes a deal with `section: null`. On death, `handleDeath` offers
+  "Use resurrection". The move reaches no section, the transaction refunds the deal, and the
+  death prompt returns with the same phantom deal offered again.
+- **The book default is always 1.** The `resurrections` and `extraChoices` entries default a
+  missing `book` to `out.book`, but `out.book` is assigned further down the function. At that
+  point it is still `freshData()`'s `1`.
+
+`sanitizeRetry` already shows the intended shape: drop an entry that names no positive-integer
+book and non-empty section.
+
+### The fix
+
+- `sanitizeData` in `state.js` now assigns `out.book` and `out.section` before
+  `out.resurrections` and `out.extraChoices`, so a missing `book` in either takes the save's
+  own book. `out.visit` still reads them after, unchanged.
+- A resurrection deal whose section is missing or blank is dropped, the way `sanitizeRetry`
+  drops a target without one.
+- `suite-economy`, beside task 6's sanitize block: `{}`, `1` and a blank-section deal are dropped,
+  a deal and an extra choice missing `book=` take the save's book 5, a deal naming book 2 keeps
+  it, and the save's own position is unchanged. Against the old `state.js`, four of the five
+  fail (`-Suite economy`: `pass=701 fail=4`); the position check is the control.
+
+Full browser suite `RESULT ALL PASS pass=3246 fail=0`.
 
 ---
