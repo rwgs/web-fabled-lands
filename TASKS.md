@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-368 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
+369 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
 the buckets below are open, and **all others are complete**. File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -20,11 +20,12 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 361. `smoke.yml` pins `actions/checkout@v4`, `actions/setup-node@v4` and `node-version: '20'`; GitHub removed Node 20 from its runners on 2026-09-23, and no run has happened since
+*(none open — file new MEDIUM work here)*
 
 **LOW**
 
 - [ ] 368. the Review log is nine-tenths of `TASKS.md`, mostly re-telling closed tasks whose detail is already archived — archive the older entries (owner's call)
+- [ ] 369. `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19 (CI notice); the `smoke` and `build-scripts` jobs rely on the image's preinstalled `pwsh` 7, `google-chrome` and `python3`, so the move could stop CI with no change here
 
 **Done**
 
@@ -401,44 +402,11 @@ this order.*
 - [x] 365. `GameState.adjustStaminaMax` had no caller, and clamped to the written maximum that task 158 replaced with the effective one in its sibling; deleted
 - [x] 366. README said to "set Pages to serve `/web`", which is not a Pages option and not how this site is deployed (root `CNAME` + root redirect); its file tree omitted `edition.js`, and its DOM-free module list omitted `state.js` and `visit-state.js`; the deploy section now describes the root-served Pages site behind Cloudflare, and both lists are complete
 - [x] 367. `ROADMAP.md`, `PLAN.md`, `SPEC.md` and three `docs/` pages restated the 4,369 shipped-section count `docs/Corpus-Census.md` owns, and `PLAN.md` carried a dated status sentence; each now points at the owner (which gained its per-book command), and two stale 3,032 pass counts found by the same sweep were retired too
+- [x] 361. `smoke.yml` pinned `actions/checkout@v4`, `actions/setup-node@v4` and `node-version: '20'`; GitHub removed Node 20 from its runners on 2026-09-23; now `@v7`/`@v7`/Node 24, and the first pushed run was green in all three jobs
 
 ---
 
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The open tasks' detail sections follow, in filed order; the Review log comes after them.
-
----
-
-## 361. CI pins the Node 20 runtime GitHub removed on 2026-09-23
-
-**Priority: MEDIUM.** CI is the drift gate (a stale bundle, a non-ASCII build script, a
-browser-touching rule import). If it cannot start, all of those merge unchecked.
-
-### What is wrong
-
-`.github/workflows/smoke.yml` uses `actions/checkout@v4` in all three jobs and
-`actions/setup-node@v4` with `node-version: '20'` in `rules-import`. GitHub's changelog
-"Deprecation of Node 20 on GitHub Actions runners" (2025-09-19) moved runners to Node 24 by
-default on 2026-06-16 and removed Node 20 on 2026-09-23. Node 20 itself reached end of life on
-2026-04-30. The last CI run was 2026-09-03 and passed. `main` is 8 commits ahead of
-`origin/main`, so the next push is the first run on runners without Node 20.
-
-### Steps
-
-1. Bump `actions/checkout` and `actions/setup-node` to their current majors that run on Node 24.
-   Read each action's releases page; don't guess the number.
-2. Set `node-version` to an LTS line still in support (22 or 24), and run
-   `node web/tests/node-import.mjs` under it locally.
-3. Record the chosen versions in the workflow comment beside the `rules-import` job.
-
-**Status 2026-09-29:** steps 1–3 are done. Both actions are on `@v7`, whose `action.yml` runs
-on `node24` (checkout v7.0.1 and setup-node v7.0.0 are the latest releases, and their notes
-list nothing this workflow relies on), and `node-version` is `'24'`. `node web/tests/node-import.mjs` passes
-under local Node 24.21. The task stays open until a pushed run validates it: pushing is the
-owner's call.
-
-### Validation
-
-- A pushed run is green in all three jobs, with no Node-20 deprecation annotation.
 
 ---
 
@@ -470,11 +438,50 @@ file pays for history twice.
 
 ---
 
+## 369. CI's `ubuntu-latest` image moves to Ubuntu 26 on 2026-10-19
+
+**Priority: LOW.** Nothing is broken. But the move lands without any change to this repository,
+and CI is the drift gate (task 361).
+
+### What is wrong
+
+Run 36564906180 (the first run after task 361, green in all three jobs) carries one notice
+annotation per job: "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19,
+2026" (actions/runner-images issue 14748). Every job in `.github/workflows/smoke.yml` is
+`runs-on: ubuntu-latest`, and the workflow leans on what that image preinstalls:
+
+- `pwsh` 7, for every `shell: pwsh` step and `build-data.ps1`;
+- `google-chrome`, called by name in the `smoke` job;
+- `python3`, for the `http.server` the suite is served from.
+
+If the Ubuntu 26 image drops or renames any of them, CI stops on the next push with an
+environment error, not a code one.
+
+### Steps
+
+1. Read the runner-images issue and the Ubuntu 26 image's software list, and check each of the
+   three tools above.
+2. Either confirm all three are present (and leave `ubuntu-latest`), or pin `runs-on:
+   ubuntu-24.04` with a comment naming the missing tool, or install it in the job.
+3. Record the decision in the workflow comment beside the `smoke` job.
+
+### Validation
+
+- A pushed run on or after 2026-10-19 is green in all three jobs.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-29 (task 361): closed **361**, filed **369**. The owner pushed. Run 36564906180
+on `19ef915` was green in all three jobs on `actions/checkout@v7`, `actions/setup-node@v7`
+and Node 24, with no Node 20 deprecation annotation. Its one notice, that `ubuntu-latest`
+moves to Ubuntu 26 from 2026-10-19, is filed as 369, because the jobs depend on that image's
+preinstalled `pwsh`, `google-chrome` and `python3`.
 
 Worked 2026-09-29 (task 367): closed **367**, filed nothing. The six copies of the shipped
 section count now point at `docs/Corpus-Census.md`, which owns the per-book counts and now

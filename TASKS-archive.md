@@ -369,6 +369,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 358. The archive's header and Contents stop at task 336
 - [x] 359. The service worker can install a stale or mixed shell under a new version key
 - [x] 360. The header's "Save & quit" discards a `?demo=` preview while saying it saved
+- [x] 361. CI pins the Node 20 runtime GitHub removed on 2026-09-23
 - [x] 362. The source gate folds case on tag and attribute names
 - [x] 363. Two engine paths ignore attributes the corpus has not used yet, and nothing pins that
 - [x] 364. `sanitizeData` keeps malformed resurrection deals and defaults their book to 1
@@ -17585,5 +17586,34 @@ warns about. `CHANGELOG.md` and `REVIEW.md` are dated records and are exempt.
 
 Validation: `grep -rn "4,369" --include=*.md . | grep -v "TASKS\|CHANGELOG\|REVIEW\|review-claude"`
 lists `docs/Corpus-Census.md` only. Documentation only; no build or test change.
+
+---
+
+## 361. CI pins the Node 20 runtime GitHub removed on 2026-09-23
+
+**Priority: MEDIUM.** CI is the drift gate (a stale bundle, a non-ASCII build script, a
+browser-touching rule import). If it cannot start, all of those merge unchecked.
+
+### What is wrong
+
+`.github/workflows/smoke.yml` uses `actions/checkout@v4` in all three jobs and
+`actions/setup-node@v4` with `node-version: '20'` in `rules-import`. GitHub's changelog
+"Deprecation of Node 20 on GitHub Actions runners" (2025-09-19) moved runners to Node 24 by
+default on 2026-06-16 and removed Node 20 on 2026-09-23. Node 20 itself reached end of life on
+2026-04-30. The last CI run was 2026-09-03 and passed. `main` is 8 commits ahead of
+`origin/main`, so the next push is the first run on runners without Node 20.
+
+### The fix
+
+- `.github/workflows/smoke.yml`: `actions/checkout@v4` became `@v7` in all three jobs, and
+  `actions/setup-node@v4` with `node-version: '20'` became `@v7` with `'24'`. The versions came
+  from each action's releases (checkout v7.0.1 and setup-node v7.0.0 are the latest), and both
+  `action.yml` files at `v7` declare `using: node24`. Neither release's notes change anything
+  this workflow relies on. A comment beside `rules-import` records the choice and why.
+- `node web/tests/node-import.mjs` passed locally under Node 24.21 (`pass=35`).
+- The owner pushed. Run 36564906180 on `19ef915` concluded **success** in all three jobs
+  (`rules-import`, `build-scripts`, `smoke`), with no Node 20 deprecation annotation. Its only
+  annotation is a notice that `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19, which I
+  filed as task 369.
 
 ---
