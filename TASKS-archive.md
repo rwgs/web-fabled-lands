@@ -370,6 +370,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 359. The service worker can install a stale or mixed shell under a new version key
 - [x] 360. The header's "Save & quit" discards a `?demo=` preview while saying it saved
 - [x] 362. The source gate folds case on tag and attribute names
+- [x] 363. Two engine paths ignore attributes the corpus has not used yet, and nothing pins that
 
 ---
 
@@ -17396,5 +17397,50 @@ explains that the gate lets it through.
 - AGENTS.md's ordinal-dictionary rule now also names `-ne`/`-notcontains` on names.
 
 Full browser suite `RESULT ALL PASS pass=3235 fail=0`.
+
+---
+
+## 363. Two engine paths ignore attributes the corpus has not used yet, and nothing pins that
+
+**Priority: LOW.** No shipped site is affected. The risk is a future node that validates cleanly
+and then behaves differently in a headless body than it would on the page.
+
+### What is wrong
+
+- **The headless effect-body walk.** `walkEffectBody` in `engine.js` runs `<fightdamage>`,
+  `<fightround>`, `<flee>`, item Use effects and `<bookchange>`. It calls `rollDifficulty` with no
+  mode and ignores a numeric `modifier=`, where `renderDifficulty` honours all six mode words and
+  the addend. It also rolls a `<random>` with no `dice=` on 2 dice, where `renderRandom` infers
+  1 die from a following 1–6 outcomes table (`inferDice`).
+- **Group fights.** `groupFightRound` in `combat.js` ignores `playerFirst=`, never runs a
+  `<fightround>`, and keeps enemies striking after a `<fightdamage>` has recorded
+  `fight.roundGoto`. `fightRound` handles all three.
+
+Census, 2026-09-29. Eight roll nodes sit inside an effect body: book2/770, book5/24, 356, 383,
+489, 565, 631 and 689. All carry `dice=` where they need it, and none carries `modifier=`. The
+four group fights (book6/192, 273, 291, 618) carry only `combat defence group name stamina`, and
+their sections hold no `<fightround>` or `<fightdamage>`.
+
+### The fix
+
+- `engine.js`: `DIFFICULTY_MODES` and `difficultyModifier(state, raw)` hold the `modifier=`
+  rule (one of six mode words, else a numeric/var addend) that `renderDifficulty` used to hold
+  inline. `walkEffectBody` now rolls a `<difficulty>` with that mode and addend, and
+  `renderDifficulty` reads the same function, so a body roll resolves as the page's would.
+- `validate-source.ps1`: a new `Test-HeadlessShapes` (run on every section file) refuses a
+  `<random>` without `dice=` under any effect-body tag, and a group `<fight>` carrying
+  `playerFirst=` or sharing its section with a `<fightround>`/`<fightdamage>`. The shipped corpus
+  has neither. Three `validate-selftest.ps1` fixtures fail on the previous gate (`pass=64
+  fail=3`) and pass on this one (`pass=67`).
+- `suite-engine`: a seeded headless `<fightdamage><difficulty modifier="noweapon">` scores
+  exactly the sword's +2 below the same roll without the modifier.
+- `suite-corpus`: the census above is pinned by name (the eight body roll nodes, the four
+  group-fight sections, and no group fight with an extra attribute or a round rule), so the
+  first new site fails and is reviewed.
+- `docs/Build-Pipeline.md` describes both gate rules and task 362's exact-case names.
+
+The dice-less `<random>` gap was closed at the gate rather than by teaching `walkEffectBody` to
+infer dice, which is the step the task prescribed: the walk has no section to look in, and no
+shipped site needs it. Full browser suite `RESULT ALL PASS pass=3241 fail=0`.
 
 ---

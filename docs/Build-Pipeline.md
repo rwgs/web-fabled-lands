@@ -104,6 +104,18 @@ misspelling therefore makes the check *easier* than the page prints it, silently
 
 The full vocabulary is in [XML Tag Reference](XML-Tag-Reference.md).
 
+Tag and attribute **names** are matched exact-case, because the engine's `getAttribute` and
+`querySelectorAll` are: `<fight playerfirst="f">` is not `playerFirst=` to the browser, so it
+must not be to the gate (task 362).
+
+A few shapes are valid tag by tag but would run differently on a **headless** path than on
+the page, so the gate refuses them outright (`Test-HeadlessShapes`): a `<random>` without
+`dice=` inside an effect body (`<fightdamage>`, `<fightround>`, `<flee>`, `<effect>`,
+`<sold>`, `<bought>`, `<bookchange>`), where `walkEffectBody` cannot infer the die count the
+page would; and a group `<fight>` carrying `playerFirst=` or sharing its section with a
+`<fightround>`/`<fightdamage>`, none of which `groupFightRound` honours. No shipped section
+has either shape. `suite-corpus` pins the sites both paths do see, by name (task 363).
+
 One attribute is checked by **value** as well as by name: `codeword=`. The authority is the
 `Codewords=` list in each `books/book<N>/book.ini` - the printed list from that volume's
 inside front cover - and the check is against the **union** of the six, because the

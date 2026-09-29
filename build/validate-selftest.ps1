@@ -159,6 +159,22 @@ $CASES = @(
        text  = '<section name="1"><P>Text.</P></section>'
        want  = 'unknown tag <P>' }
 
+    # task 363: shapes the headless effect-body walk and the group-fight round cannot honour.
+    @{ label = 'a dice-less <random> inside an effect body (task 363)'
+       file  = 'books/book1/1.xml'
+       text  = '<section name="1"><fight name="Rat" combat="1" defence="2" stamina="3"/><fightdamage><random var="r"/></fightdamage></section>'
+       want  = '<random> without dice= inside <fightdamage>' }
+
+    @{ label = 'a group fight with playerFirst= (task 363)'
+       file  = 'books/book1/1.xml'
+       text  = '<section name="1"><fight name="Rat" group="rats" combat="1" defence="2" stamina="3" playerFirst="f"/></section>'
+       want  = 'group <fight> with playerFirst=' }
+
+    @{ label = 'a group fight sharing its section with a <fightround> (task 363)'
+       file  = 'books/book1/1.xml'
+       text  = '<section name="1"><fight name="Rat" group="rats" combat="1" defence="2" stamina="3"/><fightround><lose stamina="1"/></fightround></section>'
+       want  = 'group <fight> in a section with <fightround>/<fightdamage>' }
+
     @{ label = 'a mis-cased root element (task 362)'
        file  = 'books/book1/2.xml'
        text  = '<SECTION name="2"><p>Text.</p></SECTION>'

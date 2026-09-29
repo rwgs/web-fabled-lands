@@ -236,6 +236,52 @@ export async function run(ctx) {
     ok('task300: every modifier=/modifiers= value in the corpus is one the engine acts on ('+sites300+' sites)',
        sites300 > 0 && bad300.length === 0, bad300.join(', ') || 'no modifier= sites found at all');
 
+    // --- task 363: the headless roll and group-fight sites, pinned by name --------------------
+    // walkEffectBody runs a roll inside an effect body without the page's inferDice, and
+    // groupFightRound honours no playerFirst=, <fightround> or <fightdamage>. The gate refuses
+    // those shapes; this pins every site the two paths see today, so the first new one fails
+    // here and gets reviewed rather than trusted. Update the lists only after reading the site.
+    {
+      const BODY363 = ['effect', 'fightdamage', 'fightround', 'flee', 'sold', 'bought', 'bookchange'];
+      const rolls363 = [], groups363 = [], badGroups363 = [];
+      const GROUP_ATTRS363 = ['combat', 'defence', 'group', 'name', 'stamina'];
+      for (const b of books) {
+        const raw = await rawSections(b);
+        for (const key of Object.keys(raw)) {
+          if (!/<(random|difficulty|rankcheck|fight)\b/.test(raw[key])) continue;
+          const doc = new DOMParser().parseFromString(raw[key], 'application/xml');
+          for (const r of doc.querySelectorAll('random, difficulty, rankcheck')) {
+            let p = r.parentElement;
+            while (p && !BODY363.includes(p.tagName)) p = p.parentElement;
+            if (p) rolls363.push(`${b}/${key} ${r.tagName} in ${p.tagName} dice=${r.getAttribute('dice') ?? ''} modifier=${r.getAttribute('modifier') ?? ''}`);
+          }
+          const gf = doc.querySelectorAll('fight[group]');
+          if (gf.length) groups363.push(`${b}/${key}`);
+          for (const f of gf) {
+            const extra = f.getAttributeNames().filter((a) => !GROUP_ATTRS363.includes(a));
+            if (extra.length) badGroups363.push(`${b}/${key} ${extra.join(' ')}`);
+          }
+          if (gf.length && doc.querySelector('fightround, fightdamage')) badGroups363.push(`${b}/${key} has <fightround>/<fightdamage>`);
+        }
+      }
+      const wantRolls363 = [
+        '2/770 random in flee dice=2 modifier=',
+        '5/24 difficulty in fightround dice= modifier=',
+        '5/356 random in fightdamage dice=1 modifier=',
+        '5/383 difficulty in fightround dice= modifier=',
+        '5/489 difficulty in fightdamage dice= modifier=',
+        '5/565 difficulty in fightdamage dice= modifier=',
+        '5/631 difficulty in fightdamage dice= modifier=',
+        '5/689 difficulty in fightround dice= modifier=',
+      ];
+      ok('task363: the roll nodes inside an effect body are exactly the eight reviewed',
+         JSON.stringify(rolls363.sort()) === JSON.stringify(wantRolls363.sort()), rolls363.join(' | '));
+      ok('task363: the group fights are exactly the four reviewed sections',
+         JSON.stringify(groups363.sort()) === '["6/192","6/273","6/291","6/618"]', groups363.join(', '));
+      ok('task363: no group fight carries an attribute or round rule groupFightRound ignores',
+         badGroups363.length === 0, badGroups363.join(', '));
+    }
+
     // --- task 273: the sections that gate on a codeword and delete it inside the guard ---------
     // The ones enclosing a <goto> are the ones that LOSE a destination when the guard is re-derived
     // live (§2.143 deletes Bounty and grays the →601 it deleted it for), so they are pinned by name

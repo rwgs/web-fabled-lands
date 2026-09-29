@@ -7,7 +7,7 @@
 
 import {
   resolveValue, rollDifficulty, rollRankCheck, rollTraining, rollDice,
-  childAdjustment, abilityChoiceOptions,
+  childAdjustment, abilityChoiceOptions, difficultyModifier,
 } from './engine.js';
 import { branchPlan, blessingSpendForReroll, isRollGate, viewPendingVars, provisionalVarClosure } from './render-rules.js';
 // renderChoices (render-choices) is reached through story.dispatchChoices, not a direct
@@ -235,17 +235,10 @@ export function renderDifficulty(story, container, node, path) {
   const spec = (node.getAttribute('ability') || '').trim();
   const multi = spec.includes('|');
   const level = resolveValue(story.state, node.getAttribute('level'));
-  // modifier= is either a keyword selecting how the ability score resolves
-  // (natural/noweapon/affected — book3/235/271/290, book5/516 unarmed COMBAT) or a
-  // numeric/var addend. Keywords route into the ability lookup (mode); anything
-  // else keeps the historical numeric-modifier behaviour. (task 53)
-  // `noarmour` and `current` joined the list in task 302 — both are spec words this port had
-  // no branch for, so each fell to the addend path, resolved as a var name and read 0, losing
-  // the mode with no trace. The source gate rejects a word that is not on this list, so the
-  // two must move together: build/validate-source.ps1's FL_ENUMS['modifier'].
-  const modRaw = (node.getAttribute('modifier') || '').trim().toLowerCase();
-  const mode = ['natural', 'noweapon', 'notool', 'noarmour', 'affected', 'current'].includes(modRaw) ? modRaw : null;
-  const modifier = (node.getAttribute('modifier') != null && !mode) ? resolveValue(story.state, node.getAttribute('modifier')) : 0;
+  // modifier= is either a keyword selecting how the ability score resolves (mode) or a
+  // numeric/var addend. The rule lives in engine.js difficultyModifier, shared with the
+  // headless effect-body walk. (tasks 53, 302, 363)
+  const { mode, addend: modifier } = difficultyModifier(story.state, node.getAttribute('modifier'));
 
   appendRollDescription(story, container, node, path); // its own descriptive text
 

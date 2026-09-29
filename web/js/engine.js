@@ -582,7 +582,8 @@ function walkEffectBody(parent, state, ctx) {
         ctx.lastRoll = res;
         if (ctx.log) ctx.log.push(`Rank check ${res.total} vs ${state.rankValue()} — ${res.success ? 'success' : 'failure'}`);
       } else {
-        const res = rollDifficulty(state, node.getAttribute('ability'), resolveValue(state, node.getAttribute('level')), childAdjustment(node, state));
+        const { mode, addend } = difficultyModifier(state, node.getAttribute('modifier')); // as on the page (task 363)
+        const res = rollDifficulty(state, node.getAttribute('ability'), resolveValue(state, node.getAttribute('level')), addend + childAdjustment(node, state), mode);
         if (varName) state.setVar(varName, res.margin);
         ctx.lastRoll = res;
         if (ctx.log) ctx.log.push(`${(res.ability || '').toUpperCase()} roll ${res.total} vs ${res.level} — ${res.success ? 'success' : 'failure'}`);
@@ -1813,6 +1814,21 @@ function adjustApplies(el, state) {
   if (get('crew') != null) { const s = state.currentShip(); return !!s && s.crew === get('crew'); }
   if (get('ship') != null) return matchShipType(state, get('ship'));
   return true;
+}
+
+// A <difficulty modifier=> is either one of these words, selecting how the ability score
+// resolves (natural/noweapon — book3/235/271/290, book5/516 unarmed COMBAT; noarmour and current
+// joined in task 302), or a numeric/var addend. One rule for the page widget and the headless
+// effect-body walk, so a roll inside a <fightdamage>/<fightround> resolves as the same node
+// would on the page — the walk used to drop modifier= entirely. The source gate rejects a word
+// not on this list, so the two must move together: build/validate-source.ps1's
+// FL_ENUMS['modifier']. (tasks 53, 302, 363)
+export const DIFFICULTY_MODES = ['natural', 'noweapon', 'notool', 'noarmour', 'affected', 'current'];
+export function difficultyModifier(state, raw) {
+  if (raw == null) return { mode: null, addend: 0 };
+  const word = String(raw).trim().toLowerCase();
+  if (DIFFICULTY_MODES.includes(word)) return { mode: word, addend: 0 };
+  return { mode: null, addend: resolveValue(state, raw) };
 }
 
 // difficulty: success iff (2d6 + ability + adjust) > level. `mode` is the

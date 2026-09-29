@@ -75,8 +75,8 @@ export async function run(ctx) {
     // --- task 302: the two spec mode words this port had no branch for --------------------------
     // `noarmour` and `current` are in rules/JaFL-XML-Tags.md's closed list for modifier=. Both
     // used to fall to renderDifficulty's numeric-addend path, resolve as a var name and read 0,
-    // so the mode vanished with no trace. The gate's FL_ENUMS['modifier'] and renderDifficulty's
-    // keyword list must move together with these.
+    // so the mode vanished with no trace. The gate's FL_ENUMS['modifier'] and the keyword list
+    // (engine.js DIFFICULTY_MODES since task 363) must move together with these.
     const g302 = GameState.create({ name:'Mod', gender:'m', profession:'Warrior', book:1, adv });
     g302.data.items = [];
     g302.addItem(makeItem('weapon', 'iron sword', 2));
@@ -117,6 +117,30 @@ export async function run(ctx) {
        rollNat.abilityScore === 12, 'score=' + rollNat.abilityScore);
     ok('task302: the roll reports the stat it rolled, so the widget label is not null',
        rollCur.ability === 'stamina', String(rollCur.ability));
+
+    // --- task 363: a <difficulty> inside an effect body honours modifier= as the page does ------
+    // walkEffectBody (wound time, between rounds, on fleeing, on use) called rollDifficulty with
+    // no mode and dropped modifier=, so a body roll was always against the armed score. Same
+    // seed, same node with and without modifier="noweapon": the margins differ by the weapon.
+    {
+      const g363 = GameState.create({ name:'Body', gender:'m', profession:'Warrior', book:1, adv });
+      g363.data.items = [];
+      g363.addItem(makeItem('weapon', 'iron sword', 2));
+      const unarmed363 = g363.abilityForMode('combat', 'noweapon');
+      ok('task363: fixture — the sword adds 2 to COMBAT', g363.ability('combat') === unarmed363 + 2);
+      const bodyRoll = (mod) => {
+        eng.seedRng(363);
+        eng.applyEffectBody(parse('<fightdamage><difficulty ability="combat" level="10" var="m363"' + mod + '/></fightdamage>'), g363);
+        eng.seedRng(null);
+        return g363.getVar('m363');
+      };
+      const armed363 = bodyRoll(''), bare363 = bodyRoll(' modifier="noweapon"');
+      ok('task363: a headless modifier="noweapon" difficulty rolls against the unarmed score',
+         armed363 - bare363 === 2, 'armed margin ' + armed363 + ', noweapon margin ' + bare363);
+      ok('task363: the page and the walk read modifier= through one rule',
+         JSON.stringify(eng.difficultyModifier(g363, 'noweapon')) === '{"mode":"noweapon","addend":0}'
+         && JSON.stringify(eng.difficultyModifier(g363, null)) === '{"mode":null,"addend":0}');
+    }
     const rollDef = eng.rollDifficulty(g302, 'defence', 10, 0, 'noarmour');
     ok('task302: <difficulty ability="defence" modifier="noarmour"> scores Defence less the armour',
        rollDef.abilityScore === full302 - armour302 && rollDef.ability === 'defence',

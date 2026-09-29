@@ -494,6 +494,40 @@ function Test-XmlVocabulary($el, [string]$label, [System.Collections.ArrayList]$
     foreach ($c in $el.ChildNodes) { Test-XmlVocabulary $c $label $errors }
 }
 
+# Shapes that validate tag by tag but that a HEADLESS path would run differently from the page
+# (task 363). Neither occurs in books 1-6; each is refused so its first site is reviewed rather
+# than shipped:
+#  - a dice-less <random> inside an effect body. renderRandom infers ONE die from a following
+#    1-6 outcomes table (render-rolls.js inferDice), but engine.js walkEffectBody, which runs
+#    these bodies at wound time, between rounds, on fleeing, on use and on a book change, has no
+#    section to look in and rolls two. Write dice= on it.
+#  - a group <fight> carrying playerFirst=, or sharing its section with a <fightround> or
+#    <fightdamage>. combat.js groupFightRound honours none of the three (fightRound, the
+#    single-fight path, does).
+$script:FL_EFFECT_BODY_TAGS = @('effect', 'fightdamage', 'fightround', 'flee', 'sold', 'bought', 'bookchange')
+function Test-HeadlessShapes($doc, [string]$label, [System.Collections.ArrayList]$errors) {
+    foreach ($r in $doc.GetElementsByTagName('random')) {
+        if ($r.HasAttribute('dice')) { continue }
+        for ($p = $r.ParentNode; $p -and $p.NodeType -eq [System.Xml.XmlNodeType]::Element; $p = $p.ParentNode) {
+            if ($script:FL_EFFECT_BODY_TAGS -ccontains $p.get_Name()) {
+                [void]$errors.Add(("{0} : <random> without dice= inside <{1}> - the headless walk cannot infer the die count the page would, so write dice=" -f $label, $p.get_Name()))
+                break
+            }
+        }
+    }
+    $roundNodes = $doc.GetElementsByTagName('fightround').Count + $doc.GetElementsByTagName('fightdamage').Count
+    foreach ($f in $doc.GetElementsByTagName('fight')) {
+        if (-not $f.HasAttribute('group')) { continue }
+        if ($f.HasAttribute('playerFirst')) {
+            [void]$errors.Add(("{0} : group <fight> with playerFirst= - groupFightRound does not honour it" -f $label))
+        }
+        if ($roundNodes -gt 0) {
+            [void]$errors.Add(("{0} : group <fight> in a section with <fightround>/<fightdamage> - groupFightRound runs neither" -f $label))
+            break
+        }
+    }
+}
+
 # Every explicit jump target in a document, as "<book>:<section>" keys. `section=` names a
 # section in `book=` when given, otherwise in the file's own book; <extrachoice> also arms a
 # choice AT another section (atbook/atsection). Non-literal ids are skipped: they are either a
@@ -580,6 +614,7 @@ function Test-SourceTree([string]$rulesDir, [hashtable]$bookDirs) {
                 if ($e) { [void]$errors.Add($e); return }
                 $doc = Get-XmlDoc $xml
                 Test-XmlVocabulary $doc.DocumentElement $label $errors
+                Test-HeadlessShapes $doc $label $errors
                 $targets = [System.Collections.ArrayList]::new()
                 Get-ExplicitTargets $doc.DocumentElement $b $targets
                 foreach ($t in ($targets | Select-Object -Unique)) {

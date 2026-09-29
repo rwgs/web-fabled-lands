@@ -24,7 +24,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 363. `walkEffectBody` drops `<difficulty modifier=>` and never infers `<random>` dice, and `groupFightRound` ignores `playerFirst=`, `<fightround>` and a `<fightdamage>` redirect — zero shipped sites, but the gate accepts every such shape
 - [ ] 364. `sanitizeData` keeps a resurrection deal with no section (a phantom deal that loops the death prompt), and defaults a missing deal or extra-choice `book` to `out.book` before `out.book` is assigned, so always to book 1
 - [ ] 365. `GameState.adjustStaminaMax` has no caller, and clamps to the written maximum that task 158 replaced with the effective one in its sibling
 - [ ] 366. README says to "set Pages to serve `/web`", which is not a Pages option and not how this site is deployed (root `CNAME` + root redirect); its file tree omits `edition.js`, and its DOM-free module list omits `state.js` and `visit-state.js`
@@ -401,6 +400,7 @@ this order.*
 - [x] 359. the service worker precached through the browser's HTTP cache and the CDN (Cloudflare, `max-age=14400` on `web/js`), so a new build's cache could be filled with the previous build's files — a stale or mixed shell kept under the new version key until the next deploy; `FLCache.precache` now fetches every entry at a build-unique `?v=` URL with `cache: 'reload'` and stores it under the plain URL, and the worker registers with `updateViaCache: 'none'`
 - [x] 360. the header's 💾 "Save & quit to title" called `state.save(true)`, which returns true for an ephemeral `?demo=` preview without writing, so the preview was discarded while the button said it saved; the header and the menu now share `saveOrKeep`, which keeps a preview (labelled "Keep this adventure") and only saves-and-quits a real slot
 - [x] 362. the source gate folded case on tag and attribute names (`FL_TAG_ATTRS` was a plain `@{}`, the root check `-ne`, the attribute check `-notcontains`), so a mis-cased camelCase attribute validated and was then ignored by the exact-case engine; `books/book3/207.xml` shipped `<SECTION>`/`<P>`. The name tables are ordinal dictionaries, the checks `-cne`/`-cnotcontains`, §3.207 is lower-cased, and three selftest fixtures pin it
+- [x] 363. `walkEffectBody` dropped `<difficulty modifier=>` and never inferred `<random>` dice, and `groupFightRound` ignores `playerFirst=`, `<fightround>` and a `<fightdamage>` redirect — zero shipped sites, but the gate accepted every such shape; the walk now shares `difficultyModifier` with the page, the gate refuses the other shapes (`Test-HeadlessShapes`), and `suite-corpus` pins today's sites by name
 
 ---
 
@@ -439,46 +439,6 @@ owner's call.
 ### Validation
 
 - A pushed run is green in all three jobs, with no Node-20 deprecation annotation.
-
----
-
-## 363. Two engine paths ignore attributes the corpus has not used yet, and nothing pins that
-
-**Priority: LOW.** No shipped site is affected. The risk is a future node that validates cleanly
-and then behaves differently in a headless body than it would on the page.
-
-### What is wrong
-
-- **The headless effect-body walk.** `walkEffectBody` in `engine.js` runs `<fightdamage>`,
-  `<fightround>`, `<flee>`, item Use effects and `<bookchange>`. It calls `rollDifficulty` with no
-  mode and ignores a numeric `modifier=`, where `renderDifficulty` honours all six mode words and
-  the addend. It also rolls a `<random>` with no `dice=` on 2 dice, where `renderRandom` infers
-  1 die from a following 1–6 outcomes table (`inferDice`).
-- **Group fights.** `groupFightRound` in `combat.js` ignores `playerFirst=`, never runs a
-  `<fightround>`, and keeps enemies striking after a `<fightdamage>` has recorded
-  `fight.roundGoto`. `fightRound` handles all three.
-
-Census, 2026-09-29. Eight roll nodes sit inside an effect body: book2/770, book5/24, 356, 383,
-489, 565, 631 and 689. All carry `dice=` where they need it, and none carries `modifier=`. The
-four group fights (book6/192, 273, 291, 618) carry only `combat defence group name stamina`, and
-their sections hold no `<fightround>` or `<fightdamage>`.
-
-### Steps
-
-1. Route `<difficulty modifier=>` in `walkEffectBody` through the same mode and addend rule
-   `renderDifficulty` uses. Moving that rule into `engine.js` shares it and keeps it DOM-free.
-2. Make `validate-source.ps1` refuse the shapes the headless paths cannot honour: a dice-less
-   `<random>` under a body tag, and a group `<fight>` carrying `playerFirst=` or sharing its
-   section with a `<fightround>` or `<fightdamage>`. Add a selftest fixture for each.
-3. Add a `suite-corpus` assertion pinning the census above, so the first such site fails loudly
-   and gets reviewed.
-
-### Validation
-
-- The selftest fixtures fail as intended.
-- A headless `walkEffectBody` test rolls a `modifier="noweapon"` difficulty against the unarmed
-  score.
-- `RESULT ALL PASS`.
 
 ---
 
@@ -641,6 +601,13 @@ file pays for history twice.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-09-29 (task 363): closed **363**, filed nothing. A `<difficulty>` in an effect body
+now reads `modifier=` through `engine.js`'s `difficultyModifier`, the rule the page widget
+uses. The gate refuses a dice-less body `<random>`, and any group fight with `playerFirst=` or
+sharing its section with a round rule. `suite-corpus` pins the 8 body roll nodes and 4
+group-fight sections by name. The census matched the filing exactly.
+`RESULT ALL PASS pass=3241 fail=0`.
 
 Worked 2026-09-29 (task 362): closed **362**, filed nothing. The source gate compares tag and
 attribute names exact-case, as the engine reads them, and §3.207's `<SECTION>`/`<P>` are
