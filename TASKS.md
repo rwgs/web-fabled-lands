@@ -27,7 +27,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 378. The source gate omits the boolean `choice.pay`, `choice.flee` and `fightround.pre` values; a typo such as `pay="tru"` can silently waive a printed cost
 - [ ] 379. The source gate accepts enum casing and pipe lists that their rule readers do not support, including an inert `special="ATTACK"` and ignored `modifier="natural|noarmour"`
 - [ ] 381. Player documentation still promises the best carried equipment, says fight bonuses never survive a save, and overstates which tags support `modifier="current"`
 - [ ] 382. `build/serve.py` stalls a service worker's install precache (3 of ~48 requests reach it), so the offline path and a real update cannot be exercised against the repo's own dev server; `python -m http.server` serves the same tree fine
@@ -419,6 +418,7 @@ this order.*
 - [x] 375. two tabs that loaded one slot each wrote complete snapshots, so the staler tab's autosave replaced the other's newer progress; `save()` now refuses to write over a blob that is not the one this game last loaded or wrote (first writer wins), reports a conflict, and the "Progress not saved" modal adds "Load the newer save"
 - [x] 376. the source gate skipped a missing `Adventurers.xml` and accepted `<adventurers/>`, so a published book could build with a New Adventure that threw; the gate now requires the file and the fields the creation path reads (`Test-AdventurersData`), and `suite-corpus` creates all six professions from each published book's own data
 - [x] 377. `nextFreeSlot` and `GameState.load` read storage unguarded, so a browser blocking reads threw out of New Adventure before any recovery; `nextFreeSlot` now throws `StorageReadError` rather than guess a slot is free, `GameState.load` returns null, and New Adventure offers to play without saving (`newAdventureSlot`)
+- [x] 378. the source gate left `<choice pay=>`, `<choice flee=>` and `<fightround pre=>` unvalidated, so a typo read as false (a waived cost, no escape, a late pre-round hook); `Test-AttrValue` now checks them as truth flags on those tags only, and `<fight flee=>` as the whole number it is
 
 ---
 
@@ -517,36 +517,6 @@ removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first
 
 - `https://webfl.rwgs.net/web/` is served by the Worker (a `/README.md` request answers 404).
   An installed copy updates to the next build, and it opens `/web/index.html` offline.
-
----
-
-## 378. Validate boolean values by tag where attribute meanings differ
-
-**Priority: LOW.** The current corpus is clean, but these typos can pass the gate.
-
-### What is wrong
-
-`Test-AttrValue` and `FL_BOOL_ATTRS` in
-[validate-source.ps1](build/validate-source.ps1) do not validate `pay`, `pre` or
-the choice form of `flee`. The gate accepts `choice.pay="tru"`,
-`choice.flee="tru"` and `fightround.pre="tru"`. `choiceGate` in
-[render-rules.js](web/js/render-rules.js) treats the first as explicit false:
-a 20-Shard choice still requires a 20-Shard purse but `payChoiceCost` takes
-nothing. The other two typos suppress fleeing and move a pre-round hook after
-the exchange. `fight.flee` is a numeric threshold, so adding `flee` to a global
-boolean list would reject valid fight markup.
-
-### Steps
-
-1. Validate these boolean attributes using their tag-specific meanings.
-2. Add mutation fixtures for invalid values and controls for all supported truth
-   spellings, plus a numeric fight-flee threshold.
-3. Run the source-gate self-test and documented build/test loop.
-
-### Validation
-
-- Invalid boolean values on these tags fail before bundling.
-- `fight.flee="5"` remains legal and retains its numeric meaning.
 
 ---
 
@@ -655,6 +625,13 @@ repository.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 378): closed **378**, filed nothing. `Test-AttrValue` now checks
+`pay` and `flee` on `<choice>` and `pre` on `<fightround>` against the truth set. It checks
+`<fight flee=>` as a whole number, the threshold `combat.js` parses. The gate selftest gained
+four mutation cases, which the old gate missed, and a control covering every supported
+spelling plus `flee="5"`; it now reports `pass=82`. The real corpus passes and the rebuild is a
+no-op. The full suite reported `RESULT ALL PASS pass=3341 fail=0`.
 
 Worked 2026-10-01 (task 377): closed **377**, filed nothing. `nextFreeSlot` reads storage
 strictly and throws `StorageReadError` when a read fails, because an unreadable slot is not a

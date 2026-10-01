@@ -384,6 +384,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 375. Detect concurrent play of the same save slot
 - [x] 376. Require usable character-creation data for every published book
 - [x] 377. Recover when reading browser storage is blocked
+- [x] 378. Validate boolean values by tag where attribute meanings differ
 - [x] 380. Make late asynchronous failures fail the test runners
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
@@ -21923,5 +21924,46 @@ Checked:
 - The old `state.js` lacks the `StorageReadError` export, so the new block cannot load
   against it. The filing's direct probes reproduced the old throws.
 - The full suite reported `RESULT ALL PASS pass=3341 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 378. Validate boolean values by tag where attribute meanings differ
+
+**Priority: LOW.** The current corpus is clean, but these typos can pass the gate.
+
+### What is wrong
+
+`Test-AttrValue` and `FL_BOOL_ATTRS` in
+[validate-source.ps1](build/validate-source.ps1) do not validate `pay`, `pre` or
+the choice form of `flee`. The gate accepts `choice.pay="tru"`,
+`choice.flee="tru"` and `fightround.pre="tru"`. `choiceGate` in
+[render-rules.js](web/js/render-rules.js) treats the first as explicit false:
+a 20-Shard choice still requires a 20-Shard purse but `payChoiceCost` takes
+nothing. The other two typos suppress fleeing and move a pre-round hook after
+the exchange. `fight.flee` is a numeric threshold, so adding `flee` to a global
+boolean list would reject valid fight markup.
+
+### The fix
+
+- `Test-AttrValue` in `build/validate-source.ps1` checks `pay=` and `flee=` on `<choice>` and
+  `pre=` on `<fightround>` against `FL_BOOL_VALUES` (`t`, `f`, `true`, `false`, any case). The
+  corpus writes `pay="F"`, so case stays free, as `boolAttr` reads it. Tag and attribute are
+  compared exact-case (`-ceq`), as the gate's other name checks are (task 362). `<fight
+  flee=>` must be a whole number: `makeFight` in `combat.js` reads it with `parseInt`, so
+  `flee="t"` silently became a win threshold of 0. These sit beside `FL_BOOL_ATTRS` rather
+  than in it, because that list applies by attribute name to every tag.
+- `build/validate-selftest.ps1` adds four mutations: `pay="tru"` on a 20-Shard choice,
+  `flee="tru"` on a choice, `pre="tru"` on a fightround, and `flee="t"` on a fight. A control
+  section uses `t`, `f`, `true`, `FALSE`, `F` and `True` across the three flags, plus
+  `<fight flee="5">`, and must report no error.
+- `docs/XML-Tag-Reference.md` lists the three tag-specific flags and `<fight flee=>`'s number.
+
+Checked:
+
+- Against the old gate, the four mutation cases failed (`pass=78 fail=4`). With the fix the
+  selftest reported `pass=82 fail=0`.
+- The real corpus (35 `pay="f"`, 2 `pay="t"`, 1 `pay="F"`, 15 `flee="t"`, 3 `pre=`, 4 numeric
+  `<fight flee=>`) passes, and the rebuild changed nothing.
+- The full suite reported `RESULT ALL PASS pass=3341 fail=0`.
 
 ---

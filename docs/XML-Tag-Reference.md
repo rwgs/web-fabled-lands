@@ -174,7 +174,9 @@ A value may be a `|`-separated union, and `?` / `*` are JaFL's match-any wildcar
 
 **Truth-flag attributes** - `force hidden dead not using sail start revisit cumulative once
 permanent supplemental unique visit playerFirst fatal` - take `t`, `f`, `true` or `false`.
-The books write both letters and words.
+The books write both letters and words. So do three that are truth flags on one tag only:
+`<choice pay=>`, `<choice flee=>` and `<fightround pre=>`. On `<fight>`, `flee=` is instead a
+whole number, the enemy Stamina at which the fight is won.
 
 ### `type` means something different on each tag
 

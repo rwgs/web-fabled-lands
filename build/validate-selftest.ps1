@@ -516,6 +516,26 @@ Assert 'a narrowed cure and an unqualified family cure are both accepted (task 3
 $badFam = Build-Fixture @{ 'books/book2/1.xml' = '<section name="1"><lose poison="?" family="poisononly">x</lose></section>' }
 Assert 'an unknown family= value is rejected (task 351)' ($badFam.Errors.Count -eq 1 -and $badFam.Errors[0] -match 'family') ($badFam.Errors -join ' | ')
 
+# Truth flags read by tag (task 378). A typo reads as false: pay="tru" kept the purse check and
+# charged nothing, flee="tru" was no escape, pre="tru" ran after the exchange. <fight flee=> is
+# a number, so the same attribute must stay legal there and be refused as a word.
+foreach ($bad in @(
+    @{ label = 'a misspelt choice pay='; xml = '<choices><choice section="1" shards="20" pay="tru">Pay</choice></choices>'; want = 'pay="tru" on <choice> is not a truth flag' },
+    @{ label = 'a misspelt choice flee='; xml = '<choices><choice section="1" flee="tru">Run</choice></choices>'; want = 'flee="tru" on <choice> is not a truth flag' },
+    @{ label = 'a misspelt fightround pre='; xml = '<fight name="Ogre" combat="3" defence="6" stamina="9"/><fightround pre="tru"><lose stamina="1"/></fightround>'; want = 'pre="tru" on <fightround> is not a truth flag' },
+    @{ label = 'a word as fight flee='; xml = '<fight name="Ogre" combat="3" defence="6" stamina="9" flee="t"/>'; want = 'flee="t" on <fight> is not a whole number' })) {
+    $r = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2">' + $bad.xml + '</section>' }
+    Assert "the gate catches $($bad.label) (task 378)" (
+        @($r.Errors | Where-Object { $_ -like "*$($bad.want)*" }).Count -eq 1) ($r.Errors -join ' | ')
+}
+$okBool = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2"><choices>' +
+    '<choice section="1" shards="2" pay="t">a</choice><choice section="1" shards="2" pay="f">b</choice>' +
+    '<choice section="1" shards="2" pay="true">c</choice><choice section="1" shards="2" pay="FALSE">d</choice>' +
+    '<choice section="1" shards="2" pay="F">e</choice><choice section="1" flee="t">f</choice><choice section="1" flee="True">g</choice>' +
+    '</choices><fight name="Ogre" combat="3" defence="6" stamina="9" flee="5"/>' +
+    '<fightround pre="f"><lose stamina="1"/></fightround><fightround pre="T"><lose stamina="1"/></fightround></section>' }
+Assert 'every supported truth spelling, and a numeric fight flee=, are accepted (task 378)' ($okBool.Errors.Count -eq 0) ($okBool.Errors -join ' | ')
+
 if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
 
 Write-Host ''

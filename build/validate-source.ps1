@@ -361,6 +361,18 @@ function Get-XmlDoc([string]$xml) {
 
 # One attribute value against its closed set. Returns $null when acceptable, else the reason.
 function Test-AttrValue([string]$tag, [string]$attr, [string]$value) {
+    # Truth flags whose meaning depends on the tag (task 378). boolAttr reads anything it does
+    # not recognise as false, so <choice pay="tru"> kept a 20-Shard purse check and charged
+    # nothing, <choice flee="tru"> was no escape, and <fightround pre="tru"> ran after the
+    # exchange. They cannot join FL_BOOL_ATTRS, because <fight flee=> is a number: the win
+    # threshold combat.js reads with parseInt, where "t" silently became 0.
+    $tagBool = ($tag -ceq 'choice' -and ($attr -ceq 'pay' -or $attr -ceq 'flee')) -or ($tag -ceq 'fightround' -and $attr -ceq 'pre')
+    if ($tagBool -and $script:FL_BOOL_VALUES -notcontains $value.Trim().ToLowerInvariant()) {
+        return "$attr=`"$value`" on <$tag> is not a truth flag (t/f)"
+    }
+    if ($tag -ceq 'fight' -and $attr -ceq 'flee' -and $value.Trim() -notmatch '^\d+$') {
+        return "flee=`"$value`" on <fight> is not a whole number (it is the enemy Stamina at which the fight is won)"
+    }
     if ($script:FL_BOOL_ATTRS -contains $attr) {
         if ($script:FL_BOOL_VALUES -notcontains $value.Trim().ToLowerInvariant()) {
             return "$attr=`"$value`" is not a truth flag (t/f)"
