@@ -394,6 +394,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 384. Destination rolls bypass earlier mandatory rolls
 - [x] 385. Forced action groups can be skipped
 - [x] 386. Return frames drop visit-local bonuses and locks
+- [x] 387. Empty-god ticks retain initiation
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
 
@@ -22705,5 +22706,69 @@ Checked:
 - Against the old two modules, the block reported 7 failures and a fatal. The detour's +3
   did leak back to the source, which the filing had not noticed.
 - `RESULT ALL PASS pass=3417 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 387. Empty-god ticks retain initiation
+
+**Priority: MEDIUM.** The shipped Forsaken result applies the opposite state.
+
+### What is wrong
+
+The "lose initiate status" group in [book6/589](books/book6/589.xml) contains
+`<tick god=""/>`. `applyTick` in [engine.js](web/js/engine.js) forwards the empty
+string to `GameState.setGod` in [state.js](web/js/state.js), which appends it to
+the gods list. A Sig initiate receiving the result retains Sig and its +1
+THIEVERY effect, with an additional empty god entry. The player still fails the
+"worships no god" and safe-initiation tests. Browser and Node probes confirmed
+this even after explicitly committing the group; task 385 is a separate gap.
+
+### Steps
+
+1. Add a `suite-engine` regression for the empty-god tick and a
+   `suite-actions`/`suite-inventory` case that rolls 5 at 6.589 and commits the
+   Forsaken group as a Sig initiate.
+2. Make the empty-god form clear current initiation through the normal
+   renunciation path, including god effects and tied resurrection arrangements.
+   Preserve the ability to worship again; it is not `special="godless"`.
+3. Verify an already uninitiated player gains no empty deity, ordinary named
+   initiation still works, and save/load does not preserve a new bogus entry.
+4. Run the complete build/test loop before closing.
+
+### The fix
+
+6/589 is the only shipped `<tick god="">`. The only other empty `god=` in the corpus is
+book2/578's `<if god="">`, which already tests for "no god".
+
+- `web/js/engine.js`: in `applyTick`, a `god=` that is empty after trimming renounces every
+  current god by calling `removeGod` on each. That is the same path `<lose god=>` takes:
+  it strips the god's `god:<name>` effects, re-caps Stamina, and forfeits the resurrection
+  deals tied to that god. A non-empty name still goes to `setGod`. The `godless` flag is
+  not set, so a later initiation still works. That is the difference from
+  `<tick special="godless">`.
+- `web/js/state.js`: `sanitizeData` keeps only non-blank god names, so a save written by
+  the old bug loads without its empty god.
+
+Tests:
+
+- `suite-engine`, task 387's block (9 assertions):
+  - A Sig initiate with +1 THIEVERY, a Sig deal and a supplemental godless boon takes the
+    empty-god tick.
+  - Afterwards there is no god at all, THIEVERY is back to base, and only the boon
+    remains.
+  - `godless` stays false, `<if god="">` reads true, and a later Sig initiation grants the
+    +1 again.
+  - An uninitiated player gains no god, and `sanitizeData` drops `''` and `'  '` but keeps
+    `Sig`.
+  - The boon is supplemental because a second standard deal would replace the first, which
+    is why the first draft of this assertion passed on the old code.
+- `suite-actions`, task 387's block (3 assertions): the real 6/589 is rolled to 5 and the
+  "lose initiate status" group is run as a Sig initiate. Afterwards there is no god and
+  THIEVERY is back to base, and the same holds after a save round-trip.
+
+Checked:
+
+- Against the old two modules, the blocks reported 6 and 2 failures.
+- `RESULT ALL PASS pass=3429 fail=0`, and `node-import.mjs` passed.
 
 ---

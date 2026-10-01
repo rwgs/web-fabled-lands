@@ -4502,6 +4502,30 @@ export async function run(ctx) {
       window.__FL_INSTANT_DICE__ = false;
     }
 
+    // --- task 387: §6.589's Forsaken row ends a Sig initiate's initiation ---
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const rnd = Math.random;
+      const g = GameState.create({ name: 'T387', gender: 'm', profession: 'Rogue', book: 6, adv });
+      const thBase = g.ability('thievery');
+      eng.applyEffect(parse('<tick god="Sig"><effect ability="thievery" bonus="1"/></tick>'), g, {});
+      const c = document.createElement('div');
+      const st = new Story(c, g, { navigate() {}, onDeath() {}, notify() {} });
+      g.setVisitProvider(() => st.serializeVisit());
+      g.goTo(6, '589'); st.begin(await data.getSection(6, '589'), 6, '589');
+      Math.random = () => 0.7; // one die: 5 → Forsaken
+      c.querySelector('.btn-roll').click(); await new Promise((r) => setTimeout(r, 30));
+      const forsaken = Array.from(c.querySelectorAll('.group-action')).find((b) => /lose initiate status/.test(b.textContent));
+      ok('task387: §6.589 rolling 5 offers the Forsaken group', !!forsaken);
+      if (forsaken) forsaken.click();
+      ok('task387: §6.589 running it leaves the Sig initiate with no god and base THIEVERY',
+         g.data.gods.length === 0 && g.ability('thievery') === thBase, `gods=${JSON.stringify(g.data.gods)} th=${g.ability('thievery')}`);
+      const g2 = new GameState(sanitizeData(JSON.parse(JSON.stringify(g.data))));
+      ok('task387: §6.589 the save carries no god at all', g2.data.gods.length === 0 && g2.ability('thievery') === thBase);
+      Math.random = rnd;
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
     // --- task 258: a branch's section= exit is held by the gates its section is under ---
     // The "Continue → N" revealBranch draws from a branch's section= attribute has no XML node, so
     // every node-keyed nav gate missed it. §2.105's pickpocket is a forced <transfer> and the page

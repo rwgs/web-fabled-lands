@@ -1307,4 +1307,32 @@ export async function run(ctx) {
       ok('task379: <if profession="Mage"> reads in any case', cond('<if profession="Mage"/>') === true && cond('<if profession="mage"/>') === true);
       ok('task379: profession="mage|rogue" on an <if> never matched (now refused)', cond('<if profession="mage|rogue"/>') === false);
     }
+
+    // --- task 387: <tick god=""> ends initiation; it does not add a god named "" ---
+    // book6/589's Forsaken result is `<tick god=""/>`. setGod pushed the empty name, so a Sig
+    // initiate kept Sig and its +1 THIEVERY beside a blank second god, and still failed every
+    // "worships no god" test.
+    {
+      const g387 = GameState.create({ name: 'T387', gender: 'm', profession: 'Rogue', book: 6, adv });
+      const thBase = g387.ability('thievery');
+      eng.applyEffect(parse('<tick god="Sig"><effect ability="thievery" bonus="1"/></tick>'), g387, {});
+      g387.addResurrection({ book: 2, section: '9', god: null, supplemental: true }); // coexists with a deal
+      g387.addResurrection({ book: 1, section: '5', god: 'Sig' });
+      ok('task387: (setup) a Sig initiate with +1 THIEVERY, a Sig deal and a godless boon',
+         g387.hasGod('Sig') && g387.ability('thievery') === thBase + 1 && g387.data.resurrections.length === 2);
+      eng.applyEffect(parse('<tick god=""/>'), g387, {});
+      ok('task387: an empty-god tick leaves no god at all, blank or otherwise', g387.data.gods.length === 0, JSON.stringify(g387.data.gods));
+      ok('task387: ...strips Sig\'s +1 THIEVERY', g387.ability('thievery') === thBase, `th=${g387.ability('thievery')} base=${thBase}`);
+      ok('task387: ...forfeits the Sig resurrection and keeps the godless one',
+         g387.data.resurrections.length === 1 && g387.data.resurrections[0].god == null, JSON.stringify(g387.data.resurrections));
+      ok('task387: ...and is not special="godless": the player may worship again', g387.data.godless === false);
+      ok('task387: "worships no god" now reads true', eng.evaluateCondition(parse('<if god=""/>'), g387) === true);
+      eng.applyEffect(parse('<tick god="Sig"><effect ability="thievery" bonus="1"/></tick>'), g387, {});
+      ok('task387: a later named initiation still works', g387.hasGod('Sig') && g387.ability('thievery') === thBase + 1);
+      const gNone = GameState.create({ name: 'T387b', gender: 'f', profession: 'Mage', book: 6, adv });
+      eng.applyEffect(parse('<tick god=""/>'), gNone, {});
+      ok('task387: an uninitiated player gains no empty god', gNone.data.gods.length === 0, JSON.stringify(gNone.data.gods));
+      const reloaded = sanitizeData({ ...JSON.parse(JSON.stringify(gNone.data)), gods: ['', 'Sig', '  '] });
+      ok('task387: a blank god from an older save is dropped on load', reloaded.gods.join() === 'Sig', JSON.stringify(reloaded.gods));
+    }
 }

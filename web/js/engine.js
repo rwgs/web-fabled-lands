@@ -981,7 +981,16 @@ function applyTick(el, state, opts) {
   }
   if (get('blessing') != null) { state.addBlessing(get('blessing'), boolAttr(get('permanent'))); notes.push('blessing'); did = true; }
   if (get('curse') != null) { state.addCurse(get('curse')); did = true; }
-  if (get('god') != null) { state.setGod(get('god'), readEffects(el)); did = true; }
+  if (get('god') != null) {
+    // An empty god= names no god, so it ends initiation: book6/589's Forsaken result "lose
+    // initiate status" is `<tick god=""/>`. It used to add a god named "", leaving the Sig
+    // initiate with Sig, its +1 THIEVERY, and a second, blank god. Every current god is renounced
+    // through removeGod, which strips its effects and the resurrection deals tied to it. It bars
+    // nothing: unlike special="godless", the player may worship again. (task 387)
+    if (get('god').trim() === '') state.data.gods.slice().forEach((g) => state.removeGod(g));
+    else state.setGod(get('god'), readEffects(el));
+    did = true;
+  }
   if (get('title') != null) {
     // A titlePattern= makes a patterned title (JaFL): a NEW title starts at titleValue
     // (default 1), an existing one advances by titleAdjust (default 1), and the pattern

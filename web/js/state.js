@@ -1581,7 +1581,8 @@ export function sanitizeData(raw) {
     return flagged ? flagged.id : null;
   };
   out.equipped = { weapon: equippedId('weapon', 'wielded'), armour: equippedId('armour', 'worn') };
-  out.gods = asArr(d.gods).filter((g) => typeof g === 'string');
+  // A blank name is no god: the empty god a `<tick god="">` used to add (task 387).
+  out.gods = asArr(d.gods).filter((g) => typeof g === 'string' && g.trim() !== '');
   out.godless = asBool(d.godless);
   out.oneDieRolls = asBool(d.oneDieRolls);
   out.titles = asArr(d.titles).map((t) => {

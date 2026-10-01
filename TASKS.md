@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 387. `<tick god="">` adds an empty god instead of clearing initiation at book6/589
 - [ ] 388. Money-cache deposits cease to respect `multiples=` after clamping to the purse
 - [ ] 389. Transfer equivalence ignores item effects, tags, ability and provenance, silently choosing an unequal possession
 - [ ] 390. Immunity to Injury is awarded and displayed but cannot protect against any damage
@@ -429,38 +428,11 @@ this order.*
 - [x] 384. rolling the destination die first released "Continue → 539" in book5/510 with the drowning check unmade, and did the same past book5/76's SCOUTING check and book6/373's possession-loss die. The roll gate's table seed now awaits every mandatory roll above its table, and an exit waits only for the awaited rolls above it. A revealed branch that sends the player on decides the route and holds the exits after it, so a failed drowning check no longer leaves the destination rows, or 3/157's ransom choices, live
 - [x] 385. an explicit `<group force="t">` rendered as one button and held nothing, so book6/496's "turn to 149" kept the donation, and book1/370's lost equipment, book6/135's broken weapon and the forced outcome groups (book2/134's lost stake) were skippable too. A new `computeGroupGate` holds the exits after each forced action group, and the row exit of a branch it sits in, while it renders unrun. Earlier declines, the group's own navigation and unmarked groups stay free
 - [x] 386. a return frame kept the source visit's ctx and vars but not its fight bonus or equipment lock, so looking into book6/252's lacquer box at 6/624 lifted the -2 darkness penalty, at 6/135 freed the locked weapon slot, and let a detour's own bonus leak back. The frame now captures, serialises and coerces both, and `goBack` restores them before its autosave and render
+- [x] 387. book6/589's Forsaken result `<tick god=""/>` added a god named "", so a Sig initiate kept Sig, its +1 THIEVERY and a blank second god. An empty `god=` on a tick now renounces every current god through `removeGod`, which strips their effects and tied resurrection deals but bars no later initiation, and a load drops a blank god left by an older save
 
 ---
 
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The open tasks' detail sections follow, in filed order; the Review log comes after them.
-
----
-
-## 387. Empty-god ticks retain initiation
-
-**Priority: MEDIUM.** The shipped Forsaken result applies the opposite state.
-
-### What is wrong
-
-The "lose initiate status" group in [book6/589](books/book6/589.xml) contains
-`<tick god=""/>`. `applyTick` in [engine.js](web/js/engine.js) forwards the empty
-string to `GameState.setGod` in [state.js](web/js/state.js), which appends it to
-the gods list. A Sig initiate receiving the result retains Sig and its +1
-THIEVERY effect, with an additional empty god entry. The player still fails the
-"worships no god" and safe-initiation tests. Browser and Node probes confirmed
-this even after explicitly committing the group; task 385 is a separate gap.
-
-### Steps
-
-1. Add a `suite-engine` regression for the empty-god tick and a
-   `suite-actions`/`suite-inventory` case that rolls 5 at 6.589 and commits the
-   Forsaken group as a Sig initiate.
-2. Make the empty-god form clear current initiation through the normal
-   renunciation path, including god effects and tied resurrection arrangements.
-   Preserve the ability to worship again; it is not `special="godless"`.
-3. Verify an already uninitiated player gains no empty deity, ordinary named
-   initiation still works, and save/load does not preserve a new bogus entry.
-4. Run the complete build/test loop before closing.
 
 ---
 
@@ -693,6 +665,21 @@ cannot simply be honoured.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 387): closed **387**, filed nothing. `applyTick` in `engine.js` now
+treats an empty `god=` as the end of initiation. It calls `removeGod` for every current god,
+which strips the god's effects and its tied resurrection deals, and leaves `godless` unset.
+`sanitizeData` drops a blank god name, which only the old bug could have written.
+
+Task 387's block in `suite-engine` covers:
+- a Sig initiate holding a Sig deal and a godless boon: after the tick, no god, base
+  THIEVERY, only the boon kept, `<if god="">` true, and re-initiation working;
+- an uninitiated player, who gains no god;
+- a blank god in an older save, dropped on load.
+
+In `suite-actions`, rolling 5 at 6/589 and running the Forsaken group leaves a Sig initiate
+with no god, also after a reload. Against the old code, the two blocks reported 6 and 2
+failures. `RESULT ALL PASS pass=3429 fail=0`, and `node-import.mjs` passed.
 
 Worked 2026-10-01 (task 386): closed **386**, filed nothing. The return frame now carries the
 source visit's `fightBonusSnapshot` and `equipLockSnapshot`:
