@@ -1853,8 +1853,23 @@ export function sameAffliction(a, b) {
   return !!(a && b && a.type === b.type && normalize(a.name) === normalize(b.name));
 }
 
+/** The slot index, keeping only what has the shape save() writes: a plain object whose keys are
+ *  slot numbers 0..MAX_SLOTS-1 and whose entries are plain objects with a string name. Valid
+ *  JSON of any other shape used to come straight back — `null` threw in reconcileSlotMeta and
+ *  left the title screen unrendered, and a junk entry listed a card with no adventure behind
+ *  it. Whatever is dropped here is rebuilt from its blob by reconcileSlotMeta when the blob is
+ *  readable, and nextFreeSlot still counts an unreadable blob as occupied. (task 371) */
 export function loadSlotMeta() {
-  try { return JSON.parse(localStorage.getItem(META_KEY) || '{}'); } catch { return {}; }
+  let raw;
+  try { raw = JSON.parse(localStorage.getItem(META_KEY) || '{}'); } catch { return {}; }
+  const meta = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return meta;
+  for (const [k, v] of Object.entries(raw)) {
+    if (!/^(0|[1-9]\d*)$/.test(k) || Number(k) >= MAX_SLOTS) continue;
+    if (!v || typeof v !== 'object' || Array.isArray(v) || typeof v.name !== 'string') continue;
+    meta[k] = v;
+  }
+  return meta;
 }
 
 /** Meta reconciled against the actual save blobs. save() writes `fl_save_<slot>` and then

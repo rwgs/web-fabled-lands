@@ -377,6 +377,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 366. README's deploy guidance and file tree disagree with the repository
 - [x] 367. Living documents restate the shipped-section count `docs/Corpus-Census.md` owns
 - [x] 368. The Review log is nine-tenths of `TASKS.md`
+- [x] 371. Validate the save-slot metadata shape before recovery
 - [x] 380. Make late asynchronous failures fail the test runners
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
@@ -21555,5 +21556,49 @@ Checked:
   reports `RESULT FATAL pass=0 fail=1` naming the `SyntaxError`.
 - The full suite reported `RESULT ALL PASS pass=3248 fail=0`. CI's verdict step was run
   locally on saved dumps; a pushed run has not exercised it yet.
+
+---
+
+## 371. Validate the save-slot metadata shape before recovery
+
+**Priority: MEDIUM.** A malformed index prevents access to otherwise intact adventures.
+
+### What is wrong
+
+`loadSlotMeta` in [state.js](web/js/state.js) catches JSON parse errors but returns any
+successfully parsed value. With `fl_meta` containing the literal `null`,
+`reconcileSlotMeta` throws while reading `meta[i]`. `showTitle` calls this during boot,
+so the title never finishes rendering. Strings, arrays and malformed slot entries
+also bypass the expected metadata-object contract. Existing blob reconciliation
+cannot recover when its starting index has the wrong shape.
+
+### The fix
+
+- `loadSlotMeta` in `web/js/state.js` returns `{}` unless the parsed index is a plain object,
+  and keeps an entry only if its key is a canonical slot number below `MAX_SLOTS` and its
+  value is a plain object with a string `name`. Name is the one field required, because older
+  entries may lack `updated` or `section` and `showSaves` already tolerates that. A dropped
+  entry over a readable blob is rebuilt by `reconcileSlotMeta`, and `nextFreeSlot` still
+  counts an unreadable blob as occupied, because it checks the raw key. Every caller reads the
+  index through this function, so `save()` and `deleteSlot` also write back the cleaned index.
+- `suite-economy` (task 371 block): `fl_meta` set to `null`, `42`, `"fl"`, `true`, `[]` and
+  `[{"name":"Ghost"}]` over an intact saved adventure lists exactly that adventure without
+  throwing, leaves its blob byte-identical and keeps its slot occupied. An index of malformed
+  entries (a string, an array, a number, `{}`, a numeric `name`, and keys `x`, `25` and `01`)
+  lists no ghost cards. It rebuilds the entry over the readable blob and keeps the slot of
+  an unreadable blob occupied.
+
+Checked:
+
+- Against the old `loadSlotMeta`, the `null` case failed with
+  `TypeError: Cannot read properties of null (reading '0')`, the throw as filed.
+- The real app, driven in headless Chrome over DevTools from a scratch script, rendered the
+  title screen with Continue and listed `Intact371` on the saves screen for `fl_meta` values
+  of `null`, `[]` and `{"3":"junk","9":{"name":"Ghost"},"x":{"name":"Ghost"}}`. Its blob was
+  unchanged and the page threw nothing.
+- Out of scope: in that last case the well-formed `9` entry, which has no blob, still lists a
+  card. That meta-only form is the ghost task 198 prevents by deleting meta first. Only a
+  hand edit of storage produces it now.
+- The full suite reported `RESULT ALL PASS pass=3271 fail=0`, and `node-import.mjs` passed.
 
 ---

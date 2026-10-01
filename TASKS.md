@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 371. `loadSlotMeta` accepts valid JSON of the wrong shape; `fl_meta = null` makes title/save recovery throw even when the save blobs are intact
 - [ ] 372. `sellPlan` treats ships with different crew/cargo and items with different effects as interchangeable, so a sale can silently remove the more valuable candidate
 - [ ] 373. `GameState.keep` leaves a partially written preview save behind when the metadata write fails; each retry claims another slot
 - [ ] 374. The service-worker update gate releases during unsaved play, so an automatic update can reload away a preview or progress whose autosave failed
@@ -417,6 +416,7 @@ this order.*
 - [x] 361. `smoke.yml` pinned `actions/checkout@v4`, `actions/setup-node@v4` and `node-version: '20'`; GitHub removed Node 20 from its runners on 2026-09-23; now `@v7`/`@v7`/Node 24, and the first pushed run was green in all three jobs
 - [x] 368. the Review log was nine-tenths of `TASKS.md`, mostly re-telling closed tasks whose detail is already archived; on the owner's go-ahead, the 123 entries below the latest `Reviewed` pass moved verbatim to `TASKS-archive.md`'s "Review log (archived)", and the header says where later ones go
 - [x] 380. a failure captured after a passing report prefixed a header no runner could parse above the old `RESULT ALL PASS` line, so both runners read that line and exited 0 on a page titled `TESTS_FAIL`; `flFatal` now re-runs the reporter, which writes a numeric `RESULT FAILURES` verdict, both runners also require the `TESTS_OK` title for a pass, and `run-tests-selftest.ps1` drives a late rejection and a late failing assertion through the runner
+- [x] 371. `loadSlotMeta` returned any parsed JSON, so `fl_meta = null` threw in `reconcileSlotMeta` before the title screen rendered and a junk entry listed a ghost card; it now keeps only a plain object of slot-number keys whose entries are objects with a string `name`, and what it drops is rebuilt from a readable blob or left occupied behind an unreadable one
 
 ---
 
@@ -515,34 +515,6 @@ removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first
 
 - `https://webfl.rwgs.net/web/` is served by the Worker (a `/README.md` request answers 404).
   An installed copy updates to the next build, and it opens `/web/index.html` offline.
-
----
-
-## 371. Validate the save-slot metadata shape before recovery
-
-**Priority: MEDIUM.** A malformed index prevents access to otherwise intact adventures.
-
-### What is wrong
-
-`loadSlotMeta` in [state.js](web/js/state.js) catches JSON parse errors but returns any
-successfully parsed value. With `fl_meta` containing the literal `null`,
-`reconcileSlotMeta` throws while reading `meta[i]`. `showTitle` calls this during boot,
-so the title never finishes rendering. Strings, arrays and malformed slot entries
-also bypass the expected metadata-object contract. Existing blob reconciliation
-cannot recover when its starting index has the wrong shape.
-
-### Steps
-
-1. Validate the index as a plain metadata object; reject malformed index/entry shapes
-   and reconstruct readable slots from their blobs without overwriting those blobs.
-2. Add owning-suite cases for `null`, primitives, arrays and malformed entries, with
-   an intact adventure behind them. Keep unreadable blobs occupied.
-3. Verify the title and saves screens recover, then run the documented test loop.
-
-### Validation
-
-- `fl_meta = null` with an intact `fl_save_0` lists that adventure without throwing.
-- Invalid metadata shapes neither create ghost cards nor overwrite saved adventures.
 
 ---
 
@@ -824,6 +796,16 @@ reader, although `Test-AttrValue` in
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 371): closed **371**, filed nothing. `loadSlotMeta` now validates
+the index's shape and drops malformed entries, which `reconcileSlotMeta` rebuilds from a
+readable blob. `suite-economy` gained 23 assertions; against the old function the `null`
+case threw exactly as filed. The real app, driven headless over DevTools with `fl_meta` set
+to `null`, `[]` and an object of junk entries over an intact `fl_save_3`, rendered the title
+with Continue and listed the adventure, with its blob unchanged and no page error. A
+well-formed entry with no blob behind it still lists a card. That is the ghost task 198
+prevents by deleting meta first, and only a hand edit of storage produces it now, so it was
+left alone. The full suite reported `RESULT ALL PASS pass=3271 fail=0`.
 
 Worked 2026-10-01 (task 380): closed **380**, filed nothing. A failure captured after a
 passing report now re-runs the reporter, so the verdict line itself reads `RESULT FAILURES

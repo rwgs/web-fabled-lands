@@ -1034,6 +1034,47 @@ export async function run(ctx) {
       restore();
     }
 
+    // --- task 371: valid JSON of the wrong shape in fl_meta must not block recovery ---------
+    // loadSlotMeta caught a parse error but returned any parsed value, so `null` threw in
+    // reconcileSlotMeta (the title screen never rendered) and a junk entry listed a ghost card.
+    {
+      const S = 'fl_save_', M = 'fl_meta';
+      const savedMeta = localStorage.getItem(M);
+      const savedBlobs = [];
+      for (let i = 0; i < 20; i++) { savedBlobs.push(localStorage.getItem(S + i)); localStorage.removeItem(S + i); }
+      const g371 = GameState.create({ name: 'Intact371', gender: 'f', profession: 'Mage', book: 1, adv });
+      g371.slot = 3; g371.save();
+      const blob3 = localStorage.getItem(S + 3);
+      for (const bad of ['null', '42', '"fl"', 'true', '[]', '[{"name":"Ghost"}]']) {
+        localStorage.setItem(M, bad);
+        let threw = null, recon;
+        try { recon = reconcileSlotMeta(); } catch (e) { threw = e; }
+        ok(`task371: fl_meta = ${bad} lists the intact adventure without throwing`,
+           threw === null && !!recon && Object.keys(recon).join() === '3' && recon[3].name === 'Intact371',
+           threw ? String(threw) : JSON.stringify(recon));
+        ok(`task371: fl_meta = ${bad} leaves the save blob untouched`, localStorage.getItem(S + 3) === blob3);
+        ok(`task371: fl_meta = ${bad} keeps slot 3 occupied`, nextFreeSlot() === 0);
+      }
+
+      // Malformed entries: dropped, never listed; a readable blob behind one is rebuilt from it,
+      // and an unreadable blob behind one stays occupied rather than offered for reuse.
+      localStorage.setItem(S + 0, '{not valid json');
+      localStorage.setItem(M, JSON.stringify({
+        0: 'junk', 3: [], 5: 7, 6: {}, 7: { name: 9 }, x: { name: 'Ghost' }, 25: { name: 'Ghost' }, '01': { name: 'Ghost' },
+      }));
+      const recon371 = reconcileSlotMeta();
+      ok('task371: malformed entries create no ghost cards',
+         Object.keys(recon371).join() === '3', JSON.stringify(recon371));
+      ok('task371: a malformed entry over a readable blob is rebuilt from the blob',
+         !!recon371[3] && recon371[3].name === 'Intact371' && recon371[3].profession === 'Mage', JSON.stringify(recon371[3]));
+      ok('task371: both blobs are untouched', localStorage.getItem(S + 3) === blob3 && localStorage.getItem(S + 0) === '{not valid json');
+      ok('task371: the unreadable blob keeps its slot occupied', nextFreeSlot() === 1, String(nextFreeSlot()));
+      ok('task371: a well-formed index still round-trips', JSON.stringify(loadSlotMeta()) === JSON.stringify(recon371));
+
+      if (savedMeta == null) localStorage.removeItem(M); else localStorage.setItem(M, savedMeta);
+      savedBlobs.forEach((b, i) => { if (b == null) localStorage.removeItem(S + i); else localStorage.setItem(S + i, b); });
+    }
+
     // --- task 198: a failed deletion must never leave a ghost slot ---------------------
     // deleteSlot used to remove the blob first: if the fl_meta write then threw, the save was
     // already gone while its card remained — a ghost reconcileSlotMeta cannot repair (it only
