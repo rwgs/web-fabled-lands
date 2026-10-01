@@ -12,11 +12,41 @@ import { Story } from '../js/render.js';
 import * as gates from '../js/render-gates.js';
 import * as visit from '../js/visit-state.js';
 import { rawSections } from './corpus-text.js';
+import { ABILITIES, PROFESSIONS } from '../js/rules.js';
 
 export async function run(ctx) {
   const { ok, parse } = ctx;
   await data.loadMeta();
   const adv = data.parseAdventurers(data.bookInfo(1).adventurers);
+
+    // --- task 376: every published book creates every profession from its OWN data ---------
+    // The scan below starts from book 1's data, so a book whose Adventurers.xml was missing or
+    // empty still built and passed here, and its New Adventure threw. This drives the creation
+    // path itself (parseAdventurers -> GameState.create) per book, per offered profession.
+    for (const b of data.availableBooks()) {
+      const own = data.parseAdventurers(data.bookInfo(b)?.adventurers);
+      ok(`task376: book ${b} bundles its character-creation data`,
+         !!own && Array.isArray(own.items) && !!own.professions, String(own && Object.keys(own)));
+      if (!own || !own.professions) continue;
+      const bad = [];
+      for (const p of PROFESSIONS) {
+        const scores = own.professions[p] || {};
+        const unscored = ABILITIES.filter((ab) => !(Number.isInteger(scores[ab]) && scores[ab] > 0));
+        if (unscored.length) { bad.push(`${p}: no score for ${unscored.join('/')}`); continue; }
+        let g;
+        try { g = GameState.create({ name: 'C376', gender: 'f', profession: p, book: b, adv: own }); }
+        catch (e) { bad.push(`${p}: create threw ${e && e.message}`); continue; }
+        const wrong = ABILITIES.filter((ab) => g.data.abilities[ab] !== scores[ab]);
+        if (wrong.length) bad.push(`${p}: ${wrong.join('/')} not taken from book ${b}`);
+        if (g.data.book !== b || g.data.stamina !== own.stamina || g.data.staminaMax !== own.stamina
+            || g.data.rank !== own.rank || g.data.shards !== own.gold) bad.push(`${p}: starting stats differ from book ${b}'s`);
+        const expected = own.items.filter((it) => !it.profession || it.profession === p).map((it) => it.name);
+        const got = g.data.items.map((it) => it.name);
+        if (expected.some((n) => !n) || expected.join('|') !== got.join('|')) bad.push(`${p}: items ${got.join(',')} vs ${expected.join(',')}`);
+      }
+      ok(`task376: book ${b} creates all six professions from its own scores, stats and items`, bad.length === 0, bad.join(' ; '));
+    }
+
     // scan: render EVERY section of EVERY book without throwing
     let renderErrors = 0, firstErr='', total=0;
     const gs2 = GameState.create({ name:'Scan', gender:'m', profession:'Rogue', book:1, adv });

@@ -201,15 +201,19 @@ Assert 'a missing generated-inventory marker throws instead of passing silently'
 # build before any assertion below can run - which is what it did until task 333.
 function New-E2EFixture([int]$n) {
     Reset-Tmp
+    # The character-creation data the source gate requires of every published book (task 376).
+    $create = '<abilities><header>Charisma Combat Magic Sanctity Scouting Thievery</header>' +
+        (@('Priest', 'Mage', 'Rogue', 'Troubadour', 'Warrior', 'Wayfarer' | ForEach-Object { "<profession name=`"$_`">4 4 4 4 4 4</profession>" }) -join '') +
+        '</abilities><stamina amount="9"/><rank amount="1"/><gold amount="16"/><items><item name="map"/></items>'
     $files = @{
         'books/book1/1.xml'           = '<section name="1"><p>Base one. <goto section="2"/></p></section>'
         'books/book1/2.xml'           = '<section name="2"><p>Second.</p><return/></section>'
-        'books/book1/Adventurers.xml' = '<adventurers><starting><adventurer name="Ona Fixture" profession="warrior" gender="f">A fixture warrior.</adventurer></starting></adventurers>'
+        'books/book1/Adventurers.xml' = ('<adventurers>' + $create + '<starting><adventurer name="Ona Fixture" profession="warrior" gender="f">A fixture warrior.</adventurer></starting></adventurers>')
         'books/book1/Region-Map.jpg'  = 'MAP1'
         'books/book1/Art 1.jpg'       = 'ART1'
         'books/book1/book.ini'        = 'Codewords=Basefix'
         "books/book$n/1.xml"           = '<section name="1"><p>Added book.</p><return/></section>'
-        "books/book$n/Adventurers.xml" = '<adventurers><starting><adventurer name="Sev Fixture" profession="mage" gender="m">A fixture mage.</adventurer></starting></adventurers>'
+        "books/book$n/Adventurers.xml" = ('<adventurers>' + $create + '<starting><adventurer name="Sev Fixture" profession="mage" gender="m">A fixture mage.</adventurer></starting></adventurers>')
         "books/book$n/Region-Map.jpg"  = "MAP$n"
         "books/book$n/Art $n.jpg"      = "ART$n"
         "books/book$n/book.ini"        = "Codewords=Addedfix$n"

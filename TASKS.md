@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 376. The source gate accepts a missing or empty `Adventurers.xml`, allowing a published book whose character-creation screen throws
 - [ ] 377. `nextFreeSlot` and `GameState.load` leave storage reads unguarded, so a browser that blocks those reads throws before the intended save-failure recovery can run
 
 **LOW**
@@ -418,6 +417,7 @@ this order.*
 - [x] 373. `GameState.keep` restored the preview when `save(true)` failed but left the blob a failed `fl_meta` write had already landed, so each retry claimed another slot; it now removes that blob, and if storage refuses the removal it reuses the same slot next time
 - [x] 374. `buildGameScreen` released the update gate outright, so a new build could reload away an unkept `?demo=` preview or progress whose autosave had failed; the game screen's hold now follows the save-status channel (`holdUpdateWhileUnsaved`), a successful save or Keep applies the deferred update once, and Keep drops `?demo=` so that reload lands on the title
 - [x] 375. two tabs that loaded one slot each wrote complete snapshots, so the staler tab's autosave replaced the other's newer progress; `save()` now refuses to write over a blob that is not the one this game last loaded or wrote (first writer wins), reports a conflict, and the "Progress not saved" modal adds "Load the newer save"
+- [x] 376. the source gate skipped a missing `Adventurers.xml` and accepted `<adventurers/>`, so a published book could build with a New Adventure that threw; the gate now requires the file and the fields the creation path reads (`Test-AdventurersData`), and `suite-corpus` creates all six professions from each published book's own data
 
 ---
 
@@ -516,38 +516,6 @@ removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first
 
 - `https://webfl.rwgs.net/web/` is served by the Worker (a `/README.md` request answers 404).
   An installed copy updates to the next build, and it opens `/web/index.html` offline.
-
----
-
-## 376. Require usable character-creation data for every published book
-
-**Priority: MEDIUM.** An incomplete edition can build successfully and fail on New Adventure.
-
-### What is wrong
-
-`Test-SourceTree` in [validate-source.ps1](build/validate-source.ps1) skips an absent
-`Adventurers.xml` and accepts `<adventurers/>`. `build-data.ps1` then emits a null
-or structurally empty `adventurers` payload. `getAdvData` in
-[app.js](web/js/app.js) passes this to `showCreate`, whose creation path assumes
-professions and starting items exist, as does `GameState.create` in
-[state.js](web/js/state.js). A temporary book-2 fixture with
-one valid section and `Codewords=Bounty` returns zero validation errors both with
-no Adventurers file and with an empty one. Creating from the resulting absent data
-throws. The corpus scan initializes from book 1 and does not validate character
-creation for each published book.
-
-### Steps
-
-1. Require each published book's Adventurers file and validate the fields the creation
-   path reads: ability header/profession scores, starting stats, and item structure.
-2. Exercise missing and incomplete data in the gate's fixture self-test.
-3. Add creation checks driven by the published edition, with each book's own data.
-4. Run the documented build and test loop.
-
-### Validation
-
-- A missing or unusable Adventurers file fails the source gate before bundling.
-- Every published book supports creating its offered professions from its own data.
 
 ---
 
@@ -716,6 +684,16 @@ repository.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 376): closed **376**, filed nothing. The source gate now fails a
+published book with no `Adventurers.xml` or with unusable creation data, through
+`Test-AdventurersData` in `validate-source.ps1`. `validate-selftest.ps1` gained 10 mutation
+cases, none of which the old gate caught. Its fixture and `release-selftest.ps1`'s now carry
+full creation data. `suite-corpus` creates all six professions from each published book's own
+data. With book 2's Wayfarer row stripped from a probe copy of `meta.json`, the check named
+the gap; the file was restored with `git checkout`. The real corpus passes the gate and the
+rebuild is a no-op. Validate selftest `pass=77`, release selftest `pass=59`, and the full
+suite `RESULT ALL PASS pass=3326 fail=0`.
 
 Worked 2026-10-01 (task 375): closed **375**, filed nothing. First writer wins.
 `GameState` remembers the exact blob it last loaded or wrote, and `save()` refuses to write

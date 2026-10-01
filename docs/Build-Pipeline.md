@@ -104,6 +104,12 @@ misspelling therefore makes the check *easier* than the page prints it, silently
 
 The full vocabulary is in [XML Tag Reference](XML-Tag-Reference.md).
 
+Every published book must also ship an `Adventurers.xml` that the creation screen can use:
+an ability header naming the six abilities, one row of six positive scores for each of the six
+professions, one `<stamina>`, `<rank>` and `<gold>` amount, and starting items with a valid
+kind, a name and a known profession (`Test-AdventurersData`). A missing or empty file used to
+pass, and that book's New Adventure threw (task 376).
+
 Tag and attribute **names** are matched exact-case, because the engine's `getAttribute` and
 `querySelectorAll` are: `<fight playerfirst="f">` is not `playerFirst=` to the browser, so it
 must not be to the gate (task 362).

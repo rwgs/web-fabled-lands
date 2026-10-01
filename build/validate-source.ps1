@@ -528,6 +528,58 @@ function Test-HeadlessShapes($doc, [string]$label, [System.Collections.ArrayList
     }
 }
 
+# The character-creation data the app reads from Adventurers.xml (task 376). parseAdventurers
+# in web/js/data.js maps each <profession>'s scores onto the <header>'s ability names by
+# position; showCreate in app.js offers all six professions and GameState.create in state.js
+# reads each one's scores, the <stamina>/<rank>/<gold> amounts and every <items> child. A
+# missing score defaulted to 4 in silence and a missing file or block threw on New Adventure,
+# while the gate passed both. Names are exact-case, as the app compares them.
+$script:FL_ABILITIES = @('charisma', 'combat', 'magic', 'sanctity', 'scouting', 'thievery')
+$script:FL_PROFESSIONS = @('Priest', 'Mage', 'Rogue', 'Troubadour', 'Warrior', 'Wayfarer')
+$script:FL_START_KINDS = @('item', 'weapon', 'armour', 'tool')
+function Test-AdventurersData($root, [string]$label, [System.Collections.ArrayList]$errors) {
+    $header = $root.SelectSingleNode('abilities/header')
+    $names = if ($header) { @("$($header.InnerText)".Trim().ToLowerInvariant() -split '\s+' | Where-Object { $_ }) } else { @() }
+    $absent = @($script:FL_ABILITIES | Where-Object { $names -cnotcontains $_ })
+    if ($names.Count -ne $script:FL_ABILITIES.Count -or $absent.Count) {
+        [void]$errors.Add(("{0} : <abilities><header> must name the six abilities once each (has `"{1}`")" -f $label, ($names -join ' ')))
+    }
+    foreach ($p in $script:FL_PROFESSIONS) {
+        $rows = @($root.SelectNodes("abilities/profession[@name='$p']"))
+        if ($rows.Count -ne 1) {
+            [void]$errors.Add(("{0} : profession `"{1}`" needs exactly one <abilities><profession> score row (has {2})" -f $label, $p, $rows.Count))
+            continue
+        }
+        $scores = @("$($rows[0].InnerText)".Trim() -split '\s+' | Where-Object { $_ })
+        if ($scores.Count -ne $script:FL_ABILITIES.Count -or @($scores | Where-Object { $_ -notmatch '^[1-9]\d*$' }).Count) {
+            [void]$errors.Add(("{0} : profession `"{1}`" needs six positive whole-number scores (has `"{2}`")" -f $label, $p, ($scores -join ' ')))
+        }
+    }
+    foreach ($stat in @(@{ tag = 'stamina'; min = 1 }, @{ tag = 'rank'; min = 1 }, @{ tag = 'gold'; min = 0 })) {
+        $nodes = @($root.SelectNodes($stat.tag))
+        $amount = if ($nodes.Count -eq 1) { $nodes[0].GetAttribute('amount') } else { '' }
+        if ($amount -notmatch '^\d+$' -or [int]$amount -lt $stat.min) {
+            [void]$errors.Add(("{0} : needs one <{1} amount=`"N`"> with N at least {2}" -f $label, $stat.tag, $stat.min))
+        }
+    }
+    foreach ($it in @($root.SelectNodes('items/*'))) {
+        $kind = $it.get_Name()
+        if ($script:FL_START_KINDS -cnotcontains $kind) {
+            [void]$errors.Add(("{0} : <items> holds <{1}>, which is not a starting item kind ({2})" -f $label, $kind, ($script:FL_START_KINDS -join ', ')))
+            continue
+        }
+        if (-not $it.GetAttribute('name').Trim()) {
+            [void]$errors.Add(("{0} : a starting <{1}> needs a name" -f $label, $kind))
+        }
+        if ($it.HasAttribute('bonus') -and $it.GetAttribute('bonus') -notmatch '^[+-]?\d+$') {
+            [void]$errors.Add(("{0} : starting <{1} name=`"{2}`"> has a bonus that is not a whole number" -f $label, $kind, $it.GetAttribute('name')))
+        }
+        if ($it.HasAttribute('profession') -and $script:FL_PROFESSIONS -cnotcontains $it.GetAttribute('profession')) {
+            [void]$errors.Add(("{0} : starting <{1} name=`"{2}`"> names an unknown profession `"{3}`"" -f $label, $kind, $it.GetAttribute('name'), $it.GetAttribute('profession')))
+        }
+    }
+}
+
 # Every explicit jump target in a document, as "<book>:<section>" keys. `section=` names a
 # section in `book=` when given, otherwise in the file's own book; <extrachoice> also arms a
 # choice AT another section (atbook/atsection). Non-literal ids are skipped: they are either a
@@ -649,8 +701,12 @@ function Test-SourceTree([string]$rulesDir, [hashtable]$bookDirs) {
         # 3. Adventurers.xml: rooted at <adventurers>, and each pregen's biography readable -
         #    inline prose, or the <FirstName>.xml the build folds its first <p> from. A
         #    malformed/missing bio used to leave the create-character card blank in silence.
+        #    Required, with the creation data the app reads (task 376): an absent file used to be
+        #    skipped, and the edition built a book whose New Adventure threw.
         $advPath = Join-Path $dir 'Adventurers.xml'
-        if (Test-Path $advPath) {
+        if (-not (Test-Path $advPath)) {
+            [void]$errors.Add(("{0}/Adventurers.xml : missing - a published book needs its character-creation data" -f $dirName))
+        } else {
             $checked++
             $label = "{0}/Adventurers.xml" -f $dirName
             $advXml = Read-Xml $advPath
@@ -659,6 +715,7 @@ function Test-SourceTree([string]$rulesDir, [hashtable]$bookDirs) {
             else {
                 $adoc = Get-XmlDoc $advXml
                 Test-XmlVocabulary $adoc.DocumentElement $label $errors
+                Test-AdventurersData $adoc.DocumentElement $label $errors
                 foreach ($a in $adoc.SelectNodes('//starting/adventurer')) {
                     $name = $a.GetAttribute('name')
                     if ("$($a.InnerText)".Trim()) { continue }   # inline prose (book 5)

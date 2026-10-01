@@ -382,6 +382,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 373. Roll back a partially written preview promotion
 - [x] 374. Hold automatic update reloads while play is unsaved
 - [x] 375. Detect concurrent play of the same save slot
+- [x] 376. Require usable character-creation data for every published book
 - [x] 380. Make late asynchronous failures fail the test runners
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
@@ -21807,5 +21808,60 @@ Checked:
     "Load the newer save" and "Continue". Tab 1 showed nothing.
   - "Load the newer save" put tab 2 at §20, and its next move saved §192 with no modal.
 - The full suite reported `RESULT ALL PASS pass=3314 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 376. Require usable character-creation data for every published book
+
+**Priority: MEDIUM.** An incomplete edition can build successfully and fail on New Adventure.
+
+### What is wrong
+
+`Test-SourceTree` in [validate-source.ps1](build/validate-source.ps1) skips an absent
+`Adventurers.xml` and accepts `<adventurers/>`. `build-data.ps1` then emits a null
+or structurally empty `adventurers` payload. `getAdvData` in
+[app.js](web/js/app.js) passes this to `showCreate`, whose creation path assumes
+professions and starting items exist, as does `GameState.create` in
+[state.js](web/js/state.js). A temporary book-2 fixture with
+one valid section and `Codewords=Bounty` returns zero validation errors both with
+no Adventurers file and with an empty one. Creating from the resulting absent data
+throws. The corpus scan initializes from book 1 and does not validate character
+creation for each published book.
+
+### The fix
+
+- `build/validate-source.ps1`: step 3 of `Test-SourceTree` reports a missing
+  `Adventurers.xml` as an error rather than skipping it. A present file goes through the new
+  `Test-AdventurersData`, which checks the fields the creation path reads:
+  - the `<abilities><header>` names the six abilities once each;
+  - each of the six professions has exactly one score row of six positive whole numbers;
+  - there is one `<stamina>`, `<rank>` and `<gold>` with a whole-number `amount=`
+    (stamina and rank at least 1);
+  - every `<items>` child is an `item`, `weapon`, `armour` or `tool`, has a name, has a
+    whole-number bonus if any, and names one of the six professions exact-case if it names
+    one at all.
+- `build/validate-selftest.ps1`: the fixture's Adventurers files carry full creation data
+  (`$ADV_CORE`). Ten new cases each fail: a missing file, an empty `<adventurers/>`, a header
+  missing an ability, a profession with no row, a five-score row, no Stamina, a non-numeric
+  Shards amount, a nameless item, an item for profession `warrior`, and a `<gold>` inside
+  `<items>`.
+- `build/release-selftest.ps1`: its end-to-end fixture books carry creation data too, because
+  its real builds run the gate.
+- `web/tests/suite-corpus.js`: for every book in `availableBooks()`, the bundled data parses.
+  Each of the six professions has positive scores for all six abilities, and
+  `GameState.create` from that book's own data takes those scores, the book's Stamina, Rank
+  and Shards, and exactly the starting items for that profession. The scan that follows still
+  starts from book 1's data.
+- `docs/Build-Pipeline.md` describes the new requirement under the source-XML gate.
+
+Checked:
+
+- Against the old gate, all 10 new selftest cases failed (`pass=67 fail=10`). With the fix
+  it reported `pass=77 fail=0`, and the release selftest `pass=59 fail=0`.
+- With book 2's Wayfarer row stripped from `web/data/meta.json`, `suite-corpus` failed
+  naming `Wayfarer: no score for charisma/.../thievery`. The file was restored with
+  `git checkout`.
+- The real corpus passes the gate, and the rebuild changed nothing.
+- The full suite reported `RESULT ALL PASS pass=3326 fail=0`.
 
 ---

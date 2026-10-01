@@ -25,6 +25,16 @@ function Assert([string]$label, [bool]$cond, [string]$detail) {
 }
 
 # ---- The fixture -----------------------------------------------------------------------
+# The character-creation data both books carry: the six professions' scores, the starting
+# stats and items, which the gate requires of every published book (task 376).
+$ADV_CORE = '<abilities><header>Charisma Combat Magic Sanctity Scouting Thievery</header>' +
+    '<profession name="Priest">4 2 3 6 4 2</profession><profession name="Mage">2 2 6 1 5 3</profession>' +
+    '<profession name="Rogue">5 4 4 1 2 6</profession><profession name="Troubadour">6 3 4 3 2 4</profession>' +
+    '<profession name="Warrior">3 6 2 4 3 2</profession><profession name="Wayfarer">2 5 2 3 6 4</profession>' +
+    '</abilities><stamina amount="9"/><rank amount="1"/><gold amount="16"/>' +
+    '<items><armour name="leather jerkin" bonus="1"/><weapon profession="Warrior" name="battle-axe"/><item name="map"/></items>'
+$ADV_START = '<starting><adventurer name="Andriel the Hammer" profession="Warrior" gender="m"/></starting>'
+function New-Adv([string]$core) { '<adventurers>' + $core + $ADV_START + '</adventurers>' }
 # A valid miniature of the real tree: two "bundled" books, one with a pregen whose biography
 # lives in its own file (as books 1-4 and 6 do) and one with inline prose (as book 5 does).
 $FIXTURE = @{
@@ -33,7 +43,7 @@ $FIXTURE = @{
     # turns on: an awarded codeword must stay silent while a tested-or-cleared one is reported.
     'books/book1/2.xml'    = '<section name="2"><tick codeword="Ready" hidden="t"/><lose codeword="Relic"/><difficulty ability="scouting" level="10"/><outcomes><outcome range="1-6" section="1"/></outcomes></section>'
     'books/book1/2a.xml'   = '<section name="2a"><p>A continuation.</p><return/></section>'
-    'books/book1/Adventurers.xml' = '<adventurers><starting><adventurer name="Andriel the Hammer" profession="Warrior" gender="m"/></starting></adventurers>'
+    'books/book1/Adventurers.xml' = (New-Adv $ADV_CORE)
     'books/book1/Andriel.xml'     = '<section name="Andriel"><p>A warrior of few words.</p></section>'
     # A parked working copy: it claims section 1's id, but sits in the book's temp/ folder,
     # which the gate's non-recursive walk does not enter. Present in the CLEAN fixture, so
@@ -50,7 +60,7 @@ $FIXTURE = @{
     'books/book1/book.ini' = "Map=Sokara.JPG`nDeath=680`nCodewords=Ready,Relic,\`n`tRune,\u00c9clat`n# a trailing comment, as books 1, 2 and 4 carry`n"
     'books/book2/book.ini' = "Map=Golnir.JPG`nDeath=560`nCodewords=Bounty`n"
     'books/book2/1.xml'    = '<section name="1"><trade ship="brig" cargo="timb" buy="10"/><if crew="excellent"><p>Fine crew.</p></if></section>'
-    'books/book2/Adventurers.xml' = '<adventurers><starting><adventurer name="Shen Darkeye" profession="Mage" gender="f">Born to the violet ocean.</adventurer></starting></adventurers>'
+    'books/book2/Adventurers.xml' = '<adventurers>' + $ADV_CORE + '<starting><adventurer name="Shen Darkeye" profession="Mage" gender="f">Born to the violet ocean.</adventurer></starting></adventurers>'
     'rules/Rules.xml'      = '<section name="rules"><h3>Rules</h3><p>Roll two dice.</p><table><tr><td>1</td></tr></table></section>'
     'rules/QuickRules.xml' = '<section name="quick"><p>Quick rules.</p></section>'
 }
@@ -359,6 +369,58 @@ $CASES = @(
        file  = 'books/book1/Andriel.xml'
        text  = '<section name="Andriel"><p>   </p></section>'
        want  = 'no biography prose' }
+
+    # Character-creation data (task 376): each shape below built an edition whose New
+    # Adventure threw or silently defaulted a score.
+    @{ label = 'a published book with no Adventurers.xml (task 376)'
+       file  = 'books/book2/Adventurers.xml'
+       text  = $null
+       want  = 'book2/Adventurers.xml : missing' }
+
+    @{ label = 'an empty <adventurers/> (task 376)'
+       file  = 'books/book2/Adventurers.xml'
+       text  = '<adventurers/>'
+       want  = 'must name the six abilities' }
+
+    @{ label = 'an ability header missing one ability (task 376)'
+       file  = 'books/book1/Adventurers.xml'
+       text  = (New-Adv ($ADV_CORE -replace ' Thievery', ''))
+       want  = 'must name the six abilities' }
+
+    @{ label = 'a profession with no score row (task 376)'
+       file  = 'books/book1/Adventurers.xml'
+       text  = (New-Adv ($ADV_CORE -replace '<profession name="Wayfarer">2 5 2 3 6 4</profession>', ''))
+       want  = 'profession "Wayfarer" needs exactly one' }
+
+    @{ label = 'a profession row with five scores (task 376)'
+       file  = 'books/book1/Adventurers.xml'
+       text  = (New-Adv ($ADV_CORE -replace '>3 6 2 4 3 2<', '>3 6 2 4 3<'))
+       want  = 'profession "Warrior" needs six positive whole-number scores' }
+
+    @{ label = 'a missing starting Stamina (task 376)'
+       file  = 'books/book1/Adventurers.xml'
+       text  = (New-Adv ($ADV_CORE -replace '<stamina amount="9"/>', ''))
+       want  = 'needs one <stamina amount=' }
+
+    @{ label = 'a starting Shards amount that is not a number (task 376)'
+       file  = 'books/book1/Adventurers.xml'
+       text  = (New-Adv ($ADV_CORE -replace '<gold amount="16"/>', '<gold amount="lots"/>'))
+       want  = 'needs one <gold amount=' }
+
+    @{ label = 'a starting item with no name (task 376)'
+       file  = 'books/book1/Adventurers.xml'
+       text  = (New-Adv ($ADV_CORE -replace '<item name="map"/>', '<item/>'))
+       want  = 'a starting <item> needs a name' }
+
+    @{ label = 'a starting item for an unknown profession (task 376)'
+       file  = 'books/book1/Adventurers.xml'
+       text  = (New-Adv ($ADV_CORE -replace 'profession="Warrior" name="battle-axe"', 'profession="warrior" name="battle-axe"'))
+       want  = 'names an unknown profession "warrior"' }
+
+    @{ label = 'a starting entry that is not an item kind (task 376)'
+       file  = 'books/book1/Adventurers.xml'
+       text  = (New-Adv ($ADV_CORE -replace '<item name="map"/>', '<gold amount="5"/>'))
+       want  = 'which is not a starting item kind' }
 )
 
 foreach ($c in $CASES) {
