@@ -386,6 +386,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 377. Recover when reading browser storage is blocked
 - [x] 378. Validate boolean values by tag where attribute meanings differ
 - [x] 379. Make enum validation match each reader's case and list semantics
+- [x] 381. Bring player rule summaries into line with the implemented rules
 - [x] 380. Make late asynchronous failures fail the test runners
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
@@ -22031,5 +22032,63 @@ Checked:
 - Against the old gate, all six mutations failed (`pass=83 fail=6`). With the fix the
   selftest reported `pass=89 fail=0`, and the release selftest `pass=59`.
 - The full suite reported `RESULT ALL PASS pass=3350 fail=0`.
+
+---
+
+## 381. Bring player rule summaries into line with the implemented rules
+
+**Priority: LOW.** The guides describe behavior that later rule changes replaced.
+
+### What is wrong
+
+The Combat summary in [README.md](README.md) and the Defence formula in
+[Game Rules](docs/Game-Rules.md) still say "best armour"; Game Rules and
+[Playing the Game](docs/Playing-the-Game.md) also say only the best bonus of a
+kind applies. `setEquipped`, `wieldedWeapon` and `wornArmour` in
+[state.js](web/js/state.js) honor the player's explicit selection, including
+weaker equipment, and use the strongest item only as a fallback.
+
+Game Rules says per-fight bonuses never survive a save, but `fightBonusSnapshot`
+and `restoreFightBonus` preserve them in the visit record for a mid-fight
+reload. Its Abilities section says all six modifier modes are honored by every
+reader, although `Test-AttrValue` in
+[validate-source.ps1](build/validate-source.ps1) accepts `current` only on
+`adjust` and `difficulty`.
+
+### The fix
+
+Documentation only; checked against `wieldedWeapon`, `wornArmour`, `_equipped`,
+`setEquipped`, `itemBonus`, `fightBonusSnapshot`/`restoreFightBonus` and `rollTraining`, and
+against the `current` restriction in `Test-AttrValue`.
+
+- `README.md`'s rules summary:
+  - Defence now says "worn armour", and that the weapon and armour are the sheet choices,
+    with the strongest used until the player chooses. Two of a kind never add.
+  - The Training line said `2d6 > current ability`. `rollTraining` reads the natural score,
+    as Game Rules already said, so it now says natural.
+- `docs/Game-Rules.md`:
+  - The Defence formula says "worn armour bonus", and a new paragraph explains the
+    wield/wear choice and its default.
+  - The economy bullet now reads "Bonuses of a kind never stack": the wielded weapon, the
+    worn armour, the best tool.
+  - Per-fight bonuses clear on entering a new section and survive a reload of the same
+    visit through the visit record.
+  - The modifier paragraph says five modes work on every tag that takes `modifier=`, and
+    `current` only on `<adjust>` and `<difficulty>`.
+- `docs/Playing-the-Game.md`: the Possessions bullet names the Wield/Wear buttons and keeps
+  the no-stacking rule.
+- `docs/XML-Tag-Reference.md` (found by the sibling sweep): the same "all six modes on every
+  tag" claim now names `current`'s two tags.
+
+Checked:
+
+- A repo-wide search for "best armour", "best bonus", "survive a save", "current ability" and
+  "all six modes" found no other living-document hit. `CHANGELOG.md`'s "All six modes are now
+  honoured everywhere" is a dated record and stays as written.
+- Left alone, not living documents: code comments in `web/js/state.js` still say "best armour
+  bonus" (`defence`) and "never survives a save" (the `_fightBonus` field). The `itemBonus`
+  doc comment is accurate for tools.
+- No code changed, so no test run was needed for this task. The last full run, at task 379,
+  was `RESULT ALL PASS pass=3350 fail=0`.
 
 ---

@@ -32,10 +32,14 @@ source of rules bugs in this codebase:
   ceiling**: the 12 is a limit on what the sheet can hold, not on what a weapon can add.
   A Warrior at Combat 8 wielding book 4's white sword (+8) fights at 16.
 
-Markup can ask for a specific reading through `modifier=`, and all six modes are honoured
-by every reader (see [XML Tag Reference](XML-Tag-Reference.md)):
+Markup can ask for a specific reading through `modifier=` (see
+[XML Tag Reference](XML-Tag-Reference.md)):
 
 `affected` (the default), `natural`, `current`, `noarmour`, `notool`, `noweapon`.
+
+Five of them are honoured on every tag that takes `modifier=`. `current`, the wounded
+Stamina, is read only on `<adjust>` and `<difficulty>`, the two that roll or read a stat, and
+the build gate refuses it anywhere else (`Test-AttrValue` in `build/validate-source.ps1`).
 
 An unknown `modifier=` value would silently fall through to the full affected score - the
 very score a `natural` site exists to exclude - which is why the value set is a closed
@@ -71,7 +75,7 @@ The foe strikes back against your Defence:
 ```
 Defence = Combat (including weapon bonus)
         + Rank
-        + best armour bonus
+        + worn armour bonus
         + item auras that boost Defence directly
         - affliction penalties naming Defence
         + god-granted Defence effects
@@ -79,10 +83,17 @@ Defence = Combat (including weapon bonus)
 
 Defence is **derived, never stored**, so it moves the instant anything feeding it moves.
 
+The weapon is the one you **wield** and the armour the one you **wear**. Both are chosen on the
+Adventure Sheet, and until you choose, the strongest of each kind is used (`wieldedWeapon`
+and `wornArmour` in `web/js/state.js`). A weaker pick is honoured, because a weapon's other
+effects can outweigh its bonus.
+
 Other combat rules in force: initiative and `playerFirst`, multiple attacks per round,
 group battles, fleeing (only where the section allows it), `<fightdamage>` effects that
-fire when the enemy wounds you, and per-fight attack or Defence bonuses that never survive
-the fight or a save. **Stamina 0 is death.**
+fire when the enemy wounds you, and per-fight attack or Defence bonuses. Those last only for
+the section's fight: entering a new section clears them. A reload that resumes the same visit
+keeps them, because the visit record carries them (`fightBonusSnapshot` and
+`restoreFightBonus` in `state.js`). **Stamina 0 is death.**
 
 Death is not always final - some sections offer a resurrection deal with a god, which the
 engine models as a standing arrangement rather than a one-off.
@@ -101,7 +112,8 @@ engine models as a standing arrangement rather than a one-off.
   prefix, so the buy-low/sell-high loop between ports works as printed.
 - **Three ship types** by cargo capacity: barque (1), brigantine (2), galleon (3).
 - **Carry limit is 12 items.** Money is unlimited.
-- **Only the best bonus of a kind counts.** Two swords do not stack.
+- **Bonuses of a kind never stack.** Combat takes the wielded weapon's bonus, Defence the worn
+  armour's, and an ability the best tool for it. Two swords do not add.
 
 ### Money is spent by choice
 

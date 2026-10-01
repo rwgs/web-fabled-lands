@@ -27,7 +27,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 381. Player documentation still promises the best carried equipment, says fight bonuses never survive a save, and overstates which tags support `modifier="current"`
 - [ ] 382. `build/serve.py` stalls a service worker's install precache (3 of ~48 requests reach it), so the offline path and a real update cannot be exercised against the repo's own dev server; `python -m http.server` serves the same tree fine
 - [ ] 369. `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19 (CI notice); the `smoke` and `build-scripts` jobs rely on the image's preinstalled `pwsh` 7, `google-chrome` and `python3`, so the move could stop CI with no change here
 - [ ] 370. Move hosting from GitHub Pages to a Cloudflare Worker (owner's request), keeping the root layout and the `/web/` URLs; the Worker's asset server 307s `index.html` to `./`, which the service worker's precache stored as a redirected response that a navigation refuses
@@ -419,6 +418,7 @@ this order.*
 - [x] 377. `nextFreeSlot` and `GameState.load` read storage unguarded, so a browser blocking reads threw out of New Adventure before any recovery; `nextFreeSlot` now throws `StorageReadError` rather than guess a slot is free, `GameState.load` returns null, and New Adventure offers to play without saving (`newAdventureSlot`)
 - [x] 378. the source gate left `<choice pay=>`, `<choice flee=>` and `<fightround pre=>` unvalidated, so a typo read as false (a waived cost, no escape, a late pre-round hook); `Test-AttrValue` now checks them as truth flags on those tags only, and `<fight flee=>` as the whole number it is
 - [x] 379. the source gate lower-cased every enum and allowed `|` on all of them, so `special="ATTACK"`, `crew="EXCELLENT"` and `modifier="natural|noarmour"` validated and did nothing; `special` and `crew` are now exact-case, and a union is legal only where the reader splits one (`ability`, `ship`, cargo, and `profession` on `<tick>`)
+- [x] 381. README, Game Rules and Playing the Game still said the best armour/weapon counts, Game Rules that fight bonuses never survive a save, and Game Rules and the XML Tag Reference that all six `modifier=` modes work on every tag; they now describe the wielded/worn choice, the visit-resume persistence and `current`'s two tags, and README's Training line says natural, not current
 
 ---
 
@@ -520,41 +520,6 @@ removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first
 
 ---
 
-## 381. Bring player rule summaries into line with the implemented rules
-
-**Priority: LOW.** The guides describe behavior that later rule changes replaced.
-
-### What is wrong
-
-The Combat summary in [README.md](README.md) and the Defence formula in
-[Game Rules](docs/Game-Rules.md) still say "best armour"; Game Rules and
-[Playing the Game](docs/Playing-the-Game.md) also say only the best bonus of a
-kind applies. `setEquipped`, `wieldedWeapon` and `wornArmour` in
-[state.js](web/js/state.js) honor the player's explicit selection, including
-weaker equipment, and use the strongest item only as a fallback.
-
-Game Rules says per-fight bonuses never survive a save, but `fightBonusSnapshot`
-and `restoreFightBonus` preserve them in the visit record for a mid-fight
-reload. Its Abilities section says all six modifier modes are honored by every
-reader, although `Test-AttrValue` in
-[validate-source.ps1](build/validate-source.ps1) accepts `current` only on
-`adjust` and `difficulty`.
-
-### Steps
-
-1. Correct the equipment claims everywhere they occur in living player docs,
-   preserving the separate rule that bonuses do not stack.
-2. Explain that fight bonuses expire on a fresh section but survive resuming the
-   same visit, and state the tag restriction for `current` accurately.
-3. Link the relevant symbols/files without line numbers and check sibling docs.
-
-### Validation
-
-- The guides agree with explicit equipment choice, visit-resume persistence and
-   the validator's supported modifier contexts.
-
----
-
 ## 382. Let the dev server complete a service worker's install
 
 **Priority: LOW.** Local tooling only. The shipped site and the test runner are unaffected, and
@@ -593,6 +558,16 @@ repository.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 381): closed **381**, filed nothing. Documentation only. README's
+Combat summary and Game Rules' Defence formula now say worn armour, chosen on the sheet with
+the strongest as the default. Game Rules and Playing the Game keep the no-stacking rule as
+wielded weapon, worn armour and best tool. Game Rules says fight bonuses clear on a new
+section and survive a reload of the same visit, and that `current` is read only on `<adjust>`
+and `<difficulty>`. The sibling sweep found the same `current` claim in the XML Tag Reference,
+and README's Training line saying "current ability" where `rollTraining` reads the natural
+score; both are fixed. Three code comments in `state.js` still say "best armour" or "never
+survives a save". They are noted here, not changed.
 
 Worked 2026-10-01 (task 379): closed **379**, filed nothing. Each enum's reader was
 checked for case and list handling. `special` and `crew` compare exactly, so the gate now

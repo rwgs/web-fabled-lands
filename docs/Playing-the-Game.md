@@ -47,8 +47,9 @@ The live sheet mirrors the printed one and updates on every state change:
 - The six **abilities**, plus Rank, Stamina and Shards.
 - **Defence**, derived rather than stored - see [Game Rules](Game-Rules.md).
 - **Possessions**, capped at 12 items (money is not capped), with the wielded weapon and
-  worn armour marked. Only the best bonus of a kind applies; carrying two swords does not
-  stack them.
+  worn armour marked. Choose which to wield and wear with the Wield and Wear buttons (the
+  strongest is used until you do). Bonuses of a kind never stack: carrying two swords does not
+  add them.
 - **Ship and cargo**, when you own a vessel - its type, crew grade and manifest.
 - **Codewords, blessings, curses, diseases, poisons, gods and titles** - the bookkeeping
   the printed game asks you to track by hand.

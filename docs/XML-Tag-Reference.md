@@ -205,10 +205,10 @@ neither the build nor the tests would previously notice. The attribute *name* wa
 allowlisted from the start; only the value set was missing, which is how it went
 unnoticed.
 
-All six modes are honoured on every tag that accepts the attribute, routed through one
-reader (`state.js`'s `abilityForMode`) so no tag can drift from the others. `current`
-stays tag-restricted, because it means "the wounded Stamina" and only the two tags that
-roll or read a stat have anywhere to put it.
+The other five modes are honoured on every tag that accepts the attribute, routed through
+one reader (`state.js`'s `abilityForMode`) so no tag can drift from the others. `current` is
+the exception. It means "the wounded Stamina", so only the two tags that roll or read a stat
+have anywhere to put it: `<adjust>` and `<difficulty>`. The gate refuses it on any other tag.
 
 One deliberate difference from the JaFL spec: `affected` is **not** in the spec - it is
 this port's explicit spelling of the default, and the corpus uses it once.

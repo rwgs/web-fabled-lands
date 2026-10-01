@@ -354,10 +354,12 @@ Two behaviours follow the original Java app rather than a simpler "hide it" appr
 
 - **Ability check** — `2d6 + affected ability > Difficulty` ⇒ success.
 - **Combat** — you attack with `2d6 + Combat` vs the foe's Defence (damage = the excess);
-  the foe strikes back vs your **Defence = Combat (incl. weapon) + Rank + best armour**.
+  the foe strikes back vs your **Defence = Combat (incl. weapon) + Rank + worn armour**. The
+  weapon and armour are the ones you choose on the Adventure Sheet (the strongest until you
+  do), and two of a kind never add.
   `<fightdamage>` effects fire when the enemy wounds you. Stamina 0 = death.
 - **Outcome tables** — roll `N`d6 and map the total onto ranges (`0-4`, `1,2`, `11`, `14+`).
-- **Rank check** (`roll ≤ Rank`), **Training** (`2d6 > current ability` ⇒ +1).
+- **Rank check** (`roll ≤ Rank`), **Training** (`2d6 > natural ability` ⇒ +1).
 - **Economy** — markets buy/sell items, weapons, armour, tools, ships, cargo and crew
   upgrades (one grade at a time); inline `<buy>`/`<sell>` in prose, including cargo grants
   and cargo-for-cargo barter (give any one unit, receive the offered commodity);
