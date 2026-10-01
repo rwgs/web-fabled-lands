@@ -24,7 +24,8 @@ import {
 } from './render-rules.js';
 import {
   computeFightGate, computeEscapeCodewords, isDeferredFightChain,
-  computeRollGate, rollGateHold, computeOutcomeRollGate, computeTransferGate, computeBuyGate, computeRedirectGate, isEscapeNav,
+  computeRollGate, rollGateHold, computeOutcomeRollGate, computeTransferGate, computeBuyGate, computeGroupGate,
+  computeRedirectGate, isEscapeNav,
 } from './render-gates.js';
 import {
   newCtx, resolveNodePath, serializeCtx, deserializeCtx, serializeFrame, deserializeFrame,
@@ -846,6 +847,12 @@ export class Story {
     // applyBuyGate then disables the tagged navs. Reset per render.
     this.buyGate = computeBuyGate(el);
     this.pendingBuy = false;
+    // Forced-group gating (task 385): a <group force="t"> is a mandatory action, so the exits
+    // computeGroupGate names wait for its click. renderGroup notes each forced group it draws
+    // unrun this pass (pendingGroups); applyGroupGate then disables those groups' exits.
+    this.groupGate = computeGroupGate(el);
+    this.pendingGroups = new Set();
+    this.groupGateNodes = new Map(); // tagged button → its node
     // Standing-picker gating (task 251): a visible, forced open choice — which possession
     // leaves, which ability moves, which weapon is enchanted, which profession is taken — is
     // as mandatory as the forced <transfer> above, and its onward navigation must wait for the
@@ -885,6 +892,7 @@ export class Story {
     this.applyOutcomeRollGate(flow); // hold a revealed table row's exit until its own die is rolled (task 257)
     this.applyTransferGate(flow); // gate onward nav on an unresolved forced transfer (task 107)
     this.applyBuyGate(flow); // gate onward nav on an unrun forced buy (task 136.5)
+    this.applyGroupGate(flow); // gate onward nav on an unrun forced group (task 385)
     this.surfaceExtraChoices(flow); // persistent <extrachoice> options active here (task 32)
     this.applyPendingRerollGate(flow); // hold every exit while a result is provisional (task 181)
     this.applyChoiceGate(flow); // hold every exit while a standing picker is unanswered (task 251)
@@ -1874,6 +1882,7 @@ export class Story {
     this.tagFightNav(node, btn);
     this.tagTransferNav(node, btn);
     this.tagBuyNav(node, btn);
+    this.tagGroupNav(node, btn);
     this.tagRollNav(node, btn); // and the outcome-row gate; a later roll's row waits for earlier rolls (task 384)
   }
 
@@ -2028,6 +2037,35 @@ export class Story {
       btn.disabled = true;
       btn.classList.add('gated');
       btn.title = 'Take the item above first.';
+    });
+  }
+
+  // ---- forced-group gating (task 385) --------------------------------------
+  // Tag a rendered nav button as one a forced group may hold, for applyGroupGate.
+  tagGroupNav(node, btn) {
+    if (!this.groupGate || !this.groupGate.navNodes.has(node)) return;
+    btn.dataset.groupnav = '1';
+    this.groupGateNodes.set(btn, node);
+  }
+
+  // renderGroup drew this forced group's button unrun. Never from a grayed branch, whose button
+  // cannot be clicked: a gate with no way to settle it is a softlock.
+  noteForcedGroup(node) {
+    if (this.groupGate && !this.inactive && this.groupGate.groups.has(node)) this.pendingGroups.add(node);
+  }
+
+  // Disable the exits an unrun forced group holds. Only ADDS a disable, so it composes with the
+  // other gates; the group's own button stays live, which is how it is settled.
+  applyGroupGate(flow) {
+    if (!this.pendingGroups.size) return;
+    const pending = [...this.pendingGroups].map((g) => this.groupGate.groups.get(g));
+    flow.querySelectorAll('[data-groupnav]').forEach((btn) => {
+      if (btn.disabled) return; // already gated for another reason — keep its own reason
+      const node = this.groupGateNodes.get(btn);
+      if (!pending.some((nav) => nav.has(node))) return;
+      btn.disabled = true;
+      btn.classList.add('gated');
+      btn.title = 'Carry out the action above first.';
     });
   }
 

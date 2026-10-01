@@ -644,6 +644,38 @@ export function computeBuyGate(sectionEl) {
   return { navNodes };
 }
 
+// The forced-group gate (task 385): a <group force="t"> is an action the page says the player
+// must take, but the group rendered as one button and nothing held the exits beside it. With
+// 100 Shards and a rope, book6/496's "and turn to 149" was live before the donation group ran,
+// and reached 149 with both. book1/370's equipment loss and book6/135's broken weapon were
+// skippable the same way, and so was every forced outcome group (book2/134's lost stake).
+//
+// Explicit force="t" only: the XML spec defaults a group to optional, so a blanket group gate
+// would be wrong. A group bundling a roll is not one of these, since the roll is its action
+// (groupPlan's kind 'roll'). Each group holds the exits written after it, and the "Continue → N"
+// of a branch it sits in, but never its own navigation, which is its button's, nor a decline
+// written before it (§6.496's "if you refuse, turn to 291"). The view records which groups
+// render unrun this pass (pendingGroups), so one in an untaken branch holds nothing.
+// Returns { groups: Map<group, Set>, navNodes: Set } or null.
+export function computeGroupGate(sectionEl) {
+  if (!sectionEl) return null;
+  const groups = new Map();
+  sectionEl.querySelectorAll('group').forEach((g) => {
+    if (!boolAttr(g.getAttribute('force')) || g.querySelector('difficulty, random, rankcheck')) return;
+    const nav = new Set();
+    sectionEl.querySelectorAll('choice, goto, return, ' + BRANCH_EXIT_SELECTOR).forEach((n) => {
+      if (g.contains(n) || boolAttr(n.getAttribute('flee'))) return;
+      const after = !!(g.compareDocumentPosition(n) & DOCUMENT_POSITION_FOLLOWING);
+      if (after || (BRANCH_EXIT_TAGS.has(n.tagName.toLowerCase()) && n.contains(g))) nav.add(n);
+    });
+    if (nav.size) groups.set(g, nav);
+  });
+  if (!groups.size) return null;
+  const navNodes = new Set();
+  groups.forEach((nav) => nav.forEach((n) => navNodes.add(n)));
+  return { groups, navNodes };
+}
+
 // Is this <goto>/<return> one the player MUST follow? JaFL's GotoNode defaults force=true
 // and its execute() then returns false — "user must follow this goto - block further
 // execution" — so a reached forced goto ends the section. An explicit force="f" is the

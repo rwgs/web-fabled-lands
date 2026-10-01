@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-392 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
+393 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
 the buckets below are open, and **all others are complete**. File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -23,13 +23,13 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 385. Explicitly forced action groups leave onward exits live before their costs or consequences run
 - [ ] 386. Returning from an item detour loses the source visit's fight bonuses and equipment locks
 - [ ] 387. `<tick god="">` adds an empty god instead of clearing initiation at book6/589
 - [ ] 388. Money-cache deposits cease to respect `multiples=` after clamping to the purse
 - [ ] 389. Transfer equivalence ignores item effects, tags, ability and provenance, silently choosing an unequal possession
 - [ ] 390. Immunity to Injury is awarded and displayed but cannot protect against any damage
 - [ ] 391. Combat replies land before the COMBAT-blessing reroll decision and can kill the player before a winning retry
+- [ ] 393. A forced `<group>` that bundles a roll holds nothing, so book3/273's and book3/629's "lose 1-6 of your possessions" can be walked past with the die unrolled
 
 **LOW**
 
@@ -428,42 +428,11 @@ this order.*
 - [x] 370. the site moved from GitHub Pages to an assets-only Cloudflare Worker at `webfl.rwgs.net`, deployed by CI after every job passes; the precache strips the Worker's `index.html` redirect, only `CLOUDFLARE_API_TOKEN` turned out to be needed, Pages is off, and an installed copy updated and opens offline
 - [x] 383. a Keep or import refused because another tab filled the chosen slot first deleted that tab's save: Keep removed the blob, and import's `deleteSlot` removed its meta too. The rollback now removes a blob only while it is still the one this attempt wrote, and import no longer touches meta, which a failed save never writes. That also fixes an import whose meta write failed, which used to leave its own blob behind
 - [x] 384. rolling the destination die first released "Continue → 539" in book5/510 with the drowning check unmade, and did the same past book5/76's SCOUTING check and book6/373's possession-loss die. The roll gate's table seed now awaits every mandatory roll above its table, and an exit waits only for the awaited rolls above it. A revealed branch that sends the player on decides the route and holds the exits after it, so a failed drowning check no longer leaves the destination rows, or 3/157's ransom choices, live
+- [x] 385. an explicit `<group force="t">` rendered as one button and held nothing, so book6/496's "turn to 149" kept the donation, and book1/370's lost equipment, book6/135's broken weapon and the forced outcome groups (book2/134's lost stake) were skippable too. A new `computeGroupGate` holds the exits after each forced action group, and the row exit of a branch it sits in, while it renders unrun. Earlier declines, the group's own navigation and unmarked groups stay free
 
 ---
 
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The open tasks' detail sections follow, in filed order; the Review log comes after them.
-
----
-
-## 385. Forced action groups can be skipped
-
-**Priority: MEDIUM.** Payments and narrative consequences are avoidable.
-
-### What is wrong
-
-`renderGroup` in [render-rewards.js](web/js/render-rewards.js) offers a button
-but never uses the group's `force=` to hold progression. `groupPlan` in
-[render-rules.js](web/js/render-rules.js) also omits that obligation.
-
-[book6/496](books/book6/496.xml) explicitly puts the donation in
-`<group force="t">`. With 100 Shards and a rope, its acceptance exit to 149 is
-live before the group runs; clicking it reaches 149 with all 100 Shards and the
-rope. The decline exit to 291 correctly stays live. Other explicit forced groups
-include [book1/370](books/book1/370.xml)'s equipment loss,
-[book6/135](books/book6/135.xml)'s weapon destruction, and forced outcome groups.
-The XML spec defaults an unmarked group to optional, so a blanket group gate
-would be wrong.
-
-### Steps
-
-1. Add a real-section regression to `suite-actions` for 6.496: decline is free,
-   acceptance waits, and the chosen possession plus the cash leave once.
-2. Carry explicit forced-group obligations through a DOM-free planner and gate
-   the applicable onward controls until the group has committed. Keep earlier
-   decline exits and the group's own navigation usable.
-3. Cover an unanswered bundled picker, a forced outcome group, a completed
-   group's resume, and an unmarked/explicitly optional group.
-4. Run the complete build/test loop before closing.
 
 ---
 
@@ -718,11 +687,62 @@ this), but the message never says so.
 
 ---
 
+## 393. Forced roll groups can be walked past unrolled
+
+**Priority: MEDIUM.** A printed forfeit is avoidable. Found while fixing task 385, from
+reading the gates; not yet probed in the browser.
+
+### What is wrong
+
+Task 385's `computeGroupGate` in [render-gates.js](web/js/render-gates.js) leaves out a
+group that bundles a roll, because the roll is that group's action (`groupPlan` in
+[render-rules.js](web/js/render-rules.js) returns kind `roll`). Nothing else holds one
+either. `isMandatoryRoll` refuses a roll under `<group>` (`ROLLGATE_OPTIONAL_WRAP`), so
+the roll gate never awaits it.
+
+[book3/273](books/book3/273.xml) and [book3/629](books/book3/629.xml) each put "lose 1-6
+of your possessions" in `<group force="t">`, around `<random dice="1" var="x"/>` and
+`<lose item="?" multiple="x"/>`. Their exits (2.120 and 190) appear to be live with the die
+unrolled, so the player leaves with every possession.
+
+The census in task 385 found two more forced roll groups that are bets the page makes
+optional. [book1/91](books/book1/91.xml) says "If you want to gamble", and
+[book2/134](books/book2/134.xml)'s wager is the reason for visiting. Their `force="t"`
+cannot simply be honoured.
+
+### Steps
+
+1. Probe 3/273 and 3/629 in the browser and add `suite-actions` regressions: the exit
+   waits for the die, and the possessions it names leave once.
+2. Hold the exits after a forced roll group until its roll resolves. Decide what 1/91
+   and 2/134 need: an exemption justified by their prose, or a gate that a zero stake
+   satisfies.
+3. Run the complete build/test loop before closing.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 385): closed **385**, filed **393**. The new `computeGroupGate` in
+`render-gates.js` maps each explicit `<group force="t">` that bundles no roll to the exits it
+holds: those written after it, plus the "Continue → N" of a branch it sits in. It never holds
+the group's own navigation, so a decline written before the group stays free. `groupPlan`
+returns `forced`. `renderGroup` notes each forced group it draws unrun outside a grayed branch,
+and `applyGroupGate` disables those groups' exits. A census found 36 forced groups in the shipped
+corpus, and no `force="f"` exit follows any of them. Task 385's block in `suite-actions` covers:
+- 6/496: the decline is free, acceptance waits, and the possession and tenth leave once. It
+  also covers a resume after paying, and an unanswered two-item picker.
+- a forced outcome row in 2/134, and 6/135;
+- unmarked and `force="f"` groups.
+
+Against the old code it reported 4 failures and a fatal. Task 251's 6/118 tests now run that
+page's forced COMBAT/MAGIC group before expecting the exit. **393** records that the four forced
+groups bundling a roll still hold nothing: 3/273's and 3/629's possession loss, and the 1/91 and
+2/134 bets. `RESULT ALL PASS pass=3405 fail=0`, and `node-import.mjs` passed.
 
 Worked 2026-10-01 (task 384): closed **384**, filed nothing. `computeRollGate` in
 `render-gates.js` now does three things:

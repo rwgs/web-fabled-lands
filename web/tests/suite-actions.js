@@ -2688,6 +2688,9 @@ export async function run(ctx) {
              profPicks().length === 5 && !!exit118() && exit118().disabled === true,
              `picks=${profPicks().length} dis=${exit118() && exit118().disabled}`);
           profPicks().find((b) => /Rogue/i.test(b.textContent)).click();
+          // The page's forced COMBAT/MAGIC group holds the exit too (task 385), so run it.
+          const boost118 = (c) => Array.from(c.querySelectorAll('.group-action')).find((b) => /COMBAT and MAGIC/.test(b.textContent));
+          boost118(c118).click();
           ok('task251: choosing one sets it and releases the exit',
              g118.data.profession.toLowerCase() === 'rogue' && !!exit118() && exit118().disabled === false,
              `prof=${g118.data.profession} dis=${exit118() && exit118().disabled}`);
@@ -2697,6 +2700,7 @@ export async function run(ctx) {
           gW.data.items = []; gW.addItem(makeItem('item', 'tatsu pearl'));
           const cW = document.createElement('div');
           new Story(cW, gW, { navigate(){}, onDeath(){}, notify(){} }).begin(await data.getSection(6, '118'), 6, '118');
+          boost118(cW).click();
           ok('task251: §6.118 asks a non-Priest nothing and leaves the exit live',
              cW.querySelectorAll('.ability-pick').length === 0
              && !!cW.querySelector('.goto') && cW.querySelector('.goto').disabled === false,
@@ -4307,6 +4311,106 @@ export async function run(ctx) {
       // Optional rolls stay optional: §1.21's force="f" talk-out and a paid repeat gate nothing.
       ok('task384: a force="f" roll above a table still awaits only the table die',
          gates.computeRollGate(parse('<section name="t384"><difficulty ability="charisma" level="9" force="f"/><random/><outcomes><outcome range="1-12" section="5"/></outcomes></section>')).rollNodes.size === 1);
+
+      Math.random = rnd;
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
+    // --- task 385: an explicitly forced <group> holds the exits after it until it runs ---
+    // renderGroup drew one button and nothing held the exits beside it, so §6.496's "and turn to
+    // 149" reached 149 with the donation unpaid. The spec defaults a group to OPTIONAL, so only
+    // force="t" holds anything, and a decline written before the group stays free.
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const settle = () => new Promise((r) => setTimeout(r, 30));
+      const rnd = Math.random;
+      const exitTo = (c, n) => Array.from(c.querySelectorAll('.goto, .choice'))
+        .find((b) => new RegExp('(^|\\D)' + n + '(\\D|$)').test(b.textContent));
+      const groupBtn = (c, re) => Array.from(c.querySelectorAll('.group-action')).find((b) => re.test(b.textContent));
+      const names = (g) => g.data.items.map((it) => it.name).sort().join(',');
+      const enter = async (book, sec, setup, xml) => {
+        const g = GameState.create({ name: 'T385', gender: 'f', profession: 'Warrior', book, adv });
+        g.data.items = [];
+        if (setup) setup(g);
+        const c = document.createElement('div');
+        const nav = [];
+        const st = new Story(c, g, { navigate(b, s) { nav.push(b + '/' + s); }, onDeath() {}, notify() {} });
+        g.setVisitProvider(() => st.serializeVisit());
+        g.goTo(book, sec); st.begin(xml ? parse(xml) : await data.getSection(book, sec), book, sec);
+        return { g, c, st, nav };
+      };
+      const rope = (g) => { g.data.shards = 100; g.addItem(makeItem('item', 'rope')); };
+
+      // §6.496: declining is free.
+      {
+        const { g, c, nav } = await enter(6, '496', rope);
+        const accept = exitTo(c, 149), decline = exitTo(c, 291);
+        ok('task385: §6.496 holds "turn to 149" while the donation group is unrun',
+           !!accept && accept.disabled === true && /Carry out the action/.test(accept.title), accept ? accept.title : 'no →149');
+        ok('task385: §6.496 the decline written before the group stays live', !!decline && decline.disabled === false);
+        decline.click(); await settle();
+        ok('task385: §6.496 declining keeps the cash and the rope', nav.join() === '6/291' && g.data.shards === 100 && names(g) === 'rope', nav.join());
+      }
+      // §6.496: accepting with one possession takes it and the tenth, once.
+      {
+        const { g, c, nav } = await enter(6, '496', rope);
+        groupBtn(c, /cross it off/).click(); await settle();
+        ok('task385: §6.496 running the group takes the rope and 10 Shards and releases 149',
+           g.data.shards === 90 && names(g) === '' && exitTo(c, 149).disabled === false,
+           `sh=${g.data.shards} items=${names(g)}`);
+        // A completed group resumes as done: the exit stays live and nothing is taken twice.
+        const g2 = new GameState(sanitizeData(JSON.parse(JSON.stringify(g.data))));
+        const c2 = document.createElement('div');
+        const nav2 = [];
+        const s2 = new Story(c2, g2, { navigate(b, s) { nav2.push(b + '/' + s); }, onDeath() {}, notify() {} });
+        s2.resume(await data.getSection(6, '496'), 6, '496', g2.data.visit, null);
+        ok('task385: §6.496 a resume after the donation keeps 149 live and the group done',
+           exitTo(c2, 149).disabled === false && groupBtn(c2, /cross it off/).disabled === true && g2.data.shards === 90);
+        exitTo(c2, 149).click(); await settle();
+        ok('task385: §6.496 ...and turns to 149 with the donation paid once', nav2.join() === '6/149' && g2.data.shards === 90, nav2.join());
+        void nav;
+      }
+      // §6.496 with two possessions: the bundled picker is the group's question, and an
+      // unanswered one still holds the exit.
+      {
+        const { g, c } = await enter(6, '496', (g) => { rope(g); g.addItem(makeItem('item', 'lantern')); });
+        groupBtn(c, /cross it off/).click(); await settle();
+        const picks = Array.from(c.querySelectorAll('.btn-mini')).filter((b) => /rope|lantern/i.test(b.textContent));
+        ok('task385: §6.496 an unanswered "which possession" picker still holds 149',
+           picks.length === 2 && exitTo(c, 149).disabled === true && g.data.shards === 100, `picks=${picks.length}`);
+        picks.find((b) => /lantern/i.test(b.textContent)).click(); await settle();
+        ok('task385: §6.496 answering it takes the lantern and the tenth, and releases 149',
+           names(g) === 'rope' && g.data.shards === 90 && exitTo(c, 149).disabled === false, `${names(g)} sh=${g.data.shards}`);
+      }
+
+      // A forced OUTCOME group: §2.134's "Lose your entire stake" row holds "After one wager".
+      {
+        const { c } = await enter(2, '134', (g) => { g.data.shards = 50; });
+        Math.random = () => 0; // 1+1 = 2 → range 2-4
+        Array.from(c.querySelectorAll('.btn-roll')).find((b) => !b.disabled).click(); await settle();
+        const lose = groupBtn(c, /Lose your entire stake/);
+        ok('task385: §2.134 the revealed forced row holds the exit', !!lose && exitTo(c, 203).disabled === true);
+        lose.click(); await settle();
+        ok('task385: §2.134 running the row releases it', exitTo(c, 203).disabled === false);
+        Math.random = rnd;
+      }
+
+      // §6.135: the broken weapon must come off before 719.
+      {
+        const { c } = await enter(6, '135', (g) => { g.addItem(makeItem('weapon', 'sword')); });
+        ok('task385: §6.135 holds 719 until the weapon is removed', exitTo(c, 719).disabled === true);
+        groupBtn(c, /Remove that weapon/).click(); await settle();
+        ok('task385: §6.135 removing it releases 719', exitTo(c, 719).disabled === false);
+      }
+
+      // Unmarked and explicitly optional groups hold nothing.
+      for (const force of ['', ' force="f"']) {
+        const { c } = await enter(1, 'x385', null,
+          `<section name="x385"><group${force}><text>Take the coin</text><gain shards="5"/></group> <goto section="9"/></section>`);
+        ok(`task385: a group with${force || ' no force='} leaves the exit live`, exitTo(c, 9).disabled === false);
+      }
+      ok('task385: computeGroupGate ignores an unmarked group and a roll group',
+         gates.computeGroupGate(parse('<section><group><text>a</text><gain shards="1"/></group><group force="t"><text>b</text><random/></group><goto section="9"/></section>')) === null);
 
       Math.random = rnd;
       window.__FL_INSTANT_DICE__ = false;

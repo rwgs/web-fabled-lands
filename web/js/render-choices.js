@@ -133,6 +133,7 @@ export function renderChoice(story, node, path) {
   story.tagRollNav(node, btn);
   story.tagTransferNav(node, btn);
   story.tagBuyNav(node, btn);
+  story.tagGroupNav(node, btn);
   story.tagEscapeNav(node, btn);
   return btn;
 }
@@ -228,6 +229,7 @@ export function renderGoto(story, container, node, path) {
   story.tagRollNav(node, link);
   story.tagTransferNav(node, link);
   story.tagBuyNav(node, link);
+  story.tagGroupNav(node, link);
   story.tagEscapeNav(node, link);
   container.appendChild(link);
   return link;
@@ -297,6 +299,7 @@ export function renderReturn(story, container, node, path) {
   story.tagRollNav(node, link);
   story.tagTransferNav(node, link);
   story.tagBuyNav(node, link);
+  story.tagGroupNav(node, link);
   story.tagEscapeNav(node, link);
   container.appendChild(link);
   return link;

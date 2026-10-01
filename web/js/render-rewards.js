@@ -145,6 +145,7 @@ export function renderGroup(story, container, node, path) {
   btn.className = 'group-action' + (done ? ' done' : '');
   btn.disabled = done;
   btn.textContent = (done ? '☑ ' : '☐ ') + plan.label;
+  if (!done && plan.forced) story.noteForcedGroup(node); // its exits wait for the click (task 385)
   if (!done) {
     // A bundled open forfeit — or an open ability spec — is named by the player BEFORE any of
     // this runs: the group is one button, so its other effects, awards, buys, rests and any

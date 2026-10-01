@@ -8,7 +8,7 @@
 // lives in one dependency-free file so the tests can drive it directly. (task 190)
 importScripts('./js/sw-cache.js');
 
-const VERSION = 'fl-26.10.01.6f9fc40';
+const VERSION = 'fl-26.10.01.b39c729';
 
 // The published edition's data, maps and section illustrations. GENERATED from
 // books/books.ini's Published= line by build/build-data.ps1 — do not hand-edit.

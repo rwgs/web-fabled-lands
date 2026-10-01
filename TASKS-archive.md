@@ -392,6 +392,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 380. Make late asynchronous failures fail the test runners
 - [x] 383. Failed slot claims can delete another tab's save
 - [x] 384. Destination rolls bypass earlier mandatory rolls
+- [x] 385. Forced action groups can be skipped
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
 
@@ -22555,5 +22556,84 @@ Checked:
 - Against the old three modules, the block reported 9 failures and a fatal. The task 257
   assertion also failed.
 - `RESULT ALL PASS pass=3390 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 385. Forced action groups can be skipped
+
+**Priority: MEDIUM.** Payments and narrative consequences are avoidable.
+
+### What is wrong
+
+`renderGroup` in [render-rewards.js](web/js/render-rewards.js) offers a button
+but never uses the group's `force=` to hold progression. `groupPlan` in
+[render-rules.js](web/js/render-rules.js) also omits that obligation.
+
+[book6/496](books/book6/496.xml) explicitly puts the donation in
+`<group force="t">`. With 100 Shards and a rope, its acceptance exit to 149 is
+live before the group runs; clicking it reaches 149 with all 100 Shards and the
+rope. The decline exit to 291 correctly stays live. Other explicit forced groups
+include [book1/370](books/book1/370.xml)'s equipment loss,
+[book6/135](books/book6/135.xml)'s weapon destruction, and forced outcome groups.
+The XML spec defaults an unmarked group to optional, so a blanket group gate
+would be wrong.
+
+### Steps
+
+1. Add a real-section regression to `suite-actions` for 6.496: decline is free,
+   acceptance waits, and the chosen possession plus the cash leave once.
+2. Carry explicit forced-group obligations through a DOM-free planner and gate
+   the applicable onward controls until the group has committed. Keep earlier
+   decline exits and the group's own navigation usable.
+3. Cover an unanswered bundled picker, a forced outcome group, a completed
+   group's resume, and an unmarked/explicitly optional group.
+4. Run the complete build/test loop before closing.
+
+### The fix
+
+A census found 36 explicit `<group force="t">` in the shipped corpus. Of the 32 that bundle
+no roll, none is followed by a `force="f"` exit. So every exit written after a forced
+action group can wait for it, and a decline written before it never does.
+
+- `web/js/render-gates.js`: the new `computeGroupGate` maps each forced group that bundles
+  no roll to the exits it holds. Those are the `choice`/`goto`/`return` and branch exits
+  written after it, plus the `section=` branch it sits in, such as a table row's
+  "Continue → N". It skips the group's own navigation and any `flee="t"` exit. A group that
+  bundles a roll is left out: the roll is its action.
+- `web/js/render-rules.js`: `groupPlan`'s action result carries `forced`.
+- `web/js/render-rewards.js`: `renderGroup` calls `noteForcedGroup` for a forced group it
+  draws unrun.
+- `web/js/render.js`:
+  - `groupGate`, `pendingGroups` and `groupGateNodes` are set up per render.
+  - `tagGroupNav` tags a button the gate may hold. It is called from `renderChoice`,
+    `renderGoto` and the return link in `render-choices.js`, and from `tagBranchNav`.
+  - `noteForcedGroup` ignores a grayed branch.
+  - `applyGroupGate` runs after `applyBuyGate`. It disables a tagged exit that a pending
+    group holds, with the title "Carry out the action above first."
+  - The group's own button stays live, and the dead-end fallback counts it, so a held
+    section is never read as a death.
+
+Tests:
+
+- Task 385's block in `suite-actions`, 15 assertions:
+  - 6/496: the decline to 291 is free, and 149 waits for the donation.
+  - With one possession, running the group takes the rope and 10 Shards and releases 149.
+    A resume shows the group done and 149 live, and the donation is paid once.
+  - With two possessions, the bundled picker still holds 149 until it is answered.
+  - 2/134's revealed "Lose your entire stake" row holds "After one wager" until it is run.
+  - 6/135 holds 719 until the weapon is removed.
+  - An unmarked group and a `force="f"` group leave the exit live, and
+    `computeGroupGate` ignores both an unmarked group and a roll group.
+- Task 251's 6/118 tests now run that page's forced COMBAT/MAGIC group before expecting
+  the exit to be live.
+
+Checked:
+
+- Against the old five modules, the block reported 4 failures and a fatal (no
+  `computeGroupGate`).
+- `RESULT ALL PASS pass=3405 fail=0`, and `node-import.mjs` passed.
+- Filed task 393: the four forced groups that bundle a roll still hold nothing. 3/273's
+  and 3/629's 1-6 possession loss can be walked past, and 1/91's and 2/134's bets are
+  forced in the markup but optional in the prose.
 
 ---

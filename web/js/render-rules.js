@@ -354,8 +354,9 @@ export function isEconomicPayment(node) {
 //     renders as its own widget and drives the section's branches (task 42)
 //   { kind:'inline' }         — no label or nothing to apply: a plain inline wrapper
 //   { kind:'action', label, effects, itemNodes, buyNodes, linkedAwards, restNodes,
-//     gotoNode, returnNode, isRevival } — one click-to-apply button; the view runs the
-//     listed transactions on click, then navigates/returns/revives as flagged
+//     gotoNode, returnNode, isRevival, forced } — one click-to-apply button; the view runs the
+//     listed transactions on click, then navigates/returns/revives as flagged. `forced` is an
+//     explicit force="t": the exits computeGroupGate names wait for the click (task 385)
 export function groupPlan(sectionEl, node) {
   const rollNode = node.querySelector('difficulty, random, rankcheck');
   if (rollNode) return { kind: 'roll', rollNode };
@@ -427,7 +428,8 @@ export function groupPlan(sectionEl, node) {
   if (!label || (!effects.length && !itemNodes.length && !buyNodes.length && !restNodes.length && !gotoNode && !returnNode && !isRevival)) {
     return { kind: 'inline' }; // no visible action (or nothing to apply)
   }
-  return { kind: 'action', label, effects, itemNodes, buyNodes, linkedAwards, restNodes, gotoNode, returnNode, isRevival };
+  return { kind: 'action', label, effects, itemNodes, buyNodes, linkedAwards, restNodes, gotoNode, returnNode, isRevival,
+           forced: boolAttr(node.getAttribute('force')) };
 }
 
 // Does a passive/rest child of a roll-bundling group DEFER to the roll event (JaFL
