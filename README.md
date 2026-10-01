@@ -102,8 +102,9 @@ python -m http.server 8848
 (`wrangler.jsonc`) serves `webfl.rwgs.net`. The `deploy` job in
 `.github/workflows/smoke.yml` redeploys it on every push to `main`, but only after the other
 CI jobs pass. It runs a pinned `npx wrangler deploy`, so the repository still has no
-`package.json`. It needs two repository secrets, `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID`. The custom-domain route in `wrangler.jsonc` creates the hostname's
+`package.json`. It needs one repository secret, `CLOUDFLARE_API_TOKEN`. A token scoped to
+one account lets Wrangler find the account itself, and `CLOUDFLARE_ACCOUNT_ID` is passed only
+if set. The custom-domain route in `wrangler.jsonc` creates the hostname's
 DNS record, which fails while another record holds that name. The Worker publishes the
 **repository root**, trimmed by the root `.assetsignore` (`.gitignore` syntax) to the root
 `index.html` and `web/`, less `web/_test.html`. Nothing else is public: `books/`,

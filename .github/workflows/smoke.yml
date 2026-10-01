@@ -223,9 +223,11 @@ jobs:
   # Publishes the site to the Cloudflare Worker in wrangler.jsonc (task 370), only for a push
   # to main and only once every job above has passed, so a build CI rejects never goes live.
   # Wrangler is fetched by npx at a pinned version for this step alone; the repository still
-  # has no package.json and the shipped web/ no dependencies. Needs two repository secrets:
-  # CLOUDFLARE_API_TOKEN (the "Edit Cloudflare Workers" token template) and
-  # CLOUDFLARE_ACCOUNT_ID. One deploy at a time, and a newer push waits rather than cancels.
+  # has no package.json and the shipped web/ no dependencies. Needs one repository secret,
+  # CLOUDFLARE_API_TOKEN (the "Edit Cloudflare Workers" token template). CLOUDFLARE_ACCOUNT_ID
+  # is optional: it is unset here, and Wrangler resolves the account from a token scoped to
+  # one (as every deploy since 2026-09-29 shows). One deploy at a time, and a newer push waits
+  # rather than cancels.
   deploy:
     needs: [build-scripts, rules-import, smoke]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

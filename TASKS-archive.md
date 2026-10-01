@@ -377,6 +377,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 366. README's deploy guidance and file tree disagree with the repository
 - [x] 367. Living documents restate the shipped-section count `docs/Corpus-Census.md` owns
 - [x] 368. The Review log is nine-tenths of `TASKS.md`
+- [x] 370. Host the site on a Cloudflare Worker instead of GitHub Pages
 - [x] 371. Validate the save-slot metadata shape before recovery
 - [x] 372. Preserve meaningful differences when choosing a sale candidate
 - [x] 373. Roll back a partially written preview promotion
@@ -22159,5 +22160,35 @@ Checked:
   - Keep reloaded once, onto the title.
   - The kept adventure played as a saved game, and a further update reloaded at once.
 - The full suite reported `RESULT ALL PASS pass=3352 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 370. Host the site on a Cloudflare Worker instead of GitHub Pages
+
+**Priority: LOW.** This is the owner's request (2026-09-29), not a defect. Pages works, but it
+publishes the whole repository, and Cloudflare already sits in front of it.
+
+#
+
+### Closed 2026-10-01
+
+- Step 5: the owner turned GitHub Pages off. Only `CLOUDFLARE_API_TOKEN` was ever added, and
+  `CLOUDFLARE_ACCOUNT_ID` turned out not to be needed. The first deploy (run 36635395642,
+  2026-09-29) logged it empty and uploaded all 58 assets, because Wrangler resolves the
+  account from a token scoped to one. README's deploy section and the `deploy` job's comment
+  in `smoke.yml` said two secrets, and now say one. The job still passes the account ID
+  through, so setting it later is harmless.
+- Validation:
+  - Run 36883589919 passed all four jobs and deployed `26.10.01.d4f1cd3`, which
+    `https://webfl.rwgs.net/web/js/version.js` serves.
+  - `/web/` answers 200 and `/README.md` answers 404, both with `server: cloudflare`.
+  - The owner confirmed an existing installed copy updated from the Worker site.
+  - Offline launch was checked in headless Chrome over DevTools. A fresh profile loaded
+    `/web/index.html` until the worker controlled it (cache `fl-26.10.01.d4f1cd3`), and the
+    browser was relaunched on that profile behind a dead proxy. A probe fetch failed, as
+    intended, yet `/web/index.html` and `/web/` rendered the title screen and
+    `/web/?demo=1.10` the game screen, all from the cache.
+  - Page-level network emulation was tried first and did not reach the worker's fetches,
+    so it proved nothing. The dead proxy is the check that counts.
 
 ---

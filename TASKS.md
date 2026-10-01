@@ -28,7 +28,6 @@ there once the buckets below are clear.
 **LOW**
 
 - [ ] 369. `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19 (CI notice); the `smoke` and `build-scripts` jobs rely on the image's preinstalled `pwsh` 7, `google-chrome` and `python3`, so the move could stop CI with no change here
-- [ ] 370. Move hosting from GitHub Pages to a Cloudflare Worker (owner's request), keeping the root layout and the `/web/` URLs; the Worker's asset server 307s `index.html` to `./`, which the service worker's precache stored as a redirected response that a navigation refuses
 
 **Done**
 
@@ -419,6 +418,7 @@ this order.*
 - [x] 379. the source gate lower-cased every enum and allowed `|` on all of them, so `special="ATTACK"`, `crew="EXCELLENT"` and `modifier="natural|noarmour"` validated and did nothing; `special` and `crew` are now exact-case, and a union is legal only where the reader splits one (`ability`, `ship`, cargo, and `profession` on `<tick>`)
 - [x] 381. README, Game Rules and Playing the Game still said the best armour/weapon counts, Game Rules that fight bonuses never survive a save, and Game Rules and the XML Tag Reference that all six `modifier=` modes work on every tag; they now describe the wielded/worn choice, the visit-resume persistence and `current`'s two tags, and README's Training line says natural, not current
 - [x] 382. a service worker never finished installing under `build/serve.py`. The cause was `FLCache.precache`, not the server: it read no body until every fetch had answered, so unread no-store bodies held the browser's six HTTP/1.x connections. `fetchOk` now reads each body as it arrives and stores a fresh copy (which also strips a redirect, as task 370's `unredirect` did), and `docs/Testing.md` records how to drive a real update
+- [x] 370. the site moved from GitHub Pages to an assets-only Cloudflare Worker at `webfl.rwgs.net`, deployed by CI after every job passes; the precache strips the Worker's `index.html` redirect, only `CLOUDFLARE_API_TOKEN` turned out to be needed, Pages is off, and an installed copy updated and opens offline
 
 ---
 
@@ -466,12 +466,7 @@ pushed run on the new image validates it.
 
 ---
 
-## 370. Host the site on a Cloudflare Worker instead of GitHub Pages
-
-**Priority: LOW.** This is the owner's request (2026-09-29), not a defect. Pages works, but it
-publishes the whole repository, and Cloudflare already sits in front of it.
-
-### What is wrong
+## What is wrong
 
 GitHub Pages serves `main` from the repository root under the root `CNAME`, so `books/`,
 `java-engine/` and the task files are public, and only Jekyll's `_`-prefix rule keeps
@@ -525,6 +520,16 @@ removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 370): closed **370**, filed nothing. The owner turned GitHub Pages
+off and confirmed an installed copy updated from the Worker site. Run 36883589919 deployed
+`26.10.01.d4f1cd3`, and `webfl.rwgs.net` serves it, with `/web/` answering 200 and
+`/README.md` 404, both from Cloudflare. Offline launch was checked in headless Chrome: a fresh
+profile installed the worker from the live site, and the browser was relaunched behind a dead
+proxy so no request could leave. The title screen and a `?demo=1.10` game still loaded from
+the cache. Step 5 had listed `CLOUDFLARE_ACCOUNT_ID` as required, but it was never set and
+every deploy succeeded (Wrangler resolves the account from the token). README and the
+`deploy` job's comment now say one secret.
 
 Worked 2026-10-01 (task 382): closed **382**, filed nothing. A cut-down probe isolated the
 trigger to `serve.py`'s `Cache-Control: no-store`. With it removed the worker installed;
