@@ -396,6 +396,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 386. Return frames drop visit-local bonuses and locks
 - [x] 387. Empty-god ticks retain initiation
 - [x] 388. Purse clamping breaks investment multiples
+- [x] 389. Transfers silently select unequal possessions
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
 
@@ -22831,5 +22832,78 @@ Checked:
 
 - Against the old `render-market.js`, 4 of the widget assertions failed.
 - `RESULT ALL PASS pass=3436 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 389. Transfers silently select unequal possessions
+
+**Priority: MEDIUM.** A required "choose which" transfer can take a more useful
+item without asking.
+
+### What is wrong
+
+`itemsAllSame`, used by `transferPlan` and `applyTransfer` in
+[engine.js](web/js/engine.js), compares only kind, normalized name and bonus.
+It ignores ability, tags, effects/remaining uses and award provenance. Two
+same-named rings with three and one uses therefore report `needChoice: false`.
+The transfer takes the first and does not call a supplied chooser.
+
+The real [book2/105](books/book2/105.xml) pickpocket widget also offered no
+picker with those rings. [book6/635](books/book6/635.xml)'s weapon offering and
+[book4/456](books/book4/456.xml)'s +1 offering share the same planner. Task 372
+fixed sale equivalence, not transfer equivalence.
+
+### Steps
+
+1. Add `suite-engine`/`suite-economy` cases for equal-looking items with different
+   effect uses, tags, abilities and groups. Verify the selected item alone moves.
+2. Compare all gameplay-relevant identity when deciding whether transfers need
+   a choice; a genuinely interchangeable set can retain the one-button path.
+3. Update the real transfer picker in
+   [render-market.js](web/js/render-market.js) so the labels distinguish the
+   relevant differences, and verify selection through the 2.105 widget.
+4. Run the complete build/test loop before closing.
+
+### The fix
+
+`market.js` imports `engine.js`, so the engine could not reuse task 372's `sameCandidate`
+from there.
+
+- `web/js/state.js`, which both modules already import:
+  - It gains `effectsKey` (moved unchanged from `market.js`) and a new export `sameItem(a,
+    b)`.
+  - `sameItem` compares normalised name, bonus, the bonus's ability, award `group`, the tag
+    set, and the effects including their uses left.
+  - Kind is left to the caller.
+- `web/js/market.js`: `sameCandidate` keeps the ship comparison and calls `sameItem` for
+  carried goods, so the sale planner behaves exactly as before.
+- `web/js/engine.js`: `itemsAllSame` is now "same kind and `sameItem`". `transferPlan`'s
+  `needChoice` therefore asks whenever the movers differ in any of those ways. `applyTransfer`
+  then calls the chooser instead of taking the first.
+- `web/js/render-market.js`:
+  - `possessionLabel` builds a carried item's pick label: `itemLabel`, which names the bonus's
+    ability, then any uses left (from `sellCandidateLabel`), then the tags in brackets.
+  - The sale picker's carried-goods label and the transfer picker both use it.
+  - The transfer picker labelled name and bonus only.
+  - `distinctLabels` numbers picks whose labels still collide, such as two rings that differ
+    only in their award group, so the buttons can be told apart.
+
+Tests:
+
+- Task 389's block in `suite-economy`, 12 assertions:
+  - For rings that differ only in effect uses, tags, ability or award group,
+    `transferPlan` reports `needChoice`. The chooser is asked once, and only the ring it names
+    moves to the cache.
+  - Two identical rings keep the one-button path, and the chooser is never called.
+  - The real 2/105 pickpocket, with an empty purse, offers one pick per ring, labelled "3
+    uses left" and "1 use left". Clicking the second steals that ring.
+  - Rings differing only in group get labels ending `#1` and `#2`.
+- The task 341 transfer tests now match item names case-insensitively, because the label
+  title-cases the name as the sale picker always did.
+
+Checked:
+
+- Against the old four modules, the block reported 11 failures.
+- `RESULT ALL PASS pass=3448 fail=0`, and `node-import.mjs` passed.
 
 ---

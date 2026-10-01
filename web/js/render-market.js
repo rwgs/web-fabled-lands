@@ -252,9 +252,31 @@ function sellCandidateLabel(kind, cand) {
     const load = (cand.cargo || []).length ? ` — carrying ${cand.cargo.map((c) => titleCase(c)).join(', ')}` : ' — empty';
     return titleCase(cand.type) + named + crew + load;
   }
-  const uses = (cand.effects || []).filter((e) => e.type === 'use' && e.uses >= 0)
+  return possessionLabel(cand);
+}
+
+// A carried possession's pick label: its item label (with the bonus's ability), the uses left on
+// any limited-use effect, and its tags, which are the differences sameItem asks the player about.
+// Shared by the sale and transfer pickers. (tasks 134, 372, 389)
+function possessionLabel(it) {
+  const uses = (it.effects || []).filter((e) => e.type === 'use' && e.uses >= 0)
     .map((e) => (e.uses === 0 ? 'used up' : `${e.uses} use${e.uses === 1 ? '' : 's'} left`));
-  return itemLabel(cand) + (uses.length ? ` (${uses.join(', ')})` : '');
+  const tags = (it.tags || []).length ? ` [${it.tags.join(', ')}]` : '';
+  return itemLabel(it) + (uses.length ? ` (${uses.join(', ')})` : '') + tags;
+}
+
+// Pick labels for a candidate list. Where two still read the same (a difference the label does
+// not show, such as the award group an item came from), they are numbered so the player can
+// tell the buttons apart. (task 389)
+function distinctLabels(cands) {
+  const base = cands.map(possessionLabel);
+  const seen = new Map();
+  return base.map((l) => {
+    if (base.filter((x) => x === l).length < 2) return l;
+    const n = (seen.get(l) || 0) + 1;
+    seen.set(l, n);
+    return `${l} #${n}`;
+  });
 }
 
 // Inline <buy> in prose: a crew upgrade, a ship, a tool, a carried item, or a
@@ -869,10 +891,13 @@ export function renderTransfer(story, container, node, path) {
   // the action done. Nothing moves and the forced gate stays up until the last pick lands.
   // (tasks 107 + 341)
   if (!done && plan.needChoice && (price == null || plan.canPay)) {
+    // The planner asks whenever the movers differ in any way that matters (task 389), so the
+    // labels show those differences rather than the name and bonus alone.
+    const labels = distinctLabels(plan.movers);
     const box = collectPicks(container, {
       candidates: plan.movers,
       count: plan.limit,
-      label: (it) => it.name + (it.bonus ? ` (${it.bonus >= 0 ? '+' : ''}${it.bonus})` : ''),
+      label: (it) => labels[plan.movers.indexOf(it)],
       lead: (text && text !== 'Transfer')
         ? () => { const s = document.createElement('span'); s.className = 'fx'; s.textContent = text + ': '; return s; }
         : null,

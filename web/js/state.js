@@ -1895,6 +1895,27 @@ export function sameAffliction(a, b) {
   return !!(a && b && a.type === b.type && normalize(a.name) === normalize(b.name));
 }
 
+// An order-free key for an item's effects, with sanitizeEffect's defaults, so a live item and
+// its reloaded copy agree.
+const effectsKey = (it) => (it.effects || []).map((e) => JSON.stringify([e.type || 'aura', e.ability || null,
+  e.bonus || 0, e.uses ?? -1, e.verb || null, e.text || null, e.body || null])).sort().join('|');
+
+/** Are two possessions interchangeable, so that which one a sale or a transfer takes makes no
+ *  difference? Mirrors JaFL Item.matches (name, bonus, tags, award group) and adds the bonus's
+ *  ability and the effects with their uses left: a potion with uses left is not a spent one.
+ *  Kind is the caller's to compare. Shared by market.js's sale planner (tasks 134, 372) and
+ *  engine.js's transfer planner, which compared kind, name and bonus only, so two same-named
+ *  rings with three and one charges moved without asking which (task 389). */
+export function sameItem(a, b) {
+  const tagSet = (it) => (it.tags || []).map(normalize).sort().join(' ');
+  return normalize(a.name) === normalize(b.name)
+    && (a.bonus || 0) === (b.bonus || 0)
+    && (a.ability || null) === (b.ability || null)
+    && (a.group || null) === (b.group || null)
+    && tagSet(a) === tagSet(b)
+    && effectsKey(a) === effectsKey(b);
+}
+
 /** The slot index, keeping only what has the shape save() writes: a plain object whose keys are
  *  slot numbers 0..MAX_SLOTS-1 and whose entries are plain objects with a string name. Valid
  *  JSON of any other shape used to come straight back — `null` threw in reconcileSlotMeta and

@@ -5941,17 +5941,17 @@ export async function run(ctx) {
         ok('task341: a limit="2" transfer offers a pick per mover and counts up',
            picks341(e.c).length === 3 && /1 of 2 chosen|Hand over two things/.test(e.c.textContent),
            picks341(e.c).map((b) => b.textContent).join('|'));
-        picks341(e.c).find((b) => /lantern/.test(b.textContent)).click();
+        picks341(e.c).find((b) => /lantern/i.test(b.textContent)).click();
         ok('task341: after ONE pick nothing has moved and the action is not done',
            e.g.cacheItems('X.341').length === 0 && e.g.data.items.length === 3
            && ![...e.st.ctx.applied].some((k) => k.startsWith('xfer@')),
            `stash=${e.g.cacheItems('X.341').length} carried=${e.g.data.items.length}`);
         const remaining = picks341(e.c);
         ok('task341: the picker strikes the taken choice off and reports the running tally',
-           remaining.length === 2 && !remaining.some((b) => /lantern/.test(b.textContent))
+           remaining.length === 2 && !remaining.some((b) => /lantern/i.test(b.textContent))
            && /1 of 2 chosen/.test(e.c.textContent),
            remaining.map((b) => b.textContent).join('|') + ' :: ' + e.c.textContent.replace(/\s+/g, ' ').slice(0, 80));
-        remaining.find((b) => /brass key/.test(b.textContent)).click();
+        remaining.find((b) => /brass key/i.test(b.textContent)).click();
         ok('task341: the second pick commits the WHOLE transfer — both named items move, once',
            stash341(e.g) === 'brass key,lantern' && e.g.data.items.length === 1
            && e.g.data.items[0].name === 'rope',
@@ -5968,7 +5968,7 @@ export async function run(ctx) {
            e.st.pendingTransfer === true
            && Array.from(e.c.querySelectorAll('.goto')).every((b) => b.disabled),
            `pending=${e.st.pendingTransfer}`);
-        picks341(e.c).find((b) => /rope/.test(b.textContent)).click();
+        picks341(e.c).find((b) => /rope/i.test(b.textContent)).click();
         ok('task341: one pick of two leaves the sheet, the stash and the gate exactly as they were',
            e.g.data.items.length === 3 && e.g.cacheItems('X.341').length === 0
            && e.st.pendingTransfer === true,
@@ -5979,11 +5979,11 @@ export async function run(ctx) {
       {
         const e = mk341('<transfer item="?" limit="2" price="p341" to="X.341">Hand over two</transfer>'
           + '<gain shards="10" flag="p341">10 Shards</gain>', three341());
-        picks341(e.c).find((b) => /rope/.test(b.textContent)).click();
+        picks341(e.c).find((b) => /rope/i.test(b.textContent)).click();
         ok('task341: a priced limit="2" transfer leaves its price flag clear after one pick',
            e.g.getFlag('p341') === false && e.g.cacheItems('X.341').length === 0,
            `flag=${e.g.getFlag('p341')}`);
-        picks341(e.c).find((b) => /lantern/.test(b.textContent)).click();
+        picks341(e.c).find((b) => /lantern/i.test(b.textContent)).click();
         ok('task341: …and sets it once the whole transfer commits',
            e.g.getFlag('p341') === true && stash341(e.g) === 'lantern,rope',
            `flag=${e.g.getFlag('p341')} stash=${stash341(e.g)}`);
@@ -5995,7 +5995,7 @@ export async function run(ctx) {
         const one = mk341('<transfer item="?" limit="1" to="X.341">Hand one over</transfer>', three341());
         ok('task341: limit="1" still commits on the first click, with no running tally',
            picks341(one.c).length === 3 && !/chosen/.test(one.c.textContent));
-        picks341(one.c).find((b) => /lantern/.test(b.textContent)).click();
+        picks341(one.c).find((b) => /lantern/i.test(b.textContent)).click();
         ok('task341: limit="1" moves exactly the one named', stash341(one.g) === 'lantern' && one.g.data.items.length === 2);
 
         const same = mk341('<transfer item="?" limit="2" to="X.341">Two ropes</transfer>',
@@ -6024,7 +6024,7 @@ export async function run(ctx) {
           const picks = picks341(c);
           ok(`task341: §${book}.${section} (limit="1") offers a pick per candidate and no tally`,
              picks.length === 2 && !/chosen/.test(c.textContent), `picks=${picks.length}`);
-          picks.find((b) => /second thing/.test(b.textContent)).click();
+          picks.find((b) => /second thing/i.test(b.textContent)).click();
           ok(`task341: §${book}.${section} moves the ONE named possession`,
              g.findItems('second thing').length === 0 && g.findItems('first thing').length === 1,
              g.data.items.map((i) => i.name).join(','));

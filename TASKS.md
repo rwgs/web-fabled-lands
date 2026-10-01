@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 389. Transfer equivalence ignores item effects, tags, ability and provenance, silently choosing an unequal possession
 - [ ] 390. Immunity to Injury is awarded and displayed but cannot protect against any damage
 - [ ] 391. Combat replies land before the COMBAT-blessing reroll decision and can kill the player before a winning retry
 - [ ] 393. A forced `<group>` that bundles a roll holds nothing, so book3/273's and book3/629's "lose 1-6 of your possessions" can be walked past with the die unrolled
@@ -429,41 +428,11 @@ this order.*
 - [x] 386. a return frame kept the source visit's ctx and vars but not its fight bonus or equipment lock, so looking into book6/252's lacquer box at 6/624 lifted the -2 darkness penalty, at 6/135 freed the locked weapon slot, and let a detour's own bonus leak back. The frame now captures, serialises and coerces both, and `goBack` restores them before its autosave and render
 - [x] 387. book6/589's Forsaken result `<tick god=""/>` added a god named "", so a Sig initiate kept Sig, its +1 THIEVERY and a blank second god. An empty `god=` on a tick now renounces every current god through `removeGod`, which strips their effects and tied resurrection deals but bars no later initiation, and a load drops a blank god left by an older save
 - [x] 388. a money-cache Deposit rounded the request to `multiples=` and then clamped it to the purse, so book1/104 with 150 Shards invested all 150 of a requested 200. The new DOM-free `cacheDepositAmount` in `market.js` clamps first and rounds last. Withdrawals, which the spec does not constrain, are no longer rounded to the multiple
+- [x] 389. a transfer's equivalence compared kind, name and bonus only, so two same-named rings with three and one charges moved without asking which (book2/105's pickpocket, 6/635's and 4/456's offerings). Task 372's sale identity is now `sameItem` in `state.js`, shared by the sale and transfer planners. The transfer picker labels name the bonus's ability, the uses left and the tags, and number any picks still alike
 
 ---
 
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The open tasks' detail sections follow, in filed order; the Review log comes after them.
-
----
-
-## 389. Transfers silently select unequal possessions
-
-**Priority: MEDIUM.** A required "choose which" transfer can take a more useful
-item without asking.
-
-### What is wrong
-
-`itemsAllSame`, used by `transferPlan` and `applyTransfer` in
-[engine.js](web/js/engine.js), compares only kind, normalized name and bonus.
-It ignores ability, tags, effects/remaining uses and award provenance. Two
-same-named rings with three and one uses therefore report `needChoice: false`.
-The transfer takes the first and does not call a supplied chooser.
-
-The real [book2/105](books/book2/105.xml) pickpocket widget also offered no
-picker with those rings. [book6/635](books/book6/635.xml)'s weapon offering and
-[book4/456](books/book4/456.xml)'s +1 offering share the same planner. Task 372
-fixed sale equivalence, not transfer equivalence.
-
-### Steps
-
-1. Add `suite-engine`/`suite-economy` cases for equal-looking items with different
-   effect uses, tags, abilities and groups. Verify the selected item alone moves.
-2. Compare all gameplay-relevant identity when deciding whether transfers need
-   a choice; a genuinely interchangeable set can retain the one-button path.
-3. Update the real transfer picker in
-   [render-market.js](web/js/render-market.js) so the labels distinguish the
-   relevant differences, and verify selection through the 2.105 widget.
-4. Run the complete build/test loop before closing.
 
 ---
 
@@ -639,6 +608,27 @@ cannot simply be honoured.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 389): closed **389**, filed nothing.
+- Task 372's item identity, `sameCandidate`'s carried-goods half, moved to `state.js` as
+  `sameItem`. It compares name, bonus, ability, award group, tags, and effects with their uses
+  left.
+- `market.js`'s sale planner and `engine.js`'s `itemsAllSame` (kind plus `sameItem`) now share
+  it.
+- In `render-market.js`, `possessionLabel` (the item label plus uses left and tags) now labels
+  both the sale picker and the transfer picker. `distinctLabels` numbers the picks that still
+  read alike.
+
+Task 389's block in `suite-economy` covers:
+- rings differing only in uses, tags, ability or group: each needs a choice, and only the pick
+  moves;
+- identical rings, which keep the one-button path;
+- the real 2/105 widget, which labels 3 and 1 uses left and steals the ring picked;
+- a group-only difference, which is numbered.
+
+Against the old code it reported 11 failures. The task 341 transfer tests now match item names
+case-insensitively, since the label title-cases them as the sale picker always did.
+`RESULT ALL PASS pass=3448 fail=0`, and `node-import.mjs` passed.
 
 Worked 2026-10-01 (task 388): closed **388**, filed nothing. `renderMoneyCache`'s Deposit
 now uses `cacheDepositAmount` in `market.js`, which clamps the request to the purse and the

@@ -2,7 +2,7 @@
 // Reads attributes off the parsed XML elements and applies them to a GameState.
 
 import { ABILITIES, canonShipType, CREW_LEVELS, NO_CREW, SHIP_TYPES, canonCargo } from './rules.js';
-import { makeItem, normalize, globMatch, matchItems, matchItemQuery, isShardsCurrency, currencyAward, splitItemName, parseTags } from './state.js';
+import { makeItem, normalize, globMatch, matchItems, matchItemQuery, isShardsCurrency, currencyAward, splitItemName, parseTags, sameItem } from './state.js';
 import { bookAvailable } from './edition.js'; // the DOM-free registry, never data.js (task 195)
 
 // ---- dice / RNG ------------------------------------------------------------
@@ -1298,11 +1298,12 @@ function transferShards(el, state) {
   return { spec, avail, amt };
 }
 
+// Are these transfer candidates interchangeable, so the planner may take any without asking?
+// Kind plus sameItem's full identity (task 389): kind, name and bonus alone called two
+// same-named rings with three and one charges the same, and the transfer took the first.
 function itemsAllSame(items) {
   if (items.length <= 1) return true;
-  const sig = (it) => `${it.kind}|${normalize(it.name)}|${it.bonus || 0}`;
-  const first = sig(items[0]);
-  return items.every((it) => sig(it) === first);
+  return items.every((it) => it.kind === items[0].kind && sameItem(it, items[0]));
 }
 
 /** Everything the view needs to arm a visible transfer as an action (task 107):

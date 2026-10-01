@@ -2238,6 +2238,75 @@ export async function run(ctx) {
          && cacheDepositAmount({ requested: 'x', purse: 50 }) === 0);
     }
 
+    // --- task 389: a transfer asks which possession when the candidates differ in any way ---
+    // itemsAllSame compared kind, name and bonus only, so two same-named rings with three and one
+    // charges reported needChoice false and the transfer took the first without asking.
+    {
+      const use = (n) => ({ type: 'use', ability: null, bonus: 0, uses: n, verb: 'Rub', text: null, body: null });
+      const ring = (opts = {}) => makeItem('item', 'magic ring', opts.bonus || 0, opts.ability || null, opts.tags || [],
+        opts.effects || [use(3)], opts.group || null);
+      const xfer = parse('<transfer item="?" limit="1" to="c389">choose which</transfer>');
+      const planFor = (items) => {
+        const g = GameState.create({ name: 'T389', gender: 'm', profession: 'Rogue', book: 2, adv });
+        g.data.items = []; items.forEach((it) => g.addItem(it));
+        return { g, plan: eng.transferPlan(xfer, g) };
+      };
+      const cases = [
+        ['effect uses', () => [ring(), ring({ effects: [use(1)] })]],
+        ['tags', () => [ring(), ring({ tags: ['cursed'] })]],
+        ['ability', () => [ring({ bonus: 1, ability: 'magic' }), ring({ bonus: 1, ability: 'thievery' })]],
+        ['award group', () => [ring(), ring({ group: '5.238' })]],
+      ];
+      for (const [what, mk] of cases) {
+        const { g, plan } = planFor(mk());
+        ok(`task389: same-named rings differing in ${what} need a choice`, plan.needChoice === true);
+        const pick = g.data.items[1];
+        let asked = 0;
+        eng.applyEffect(xfer, g, { chooser: (movers) => { asked++; return [movers.find((m) => m.id === pick.id)]; } });
+        ok(`task389: ...and the chooser's pick alone moves (${what})`,
+           asked === 1 && g.data.items.length === 1 && g.data.items[0].id !== pick.id
+           && g.cacheItems('c389').length === 1 && g.cacheItems('c389')[0].id === pick.id);
+      }
+      {
+        const { g, plan } = planFor([ring(), ring()]);
+        let asked = 0;
+        eng.applyEffect(xfer, g, { chooser: () => { asked++; return []; } });
+        ok('task389: genuinely interchangeable rings keep the one-button path',
+           plan.needChoice === false && asked === 0 && g.data.items.length === 1 && g.cacheItems('c389').length === 1);
+      }
+
+      // The real §2.105 pickpocket, with no money, so he steals one possession: the picker
+      // names the uses left and takes the ring the player picks.
+      {
+        const g = GameState.create({ name: 'T389b', gender: 'm', profession: 'Rogue', book: 2, adv });
+        g.data.shards = 0; g.data.items = [];
+        g.addItem(ring()); g.addItem(ring({ effects: [use(1)] }));
+        const c = document.createElement('div');
+        new Story(c, g, { navigate() {}, onDeath() {}, notify() {} }).begin(await data.getSection(2, '105'), 2, '105');
+        const picks = Array.from(c.querySelectorAll('.ability-pick')).filter((b) => /magic ring/i.test(b.textContent));
+        ok('task389: §2.105 offers a pick per ring, labelled with the uses left',
+           picks.length === 2 && picks.some((b) => /3 uses left/.test(b.textContent)) && picks.some((b) => /1 use left/.test(b.textContent)),
+           picks.map((b) => b.textContent).join(' | '));
+        const one = picks.find((b) => /1 use left/.test(b.textContent));
+        if (one) one.click();
+        const left = g.data.items.filter((it) => /magic ring/i.test(it.name));
+        ok('task389: §2.105 the picked ring is the one stolen',
+           left.length === 1 && left[0].effects[0].uses === 3 && g.cacheItems('2.105').length === 1
+           && g.cacheItems('2.105')[0].effects[0].uses === 1, `left=${left.length}`);
+      }
+      // Rings the label cannot tell apart (only the award group differs) are numbered.
+      {
+        const g = GameState.create({ name: 'T389c', gender: 'm', profession: 'Rogue', book: 2, adv });
+        g.data.shards = 0; g.data.items = [];
+        g.addItem(ring()); g.addItem(ring({ group: '5.238' }));
+        const c = document.createElement('div');
+        new Story(c, g, { navigate() {}, onDeath() {}, notify() {} }).begin(await data.getSection(2, '105'), 2, '105');
+        const labels = Array.from(c.querySelectorAll('.ability-pick')).filter((b) => /magic ring/i.test(b.textContent)).map((b) => b.textContent);
+        ok('task389: picks the label cannot otherwise tell apart are numbered',
+           labels.length === 2 && labels[0] !== labels[1] && labels.every((l) => /#[12]$/.test(l)), labels.join(' | '));
+      }
+    }
+
     { // block-scoped
       // 1. Cache amount spinners are named and labelled from their own cache.
       const g202 = GameState.create({ name: 'A202', gender: 'f', profession: 'Rogue', book: 1, adv });
