@@ -378,6 +378,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 367. Living documents restate the shipped-section count `docs/Corpus-Census.md` owns
 - [x] 368. The Review log is nine-tenths of `TASKS.md`
 - [x] 371. Validate the save-slot metadata shape before recovery
+- [x] 372. Preserve meaningful differences when choosing a sale candidate
 - [x] 380. Make late asynchronous failures fail the test runners
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
@@ -21600,5 +21601,48 @@ Checked:
   card. That meta-only form is the ghost task 198 prevents by deleting meta first. Only a
   hand edit of storage produces it now.
 - The full suite reported `RESULT ALL PASS pass=3271 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 372. Preserve meaningful differences when choosing a sale candidate
+
+**Priority: MEDIUM.** The implicit choice can discard upgraded crew or usable effects.
+
+### What is wrong
+
+`sameCandidate` in [market.js](web/js/market.js) compares ships by hull type, cargo
+count and name, excluding crew grade and cargo contents. Two empty barques named
+`Ship`, one with excellent crew and one with poor crew, yield
+`sellPlan(...).needsChoice === false`. `sellTrade` then sells the first, which can
+be the excellent vessel. Its item comparison similarly excludes `effects`, so
+otherwise identical possessions with different remaining uses need no picker.
+
+### The fix
+
+- `sameCandidate` in `web/js/market.js` now requires two ships to match in crew grade and in
+  cargo contents, compared as an order-free multiset of canonical commodities. Before, it
+  compared only the load count. Two items must also match in effects. Each effect is keyed on
+  type, ability, bonus, uses, verb, text and body, with `sanitizeEffect`'s defaults, so a
+  live effect with unset fields matches its reloaded copy and a reload does not create a
+  false prompt. The headless default without a chooser is unchanged: the emptiest ship or the
+  plainest item.
+- `sellCandidateLabel` in `web/js/render-market.js` adds each ship's crew (`(excellent crew)`
+  or `(no crew)`), and for items the uses left on each limited-use effect (`(2 uses left)` or
+  `(used up)`). Without these, the picker the fix now raises would show two identical buttons
+  for the cases this task is about. The Adventure Sheet shows no use count either.
+- `suite-economy` (task 372 block) checks the plan. Two empty barques that differ only in crew
+  need a choice, and so do two whose equal loads differ in cargo. Furs-and-grain against
+  grain-and-furs is still interchangeable. Potions with 2 and 1 uses left need a choice, as
+  do a potion with an effect and one without. A live effect with defaults unset and its
+  sanitized twin need no choice, nor do two identical barques. Through the real `<market>`
+  widget, the picker labels name each crew and each potion's uses left. Picking removes only
+  that candidate and credits the price once, and identical barques sell with no picker.
+
+Checked:
+
+- Against the old `market.js` and `render-market.js`, 6 of the new assertions failed. The
+  crew, cargo, uses and effect-presence cases needed no choice, and with no picker the widget
+  check found no button to click.
+- The full suite reported `RESULT ALL PASS pass=3283 fail=0`, and `node-import.mjs` passed.
 
 ---

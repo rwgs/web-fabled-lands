@@ -9,7 +9,7 @@
 import { applyEffect, applyEffectBody, boolAttr, resolveValue, applyRest, buyResurrectionDeal, readItemEffects, filterMatches, transferPlan, isKeep } from './engine.js';
 import { shopKind, goodsFrom, ownsGoods, hasCargoSpace, buyTrade, sellTrade, sellPlan, applyInlineBuy, buyOptions, sellInlineItem, sellCargo, cargoBuyPlan, crewUpgradePlan, cargoSellPlan } from './market.js';
 import { normalize, parseTags, splitItemName, isShardsCurrency } from './state.js';
-import { canonCargo } from './rules.js';
+import { canonCargo, NO_CREW } from './rules.js';
 import { modal } from './ui.js';
 import { MARKET_TITLES, titleCase, escapeHtml, itemLabel, bonusSuffix } from './render-util.js';
 import { isChooseOne, isPricedResurrection } from './render-rules.js';
@@ -241,16 +241,20 @@ function showSellPicker(story, rowEl, plan, commit) {
   (rowEl.parentNode || rowEl).insertBefore(box, rowEl.nextSibling);
 }
 
-// A short label for a sale candidate: a ship shows its type/name and whether its hold is
-// laden (so selling the wrong vessel — and its cargo — is an informed choice); a cargo pick
-// names the carrying vessel; a carried good uses its item label.
+// A short label for a sale candidate: a ship shows its type/name, crew and whether its hold
+// is laden (so selling the wrong vessel — and its crew or cargo — is an informed choice); a
+// cargo pick names the carrying vessel; a carried good uses its item label plus the uses left
+// on any limited-use effect, since the picker is asked for when those differ. (tasks 134, 372)
 function sellCandidateLabel(kind, cand) {
   if (kind === 'ship' || kind === 'cargo') {
     const named = cand.name && cand.name !== 'Ship' ? ` "${cand.name}"` : '';
+    const crew = cand.crew === NO_CREW ? ' (no crew)' : (cand.crew ? ` (${cand.crew} crew)` : '');
     const load = (cand.cargo || []).length ? ` — carrying ${cand.cargo.map((c) => titleCase(c)).join(', ')}` : ' — empty';
-    return titleCase(cand.type) + named + load;
+    return titleCase(cand.type) + named + crew + load;
   }
-  return itemLabel(cand);
+  const uses = (cand.effects || []).filter((e) => e.type === 'use' && e.uses >= 0)
+    .map((e) => (e.uses === 0 ? 'used up' : `${e.uses} use${e.uses === 1 ? '' : 's'} left`));
+  return itemLabel(cand) + (uses.length ? ` (${uses.join(', ')})` : '');
 }
 
 // Inline <buy> in prose: a crew upgrade, a ship, a tool, a carried item, or a

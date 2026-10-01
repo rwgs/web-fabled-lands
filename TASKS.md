@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 372. `sellPlan` treats ships with different crew/cargo and items with different effects as interchangeable, so a sale can silently remove the more valuable candidate
 - [ ] 373. `GameState.keep` leaves a partially written preview save behind when the metadata write fails; each retry claims another slot
 - [ ] 374. The service-worker update gate releases during unsaved play, so an automatic update can reload away a preview or progress whose autosave failed
 - [ ] 375. Two tabs can load the same save slot and silently overwrite each other's progress because autosave never checks whether the stored adventure changed
@@ -417,6 +416,7 @@ this order.*
 - [x] 368. the Review log was nine-tenths of `TASKS.md`, mostly re-telling closed tasks whose detail is already archived; on the owner's go-ahead, the 123 entries below the latest `Reviewed` pass moved verbatim to `TASKS-archive.md`'s "Review log (archived)", and the header says where later ones go
 - [x] 380. a failure captured after a passing report prefixed a header no runner could parse above the old `RESULT ALL PASS` line, so both runners read that line and exited 0 on a page titled `TESTS_FAIL`; `flFatal` now re-runs the reporter, which writes a numeric `RESULT FAILURES` verdict, both runners also require the `TESTS_OK` title for a pass, and `run-tests-selftest.ps1` drives a late rejection and a late failing assertion through the runner
 - [x] 371. `loadSlotMeta` returned any parsed JSON, so `fl_meta = null` threw in `reconcileSlotMeta` before the title screen rendered and a junk entry listed a ghost card; it now keeps only a plain object of slot-number keys whose entries are objects with a string `name`, and what it drops is rebuilt from a readable blob or left occupied behind an unreadable one
+- [x] 372. `sameCandidate` compared ships by hull, load count and name and items without their effects, so an excellent crew, a different cargo or a potion with uses left could be sold with no picker; it now compares crew, cargo contents (order-free) and effects, and the picker's labels name the crew and the uses left
 
 ---
 
@@ -515,34 +515,6 @@ removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first
 
 - `https://webfl.rwgs.net/web/` is served by the Worker (a `/README.md` request answers 404).
   An installed copy updates to the next build, and it opens `/web/index.html` offline.
-
----
-
-## 372. Preserve meaningful differences when choosing a sale candidate
-
-**Priority: MEDIUM.** The implicit choice can discard upgraded crew or usable effects.
-
-### What is wrong
-
-`sameCandidate` in [market.js](web/js/market.js) compares ships by hull type, cargo
-count and name, excluding crew grade and cargo contents. Two empty barques named
-`Ship`, one with excellent crew and one with poor crew, yield
-`sellPlan(...).needsChoice === false`. `sellTrade` then sells the first, which can
-be the excellent vessel. Its item comparison similarly excludes `effects`, so
-otherwise identical possessions with different remaining uses need no picker.
-
-### Steps
-
-1. Include the meaningful ship and item state in the interchangeability decision.
-2. Verify the real sale widget asks when crew, cargo contents or item effects differ,
-   and still omits the picker for truly interchangeable candidates.
-3. Add owning-suite assertions and run the documented test loop.
-
-### Validation
-
-- Equal-name/equal-hull ships with different crew or cargo require a choice.
-- Equal-name items with different effects or remaining uses require a choice.
-- The chosen candidate alone is removed and proceeds are credited once.
 
 ---
 
@@ -796,6 +768,15 @@ reader, although `Test-AttrValue` in
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 372): closed **372**, filed nothing. `sameCandidate` in
+`market.js` now also compares crew grade, cargo contents (order-free) and item effects, using
+`sanitizeEffect`'s defaults so a live item and its reloaded copy still match. The sale
+picker's labels now name each ship's crew and each item's uses left; otherwise the new
+prompt would have shown two identical buttons. `suite-economy` gained 12 assertions, which
+cover the plan and the real widget: it asks, removes only the pick and credits the price
+once, and two truly identical barques still sell with no picker. Against the old code, 6
+of them failed. The full suite reported `RESULT ALL PASS pass=3283 fail=0`.
 
 Worked 2026-10-01 (task 371): closed **371**, filed nothing. `loadSlotMeta` now validates
 the index's shape and drops malformed entries, which `reconcileSlotMeta` rebuilds from a

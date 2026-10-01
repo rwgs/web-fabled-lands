@@ -3376,6 +3376,76 @@ export async function run(ctx) {
       ok('task134: picking the empty ship leaves the laden one', g.data.ships.length === 1 && g.data.ships[0].name === 'Laden', JSON.stringify(g.data.ships.map((s) => s.name)));
     }
 
+    // --- task 372: crew, cargo contents and item effects are part of what a sale hands over ---
+    // sameCandidate compared ships by hull, load COUNT and name, and items without effects, so
+    // an excellent-crewed barque or a potion with uses left could leave with no question asked.
+    {
+      const barqueRow = () => goodsFrom(parse('<trade ship="barque" sell="300"/>'), 'ship', 'barque', 0);
+      const potionRow = () => goodsFrom(parse('<item name="healing potion" sell="40"/>'), 'item', 'healing potion', 0);
+      const heal = (uses) => ({ type: 'use', ability: null, bonus: 0, uses, verb: 'Drink', text: '+5 Stamina', body: '<rest stamina="5"/>' });
+      const mk372 = (ships, potions = []) => {
+        const g = GameState.create({ name: 'S372', gender: 'f', profession: 'Mage', book: 2, adv });
+        g.ephemeral = true;
+        g.data.ships = []; g.data.items = []; g.data.shards = 0;
+        ships.forEach((s) => g.addShip({ type: 'barque', name: 'Ship', crew: 'average', cargo: [], docked: null, ...s }));
+        potions.forEach((p) => g.addItem(makeItem('item', 'healing potion', 0, null, [], p)));
+        return g;
+      };
+      ok('task372: equal empty barques with different crews need a choice',
+         sellPlan(mk372([{ crew: 'excellent' }, { crew: 'poor' }]), barqueRow()).needsChoice === true);
+      ok('task372: equal-load barques with different cargo need a choice',
+         sellPlan(mk372([{ cargo: ['furs'] }, { cargo: ['grain'] }]), barqueRow()).needsChoice === true);
+      ok('task372: the same cargo in another order is still interchangeable',
+         sellPlan(mk372([{ cargo: ['furs', 'grain'] }, { cargo: ['grain', 'furs'] }]), barqueRow()).needsChoice === false);
+      ok('task372: equal-name potions with different uses left need a choice',
+         sellPlan(mk372([], [[heal(2)], [heal(1)]]), potionRow()).needsChoice === true);
+      ok('task372: a potion with an effect and one without need a choice',
+         sellPlan(mk372([], [[heal(1)], []]), potionRow()).needsChoice === true);
+      // A live effect and its reloaded copy (sanitizeEffect fills the defaults) are one item.
+      const gLive = mk372([], [[{ type: 'use', bonus: 0, uses: 1, verb: 'Drink', text: '+5 Stamina', body: '<rest stamina="5"/>' }], [heal(1)]]);
+      ok('task372: equal potions, one with defaults left unset, need no choice',
+         sellPlan(gLive, potionRow()).needsChoice === false);
+      ok('task372: two identical empty barques still need no choice',
+         sellPlan(mk372([{}, {}]), barqueRow()).needsChoice === false);
+
+      // The real sale widget: ask, label the difference, remove only the pick, pay once.
+      const sell372 = (g, xml) => {
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate(){}, onDeath(){}, notify(){} });
+        st.begin(parse(`<section><market>${xml}</market></section>`), 2, 'x372');
+        Array.from(c.querySelectorAll('.btn-mini')).find((b) => /^Sell/.test(b.textContent)).click();
+        return c;
+      };
+      const gCrew = mk372([{ name: 'Ship', crew: 'excellent' }, { name: 'Ship', crew: 'poor' }]);
+      const cCrew = sell372(gCrew, '<trade ship="barque" sell="300"/>');
+      const crewBtns = Array.from(cCrew.querySelectorAll('.sell-choice button'));
+      ok('task372: the widget asks which barque, and the labels name each crew',
+         crewBtns.length === 2 && /excellent crew/.test(crewBtns[0].textContent + crewBtns[1].textContent)
+         && /poor crew/.test(crewBtns[0].textContent + crewBtns[1].textContent),
+         crewBtns.map((b) => b.textContent).join(' | '));
+      crewBtns.find((b) => /poor crew/.test(b.textContent)).click();
+      ok('task372: picking the poor crew sells only it, credited once',
+         gCrew.data.ships.length === 1 && gCrew.data.ships[0].crew === 'excellent' && gCrew.data.shards === 300,
+         JSON.stringify({ ships: gCrew.data.ships.map((s) => s.crew), shards: gCrew.data.shards }));
+
+      const gPot = mk372([], [[heal(2)], [heal(1)]]);
+      const cPot = sell372(gPot, '<item name="healing potion" sell="40"/>');
+      const potBtns = Array.from(cPot.querySelectorAll('.sell-choice button'));
+      ok('task372: the widget asks which potion, and the labels name the uses left',
+         potBtns.length === 2 && potBtns.some((b) => /2 uses left/.test(b.textContent)) && potBtns.some((b) => /1 use left/.test(b.textContent)),
+         potBtns.map((b) => b.textContent).join(' | '));
+      potBtns.find((b) => /1 use left/.test(b.textContent)).click();
+      ok('task372: picking the 1-use potion sells only it, credited once',
+         gPot.data.items.length === 1 && gPot.data.items[0].effects[0].uses === 2 && gPot.data.shards === 40,
+         JSON.stringify({ uses: gPot.data.items.map((i) => i.effects[0] && i.effects[0].uses), shards: gPot.data.shards }));
+
+      const gSame = mk372([{}, {}]);
+      const cSame = sell372(gSame, '<trade ship="barque" sell="300"/>');
+      ok('task372: truly interchangeable barques sell with no picker, credited once',
+         !cSame.querySelector('.sell-choice') && gSame.data.ships.length === 1 && gSame.data.shards === 300,
+         JSON.stringify({ ships: gSame.data.ships.length, shards: gSame.data.shards }));
+    }
+
     // --- task 342: which vessel a cargo buy, crew upgrade or cargo sale changes -------------
     // The economy layer selected by ARRAY POSITION: cargoShipWithSpace took the first local
     // hull with room, and canUpgradeCrew/applyInlineBuy read state.currentShip(), which at a

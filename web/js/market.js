@@ -238,13 +238,22 @@ const shipLoad = (s) => (s.cargo || []).length;
 // a plain possession outranks one bearing an ability, an <effect>, tags, or an award group.
 const itemWeight = (it) => (it.ability ? 1 : 0) + ((it.effects || []).length ? 1 : 0) + ((it.tags || []).length ? 1 : 0) + (it.group ? 1 : 0);
 
+// Order-free keys for the state a sale hands over with the candidate: a ship's cargo, and an
+// item's effects with sanitizeEffect's defaults, so a live item and its reloaded copy agree.
+const cargoKey = (s) => (s.cargo || []).map(canonCargo).sort().join('|');
+const effectsKey = (it) => (it.effects || []).map((e) => JSON.stringify([e.type || 'aura', e.ability || null,
+  e.bonus || 0, e.uses ?? -1, e.verb || null, e.text || null, e.body || null])).sort().join('|');
+
 /** Are two sale candidates interchangeable, so which one leaves makes no difference?
- *  Mirrors JaFL Item.matches (name+bonus+tags+group) for carried goods, and adds cargo
- *  load for ships (an empty and a laden vessel of one type are NOT the same sale). */
+ *  Mirrors JaFL Item.matches (name+bonus+tags+group) for carried goods, and adds effects (a
+ *  potion with uses left is not a spent one). Ships compare crew grade and cargo contents as
+ *  well as hull and name: an excellent and a poor crew, or a hold of furs and one of grain,
+ *  are NOT the same sale. (tasks 134, 372) */
 function sameCandidate(kind, a, b) {
   if (kind === 'ship') {
     return canonShipType(a.type) === canonShipType(b.type)
-      && shipLoad(a) === shipLoad(b)
+      && (a.crew || null) === (b.crew || null)
+      && cargoKey(a) === cargoKey(b)
       && normalize(a.name || '') === normalize(b.name || '');
   }
   const tagSet = (it) => (it.tags || []).map(normalize).sort().join(' ');
@@ -252,7 +261,8 @@ function sameCandidate(kind, a, b) {
     && (a.bonus || 0) === (b.bonus || 0)
     && (a.ability || null) === (b.ability || null)
     && (a.group || null) === (b.group || null)
-    && tagSet(a) === tagSet(b);
+    && tagSet(a) === tagSet(b)
+    && effectsKey(a) === effectsKey(b);
 }
 
 /** The possessions a sell of `goods` could take, safest-default first. Ships/cargo need the
