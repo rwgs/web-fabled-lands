@@ -24,7 +24,7 @@ import {
 } from './render-rules.js';
 import {
   computeFightGate, computeEscapeCodewords, isDeferredFightChain,
-  computeRollGate, computeOutcomeRollGate, computeTransferGate, computeBuyGate, computeRedirectGate, isEscapeNav,
+  computeRollGate, rollGateHold, computeOutcomeRollGate, computeTransferGate, computeBuyGate, computeRedirectGate, isEscapeNav,
 } from './render-gates.js';
 import {
   newCtx, resolveNodePath, serializeCtx, deserializeCtx, serializeFrame, deserializeFrame,
@@ -825,6 +825,7 @@ export class Story {
     // EFFECT, where the gate releases as soon as the roll resolves (task 247). See
     // computeRollGate / applyRollGate.
     this.rollGate = computeRollGate(el);
+    this.rollGateNodes = new Map(); // tagged button/fight box → its node, for rollGateHold (task 384)
     // Outcome-row roll gating (task 257): the roll a revealed <outcome> makes is the row's own
     // stake, so the row's exit waits for it — book3/15's "Continue → 52" beside the unrolled
     // "Lose 2-12 Shards" die used to settle the debt at zero. noteOutcomeRoll flags
@@ -1845,7 +1846,11 @@ export class Story {
   // rides along here rather than in another list beside every tagger, because it answers the
   // same question of the same node — must a roll be made before this exit? (task 257)
   tagRollNav(node, btn) {
-    if (this.rollGate && this.rollGate.navNodes.has(node)) btn.dataset.rollnav = '1';
+    const gate = this.rollGate;
+    if (gate && (gate.navNodes.has(node) || gate.branchExits.has(node))) {
+      btn.dataset.rollnav = '1';
+      this.rollGateNodes.set(btn, node);
+    }
     this.tagOutcomeRollNav(node, btn);
   }
 
@@ -1869,7 +1874,13 @@ export class Story {
     this.tagFightNav(node, btn);
     this.tagTransferNav(node, btn);
     this.tagBuyNav(node, btn);
-    this.tagOutcomeRollNav(node, btn);
+    this.tagRollNav(node, btn); // and the outcome-row gate; a later roll's row waits for earlier rolls (task 384)
+  }
+
+  // The walk revealed a branch: if it sends the player on, it decides the route, and the roll
+  // gate holds the exits after it (rollGateHold, task 384). Never from a grayed branch.
+  noteRevealedBranch(node) {
+    if (this.rollGate && !this.inactive && this.rollGate.redirectBranches.has(node)) this.rollGate.revealed.add(node);
   }
 
   // The walk reached a roll: if it is a gated row's stake and still unmade, hold the row's exit.
@@ -1901,7 +1912,10 @@ export class Story {
   // The gate names the <fight> NODE, so the mark has to be made where the widget is built —
   // a rendered box carries no trace of its position relative to the gating roll.
   tagRollFight(node, box) {
-    if (this.rollGate && this.rollGate.fightNodes.has(node)) box.dataset.rollfight = '1';
+    if (this.rollGate && this.rollGate.fightNodes.has(node)) {
+      box.dataset.rollfight = '1';
+      this.rollGateNodes.set(box, node);
+    }
   }
 
   // Tag a rendered nav button as a flee/escape exit (isEscapeNav owns the rule), so
@@ -1926,31 +1940,25 @@ export class Story {
     const held = Array.from(flow.querySelectorAll(
       '[data-rollnav], [data-rollfight] .btn-roll, [data-rollfight] .blessing-combat'));
     if (!held.length) return;
-    // EVERY roll the gate awaits must have resolved (task 292): §4.257 routes on the pair of
-    // Difficulty-14 checks it makes, so a hold lifted by whichever one the player rolled first
-    // hands out the exit the OTHER roll decides. Seeds 1-3 await exactly one roll, so this is
-    // the same test they always made.
+    // EVERY awaited roll above the exit must have resolved (tasks 292 + 384): §4.257 routes on the
+    // pair of Difficulty-14 checks it makes, so a hold lifted by whichever one the player rolled
+    // first hands out the exit the OTHER roll decides.
     // A rolled gate whose result is still a pending blessing-reroll decision (task 175) is not
     // final: keep the onward navigation locked exactly as an unrolled gate, so the player
     // cannot walk past the decision before keeping or rerolling it.
-    const unresolved = [...gate.rollNodes].some((n) => {
+    const settled = (n) => {
       const path = gate.rollPaths.get(n);
-      return path == null || !this.ctx.rolls.get('roll@' + path) || this.rerollPendingRolls.has(path);
-    });
-    let disable, title;
-    if (unresolved) {
-      disable = true; title = 'Resolve the roll above first.';
-    } else {
-      const oc = gate.matchedOutcome;
-      const redirect = !!oc && (!!oc.querySelector('goto') || oc.getAttribute('section') != null);
-      disable = redirect; title = 'Your route is decided — follow it.';
-    }
-    if (!disable) return;
+      return path != null && !!this.ctx.rolls.get('roll@' + path) && !this.rerollPendingRolls.has(path);
+    };
+    const TITLES = { unrolled: 'Resolve the roll above first.', decided: 'Your route is decided — follow it.' };
     held.forEach((btn) => {
       if (btn.disabled) return; // already gated (fight, cost, edition…) — keep its own reason
+      const node = this.rollGateNodes.get(btn.dataset.rollnav ? btn : btn.closest('[data-rollfight]'));
+      const hold = node ? rollGateHold(gate, node, settled) : null;
+      if (!hold) return;
       btn.disabled = true;
       btn.classList.add('gated');
-      btn.title = title;
+      btn.title = TITLES[hold];
     });
   }
 

@@ -629,11 +629,13 @@ export async function run(ctx) {
        gained292.join(' ') === '1/313 2/345 2/378 2/389 2/529 2/536 2/563 2/584 2/614 2/637 2/654 2/683 2/752 '
          + '3/267 3/379 3/412 3/455 3/492 3/559 3/583 4/257 5/245 5/343 5/432 6/17 6/344 6/402 6/738',
        gained292.length + ': ' + gained292.join(' '));
-    // §4.257 is the whole reason the gate awaits a SET of rolls: it is the only shipped section
-    // whose gate has more than one, and the other three seeds must keep naming exactly one each,
-    // since a table matches one row, an effect owes one magnitude and a branch belongs to one check.
+    // §4.257 is the whole reason the gate awaits a SET of rolls: it is the only condition-seeded
+    // section with more than one, and the effect and branch seeds must keep naming exactly one
+    // each, since an effect owes one magnitude and a branch belongs to one check. The table seed
+    // also awaits the checks made above its table (task 384), in exactly these four sections.
     const g257 = gates.computeRollGate(await data.getSection(4, '257'));
-    ok('task292: only §4.257 awaits two rolls, and no other seed awaits more than one',
-       multi292.length === 0 && !!g257 && g257.rollNodes.size === 2,
+    ok('task292: only §4.257 and four table sections await two rolls, and no other seed awaits more than one',
+       multi292.join(', ') === '5/76 seed=table, 5/510 seed=table, 6/86 seed=table, 6/373 seed=table'
+         && !!g257 && g257.rollNodes.size === 2,
        (g257 ? 'rolls=' + g257.rollNodes.size : 'no gate on 4/257') + '; ' + multi292.join(', '));
 }

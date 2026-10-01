@@ -441,6 +441,7 @@ export function renderBranch(story, container, node, path, activeRoll) {
 }
 
 function revealBranch(story, container, node, path) {
+  story.noteRevealedBranch(node); // a branch that sends the player on decides the route (task 384)
   const box = document.createElement('span');
   box.className = 'branch';
   // apply effects + render inner content

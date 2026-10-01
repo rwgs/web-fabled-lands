@@ -4100,10 +4100,12 @@ export async function run(ctx) {
       const c15 = document.createElement('div');
       const st15 = new Story(c15, g15, { navigate(){}, onDeath(){}, notify(){} });
       st15.begin(await data.getSection(3, '15'), 3, '15');
-      // Every exit §3.15 has lives inside an outcome, which seed 1 rightly skips (§1.299's
-      // drunken soldier is what the roll reveals), so the section-level gate is null either way.
+      // Every exit §3.15 has lives inside an outcome, which only the table's own die reveals
+      // (§1.299's drunken soldier is what the roll reveals). The section-level gate collects those
+      // row exits (task 384) but awaits that die alone, so it can hold none of them.
       ok('task257: §3.15 builds a row gate where the section gate has nothing to hold',
-         st15.outcomeRollGate !== null && st15.rollGate === null);
+         st15.outcomeRollGate !== null && !!st15.rollGate && st15.rollGate.rollNodes.size === 1
+         && st15.rollGate.navNodes.size === 0 && st15.rollGate.fightNodes.size === 0);
       ok('task257: §3.15 offers no row exit until the table itself is rolled', !cont257(c15));
       Math.random = () => 0; // both dice = 1 → 2 → range 2-5
       c15.querySelector('.btn-roll').click(); await settle257();
@@ -4168,6 +4170,145 @@ export async function run(ctx) {
          Array.from(c257c.querySelectorAll('.choice')).map((b) => b.disabled).join(','));
 
       Math.random = rnd257;
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
+    // --- task 384: a later destination roll cannot release an exit an earlier roll still owes ---
+    // The table seed awaited only the first mandatory <random>, and a gate with no <choice>/<goto>
+    // below its roll was null. So in §5.510 rolling the destination die first drew a live
+    // "Continue → 539" with the drowning Rank check unmade, and §5.76's SCOUTING check and
+    // §6.373's possession-loss die were skipped the same way. A revealed branch that sends the
+    // player on also decides the route: a failed drowning check holds the destination rows.
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const settle = () => new Promise((r) => setTimeout(r, 30));
+      const rnd = Math.random;
+      const rollBtn = (c, re) => Array.from(c.querySelectorAll('.btn-roll')).find((b) => re.test(b.textContent));
+      const exitTo = (c, n) => Array.from(c.querySelectorAll('.goto, .choice'))
+        .find((b) => new RegExp('(^|\\D)' + n + '(\\D|$)').test(b.textContent));
+      const roll = async (c, re, r) => {
+        const b = rollBtn(c, re);
+        if (!b) { ok('task384: (setup) a roll button matches ' + re, false, Array.from(c.querySelectorAll('.btn-roll')).map((x) => x.textContent).join(' | ')); return; }
+        Math.random = () => r; b.click(); await settle();
+      };
+      const enter = async (book, sec, setup) => {
+        const g = GameState.create({ name: 'T384', gender: 'm', profession: 'Warrior', book, adv });
+        g.data.rank = 1; g.data.stamina = 20; g.data.staminaMax = 20;
+        if (setup) setup(g);
+        const c = document.createElement('div');
+        const nav = [];
+        const st = new Story(c, g, { navigate(b, s) { nav.push(b + '/' + s); }, onDeath() {}, notify() {} });
+        g.setVisitProvider(() => st.serializeVisit());
+        g.goTo(book, sec); st.begin(await data.getSection(book, sec), book, sec);
+        return { g, c, st, nav };
+      };
+      const RANK = /Rank check/, DIE = /Roll 1 die/, TWO = /Roll 2 dice/;
+
+      // §5.510: destination first (die 1 → 539), then a passed check (1+1-2 = 0 <= Rank 1).
+      {
+        const { c, nav } = await enter(5, '510');
+        await roll(c, DIE, 0);
+        const held = exitTo(c, 539);
+        ok('task384: §5.510 the destination row waits for the drowning check rolled after it',
+           !!held && held.disabled === true && /Resolve the roll/.test(held.title), held ? held.title : 'no →539');
+        await roll(c, RANK, 0);
+        ok('task384: §5.510 a passed check releases the row', exitTo(c, 539).disabled === false);
+        exitTo(c, 539).click(); await settle();
+        ok('task384: §5.510 ...which turns to 539', nav.join() === '5/539', nav.join());
+      }
+      // §5.510: destination first, then a failed check (6+6-2 = 10 > Rank 1): drowned.
+      {
+        const { c, nav } = await enter(5, '510');
+        await roll(c, DIE, 0);
+        await roll(c, RANK, 0.9);
+        const drown = exitTo(c, 7), row = exitTo(c, 539);
+        ok('task384: §5.510 a failed check leaves the drowning exit live',
+           !!drown && drown.disabled === false, drown ? drown.title : 'no →7');
+        ok('task384: §5.510 ...and holds the destination row: the route is decided',
+           !!row && row.disabled === true && /route is decided/.test(row.title), row ? row.title : 'no →539');
+        drown.click(); await settle();
+        ok('task384: §5.510 the failed check turns to 7', nav.join() === '5/7', nav.join());
+      }
+      // §5.510: the check first and failed, then the die: the row it draws is held too.
+      {
+        const { c } = await enter(5, '510');
+        await roll(c, RANK, 0.9);
+        ok('task384: §5.510 a failed check first offers 7 at once', exitTo(c, 7).disabled === false);
+        await roll(c, DIE, 0.5);
+        const row = exitTo(c, 334);
+        ok('task384: §5.510 a destination rolled after the failure is held', !!row && row.disabled === true);
+      }
+      // §5.510 saved and resumed with only the destination rolled.
+      {
+        const { g, c } = await enter(5, '510');
+        await roll(c, DIE, 0);
+        const g2 = new GameState(sanitizeData(JSON.parse(JSON.stringify({ ...g.data, visit: g.data.visit || null }))));
+        const c2 = document.createElement('div');
+        const s2 = new Story(c2, g2, { navigate() {}, onDeath() {}, notify() {} });
+        s2.resume(await data.getSection(5, '510'), 5, '510', g2.data.visit, null);
+        const held = exitTo(c2, 539);
+        ok('task384: §5.510 a resume with one roll made keeps the row held',
+           !!held && held.disabled === true && !!rollBtn(c2, RANK) && !rollBtn(c2, DIE), held ? held.title : 'no →539');
+        await roll(c2, RANK, 0);
+        ok('task384: §5.510 ...and the resumed check releases it', exitTo(c2, 539).disabled === false);
+      }
+
+      // §5.76: a failed SCOUTING check reads the die; a passed one decides the route (→471).
+      {
+        const { c } = await enter(5, '76');
+        await roll(c, DIE, 0); // die 1 → 176
+        ok('task384: §5.76 the fog row waits for the SCOUTING check', exitTo(c, 176).disabled === true);
+        await roll(c, TWO, 0); // 1+1 + SCOUTING fails Difficulty 13
+        ok('task384: §5.76 a failed check releases the row it reads', exitTo(c, 176).disabled === false);
+      }
+      {
+        const { c } = await enter(5, '76', (g) => { g.data.abilities.scouting = 12; });
+        await roll(c, DIE, 0);
+        await roll(c, TWO, 0.9); // 6+6 + 12 passes
+        ok('task384: §5.76 a passed check leaves 471 live and holds the fog row',
+           exitTo(c, 471).disabled === false && exitTo(c, 176).disabled === true);
+      }
+
+      // §6.373: the landing roll first; the possession-loss die (1-6 lost) is still owed.
+      {
+        const { g, c } = await enter(6, '373', (g) => {
+          g.data.items = [];
+          ['rope', 'lantern', 'flask'].forEach((n) => g.addItem(makeItem('item', n)));
+        });
+        await roll(c, TWO, 0); // 2 → the capital, 79
+        const before = g.data.items.length;
+        ok('task384: §6.373 the landing row waits for the possession-loss die',
+           exitTo(c, 79).disabled === true && before === 3, `items=${before}`);
+        await roll(c, DIE, 0); // x = 1: "you decide which possessions to lose"
+        const picks = Array.from(c.querySelectorAll('.btn-mini')).filter((b) => /rope|lantern|flask/i.test(b.textContent));
+        ok('task384: §6.373 rolling it asks which possession is lost, and the row still waits',
+           picks.length === 3 && exitTo(c, 79).disabled === true && g.data.items.length === 3,
+           `picks=${picks.length} items=${g.data.items.length}`);
+        if (picks[0]) { picks[0].click(); await settle(); }
+        ok('task384: §6.373 answering it takes one possession and releases the row',
+           g.data.items.length === 2 && exitTo(c, 79).disabled === false, `items=${g.data.items.length}`);
+      }
+
+      // The same rule over other shipped drowning checks: a failure no longer leaves the exits after it.
+      {
+        const { c } = await enter(3, '157');
+        await roll(c, RANK, 0.9);
+        const pay = Array.from(c.querySelectorAll('.choice')).find((b) => /ransom/i.test(b.textContent));
+        ok('task384: §3.157 a drowned player cannot take the ransom choices',
+           exitTo(c, 123).disabled === false && !!pay && pay.disabled === true);
+      }
+      {
+        const { c } = await enter(4, '540', (g) => { g.data.rank = 6; });
+        await roll(c, RANK, 0); // 1+1 <= Rank 6
+        const on = exitTo(c, 585);
+        ok('task384: §4.540 a passed check still reaches 585', !!on && on.disabled === false, on ? on.title : 'no →585');
+      }
+
+      // Optional rolls stay optional: §1.21's force="f" talk-out and a paid repeat gate nothing.
+      ok('task384: a force="f" roll above a table still awaits only the table die',
+         gates.computeRollGate(parse('<section name="t384"><difficulty ability="charisma" level="9" force="f"/><random/><outcomes><outcome range="1-12" section="5"/></outcomes></section>')).rollNodes.size === 1);
+
+      Math.random = rnd;
       window.__FL_INSTANT_DICE__ = false;
     }
 

@@ -68,6 +68,7 @@ const ROLLGATE_OPTIONAL_WRAP = new Set(['if', 'elseif', 'else', 'success', 'fail
 // ("their own gotos aren't gated"); fightround is the third member. (task 247)
 const ROLLGATE_FIGHT_HOOK_WRAP = new Set(['flee', 'fightround', 'fightdamage']);
 const ROLLGATE_OUTCOME_WRAP = new Set(['outcomes', 'outcome']);
+const ROW_WRAP = new Set(['outcome']); // a table ROW, which only its roll reveals (task 384)
 const TRANSFER_GROUP_WRAP = new Set(['group']);
 const BUY_GROUP_WRAP = new Set(['group']);
 // A navigation inside one of these is the player's to pick, not a step the section
@@ -310,11 +311,18 @@ function isForcedRoll(sectionEl, r) {
   return !(fl != null && isRollGate(sectionEl, fl));
 }
 
-// Seed 1 (task 104) — the mandatory <random> whose result an <outcomes> TABLE reads.
-function tableRoll(sectionEl, outcomesNode) {
-  return Array.from(sectionEl.querySelectorAll('random')).find((r) =>
+// Seed 1 (task 104) — the mandatory <random> whose result an <outcomes> TABLE reads, and every
+// other mandatory roll above the table (task 384). The seed used to await only the first
+// mandatory <random>, so a check the page makes BEFORE its destination die was nobody's: in
+// book5/510, rolling the die first drew "Continue → 539" with the drowning Rank check unmade,
+// and book5/76's SCOUTING check and book6/373's possession-loss die were skipped the same way.
+// (In book6/373 the first <random> was not even the table's own die.) Which exit waits for
+// which roll is rollGateHold's question, so the drowning branch above the die stays live.
+function tableRolls(sectionEl, outcomesNode) {
+  const above = Array.from(sectionEl.querySelectorAll('random, rankcheck, difficulty')).filter((r) =>
     !!(r.compareDocumentPosition(outcomesNode) & DOCUMENT_POSITION_FOLLOWING)
-    && isMandatoryRoll(sectionEl, r)) || null;
+    && isMandatoryRoll(sectionEl, r));
+  return above.some((r) => r.tagName.toLowerCase() === 'random') ? above : [];
 }
 
 // Seed 2 (task 247) — the mandatory roll whose result an EFFECT reads. The gate had only
@@ -431,15 +439,16 @@ function conditionRolls(sectionEl) {
 // is the table this gate's roll feeds, or null when the gate came from the effect, branch or
 // condition seed — there is no outcome to match then, so applyRollGate releases on the roll (and,
 // for a branch seed, the <success>/<failure> the roll reveals) RESOLVING. Returns
-// { rollNode, rollNodes:Set, seed, outcomesNode, navNodes:Set, fightNodes:Set, rollPaths:Map,
-// matchedOutcome } or null.
+// { rollNode, rollNodes:Set, seed, outcomesNode, navNodes:Set, branchExits:Set, fightNodes:Set,
+// redirectBranches:Set, rollPaths:Map, matchedOutcome, revealed:Set } or null. rollGateHold
+// below reads it.
 export function computeRollGate(sectionEl) {
   if (!sectionEl) return null;
   const outcomesNode = sectionEl.querySelector('outcomes');
-  const tabled = outcomesNode ? tableRoll(sectionEl, outcomesNode) : null;
+  const tabled = outcomesNode ? tableRolls(sectionEl, outcomesNode) : [];
   // The seeds are tried in order and `seed` names the one that fired, so a census can ask which
   // sections a newly added seed is holding — the measurement task 292 wanted before committing it.
-  let seed = 'table', rolls = tabled ? [tabled] : [];
+  let seed = 'table', rolls = tabled;
   const trySeed = (name, find) => {
     if (rolls.length) return;                 // lazy, so a table-seeded gate still scans nothing else
     const found = find();
@@ -472,9 +481,60 @@ export function computeRollGate(sectionEl) {
     if (hasAncestorTag(f, ROLLGATE_OUTCOME_WRAP)) return;
     fightNodes.add(f);
   });
-  if (!navNodes.size && !fightNodes.size) return null; // pure roll-to-goto travel — nothing to gate
-  return { rollNode, rollNodes: new Set(rolls), seed, outcomesNode: tabled ? outcomesNode : null,
-           navNodes, fightNodes, rollPaths: new Map(), matchedOutcome: null };
+  // The exits a later roll REVEALS (task 384): a branch's own "Continue → N" and the navigation
+  // inside a table row. Each is drawn only once its own roll has resolved, so it needs holding
+  // only by an awaited roll ABOVE that one, which rollGateHold asks. `outcome` and not
+  // `outcomes`: a <choice> directly in the table is the "or don't try" alternative to rolling.
+  const branchExits = new Set();
+  sectionEl.querySelectorAll(BRANCH_EXIT_SELECTOR + ', choice, goto, return').forEach((n) => {
+    if (navNodes.has(n) || !(rollNode.compareDocumentPosition(n) & DOCUMENT_POSITION_FOLLOWING)) return;
+    if (!BRANCH_EXIT_TAGS.has(n.tagName.toLowerCase()) && !hasAncestorTag(n, ROW_WRAP)) return;
+    if (boolAttr(n.getAttribute('flee'))) return;
+    branchExits.add(n);
+  });
+  // A revealed branch that sends the player on decides the route, and JaFL's forced goto ends
+  // the section there (isMandatoryRedirect). So a <failure> that drowns the player holds the
+  // exits written after it: book5/510's destination rows, book3/157's ransom choices, book5/689's
+  // fight, book1/344's flight to 216. (task 384)
+  const redirectBranches = new Set();
+  sectionEl.querySelectorAll('success, failure').forEach((b) => {
+    if (!(rollNode.compareDocumentPosition(b) & DOCUMENT_POSITION_FOLLOWING)) return;
+    if (hasAncestorTag(b, REDIRECT_OPTIONAL_WRAP) || hasAncestorTag(b, ROLLGATE_OUTCOME_WRAP)) return;
+    if (branchRedirects(b)) redirectBranches.add(b);
+  });
+  if (!navNodes.size && !fightNodes.size && !branchExits.size) return null; // nothing to gate
+  return { rollNode, rollNodes: new Set(rolls), seed, outcomesNode: tabled.length ? outcomesNode : null,
+           navNodes, branchExits, fightNodes, redirectBranches, rollPaths: new Map(), matchedOutcome: null,
+           revealed: new Set() };
+}
+
+// Does this revealed <success>/<failure> send the player on? Its own section=, or a mandatory
+// redirect written in it unconditionally — not one under a nested condition, which may not fire.
+function branchRedirects(branch) {
+  if (branch.getAttribute('section') != null) return true;
+  return Array.from(branch.querySelectorAll('goto, return')).some((g) => {
+    if (!isMandatoryRedirect(g)) return false;
+    for (let p = g.parentNode; p && p !== branch; p = p.parentNode) {
+      if (REDIRECT_CONDITIONAL_WRAP.has(p.tagName.toLowerCase())) return false;
+    }
+    return true;
+  });
+}
+
+// Why the roll gate holds this exit or fight now, or null (task 384). Not one hold for every
+// exit below the first awaited roll: an exit waits for the awaited rolls ABOVE it, so book5/510's
+// drowning <goto> is live once its own check fails, while the destination rows below wait for
+// that check. `settled(roll)` is the view's word on whether a roll has a kept result. Once those
+// rolls have settled, an exit after a revealed branch that sends the player on is held because
+// the route is decided: a revealed redirect branch, or the table row the dice turned up when it
+// carries a <goto> or section= (task 104). The revealing branch's own exit is never held.
+export function rollGateHold(gate, node, settled) {
+  const above = (a, b) => !!(a.compareDocumentPosition(b) & DOCUMENT_POSITION_FOLLOWING);
+  if ([...gate.rollNodes].some((r) => above(r, node) && !settled(r))) return 'unrolled';
+  const oc = gate.matchedOutcome;
+  const deciders = [...gate.revealed];
+  if (oc && (oc.querySelector('goto') || oc.getAttribute('section') != null)) deciders.push(oc);
+  return deciders.some((b) => b !== node && !b.contains(node) && above(b, node)) ? 'decided' : null;
 }
 
 // The outcome-row roll gate (task 257) — the roll a REVEALED table row makes, holding that

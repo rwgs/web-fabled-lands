@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 384. A later destination roll can bypass an earlier mandatory survival check or possession-loss roll
 - [ ] 385. Explicitly forced action groups leave onward exits live before their costs or consequences run
 - [ ] 386. Returning from an item detour loses the source visit's fight bonuses and equipment locks
 - [ ] 387. `<tick god="">` adds an empty god instead of clearing initiation at book6/589
@@ -428,42 +427,11 @@ this order.*
 - [x] 382. a service worker never finished installing under `build/serve.py`. The cause was `FLCache.precache`, not the server: it read no body until every fetch had answered, so unread no-store bodies held the browser's six HTTP/1.x connections. `fetchOk` now reads each body as it arrives and stores a fresh copy (which also strips a redirect, as task 370's `unredirect` did), and `docs/Testing.md` records how to drive a real update
 - [x] 370. the site moved from GitHub Pages to an assets-only Cloudflare Worker at `webfl.rwgs.net`, deployed by CI after every job passes; the precache strips the Worker's `index.html` redirect, only `CLOUDFLARE_API_TOKEN` turned out to be needed, Pages is off, and an installed copy updated and opens offline
 - [x] 383. a Keep or import refused because another tab filled the chosen slot first deleted that tab's save: Keep removed the blob, and import's `deleteSlot` removed its meta too. The rollback now removes a blob only while it is still the one this attempt wrote, and import no longer touches meta, which a failed save never writes. That also fixes an import whose meta write failed, which used to leave its own blob behind
+- [x] 384. rolling the destination die first released "Continue → 539" in book5/510 with the drowning check unmade, and did the same past book5/76's SCOUTING check and book6/373's possession-loss die. The roll gate's table seed now awaits every mandatory roll above its table, and an exit waits only for the awaited rolls above it. A revealed branch that sends the player on decides the route and holds the exits after it, so a failed drowning check no longer leaves the destination rows, or 3/157's ransom choices, live
 
 ---
 
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The open tasks' detail sections follow, in filed order; the Review log comes after them.
-
----
-
-## 384. Destination rolls bypass earlier mandatory rolls
-
-**Priority: MEDIUM.** Shipped sections can skip death checks and forfeits.
-
-### What is wrong
-
-`computeRollGate` in [render-gates.js](web/js/render-gates.js) takes the first
-successful seed and holds ordinary navigation after its selected roll. It
-excludes outcome-table exits; it does not accumulate the earlier obligations a
-later roll and its exit depend on.
-
-In [book5/510](books/book5/510.xml), rolling the destination die first enables
-"Continue -> 539" and reaches that section without making the drowning
-Rank check. The same click order bypasses the SCOUTING check in
-[book5/76](books/book5/76.xml) and the possession-loss die in
-[book6/373](books/book6/373.xml). Browser probes exercised all three on the
-shipped bundles; the drowning exit also actually navigated.
-
-### Steps
-
-1. Add click-order regressions to `suite-combat`/`suite-actions` for those three
-   sections: a destination roll cannot enable an exit while an earlier required
-   roll or its required forfeit is unmade.
-2. Plan all applicable roll obligations, including prerequisites of later rolls
-   and exits synthesized from an outcome's `section=`. Keep conditional and
-   optional alternatives usable when their prerequisite has resolved that way.
-3. Verify success/failure routing, including drowning death, and a save/resume
-   with only one roll made. Preserve optional talk-or-fight and paid-repeat rolls.
-4. Run the complete build/test loop before closing.
 
 ---
 
@@ -755,6 +723,25 @@ this), but the message never says so.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 384): closed **384**, filed nothing. `computeRollGate` in
+`render-gates.js` now does three things:
+- Its table seed awaits every mandatory roll above the table. That changes 5/76, 5/510, 6/86
+  and 6/373, the only shipped tables with two such rolls.
+- It collects the exits a later roll reveals (a branch's `section=`, the navigation inside a
+  table row).
+- It names the `<success>`/`<failure>` branches that send the player on.
+
+The new `rollGateHold` decides each exit separately. An exit waits for the awaited rolls above
+it. After a revealed redirect branch, the exits that follow are held as "Your route is
+decided". A census of shipped branches with a forced redirect and an unconditional exit after
+them found 13 sections, among them 1/168, 1/344, 3/157, 4/540 and 5/689, where a failed
+survival or escape check used to leave the later exits live. Task 384's block in
+`suite-actions` drives 5/510 in both click orders and resumes it with one roll made. It also
+covers both 5/76 results, 6/373's possession picker, 3/157 and 4/540. Against the old code it
+reported 9 failures and a fatal. Task 292's census now expects the four table sections, and
+task 257's §3.15 assertion expects a section gate that awaits only the table die.
+`RESULT ALL PASS pass=3390 fail=0`, and `node-import.mjs` passed.
 
 Worked 2026-10-01 (task 383): closed **383**, filed **392**. `keep` and `importSave` now roll
 back through `removeOwnBlob` in `state.js`. It removes the slot's blob only while it is still

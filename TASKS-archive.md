@@ -391,6 +391,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 382. Let the dev server complete a service worker's install
 - [x] 380. Make late asynchronous failures fail the test runners
 - [x] 383. Failed slot claims can delete another tab's save
+- [x] 384. Destination rolls bypass earlier mandatory rolls
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
 
@@ -22450,5 +22451,109 @@ Checked:
   passed.
 - Filed task 392: the refused claim reports the two-tab message, which calls the rival's
   save a newer copy of this adventure.
+
+---
+
+## 384. Destination rolls bypass earlier mandatory rolls
+
+**Priority: MEDIUM.** Shipped sections can skip death checks and forfeits.
+
+### What is wrong
+
+`computeRollGate` in [render-gates.js](web/js/render-gates.js) takes the first
+successful seed and holds ordinary navigation after its selected roll. It
+excludes outcome-table exits; it does not accumulate the earlier obligations a
+later roll and its exit depend on.
+
+In [book5/510](books/book5/510.xml), rolling the destination die first enables
+"Continue -> 539" and reaches that section without making the drowning
+Rank check. The same click order bypasses the SCOUTING check in
+[book5/76](books/book5/76.xml) and the possession-loss die in
+[book6/373](books/book6/373.xml). Browser probes exercised all three on the
+shipped bundles; the drowning exit also actually navigated.
+
+### Steps
+
+1. Add click-order regressions to `suite-combat`/`suite-actions` for those three
+   sections: a destination roll cannot enable an exit while an earlier required
+   roll or its required forfeit is unmade.
+2. Plan all applicable roll obligations, including prerequisites of later rolls
+   and exits synthesized from an outcome's `section=`. Keep conditional and
+   optional alternatives usable when their prerequisite has resolved that way.
+3. Verify success/failure routing, including drowning death, and a save/resume
+   with only one roll made. Preserve optional talk-or-fight and paid-repeat rolls.
+4. Run the complete build/test loop before closing.
+
+### The fix
+
+In all three sections the gate was `null`, for two reasons:
+
+- The table seed awaited only the first mandatory `<random>`. In 6/373 that was not even the
+  table's own die.
+- The gate collected only `<choice>`/`<goto>`/`<return>` below that roll, outside the table,
+  and these sections have none. Their only exits are table rows.
+
+A census found nine shipped sections with two or more mandatory rolls. The other five
+(2/419, 3/437, 3/476, 4/257, 6/442) route on both rolls through box codewords or a
+condition, and are unchanged.
+
+- `web/js/render-gates.js`:
+  - `tableRolls` replaces `tableRoll`. The table seed now awaits every mandatory roll above
+    its table, and still needs a mandatory `<random>` among them. Four sections change:
+    5/76, 5/510, 6/86 (the antique roll is now owed before "→ 416") and 6/373.
+  - `computeRollGate` also returns `branchExits` and `redirectBranches`:
+    - `branchExits` are the exits a later roll reveals: a `success`/`failure`/`outcome`
+      with `section=`, and the navigation inside a table row. A `<choice>` placed directly
+      in `<outcomes>` is not one, because it is the "or don't try" alternative.
+    - `redirectBranches` are the `<success>`/`<failure>` branches that send the player on:
+      a `section=`, or a mandatory redirect (`isMandatoryRedirect`) with no nested
+      condition around it.
+  - A gate is no longer `null` when its only exits are branch exits.
+  - The new `rollGateHold(gate, node, settled)` decides each exit or fight separately:
+    - It is held while any awaited roll above it is unsettled. So 5/510's drowning `<goto>`
+      is live once its own check fails, while the rows below still wait.
+    - Once those rolls have settled, it is held as "decided" if a revealed redirect branch,
+      or a redirecting matched table row (task 104's rule), comes before it. The revealing
+      branch's own exit is never held.
+    - The old code held every tagged exit below the first awaited roll until all of them
+      resolved. Only 4/257 awaited more than one roll, and all of its exits sit below both,
+      so it is unchanged.
+- `web/js/render.js`:
+  - `tagRollNav` also tags branch exits, and `tagRollFight` does the same for fights. Both
+    record the node of each tagged button or fight box in `rollGateNodes`.
+  - `tagBranchNav` now calls `tagRollNav`.
+  - The new `noteRevealedBranch` records a revealed redirect branch, but never from a
+    grayed branch.
+  - `applyRollGate` asks `rollGateHold` for each held control.
+- `web/js/render-rolls.js`: `revealBranch` calls `noteRevealedBranch`.
+
+The "decided" rule is JaFL's: a reached forced goto ends the section. A census of shipped
+`<success>`/`<failure>` branches that carry a forced redirect and are followed by an
+unconditional exit found 13 sections: 1/168, 1/344, 3/157, 3/399, 4/540, 5/76, 5/282,
+5/488, 5/510, 5/582, 5/672, 5/689 and 6/83. In each one, the path that redirected used to
+leave the later exits live. For example, 3/157's drowned player could still choose the
+ransom, and 5/689's could still fight the drake.
+
+Tests:
+
+- Task 384's block in `suite-actions`, 19 assertions:
+  - 5/510 in both click orders, with a passed and a failed check. It navigates to 539 and
+    to 7, and it saves and resumes with only the destination rolled.
+  - 5/76 with a failed check (the fog row is released) and a passed one (471 is live, and
+    the row is held as decided).
+  - 6/373: the landing row waits for the possession die, then for its "which possession"
+    picker, and is released once that is answered.
+  - 3/157's ransom choices are held after drowning, and 4/540 still reaches 585 after a
+    pass.
+  - A `force="f"` roll above a table is not awaited.
+- Task 292's census in `suite-corpus` now expects the four table sections. Task 257's §3.15
+  assertion expects a section gate that awaits only the table die and holds no navigation
+  or fight.
+
+Checked:
+
+- Against the old three modules, the block reported 9 failures and a fatal. The task 257
+  assertion also failed.
+- `RESULT ALL PASS pass=3390 fail=0`, and `node-import.mjs` passed.
 
 ---
