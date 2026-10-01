@@ -393,6 +393,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 383. Failed slot claims can delete another tab's save
 - [x] 384. Destination rolls bypass earlier mandatory rolls
 - [x] 385. Forced action groups can be skipped
+- [x] 386. Return frames drop visit-local bonuses and locks
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
 
@@ -22635,5 +22636,74 @@ Checked:
 - Filed task 393: the four forced groups that bundle a roll still hold nothing. 3/273's
   and 3/629's 1-6 possession loss can be walked past, and 1/91's and 2/134's bets are
   forced in the markup but optional in the prose.
+
+---
+
+## 386. Return frames drop visit-local bonuses and locks
+
+**Priority: MEDIUM.** An item detour can remove a penalty or bypass destruction.
+
+### What is wrong
+
+`Story._captureReturnFrame` and `Story.goBack` in
+[render.js](web/js/render.js), and `serializeFrame`/`deserializeFrame` in
+[visit-state.js](web/js/visit-state.js), keep the source ctx and variables but
+omit its fight-bonus and equipment-lock snapshots. Entering the detour calls
+`Story.begin`, which clears both. Returning restores the granting ticks' memos,
+so those ticks never reapply.
+
+Browser probes used the lacquer box from [book6/252](books/book6/252.xml), which
+can be inspected at any time, and [book6/272](books/book6/272.xml)'s real return
+control. Returning to
+[book6/624](books/book6/624.xml) changed the darkness attack penalty from -2 to
+0; returning to [book6/135](books/book6/135.xml) left its previously locked
+weapon slot unlocked. Current-visit save/resume already carries both snapshots;
+the return frame does not.
+
+### Steps
+
+1. Add direct-return and detour-save/load/return cases to `suite-actions` or
+   `suite-inventory`, using the two source sections above.
+2. Capture and serialize the source visit's fight bonuses and equipment locks,
+   coerce them on load, and restore them before any return autosave or render.
+3. Keep source and detour snapshots distinct; verify the weapon cannot be
+   switched after return and that any detour bonus does not leak back.
+4. Run the complete build/test loop before closing.
+
+### The fix
+
+- `web/js/render.js`:
+  - `_captureReturnFrame` records `fightBonus` (`fightBonusSnapshot`) and `equipLock`
+    (`equipLockSnapshot`) beside the vars.
+  - `goBack` calls `restoreFightBonus` and `restoreEquipLocks` with the frame's values. It
+    does so after restoring the Story's identity and before `restoreReturn`, whose
+    `changed()` autosaves, and before the render.
+  - So the detour's own bonus and lock are replaced, not merged.
+- `web/js/visit-state.js`:
+  - `serializeFrame` writes copies of both fields.
+  - `deserializeFrame` coerces them as `sanitizeVisit` coerces the visit's own: integer
+    bonuses through `frameNum`, and a slot locked only by a literal `true`.
+  - A frame saved before this change carries neither field, and returns with none, as it
+    did then.
+
+Tests:
+
+- Task 386's block in `suite-actions`, 12 assertions. It uses the real lacquer box item
+  from 6/252 (`readItemEffects`), driven through `Story.useItem`, and 6/272's "turn back".
+  - At 6/624 without light, the -2 penalty is set on entry, cleared in 6/272, and restored
+    on return.
+  - At 6/135, the weapon slot is still locked after the return, and `setEquipped` refuses
+    the axe.
+  - A synthetic detour that grants +3 does not leak it back: the source's -2 is restored.
+  - Saved and reloaded inside the detour, for both sections: the deserialised frame
+    carries the -2 or the lock, and the return after the reload restores it.
+  - `deserializeFrame` rounds a string bonus, zeroes a junk one, and locks only on a
+    literal `true`.
+
+Checked:
+
+- Against the old two modules, the block reported 7 failures and a fatal. The detour's +3
+  did leak back to the source, which the filing had not noticed.
+- `RESULT ALL PASS pass=3417 fail=0`, and `node-import.mjs` passed.
 
 ---

@@ -419,6 +419,11 @@ export class Story {
       vars: { ...this.state.data.vars },
       location: this.state.data.location ?? null,
       entryTicks: this.state.entryTickCount(),
+      // The visit's per-fight bonus and equipment lock (tasks 156, 345), which begin() clears for
+      // the detour. The source's granting ticks stay memoised in its ctx and never re-fire, so
+      // the frame is the only place they survive the return. (task 386)
+      fightBonus: this.state.fightBonusSnapshot(),
+      equipLock: this.state.equipLockSnapshot(),
       usedSource: this._pendingSourceNode || null,
     };
     this._pendingSourceNode = null;
@@ -1796,6 +1801,10 @@ export class Story {
     this.ctx.usedSource = frame.usedSource; // the source action taken (spent unless revisit="t")
     this.sectionTodock = frame.sectionTodock;
     this.deferredCleanups = new Map(); // rebuilt as the restored section re-renders (task 88)
+    // The source's fight bonus and equipment lock replace the detour's, before restoreReturn's
+    // autosave and the render: a detour's own bonus must not leak back. (task 386)
+    this.state.restoreFightBonus(frame.fightBonus);
+    this.state.restoreEquipLocks(frame.equipLock);
     this.state.restoreReturn(frame);  // pop history + restore position/vars/location (autosaves — now coherent)
     this.render();
     this.focusSection(); // a <return> lands on a different section than the player was on (task 194)

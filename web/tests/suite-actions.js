@@ -744,6 +744,92 @@ export async function run(ctx) {
       }
     }
 
+    // --- task 386: a return restores the source visit's fight bonus and equipment lock ---
+    // The return frame kept the source's ctx and vars but not the per-fight bonus (task 156) or
+    // the weapon/armour lock (task 345). Entering the detour clears both, and returning restored
+    // the granting ticks' memos, so the ticks never re-ran: §6.624's darkness penalty went from -2
+    // to 0, and §6.135's locked weapon slot came back free. The real detour is §6.252's lacquer
+    // box, which can be looked into at any time, and §6.272's <return>.
+    {
+      const el252 = await data.getSection(6, '252');
+      const boxNode = el252.querySelector('item');
+      const secs = {
+        624: await data.getSection(6, '624'), 135: await data.getSection(6, '135'), 272: await data.getSection(6, '272'),
+        D386: parse('<section name="D386"><tick special="attack" bonus="3" hidden="t"/><p>Detour.</p><return>Back</return></section>'),
+      };
+      const build = (sec, setup) => {
+        const g = GameState.create({ name: 'T386', gender: 'm', profession: 'Warrior', book: 6, adv });
+        g.data.items = [];
+        const box = makeItem('item', 'lacquer box', 0, null, [], eng.readItemEffects(boxNode));
+        g.addItem(box);
+        if (setup) setup(g);
+        const c = document.createElement('div');
+        let st;
+        const enter = (b, s) => { g.goTo(b, s); st.begin(secs[String(s)], b, s); };
+        st = new Story(c, g, { navigate: enter, onDeath() {}, notify() {} });
+        g.setVisitProvider(() => st.serializeVisit());
+        enter(6, sec);
+        const lookInto = (to = '272') => {
+          const eff = box.effects.find((e) => e.type === 'use');
+          const body = to === '272' ? parse('<effect>' + eff.body + '</effect>') : parse(`<effect><goto section="${to}"/></effect>`);
+          st.useItem(box, to === '272' ? eff : { ...eff, body: `<goto section="${to}"/>` }, body);
+        };
+        const back = () => Array.from(c.querySelectorAll('.goto')).find((b) => /turn back|Back/.test(b.textContent)).click();
+        return { g, c, st, lookInto, back };
+      };
+
+      // §6.624, no light: -2 COMBAT for the bear, and it is still -2 after looking into the box.
+      {
+        const { g, st, lookInto, back } = build('624');
+        ok('task386: §6.624 sets the darkness penalty on entry', g.fightAttackBonus() === -2, 'atk=' + g.fightAttackBonus());
+        lookInto();
+        ok('task386: (setup) the lacquer box opens §6.272, which clears the bonus', st.section === '272' && g.fightAttackBonus() === 0, `sec=${st.section} atk=${g.fightAttackBonus()}`);
+        back();
+        ok('task386: returning to §6.624 restores the -2 penalty', st.section === '624' && g.fightAttackBonus() === -2, `sec=${st.section} atk=${g.fightAttackBonus()}`);
+      }
+      // §6.135: the weapon lock set on entry holds after the detour, so the blade cannot be swapped.
+      {
+        const { g, st, lookInto, back } = build('135', (g) => { g.addItem(makeItem('weapon', 'sword')); g.addItem(makeItem('weapon', 'axe')); });
+        const axe = g.data.items.find((it) => it.name === 'axe');
+        ok('task386: §6.135 locks the weapon slot on entry', g.equipLocked('weapon') === true);
+        lookInto(); back();
+        ok('task386: returning to §6.135 keeps the weapon slot locked',
+           st.section === '135' && g.equipLocked('weapon') === true && g.setEquipped('weapon', axe.id) === false);
+      }
+      // A detour's own bonus does not leak back to the source.
+      {
+        const { g, lookInto, back } = build('624');
+        lookInto('D386');
+        ok('task386: (setup) the detour sets its own +3', g.fightAttackBonus() === 3, 'atk=' + g.fightAttackBonus());
+        back();
+        ok('task386: returning drops the detour\'s +3 and restores the source\'s -2', g.fightAttackBonus() === -2, 'atk=' + g.fightAttackBonus());
+      }
+      // Saved and loaded inside the detour: the frame carries the source's bonus and lock.
+      for (const [sec, setup, probe, inFrame, what] of [
+        ['624', null, (g) => g.fightAttackBonus() === -2, (f) => !!f.fightBonus && f.fightBonus.attack === -2, 'the -2 penalty'],
+        ['135', (g) => g.addItem(makeItem('weapon', 'sword')), (g) => g.equipLocked('weapon') === true,
+          (f) => !!f.equipLock && f.equipLock.weapon === true, 'the weapon lock'],
+      ]) {
+        const { g, lookInto } = build(sec, setup);
+        lookInto();
+        const g2 = new GameState(sanitizeData(JSON.parse(JSON.stringify(g.data))));
+        const c2 = document.createElement('div');
+        const s2 = new Story(c2, g2, { navigate() {}, onDeath() {}, notify() {} });
+        const rec = g2.data.visit;
+        const frame = rec && rec.frame ? s2.deserializeFrame(rec.frame, secs[sec]) : null;
+        s2.resume(secs['272'], 6, '272', rec, frame);
+        ok(`task386: §6.${sec} a save in the detour keeps the frame's ${what}`, !!frame && inFrame(frame));
+        Array.from(c2.querySelectorAll('.goto')).find((b) => /turn back/.test(b.textContent)).click();
+        ok(`task386: §6.${sec} returning after the reload restores ${what}`, s2.section === sec && probe(g2), `sec=${s2.section}`);
+      }
+      // An untrusted frame coerces: a non-integer bonus rounds, and only a literal true locks.
+      {
+        const f = visit.deserializeFrame({ book: 6, section: '624', fightBonus: { attack: '-2', defence: 'x' }, equipLock: { weapon: 'true', armour: true } }, secs['624']);
+        ok('task386: deserializeFrame coerces the bonus and the lock',
+           f.fightBonus.attack === -2 && f.fightBonus.defence === 0 && f.equipLock.weapon === false && f.equipLock.armour === true, JSON.stringify(f && [f.fightBonus, f.equipLock]));
+      }
+    }
+
     // --- task 116: a save round-trip resumes the current visit; effects/rolls do not restart ---
     // Autosave persists a serializable visit record; loading rebuilds the renderer's memo and
     // resumes the exact visit instead of re-entering the section (which would repeat entry

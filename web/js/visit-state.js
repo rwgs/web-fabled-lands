@@ -341,8 +341,9 @@ export function deserializeCtx(rec, sectionEl) {
 }
 
 // Serialise the one-level return frame (task 110): its section identity, section-local vars,
-// location, entry-tick baseline, taken source action (as a path) and its own ctx. The frame's
-// sectionEl is NOT stored — it is re-parsed from book/section on resume.
+// location, entry-tick baseline, fight bonus and equipment lock (task 386), taken source action
+// (as a path) and its own ctx. The frame's sectionEl is NOT stored — it is re-parsed from
+// book/section on resume.
 export function serializeFrame(frame) {
   return {
     book: frame.book,
@@ -351,6 +352,8 @@ export function serializeFrame(frame) {
     vars: { ...frame.vars },
     location: frame.location ?? null,
     entryTicks: frame.entryTicks,
+    fightBonus: frame.fightBonus ? { ...frame.fightBonus } : null,
+    equipLock: frame.equipLock ? { ...frame.equipLock } : null,
     usedSourcePath: nodePathIn(frame.usedSource, frame.sectionEl),
     ctx: serializeCtx(frame.ctx, frame.sectionEl),
   };
@@ -379,6 +382,9 @@ function frameStr(v) { return (v == null || v === '') ? null : String(v); }
 // baseline skews the `<if ticks=>` comparison), and location/sectionTodock become a string or
 // null. book must name a positive integer — with none the whole frame drops, leaving the
 // resume with no return available, exactly as a legacy save without one. (task 203)
+// The fight bonus and equipment lock (task 386) are coerced as sanitizeVisit coerces the
+// visit's own: integer bonuses, and a slot locked only by a literal `true`. A record from
+// before task 386 carries neither, and returns with none, as it did then.
 export function deserializeFrame(rec, frameSectionEl) {
   if (!rec || typeof rec !== 'object' || Array.isArray(rec) || !frameSectionEl) return null;
   if (rec.section == null) return null;
@@ -399,6 +405,12 @@ export function deserializeFrame(rec, frameSectionEl) {
     vars,
     location: frameStr(rec.location),
     entryTicks: frameNum(rec.entryTicks, 0, { min: 0, int: true }),
+    fightBonus: rec.fightBonus && typeof rec.fightBonus === 'object'
+      ? { attack: frameNum(rec.fightBonus.attack, 0, { int: true }), defence: frameNum(rec.fightBonus.defence, 0, { int: true }) }
+      : null,
+    equipLock: rec.equipLock && typeof rec.equipLock === 'object'
+      ? { weapon: rec.equipLock.weapon === true, armour: rec.equipLock.armour === true }
+      : null,
     usedSource: resolveNodePath(rec.usedSourcePath, frameSectionEl),
   };
 }

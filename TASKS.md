@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 386. Returning from an item detour loses the source visit's fight bonuses and equipment locks
 - [ ] 387. `<tick god="">` adds an empty god instead of clearing initiation at book6/589
 - [ ] 388. Money-cache deposits cease to respect `multiples=` after clamping to the purse
 - [ ] 389. Transfer equivalence ignores item effects, tags, ability and provenance, silently choosing an unequal possession
@@ -429,43 +428,11 @@ this order.*
 - [x] 383. a Keep or import refused because another tab filled the chosen slot first deleted that tab's save: Keep removed the blob, and import's `deleteSlot` removed its meta too. The rollback now removes a blob only while it is still the one this attempt wrote, and import no longer touches meta, which a failed save never writes. That also fixes an import whose meta write failed, which used to leave its own blob behind
 - [x] 384. rolling the destination die first released "Continue → 539" in book5/510 with the drowning check unmade, and did the same past book5/76's SCOUTING check and book6/373's possession-loss die. The roll gate's table seed now awaits every mandatory roll above its table, and an exit waits only for the awaited rolls above it. A revealed branch that sends the player on decides the route and holds the exits after it, so a failed drowning check no longer leaves the destination rows, or 3/157's ransom choices, live
 - [x] 385. an explicit `<group force="t">` rendered as one button and held nothing, so book6/496's "turn to 149" kept the donation, and book1/370's lost equipment, book6/135's broken weapon and the forced outcome groups (book2/134's lost stake) were skippable too. A new `computeGroupGate` holds the exits after each forced action group, and the row exit of a branch it sits in, while it renders unrun. Earlier declines, the group's own navigation and unmarked groups stay free
+- [x] 386. a return frame kept the source visit's ctx and vars but not its fight bonus or equipment lock, so looking into book6/252's lacquer box at 6/624 lifted the -2 darkness penalty, at 6/135 freed the locked weapon slot, and let a detour's own bonus leak back. The frame now captures, serialises and coerces both, and `goBack` restores them before its autosave and render
 
 ---
 
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The open tasks' detail sections follow, in filed order; the Review log comes after them.
-
----
-
-## 386. Return frames drop visit-local bonuses and locks
-
-**Priority: MEDIUM.** An item detour can remove a penalty or bypass destruction.
-
-### What is wrong
-
-`Story._captureReturnFrame` and `Story.goBack` in
-[render.js](web/js/render.js), and `serializeFrame`/`deserializeFrame` in
-[visit-state.js](web/js/visit-state.js), keep the source ctx and variables but
-omit its fight-bonus and equipment-lock snapshots. Entering the detour calls
-`Story.begin`, which clears both. Returning restores the granting ticks' memos,
-so those ticks never reapply.
-
-Browser probes used the lacquer box from [book6/252](books/book6/252.xml), which
-can be inspected at any time, and [book6/272](books/book6/272.xml)'s real return
-control. Returning to
-[book6/624](books/book6/624.xml) changed the darkness attack penalty from -2 to
-0; returning to [book6/135](books/book6/135.xml) left its previously locked
-weapon slot unlocked. Current-visit save/resume already carries both snapshots;
-the return frame does not.
-
-### Steps
-
-1. Add direct-return and detour-save/load/return cases to `suite-actions` or
-   `suite-inventory`, using the two source sections above.
-2. Capture and serialize the source visit's fight bonuses and equipment locks,
-   coerce them on load, and restore them before any return autosave or render.
-3. Keep source and detour snapshots distinct; verify the weapon cannot be
-   switched after return and that any detour bonus does not leak back.
-4. Run the complete build/test loop before closing.
 
 ---
 
@@ -726,6 +693,20 @@ cannot simply be honoured.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 386): closed **386**, filed nothing. The return frame now carries the
+source visit's `fightBonusSnapshot` and `equipLockSnapshot`:
+- `_captureReturnFrame` in `render.js` takes them, and `serializeFrame` writes them.
+- `deserializeFrame` in `visit-state.js` coerces them the way `sanitizeVisit` coerces the
+  visit's own.
+- `goBack` restores both before `restoreReturn`'s autosave and the render.
+
+Task 386's block in `suite-actions` uses the real lacquer box from 6/252 and its return at
+6/272. It covers 6/624's -2 penalty and 6/135's weapon lock, with a direct return and with a
+save and reload inside the detour. In 6/135 the swap is refused after the return. A detour's
+own +3 does not leak back, and an untrusted frame is coerced. Against the old code it reported
+7 failures and a fatal. The detour's +3 did leak back, which the filing had not noticed.
+`RESULT ALL PASS pass=3417 fail=0`, and `node-import.mjs` passed.
 
 Worked 2026-10-01 (task 385): closed **385**, filed **393**. The new `computeGroupGate` in
 `render-gates.js` maps each explicit `<group force="t">` that bundles no roll to the exits it
