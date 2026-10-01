@@ -379,6 +379,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 368. The Review log is nine-tenths of `TASKS.md`
 - [x] 371. Validate the save-slot metadata shape before recovery
 - [x] 372. Preserve meaningful differences when choosing a sale candidate
+- [x] 373. Roll back a partially written preview promotion
 - [x] 380. Make late asynchronous failures fail the test runners
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
@@ -21644,5 +21645,43 @@ Checked:
   crew, cargo, uses and effect-presence cases needed no choice, and with no picker the widget
   check found no button to click.
 - The full suite reported `RESULT ALL PASS pass=3283 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 373. Roll back a partially written preview promotion
+
+**Priority: MEDIUM.** Failed retries can consume every save slot with duplicate previews.
+
+### What is wrong
+
+`GameState.keep` in [state.js](web/js/state.js) restores the old slot and ephemeral
+flag when `save(true)` fails, but does not remove the new slot's partial write.
+If writing `fl_save_<slot>` succeeds and writing `fl_meta` throws, the blob stays.
+`nextFreeSlot` correctly counts it as occupied, so the next Keep attempt creates
+another blob. Three such attempts leave `fl_save_0`, `fl_save_1` and `fl_save_2`
+while the live adventure still reports that it is an ephemeral preview.
+
+### The fix
+
+- When `save(true)` fails, `GameState.keep` in `web/js/state.js` still restores the old slot
+  and the ephemeral flag. It now also removes `fl_save_<slot>` for the slot it just claimed.
+  `nextFreeSlot` only returns a slot with no meta entry and no blob, so anything there is this
+  attempt's own partial write, and removing it frees the slot again. If storage refuses the
+  removal as well, `_keepSlot` remembers the slot, and the next `keep()` reuses it while no
+  meta entry has claimed it. Failed attempts therefore hold at most one slot. A success
+  clears `_keepSlot`. The thrown storage message is unchanged, so `keepDemo` in `app.js`
+  still offers Export, which reads the untouched in-memory `state.data`.
+- `suite-economy` (task 373 block) makes every `fl_meta` write throw and tries three Keeps.
+  All three report the failure, no blob is left, the game is still the same preview on its
+  old slot with its progress, and `nextFreeSlot` is still 0. With `removeItem` also refused,
+  two more failures hold only slot 0. Once removal works again, a failure clears it. With
+  storage restored, Keep succeeds as exactly one blob and one meta entry. The kept blob
+  carries the progress and the visit record from the game's visit provider.
+
+Checked:
+
+- Against the old `keep()`, 5 of the 8 assertions failed. Three failures left blobs in
+  `0,1,2`, the bug as filed, and the eventual success left seven listed adventures.
+- The full suite reported `RESULT ALL PASS pass=3291 fail=0`, and `node-import.mjs` passed.
 
 ---

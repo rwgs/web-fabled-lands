@@ -1355,9 +1355,16 @@ export class GameState {
    *  Returns the slot number, or throws if all slots are full or the write
    *  fails. Transactional: on a failed write the game stays an ephemeral
    *  preview on its old slot (so the player can retry or export) and the
-   *  storage error is raised. */
+   *  storage error is raised.
+   *
+   *  save() writes the blob and then fl_meta, so a failure between the two left the blob in
+   *  the claimed slot. nextFreeSlot rightly counts a blob as occupied, so every retry claimed
+   *  another slot. The slot was free when claimed, so whatever is in it now is this attempt's
+   *  write and is removed; if storage refuses that too, the slot is remembered and the next
+   *  attempt reuses it while no meta entry has claimed it. (task 373) */
   keep() {
-    const slot = nextFreeSlot();
+    const own = this._keepSlot;
+    const slot = own != null && !loadSlotMeta()[own] ? own : nextFreeSlot();
     if (slot == null) throw new Error('All save slots are full. Delete or export a save first.');
     const prevSlot = this.slot;
     this.slot = slot;
@@ -1365,8 +1372,10 @@ export class GameState {
     if (!this.save(true)) { // explicit: a suppressed txn must not fake this promotion write (task 168)
       this.slot = prevSlot;
       this.ephemeral = true;
+      try { localStorage.removeItem(SAVE_PREFIX + slot); this._keepSlot = null; } catch (_) { this._keepSlot = slot; }
       throw new Error(this.lastSaveError || 'Could not save this adventure.');
     }
+    this._keepSlot = null;
     return slot;
   }
 }

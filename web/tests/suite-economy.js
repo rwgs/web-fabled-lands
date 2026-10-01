@@ -963,6 +963,56 @@ export async function run(ctx) {
       deleteSlot(impOkSlot);
     }
 
+    // --- task 373: a Keep that fails BETWEEN save()'s two writes must not claim a slot ---
+    // The blob landed, fl_meta threw, and keep() restored the preview but left the blob, which
+    // nextFreeSlot counts as occupied — so each retry claimed one more slot.
+    {
+      const S = 'fl_save_', M = 'fl_meta';
+      const savedMeta = localStorage.getItem(M);
+      const savedBlobs = [];
+      for (let i = 0; i < 20; i++) { savedBlobs.push(localStorage.getItem(S + i)); localStorage.removeItem(S + i); }
+      localStorage.removeItem(M);
+      const blobs = () => { const o = []; for (let i = 0; i < 20; i++) if (localStorage.getItem(S + i) != null) o.push(i); return o.join(); };
+      const realSet = Storage.prototype.setItem, realRemove = Storage.prototype.removeItem;
+      const metaFails = () => { localStorage.setItem = function (k, v) { if (k === M) { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; } return realSet.call(this, k, v); }; };
+      const attempt = () => { try { g373.keep(); return null; } catch (e) { return e.message; } };
+
+      const g373 = GameState.create({ name: 'Keep373', gender: 'f', profession: 'Rogue', book: 1, adv });
+      g373.slot = 0; g373.ephemeral = true; g373.data.shards = 373;
+      g373.setVisitProvider(() => ({ v: 1, book: g373.data.book, section: g373.data.section, mark: 'visit373' }));
+      metaFails();
+      const msgs = [attempt(), attempt(), attempt()];
+      ok('task373: each Keep failing after the blob write reports the failure',
+         msgs.every((m) => typeof m === 'string' && /full/i.test(m)), JSON.stringify(msgs));
+      ok('task373: three failed Keeps leave no blob behind', blobs() === '', blobs());
+      ok('task373: the live game is still the same preview', g373.ephemeral === true && g373.slot === 0 && g373.data.shards === 373 && g373.data.name === 'Keep373');
+      ok('task373: no slot is claimed by the failures', nextFreeSlot() === 0, String(nextFreeSlot()));
+
+      // Storage refuses the clean-up as well: the blob stays, so the retry must reuse ITS slot.
+      localStorage.removeItem = function () { throw new Error('blocked'); };
+      attempt(); attempt();
+      localStorage.removeItem = realRemove;
+      ok('task373: with removal refused too, repeated failures hold one slot, not one each', blobs() === '0', blobs());
+      attempt(); // removal works again: the held slot is cleaned up
+      ok('task373: once removal works, a failed Keep clears the held slot', blobs() === '', blobs());
+
+      delete localStorage.setItem;
+      const kept373 = attempt();
+      const meta373 = reconcileSlotMeta();
+      const blob373 = readSlotData(g373.slot);
+      ok('task373: a later Keep succeeds as one discoverable adventure',
+         kept373 === null && g373.ephemeral === false && blobs() === String(g373.slot)
+         && Object.keys(meta373).join() === String(g373.slot) && meta373[g373.slot].name === 'Keep373',
+         JSON.stringify({ kept373, blobs: blobs(), meta: Object.keys(meta373) }));
+      ok('task373: the kept adventure carries the current visit and progress',
+         !!blob373 && blob373.shards === 373 && !!blob373.visit && blob373.visit.mark === 'visit373',
+         JSON.stringify(blob373 && blob373.visit));
+
+      delete localStorage.setItem; delete localStorage.removeItem;
+      for (let i = 0; i < 20; i++) { if (savedBlobs[i] == null) localStorage.removeItem(S + i); else localStorage.setItem(S + i, savedBlobs[i]); }
+      if (savedMeta == null) localStorage.removeItem(M); else localStorage.setItem(M, savedMeta);
+    }
+
     // --- task 176: unavailable-book input rejects inside the recovery UI ---
     // An import whose current book isn't bundled must be rejected BEFORE a slot is claimed or
     // written, so Play can never build a game screen that then strands on the rejected fetch.
