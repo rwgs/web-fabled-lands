@@ -377,6 +377,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 366. README's deploy guidance and file tree disagree with the repository
 - [x] 367. Living documents restate the shipped-section count `docs/Corpus-Census.md` owns
 - [x] 368. The Review log is nine-tenths of `TASKS.md`
+- [x] 380. Make late asynchronous failures fail the test runners
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
 
@@ -21502,5 +21503,57 @@ new home with CRs stripped, compares byte-identical (`cmp`), and the entry count
 123 moved + 10 kept = the 133 `Worked`/`Reviewed` entries before the move. The block holds no
 `#` heading, checkbox or `---` line, so the archive's `## <N>.` and Contents censuses are
 unaffected. Documentation only.
+
+---
+
+## 380. Make late asynchronous failures fail the test runners
+
+**Priority: HIGH.** The release gate can report success for a page it has marked failed.
+
+### What is wrong
+
+After `report` has passed, `flFatal` in [web/_test.html](web/_test.html) writes
+`RESULT FAILURES (async error after report) pass=? fail=1`, followed by the old
+results including `RESULT ALL PASS pass=N fail=0`, and sets the title to
+`TESTS_FAIL`. The failure header does not match the numeric verdict pattern in
+[run-tests.ps1](build/run-tests.ps1) or the `RESULT_LINE` extraction in
+[smoke.yml](.github/workflows/smoke.yml). Both therefore select the preserved
+`ALL PASS` line and succeed. An uncaught rejection or a failing `ok` after the
+report can bypass the sticky-fatal contract despite the DOM recording it.
+Executing the harness's own classic script with a completed passing result,
+then calling `flFatal`, reproduces `TESTS_FAIL` and an extracted `ALL PASS`.
+
+### The fix
+
+- `web/_test.html`: `flFatal`'s post-report branch calls `window.__FL_REPORT__` (the module's
+  `report`) instead of prefixing a header, so the verdict line is rewritten in place as
+  `RESULT FAILURES pass=N fail=M` with the `ASYNC-FATAL` line beneath it, and no stale
+  `ALL PASS` line survives. A failing `ok` after the report already routed through `flFatal`
+  (task 143), so it now also lands its `FAIL` line in the dump. `?latefail=reject|assert`
+  schedules one late failure a second after a passing report, for the self-test.
+- `build/run-tests.ps1` and the `smoke` job in `.github/workflows/smoke.yml`: an `ALL PASS`
+  line passes only if the dump also carries `<title>TESTS_OK</title>`, which `report` writes
+  with it, so a page that marks itself failed later cannot pass on a stale copy. Both print
+  `ASYNC-FATAL` lines with the failures. `run-tests.ps1` gained `-LateFailure reject|assert`,
+  which appends `latefail=` to the URL.
+- `build/run-tests-selftest.ps1` cases 6 and 7 drive both late failures through the runner
+  against the real browser and page. Each must exit non-zero, report a numeric
+  `RESULT FAILURES` verdict, never print `RESULT ALL PASS`, and name the failure.
+- README and `docs/Testing.md` describe the re-report and the title requirement.
+
+Checked:
+
+- The runner self-test reported `RESULT ALL PASS pass=33 fail=0`.
+- With the old prefix restored in `flFatal`, `-LateFailure reject` extracted
+  `RESULT ALL PASS pass=309 fail=0`, the bug as filed. The runner's title check failed it
+  (exit 1). On that dump the HEAD `smoke.yml` verdict step printed "Smoke suite passed" and
+  exited 0, and the new step exited 1.
+- With the fix, both late failures produced `RESULT FAILURES pass=309 fail=1` and exit 1 from
+  the runner. The old and new CI verdict steps both exit 1 on those dumps.
+- Distinctions kept: `-VirtualTimeBudget 20` still reports `CUT SHORT, not a bootstrap abort`
+  with how far it got, and a temporary duplicate top-level `const` in `suite-engine.js` still
+  reports `RESULT FATAL pass=0 fail=1` naming the `SyntaxError`.
+- The full suite reported `RESULT ALL PASS pass=3248 fail=0`. CI's verdict step was run
+  locally on saved dumps; a pushed run has not exercised it yet.
 
 ---

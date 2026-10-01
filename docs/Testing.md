@@ -204,7 +204,13 @@ reported as `CUT SHORT, not broken`. A cut-short run also reports how far it got
 | No `RESULT` line at all | Either the dump never reached you (a capture failure - check its size first, since that failure is silent) or the page never loaded (server down, or a 404 - serve the repo root and request `/web/_test.html`). It **never** means a suite failed quietly. |
 
 The reporter is **sticky-fatal**: an uncaught async error or unhandled rejection captured
-mid-run fails the aggregate and can never be overwritten by a later "ALL PASS".
+mid-run fails the aggregate and can never be overwritten by a later "ALL PASS". One captured
+*after* a passing report, or a failing assertion from un-awaited work, re-runs the reporter,
+so the verdict line becomes `RESULT FAILURES` with an `ASYNC-FATAL` line beneath it. Both
+runners also require the page title `TESTS_OK` for a pass: the old post-report header was not a
+numeric verdict, so they read the stale `ALL PASS` line under it and exited 0 on a page titled
+`TESTS_FAIL` (task 380). `run-tests-selftest.ps1` drives both late failures through the runner
+with `-LateFailure reject|assert`.
 
 Each suite is its own module scope, so the same identifier may be declared at top level in
 two suites without colliding - but that is the **only** isolation it buys.

@@ -42,9 +42,16 @@
     5. A browser that never exits. The run must fail naming the hang and the wall clock, must
        not read as an empty dump, and must come back in seconds rather than in the shim's time.
 
+  The last two drive the real browser and page: a failure that lands AFTER a passing report used
+  to leave the old ALL PASS line in the dump beneath a header no runner could parse, so the run
+  exited 0 on a page titled TESTS_FAIL (task 380). -LateFailure has the page schedule one:
+
+    6. A rejection nobody handles, a second after the report. The run must fail.
+    7. A failing assertion, a second after the report. The run must fail and name it.
+
   Windows-only, like run-tests.ps1 itself (Chrome under Program Files, .cmd shims); CI drives the
   browser suite directly instead, so this is not part of the CI matrix. Run it after touching
-  discovery, the empty-dump branch or the browser's wall-clock bound:
+  discovery, the empty-dump branch, the browser's wall-clock bound or the verdict extraction:
 
   Run: pwsh -ExecutionPolicy Bypass -File build/run-tests-selftest.ps1   (exit 0 = pass)
 
@@ -193,6 +200,19 @@ try {
         ($r.Text -notmatch 'no stdout handle|produced no output at all') $r.Text
     Assert 'it says what to try instead of hanging again' `
         ($r.Text -match 'raise -BrowserTimeoutSeconds') $r.Text
+
+    # ---- 6 and 7. A failure that arrives after a passing report -------------------------
+    foreach ($case in @(
+        @{ Kind = 'reject'; Named = 'unhandled rejection: .*latefail self-test rejection' },
+        @{ Kind = 'assert'; Named = 'FAIL latefail self-test assertion' })) {
+        $r = Invoke-Runner $realPath @('-Suite', 'engine', '-Port', "$port", '-LateFailure', $case.Kind)
+        Assert "a late $($case.Kind) after a passing report fails the run" ($r.Code -ne 0) $r.Text
+        Assert "the late $($case.Kind) is reported as a numeric failure verdict" `
+            ($r.Text -match 'RESULT FAILURES pass=[1-9]\d* fail=[1-9]') $r.Text
+        Assert "the stale ALL PASS line is not read as the verdict" `
+            ($r.Text -notmatch 'RESULT ALL PASS') $r.Text
+        Assert "the late $($case.Kind) is named" ($r.Text -match $case.Named) $r.Text
+    }
 }
 finally {
     $env:PATH = $realPath

@@ -13,15 +13,17 @@
   //     by the reporter's unconditional final line — potentially as ALL PASS.
   // The fix: any capture sets a sticky window flag. The module reporter honours it and can
   // never report ALL PASS once it is set; a captured error that arrives after a PASS report
-  // flips the title back to failure.
+  // has the reporter run again, which flips the title and the verdict back to failure.
   window.__FL_ASYNC_FATAL__ = '';
   function flFatal(msg) {
     if (!window.__FL_ASYNC_FATAL__) window.__FL_ASYNC_FATAL__ = msg;
     var el = document.getElementById('results');
     if (document.title === 'TESTS_OK') {
-      // The reporter already passed — a captured async error must flip the aggregate.
-      document.title = 'TESTS_FAIL';
-      if (el) el.textContent = 'RESULT FAILURES (async error after report) pass=? fail=1\nASYNC-FATAL ' + msg + '\n' + el.textContent;
+      // The reporter already passed — a captured async error must flip the aggregate. It is
+      // re-run rather than prefixed: a header above the old text left the old
+      // "RESULT ALL PASS pass=N fail=0" line beneath it, and a header the runners could not
+      // parse let them read that stale line as the verdict and exit 0 (task 380).
+      window.__FL_REPORT__();
     } else if (document.title !== 'TESTS_FAIL') {
       // Before the reporter runs — surface a provisional fatal so a hang reads as a failure.
       if (el) el.textContent = 'RESULT FATAL pass=0 fail=1\nFATAL ' + msg;
@@ -133,7 +135,15 @@ function report() {
   document.title = passed ? 'TESTS_OK' : 'TESTS_FAIL';
   reported = true;   // any later failing ok() must now route through flFatal (task 143)
 }
+window.__FL_REPORT__ = report;   // flFatal re-reports a failure captured after a pass (task 380)
 
-main();
+// ?latefail=reject|assert schedules one failure for AFTER a passing report, so
+// run-tests-selftest.ps1 can prove the runner still fails a page that fails late (task 380).
+const late = new URLSearchParams(location.search).get('latefail');
+
+main().then(() => {
+  if (late === 'reject') setTimeout(() => { Promise.reject(new Error('latefail self-test rejection')); }, 1000);
+  if (late === 'assert') setTimeout(() => ok('latefail self-test assertion', false), 1000);
+});
 </script>
 </body></html>

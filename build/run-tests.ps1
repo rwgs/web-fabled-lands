@@ -46,6 +46,8 @@
   the first match. The source literal only wins when #results never populated, which means the
   page never finished - correctly a FATAL, but NOT the bootstrap abort that string otherwise
   denotes, which is the task 236 case. (task 142, mirrored from .github/workflows/smoke.yml)
+  An ALL PASS line also needs the page title TESTS_OK, which report() writes with it: a page
+  that fails after reporting must not pass on a stale copy of its earlier verdict. (task 380)
 
   Exit code is 0 only on RESULT ALL PASS.
 
@@ -77,6 +79,10 @@
   never be the reason this trips, and a hang must never be the reason a run reports nothing.
   The failure-path probe in Test-BrowserWritesOutput keeps its own much shorter bound.
 
+.PARAMETER LateFailure
+  Self-test hook (run-tests-selftest.ps1): reject or assert appends ?latefail= so the page
+  schedules one failure after its report has passed. The run must then fail. (task 380)
+
 .EXAMPLE
   pwsh -ExecutionPolicy Bypass -File build/run-tests.ps1
 .EXAMPLE
@@ -89,7 +95,9 @@ param(
     [string]$Browser,
     [switch]$KeepDump,
     [int]$VirtualTimeBudget = 300000,
-    [int]$BrowserTimeoutSeconds = 300
+    [int]$BrowserTimeoutSeconds = 300,
+    [ValidateSet('reject', 'assert')]
+    [string]$LateFailure
 )
 
 Set-StrictMode -Version Latest
@@ -314,7 +322,10 @@ $dump       = Join-Path $tmp ('fl-dump-' + [guid]::NewGuid().ToString('N') + '.h
 $srvErr     = Join-Path $tmp ('fl-serve-' + [guid]::NewGuid().ToString('N') + '.log')
 
 $url = "http://127.0.0.1:$Port/web/_test.html"
-if ($Suite) { $url += "?suite=$Suite" }
+$query = @()
+if ($Suite) { $query += "suite=$Suite" }
+if ($LateFailure) { $query += "latefail=$LateFailure" }
+if ($query) { $url += '?' + ($query -join '&') }
 
 $server = $null
 try {
@@ -391,9 +402,22 @@ try {
         exit 1
     }
 
+    # report() writes the RESULT line and the page title together, so a pass needs both. A title
+    # that disagrees means the page marked itself failed after reporting, and the ALL PASS line
+    # read above is a stale copy rather than the live verdict. (task 380)
+    if ($verdict -match 'ALL PASS' -and
+        -not (Select-String -Path $dump -Pattern '<title>TESTS_OK</title>' -SimpleMatch -Quiet)) {
+        Write-Host ''
+        Write-Host 'The RESULT line says ALL PASS but the page title is not TESTS_OK: the page marked itself failed after it reported.'
+        Select-String -Path $dump -Pattern '^(FAIL|FATAL|ASYNC-FATAL) ' | Select-Object -First 25 |
+            ForEach-Object { Write-Host $_.Line }
+        Write-Host "Full dump: $dump"
+        exit 1
+    }
+
     if ($verdict -notmatch 'ALL PASS') {
         Write-Host ''
-        Select-String -Path $dump -Pattern '^(FAIL|FATAL) ' | Select-Object -First 25 |
+        Select-String -Path $dump -Pattern '^(FAIL|FATAL|ASYNC-FATAL) ' | Select-Object -First 25 |
             ForEach-Object { Write-Host $_.Line }
         $why = Get-CutShortDiagnosis $dump
         if ($why) { Write-Host ''; Write-Host $why }

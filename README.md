@@ -421,7 +421,9 @@ The first line of the dumped `#results` reads
 `RESULT ALL PASS …` when healthy (page title
 `TESTS_OK`); any failure, or any uncaught async error / unhandled promise rejection captured
 during the run, reports `RESULT FAILURES`/`RESULT FATAL` and title `TESTS_FAIL` — the fatal
-state is sticky and can never be overwritten by a later "ALL PASS".
+state is sticky and can never be overwritten by a later "ALL PASS". One captured *after* a
+passing report re-runs the reporter, so the verdict line itself turns to `RESULT FAILURES`, and
+both runners pass a run only when that line and the `TESTS_OK` title agree.
 
 `_test.html` itself is just the harness + reporter; the assertions live in focused ES-module
 suites under [`web/tests/`](web/tests), each exporting one `async run(ctx)` and rebuilding its

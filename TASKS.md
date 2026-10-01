@@ -19,7 +19,7 @@ there once the buckets below are clear.
 
 **HIGH**
 
-- [ ] 380. A late asynchronous test failure preserves an earlier `ALL PASS` line below an unparsable failure header, so both the local runner and CI can incorrectly pass the failed page
+*(none open — file new HIGH work here)*
 
 **MEDIUM**
 
@@ -416,6 +416,7 @@ this order.*
 - [x] 367. `ROADMAP.md`, `PLAN.md`, `SPEC.md` and three `docs/` pages restated the 4,369 shipped-section count `docs/Corpus-Census.md` owns, and `PLAN.md` carried a dated status sentence; each now points at the owner (which gained its per-book command), and two stale 3,032 pass counts found by the same sweep were retired too
 - [x] 361. `smoke.yml` pinned `actions/checkout@v4`, `actions/setup-node@v4` and `node-version: '20'`; GitHub removed Node 20 from its runners on 2026-09-23; now `@v7`/`@v7`/Node 24, and the first pushed run was green in all three jobs
 - [x] 368. the Review log was nine-tenths of `TASKS.md`, mostly re-telling closed tasks whose detail is already archived; on the owner's go-ahead, the 123 entries below the latest `Reviewed` pass moved verbatim to `TASKS-archive.md`'s "Review log (archived)", and the header says where later ones go
+- [x] 380. a failure captured after a passing report prefixed a header no runner could parse above the old `RESULT ALL PASS` line, so both runners read that line and exited 0 on a page titled `TESTS_FAIL`; `flFatal` now re-runs the reporter, which writes a numeric `RESULT FAILURES` verdict, both runners also require the `TESTS_OK` title for a pass, and `run-tests-selftest.ps1` drives a late rejection and a late failing assertion through the runner
 
 ---
 
@@ -783,40 +784,6 @@ failures, not mis-cased shipped nodes found during this pass.
 
 ---
 
-## 380. Make late asynchronous failures fail the test runners
-
-**Priority: HIGH.** The release gate can report success for a page it has marked failed.
-
-### What is wrong
-
-After `report` has passed, `flFatal` in [web/_test.html](web/_test.html) writes
-`RESULT FAILURES (async error after report) pass=? fail=1`, followed by the old
-results including `RESULT ALL PASS pass=N fail=0`, and sets the title to
-`TESTS_FAIL`. The failure header does not match the numeric verdict pattern in
-[run-tests.ps1](build/run-tests.ps1) or the `RESULT_LINE` extraction in
-[smoke.yml](.github/workflows/smoke.yml). Both therefore select the preserved
-`ALL PASS` line and succeed. An uncaught rejection or a failing `ok` after the
-report can bypass the sticky-fatal contract despite the DOM recording it.
-Executing the harness's own classic script with a completed passing result,
-then calling `flFatal`, reproduces `TESTS_FAIL` and an extracted `ALL PASS`.
-
-### Steps
-
-1. Emit an unambiguous machine-readable final failure verdict and ensure the
-   runners read the live result rather than an embedded earlier verdict.
-2. Drive a delayed rejection and a delayed failing assertion after a successful
-   report through the actual runner path; both must exit non-zero.
-3. Retain the distinctions between parse/bootstrap failure, ordinary assertion
-   failure and a cut-short run. Verify both local and CI extraction policies.
-4. Run the runner self-test and documented build/test loop.
-
-### Validation
-
-- A page marked failed after its report cannot yield an exit-zero `ALL PASS`.
-- A clean complete suite still passes, and unfinished runs still fail accurately.
-
----
-
 ## 381. Bring player rule summaries into line with the implemented rules
 
 **Priority: LOW.** The guides describe behavior that later rule changes replaced.
@@ -857,6 +824,17 @@ reader, although `Test-AttrValue` in
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 380): closed **380**, filed nothing. A failure captured after a
+passing report now re-runs the reporter, so the verdict line itself reads `RESULT FAILURES
+pass=N fail=M`, and both runners pass only an `ALL PASS` line whose page title is `TESTS_OK`.
+`run-tests-selftest.ps1` gained cases 6 and 7 (a late rejection and a late failing assertion,
+via the runner's new `-LateFailure` and the harness's `?latefail=`) and reported
+`pass=33 fail=0`. With the old `flFatal` restored, the runner's title check alone failed the
+page while the HEAD `smoke.yml` verdict step, run on the same dump, exited 0 and the new one 1.
+A cut-short run and a bootstrap parse error kept their own diagnoses. The full suite reported
+`RESULT ALL PASS pass=3248 fail=0`. CI's verdict step was exercised locally on saved dumps,
+not on a pushed run.
 
 Reviewed 2026-10-01 (Codex, whole repository): filed **371-381**, closed nothing.
 The full report is [review-codex.md](review-codex.md). **380** is HIGH: the harness's

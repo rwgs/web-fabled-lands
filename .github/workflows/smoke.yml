@@ -168,6 +168,15 @@ jobs:
           echo "${RESULT_LINE:-(no RESULT line — the suite did not run)}"
           case "$RESULT_LINE" in
             "RESULT ALL PASS"*)
+              # report() writes this line and the page title together, so a pass needs both: a
+              # title that disagrees means the page failed after reporting and the line is stale.
+              # (task 380, mirrored in run-tests.ps1)
+              if ! grep -q '<title>TESTS_OK</title>' "$DOM"; then
+                echo "✗ The RESULT line says ALL PASS but the page title is not TESTS_OK:"
+                echo "  the page marked itself failed after it reported."
+                grep -oE '(ASYNC-FATAL|FAIL) [^<]{0,160}' "$DOM" | head -50 || true
+                exit 1
+              fi
               echo "✓ Smoke suite passed." ;;
             "RESULT FATAL"*)
               # Two very different things wear this verdict. A bootstrap abort has flFatal
@@ -190,7 +199,7 @@ jobs:
               exit 1 ;;
             "RESULT FAILURES"*)
               echo "✗ Smoke suite failed. First FAIL lines:"
-              grep -oE 'FAIL [^<]{0,160}' "$DOM" | head -50 || true
+              grep -oE '(ASYNC-FATAL|FAIL) [^<]{0,160}' "$DOM" | head -50 || true
               # Name the right culprit when the CLOCK ran out rather than the code (task 236).
               # From inside the page a budget expiry and a broken server are the same
               # TypeError; from out here they are not, because this job owns the server. If it
