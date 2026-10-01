@@ -156,7 +156,12 @@ must be kept in step with `combat.js`'s fight parser.
 
 ## Enumerated values
 
-A value may be a `|`-separated union, and `?` / `*` are JaFL's match-any wildcards.
+`?` / `*` are JaFL's match-any wildcards. A `|`-separated union is legal only where the reader
+splits one: `ability`, `ship` and cargo values, and `profession` on `<tick>` (the
+choose-a-profession picker). Every other attribute here takes one value. Values are read in any
+case, except `special` and `crew`, which must be written exactly as listed (`difficultyCurse`,
+`excellent`). Their readers compare the spelling, so `special="ATTACK"` would do nothing
+(task 379).
 
 | Attribute | Legal values |
 |---|---|

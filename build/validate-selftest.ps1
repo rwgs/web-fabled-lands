@@ -536,6 +536,29 @@ $okBool = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2"><choices>' +
     '<fightround pre="f"><lose stamina="1"/></fightround><fightround pre="T"><lose stamina="1"/></fightround></section>' }
 Assert 'every supported truth spelling, and a numeric fight flee=, are accepted (task 378)' ($okBool.Errors.Count -eq 0) ($okBool.Errors -join ' | ')
 
+# Enum case and list rules per reader (task 379). Each of these validated, then did nothing.
+foreach ($bad in @(
+    @{ label = 'an upper-case special='; xml = '<tick special="ATTACK" bonus="2"/>'; want = 'special="ATTACK" must be written exactly' },
+    @{ label = 'a mis-cased special='; xml = '<tick special="difficultycurse"/>'; want = 'special="difficultycurse" must be written exactly' },
+    @{ label = 'an upper-case crew='; xml = '<if crew="EXCELLENT"><p>Fine.</p></if>'; want = 'crew="EXCELLENT" must be written exactly' },
+    @{ label = 'a modifier= union'; xml = '<difficulty ability="combat" level="9" modifier="natural|noarmour"/>'; want = 'modifier="natural|noarmour" takes one value on <difficulty>' },
+    @{ label = 'a profession= union outside <tick>'; xml = '<if profession="mage|rogue"><p>Either.</p></if>'; want = 'profession="mage|rogue" takes one value on <if>' },
+    @{ label = 'a gender= union'; xml = '<if gender="m|f"><p>Anyone.</p></if>'; want = 'gender="m|f" takes one value on <if>' })) {
+    $r = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2">' + $bad.xml + '</section>' }
+    Assert "the gate catches $($bad.label) (task 379)" (
+        @($r.Errors | Where-Object { $_ -like "*$($bad.want)*" }).Count -eq 1) ($r.Errors -join ' | ')
+}
+# ...and every shape the corpus relies on still passes: the exact special spellings, a crew grade
+# and delta, a mode word in any case, ability unions and capitals, a ship union, a capitalised
+# profession and the <tick> profession picker.
+$okEnum = Build-Fixture @{ 'books/book1/2.xml' = '<section name="2">' +
+    '<tick special="difficultyCurse"/><tick special="difficultyRestore"/><tick special="attack" bonus="2"/>' +
+    '<if crew="excellent"><p>Fine.</p></if><lose crew="-1"/><difficulty ability="COMBAT" level="9" modifier="NATURAL"/>' +
+    '<difficulty ability="scouting|thievery|combat" level="9"/><if ship="barque|brigantine"><p>Small.</p></if>' +
+    '<if profession="Troubadour"><p>Sing.</p></if><tick profession="mage|rogue|troubadour|warrior|wayfarer"/>' +
+    '</section>' }
+Assert 'the enum shapes their readers support are all accepted (task 379)' ($okEnum.Errors.Count -eq 0) ($okEnum.Errors -join ' | ')
+
 if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
 
 Write-Host ''

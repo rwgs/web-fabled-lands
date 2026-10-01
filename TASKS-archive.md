@@ -385,6 +385,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 376. Require usable character-creation data for every published book
 - [x] 377. Recover when reading browser storage is blocked
 - [x] 378. Validate boolean values by tag where attribute meanings differ
+- [x] 379. Make enum validation match each reader's case and list semantics
 - [x] 380. Make late asynchronous failures fail the test runners
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
@@ -21965,5 +21966,70 @@ Checked:
 - The real corpus (35 `pay="f"`, 2 `pay="t"`, 1 `pay="F"`, 15 `flee="t"`, 3 `pre=`, 4 numeric
   `<fight flee=>`) passes, and the rebuild changed nothing.
 - The full suite reported `RESULT ALL PASS pass=3341 fail=0`.
+
+---
+
+## 379. Make enum validation match each reader's case and list semantics
+
+**Priority: LOW.** Accepted authoring errors still become silent rule failures.
+
+### What is wrong
+
+`Test-AttrValue` in [validate-source.ps1](build/validate-source.ps1) lowercases
+all enum values and permits pipe unions generally. Several readers take a
+single case-sensitive token instead. The gate accepts `special="ATTACK"` and
+`special="difficultycurse"`, but `applySpecial` in
+[engine.js](web/js/engine.js) applies neither. It accepts `crew="EXCELLENT"`
+on an `if`, but `evaluateCondition` does not match an excellent crew. It also
+accepts `modifier="natural|noarmour"`, which `difficultyModifier` resolves as
+no mode and a zero addend, retaining the full affected score. These were
+confirmed with direct value-gate and engine probes; they are latent authoring
+failures, not mis-cased shipped nodes found during this pass.
+
+### The fix
+
+The readers set the rules, and the gate now follows them. Each `FL_ENUMS` attribute's
+readers were checked for case and `|` handling:
+
+| Attribute | Reader(s) | Case | Union |
+|---|---|---|---|
+| `special` | `applySpecial` (`===`) | exact | no |
+| `crew` | `evaluateCondition` and the `<set>` test (`s.crew ===`) | exact | no (an integer delta is separate) |
+| `modifier` | `difficultyModifier`, `setValueMode`, `abilityForMode`, `staminaForMode`, `rankForMode` | any (lower-cased) | no |
+| `gender` | `evaluateCondition` (`startsWith('m')`) | any | no |
+| `choose` | `normalize(...) === 'best'` | any | no |
+| `family` | `boolAttr` | any | no |
+| `blessing` | `canonBlessing` / `hasBlessing` | any | no |
+| `abilityDamaged` | `combat.js` (lower-cased) | any | no |
+| `profession` | `normalize` compare; `needsProfessionChoice` and the `<tick>` picker split `|` | any | on `<tick>` only |
+| `ability`, `ship`, cargo | the roll picker, `matchShipType`, the cargo matchers | any | yes |
+
+- `build/validate-source.ps1`: `FL_EXACT_ENUMS` (`special`, `crew`) are compared with
+  `-cnotcontains` against the listed spelling. `FL_SINGLE_ENUMS`, plus `profession` on any tag
+  but `<tick>`, refuse a `|`. Their union is otherwise one unknown word, which, for
+  `modifier`, `difficultyModifier` read as no mode and the full score.
+- `build/validate-selftest.ps1` adds six mutations: `special="ATTACK"`,
+  `special="difficultycurse"`, `<if crew="EXCELLENT">`, `modifier="natural|noarmour"`,
+  `<if profession="mage|rogue">` and `gender="m|f"`. A control section holds every shipped
+  shape: the exact `special` spellings, a crew grade and `-1` delta, `modifier="NATURAL"`,
+  an upper-case and a three-way `ability`, a `ship` union, a capitalised `profession`, and
+  the `<tick>` profession picker.
+- `web/tests/suite-engine.js` (task 379 block) checks the reader side. `crew="excellent"`
+  matches and `EXCELLENT` never did. `difficultyCurse`/`difficultyRestore` act and
+  `difficultycurse` did nothing. A mode word reads in any case, while
+  `"natural|noarmour"` read as no mode. `profession="Mage"` matches in any case, while
+  `"mage|rogue"` on an `<if>` never matched.
+- `docs/XML-Tag-Reference.md` states the union and case rules above the enum table.
+
+Checked:
+
+- A census of the shipped corpus found the shapes the control covers: capitalised `ability`
+  on `<difficulty>`/`<training>`/`<effect>`, 15 `ability` unions on `<difficulty>`, a
+  capitalised `profession` on `<adjust>`/`<choice>`/`<if>`, one `<tick>` profession union,
+  and `special="difficultyCurse"`/`"difficultyRestore"`. All still pass, and the rebuild
+  changed nothing.
+- Against the old gate, all six mutations failed (`pass=83 fail=6`). With the fix the
+  selftest reported `pass=89 fail=0`, and the release selftest `pass=59`.
+- The full suite reported `RESULT ALL PASS pass=3350 fail=0`.
 
 ---

@@ -1281,4 +1281,30 @@ export async function run(ctx) {
          adj349('natural') === 10 && adj349('affected') === 17 && adj349('current') === 4,
          [adj349('natural'), adj349('affected'), adj349('current')].join('/'));
     }
+
+    // --- task 379: what the source gate accepts for an enum is what its reader does ---------
+    // The gate lower-cased every enum and allowed '|' everywhere, so three shapes validated and
+    // were then inert. These pin both halves: the accepted spellings act, the refused ones did not.
+    {
+      const g379 = GameState.create({ name: 'E379', gender: 'f', profession: 'Mage', book: 1, adv });
+      g379.data.ships = [];
+      g379.addShip({ type: 'barque', crew: 'excellent', cargo: [], docked: null });
+      const cond = (xml) => eng.evaluateCondition(parse(xml), g379);
+      ok('task379: <if crew="excellent"> matches an excellent crew', cond('<if crew="excellent"/>') === true);
+      ok('task379: crew="EXCELLENT" never matched it (now refused by the gate)', cond('<if crew="EXCELLENT"/>') === false);
+      g379.data.oneDieRolls = false;
+      eng.applyEffectBody(parse('<x><tick special="difficultycurse"/></x>'), g379);
+      ok('task379: special="difficultycurse" did nothing (now refused)', g379.data.oneDieRolls === false);
+      eng.applyEffectBody(parse('<x><tick special="difficultyCurse"/></x>'), g379);
+      ok('task379: special="difficultyCurse" sets one-die rolls', g379.data.oneDieRolls === true);
+      eng.applyEffectBody(parse('<x><tick special="difficultyRestore"/></x>'), g379);
+      ok('task379: special="difficultyRestore" lifts them', g379.data.oneDieRolls === false);
+      const mod = (raw) => eng.difficultyModifier(g379, raw);
+      ok('task379: a mode word reads in any case, as the gate accepts it',
+         mod('natural').mode === 'natural' && mod('NATURAL').mode === 'natural' && mod('NoArmour').mode === 'noarmour');
+      ok('task379: modifier="natural|noarmour" read as no mode at all (now refused)',
+         mod('natural|noarmour').mode === null, JSON.stringify(mod('natural|noarmour')));
+      ok('task379: <if profession="Mage"> reads in any case', cond('<if profession="Mage"/>') === true && cond('<if profession="mage"/>') === true);
+      ok('task379: profession="mage|rogue" on an <if> never matched (now refused)', cond('<if profession="mage|rogue"/>') === false);
+    }
 }

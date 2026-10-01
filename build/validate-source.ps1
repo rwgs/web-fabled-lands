@@ -193,6 +193,14 @@ $script:FL_ENUMS = ConvertTo-OrdinalMap @{
     'ship'           = 'barque brigantine galleon brig gall galley t'  # 't' = "any ship"
     'special'        = 'armourlock attack defence difficultyCurse difficultyRestore godless lock unlock weaponlock'
 }
+# How each enum's reader takes it (task 379). FL_EXACT_ENUMS readers compare the spelling
+# exactly: applySpecial (special) and the crew === tests. FL_SINGLE_ENUMS readers take one
+# word and split no '|': difficultyModifier/setValueMode/abilityForMode (modifier), the gender
+# and choose tests, boolAttr (family), hasBlessing, and combat.js abilityDamaged. ability,
+# ship and cargo really are unions (the roll picker, matchShipType, the cargo matchers), and
+# profession is one only on <tick> (needsProfessionChoice).
+$script:FL_EXACT_ENUMS = @('special', 'crew')
+$script:FL_SINGLE_ENUMS = @('special', 'crew', 'modifier', 'gender', 'choose', 'family', 'blessing', 'abilityDamaged')
 # The eight tradable commodities. Ports abbreviate them ("grai", "meta", "timb"), which
 # canonCargo folds by prefix, so a prefix of exactly one commodity is legal here too.
 $script:FL_CARGO = @('grain', 'furs', 'metals', 'minerals', 'spices', 'textiles', 'timber', 'slaves')
@@ -428,6 +436,14 @@ function Test-AttrValue([string]$tag, [string]$attr, [string]$value) {
         return $null
     }
     if ($attr -eq 'cargo' -or $script:FL_ENUMS.ContainsKey($attr)) {
+        # Each reader's own list and case rules (task 379). A union is legal only where the
+        # reader splits it; elsewhere "natural|noarmour" was one unknown word, which
+        # difficultyModifier read as no mode and the full score. A profession list is the
+        # <tick> picker's alone.
+        $single = ($script:FL_SINGLE_ENUMS -ccontains $attr) -or ($attr -ceq 'profession' -and $tag -cne 'tick')
+        if ($single -and $value.Contains('|')) {
+            return "$attr=`"$value`" takes one value on <$tag>; its reader does not split '|'"
+        }
         foreach ($part in ($value -split '\|')) {
             $p = $part.Trim().ToLowerInvariant()
             if ($p -eq '' -or $p -eq '?' -or $p -eq '*') { continue }   # JaFL match-any wildcards
@@ -441,6 +457,11 @@ function Test-AttrValue([string]$tag, [string]$attr, [string]$value) {
             if ($attr -eq 'crew' -and $p -match '^[+-]?\d+$') { continue }  # a crew-quality delta
             if (($script:FL_ENUMS[$attr] -split ' ') -notcontains $p) {
                 return "$attr=`"$part`" is not a known $attr ($($script:FL_ENUMS[$attr]))"
+            }
+            # applySpecial and the crew comparisons match the spelling exactly, so
+            # special="ATTACK" and crew="EXCELLENT" did nothing. (task 379)
+            if ($script:FL_EXACT_ENUMS -ccontains $attr -and ($script:FL_ENUMS[$attr] -split ' ') -cnotcontains $part.Trim()) {
+                return "$attr=`"$part`" must be written exactly as $($script:FL_ENUMS[$attr]) - its reader is case-sensitive"
             }
             # The one value in FL_ENUMS whose legality depends on its TAG. `current` means "the
             # WOUNDED Stamina, not the unwounded maximum", so it is only meaningful where a stat

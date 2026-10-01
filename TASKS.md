@@ -27,7 +27,6 @@ there once the buckets below are clear.
 
 **LOW**
 
-- [ ] 379. The source gate accepts enum casing and pipe lists that their rule readers do not support, including an inert `special="ATTACK"` and ignored `modifier="natural|noarmour"`
 - [ ] 381. Player documentation still promises the best carried equipment, says fight bonuses never survive a save, and overstates which tags support `modifier="current"`
 - [ ] 382. `build/serve.py` stalls a service worker's install precache (3 of ~48 requests reach it), so the offline path and a real update cannot be exercised against the repo's own dev server; `python -m http.server` serves the same tree fine
 - [ ] 369. `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19 (CI notice); the `smoke` and `build-scripts` jobs rely on the image's preinstalled `pwsh` 7, `google-chrome` and `python3`, so the move could stop CI with no change here
@@ -419,6 +418,7 @@ this order.*
 - [x] 376. the source gate skipped a missing `Adventurers.xml` and accepted `<adventurers/>`, so a published book could build with a New Adventure that threw; the gate now requires the file and the fields the creation path reads (`Test-AdventurersData`), and `suite-corpus` creates all six professions from each published book's own data
 - [x] 377. `nextFreeSlot` and `GameState.load` read storage unguarded, so a browser blocking reads threw out of New Adventure before any recovery; `nextFreeSlot` now throws `StorageReadError` rather than guess a slot is free, `GameState.load` returns null, and New Adventure offers to play without saving (`newAdventureSlot`)
 - [x] 378. the source gate left `<choice pay=>`, `<choice flee=>` and `<fightround pre=>` unvalidated, so a typo read as false (a waived cost, no escape, a late pre-round hook); `Test-AttrValue` now checks them as truth flags on those tags only, and `<fight flee=>` as the whole number it is
+- [x] 379. the source gate lower-cased every enum and allowed `|` on all of them, so `special="ATTACK"`, `crew="EXCELLENT"` and `modifier="natural|noarmour"` validated and did nothing; `special` and `crew` are now exact-case, and a union is legal only where the reader splits one (`ability`, `ship`, cargo, and `profession` on `<tick>`)
 
 ---
 
@@ -520,38 +520,6 @@ removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first
 
 ---
 
-## 379. Make enum validation match each reader's case and list semantics
-
-**Priority: LOW.** Accepted authoring errors still become silent rule failures.
-
-### What is wrong
-
-`Test-AttrValue` in [validate-source.ps1](build/validate-source.ps1) lowercases
-all enum values and permits pipe unions generally. Several readers take a
-single case-sensitive token instead. The gate accepts `special="ATTACK"` and
-`special="difficultycurse"`, but `applySpecial` in
-[engine.js](web/js/engine.js) applies neither. It accepts `crew="EXCELLENT"`
-on an `if`, but `evaluateCondition` does not match an excellent crew. It also
-accepts `modifier="natural|noarmour"`, which `difficultyModifier` resolves as
-no mode and a zero addend, retaining the full affected score. These were
-confirmed with direct value-gate and engine probes; they are latent authoring
-failures, not mis-cased shipped nodes found during this pass.
-
-### Steps
-
-1. Define case and union rules per enum reader, retaining legitimate list selectors.
-2. Reject unsupported forms or canonicalize them consistently in the appropriate
-   reader; keep the vocabulary and runtime behavior aligned.
-3. Add mutation fixtures and runtime controls for these examples, then run the
-   documented build/test loop.
-
-### Validation
-
-- Every accepted enum casing/list shape has the behavior its reader promises.
-- Unsupported special, crew and modifier forms fail before bundling.
-
----
-
 ## 381. Bring player rule summaries into line with the implemented rules
 
 **Priority: LOW.** The guides describe behavior that later rule changes replaced.
@@ -625,6 +593,16 @@ repository.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 379): closed **379**, filed nothing. Each enum's reader was
+checked for case and list handling. `special` and `crew` compare exactly, so the gate now
+requires the listed spelling for them. Eight attributes take one value: `special`, `crew`,
+`modifier`, `gender`, `choose`, `family`, `blessing` and `abilityDamaged`. So does
+`profession` everywhere except `<tick>`, which the picker splits. A union stays legal for
+`ability`, `ship` and cargo. A corpus census found every shipped shape still legal. The
+gate selftest gained six mutations, which the old gate missed, and a control; it now reports
+`pass=89`. `suite-engine` gained runtime controls showing the accepted spellings act and the
+refused ones were inert. The full suite reported `RESULT ALL PASS pass=3350 fail=0`.
 
 Worked 2026-10-01 (task 378): closed **378**, filed nothing. `Test-AttrValue` now checks
 `pay` and `flee` on `<choice>` and `pre` on `<fightround>` against the truth set. It checks
