@@ -217,6 +217,28 @@ two suites without colliding - but that is the **only** isolation it buys.
 
 ---
 
+## Driving a real update by hand
+
+The suite cannot forge a `controllerchange`, so the update path (`registerSW` and the update
+gate in `app.js`, `sw.js`'s install) is checked in a real browser:
+
+1. Copy `web/` to a scratch directory and serve that copy with `build/serve.py --directory`,
+   so editing it cannot touch the repository.
+2. Open `/web/index.html` (or `?demo=1.1` for a preview) in Chrome with a fresh `fl-`
+   profile. Wait until `navigator.serviceWorker.controller` is set, then reload, because the
+   page only listens for `controllerchange` if a worker controlled it at load.
+3. Change the `VERSION` line in the copy's `sw.js`, then call
+   `navigator.serviceWorker.getRegistration().then((r) => r.update())`. The new worker
+   installs, takes control, and the gate either reloads the page or holds the reload until
+   the adventure is kept or saved (task 374).
+
+Headless Chrome with `--remote-debugging-port` can drive all three steps over the DevTools
+protocol from a short Node script. Until task 382 this needed `python -m http.server`: the
+precache read no body until every fetch had answered, and against `serve.py`'s no-store
+responses the browser's six connections per host filled up and the install never finished.
+
+---
+
 ## Leftovers
 
 Prefix any by-hand profile or dump `fl-` under the temp directory and the runner collects

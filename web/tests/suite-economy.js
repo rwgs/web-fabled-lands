@@ -1826,6 +1826,40 @@ export async function run(ctx) {
          stored ? 'redirected=' + stored.redirected + ' status=' + stored.status : 'puts=' + puts.length);
     }
 
+    // --- task 382: each precache body is read as it arrives, not after the slowest fetch ---
+    // precache fetched every REQUIRED entry at once and read no body until all had answered.
+    // Over HTTP/1.x a browser opens six connections per host, and an unread no-store body holds
+    // its connection, so against build/serve.py the install stalled after a handful of requests
+    // and the worker never activated. Here one response is held back: the others must already
+    // have been read, and nothing may be stored until the last one arrives.
+    { // block-scoped
+      await import('../js/sw-cache.js');
+      const FLCache = self.FLCache;
+      const reads = [];
+      let releaseLast;
+      const lastGate = new Promise((r) => { releaseLast = r; });
+      // highWaterMark 0: the body is pulled only when something reads it.
+      const body = (name) => new ReadableStream({
+        pull(c) { reads.push(name); c.enqueue(new TextEncoder().encode('BODY ' + name)); c.close(); },
+      }, { highWaterMark: 0 });
+      const slowFetch = async (url) => {
+        const plain = url.replace(/\?v=.*$/, '');
+        if (plain === './last') await lastGate;
+        return new Response(body(plain));
+      };
+      const puts = [];
+      const cache382 = { async put(url, res) { puts.push([url, await res.text()]); } };
+      const done = FLCache.precache(cache382, ['./a', './b', './last'], 'fl-x', slowFetch);
+      await new Promise((r) => setTimeout(r, 0));
+      ok('task382: the bodies that arrived are read while a slower fetch is still pending',
+         reads.join() === './a,./b' && puts.length === 0, 'reads=' + reads.join() + ' puts=' + puts.length);
+      releaseLast();
+      await done;
+      ok('task382: every entry is then stored, body intact',
+         JSON.stringify(puts) === JSON.stringify([['./a', 'BODY ./a'], ['./b', 'BODY ./b'], ['./last', 'BODY ./last']]),
+         JSON.stringify(puts));
+    }
+
     // --- task 206: REQUIRED must list every module the app actually loads ---
     // The precache list is hand-maintained, and edition.js (added by task 195) was missing from
     // it. That is not a missed nicety: install's addAll(REQUIRED) succeeds, then activate judges

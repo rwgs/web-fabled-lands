@@ -387,6 +387,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 378. Validate boolean values by tag where attribute meanings differ
 - [x] 379. Make enum validation match each reader's case and list semantics
 - [x] 381. Bring player rule summaries into line with the implemented rules
+- [x] 382. Let the dev server complete a service worker's install
 - [x] 380. Make late asynchronous failures fail the test runners
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
@@ -22090,5 +22091,73 @@ Checked:
   doc comment is accurate for tools.
 - No code changed, so no test run was needed for this task. The last full run, at task 379,
   was `RESULT ALL PASS pass=3350 fail=0`.
+
+---
+
+## 382. Let the dev server complete a service worker's install
+
+**Priority: LOW.** Local tooling only. The shipped site and the test runner are unaffected, and
+the runner's page registers no worker.
+
+### What is wrong
+
+Task 374's app-shell check served a scratch copy of `web/` with `build/serve.py` and opened
+`?demo=1.1` in headless Chrome over DevTools. The worker stayed `installing` for over three
+minutes with an empty cache. The server logged only `sw.js`, `js/sw-cache.js` and three
+`?v=` precache requests, and the rest of the required list never arrived. The same probe
+against `python -m http.server` on the same tree installed, activated and controlled the
+page within seconds (48 `?v=` requests). Under `serve.py`, a real update and the offline
+path therefore cannot be checked locally. The cause is not diagnosed. Candidates are
+`NoStoreHandler`'s `Cache-Control: no-store`/`Pragma` headers on the `cache: 'reload'`
+fetches, and the IPv4-only bind. The scratch probe was `sw-probe.mjs`, not kept in the
+repository.
+
+### The fix
+
+The filing suspected `serve.py`, but the defect was in the worker's precache, and `serve.py`
+is unchanged.
+
+- Diagnosis: a cut-down probe registered `web/sw.js` in headless Chrome over DevTools and
+  waited for `activated`. Results:
+
+  | Server | Worker |
+  |---|---|
+  | stock `http.server`, bound to `127.0.0.1` | activated |
+  | `serve.py` without its two cache headers | activated |
+  | `serve.py` without only `Pragma` | stalled |
+  | `serve.py` with `allow_reuse_address` on | stalled |
+
+  So the trigger is `Cache-Control: no-store`. `FLCache.precache` fetched all of
+  REQUIRED in parallel and read no body until every response had arrived, so it could check
+  them all before writing any. Over HTTP/1.x a browser allows six connections per host. A
+  cacheable body is drained by the HTTP cache, but a no-store one is not, so the unread bodies
+  held the connections and the remaining requests were never sent. Serving a copy of `web/`
+  whose `fetchOk` read each body first, with the unmodified `serve.py`, activated.
+- `web/js/sw-cache.js`: `fetchOk` reads each response with `arrayBuffer()` as it arrives and
+  returns a fresh `Response` with the same status, status text and headers. It is still
+  all-or-nothing, since nothing is put until every fetch has succeeded. A fresh `Response` is
+  never `redirected`, which is what task 370's `unredirect` provided, so that helper is
+  removed and its reason kept in the comment.
+- `web/tests/suite-economy.js` (task 382 block): an injected fetch holds `./last` back while
+  `./a` and `./b` answer with streams that record when they are pulled (`highWaterMark: 0`).
+  Before `./last` is released both bodies must have been read and nothing stored, and then
+  all three must be stored with their bodies. The task 359 and task 370 precache tests still
+  pass.
+- `docs/Testing.md`'s new section "Driving a real update by hand" records the recipe.
+
+Production behind Cloudflare is probably unaffected: HTTP/2 multiplexes, and the responses
+there are cacheable. Any HTTP/1.1 path could have hit it, though, such as a self-hosted
+static server sending no-store or a proxy that downgrades the connection.
+
+Checked:
+
+- Against the old `sw-cache.js`, the new assertion failed (`reads= puts=0`).
+- Under `build/serve.py` serving the repository, the worker activated after 48 precache
+  requests, as under the stock server.
+- Task 374's update probe ran on `serve.py`:
+  - An update during preview play did not reload the page.
+  - Keep reloaded once, onto the title.
+  - The kept adventure played as a saved game, and a further update reloaded at once.
+- The full suite reported `RESULT ALL PASS pass=3352 fail=0`, and `node-import.mjs` passed.
 
 ---

@@ -62,17 +62,19 @@ self.FLCache = (() => {
   const fetchFresh = (fetchFn, url, version) =>
     fetchFn(url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(version), { cache: 'reload' });
 
-  // Cloudflare's asset server answers ./index.html with a 307 to ./ (task 370), and the browser
-  // refuses a redirected response as the answer to a navigation. The page would then fail to
-  // load from the cache, so a redirected response is stored as a fresh copy with no redirect.
-  const unredirect = (res) => res.redirected
-    ? new Response(res.body, { status: res.status, statusText: res.statusText, headers: res.headers })
-    : res;
-
+  // Each body is read as soon as its response arrives, and stored as a fresh copy. Two reasons:
+  //  * Reading it frees the connection (task 382). precache waits for every REQUIRED response
+  //    before writing any, and over HTTP/1.x a browser opens six connections per host. An unread
+  //    body holds its connection unless the HTTP cache drains it, which a no-store response
+  //    (build/serve.py) never is, so the install stalled after a handful of requests.
+  //  * A fresh copy is never "redirected" (task 370). Cloudflare's asset server answers
+  //    ./index.html with a 307 to ./, and the browser refuses a redirected response as the
+  //    answer to a navigation, so the page would fail to load from the cache.
   const fetchOk = async (fetchFn, url, version) => {
     const res = await fetchFresh(fetchFn, url, version);
     if (!res.ok) throw new TypeError('precache ' + url + ': HTTP ' + res.status);
-    return unredirect(res);
+    const body = await res.arrayBuffer();
+    return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
   };
 
   // All-or-nothing, like the addAll() it replaces: every response is fetched and checked
