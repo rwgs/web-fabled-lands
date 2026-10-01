@@ -68,7 +68,9 @@ deletes them. Export a save to a JSON file to move it or keep a backup; imports 
 validated and migrated, so a save from an older build still loads.
 
 If a write fails - storage full, or private-browsing mode blocking it - the game says so
-rather than silently discarding progress.
+rather than silently discarding progress. If the browser blocks even reading storage, New
+Adventure cannot tell which slots are free, so it offers to play without saving rather than
+risk overwriting one. That adventure can be exported, or kept once storage is allowed.
 
 Two tabs or windows playing the same adventure do not overwrite each other. The first one to
 save keeps saving. The other is told its progress was not written, and can export its own

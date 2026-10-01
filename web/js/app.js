@@ -74,6 +74,29 @@ async function startDemo(spec) {
   }
 }
 
+/** Where a new adventure will be saved (task 377): `{ go: true, slot }` for a free slot,
+ *  `{ go: true, slot: null }` to play without saving, or `{ go: false }` when the slots are
+ *  full or the player cancels. A StorageReadError from `find` means no slot can be chosen
+ *  safely, so the player is asked rather than given one that might hold an adventure. Its
+ *  collaborators are injected so the suite drives it without the screens. */
+export async function newAdventureSlot({ find, onFull, askUnsaved }) {
+  let slot;
+  try { slot = find(); } catch (e) {
+    if (!e || e.name !== 'StorageReadError') throw e;
+    return (await askUnsaved(e.message)) ? { go: true, slot: null } : { go: false };
+  }
+  if (slot == null) { await onFull(); return { go: false }; }
+  return { go: true, slot };
+}
+
+function askPlayUnsaved(message) {
+  return modal({
+    title: 'Saved adventures can’t be read',
+    body: `<p>${escapeHtml(message)}</p><p>You can play without saving instead. The adventure stays in this tab: export it to a file, or keep it once storage is allowed again.</p>`,
+    buttons: [{ label: 'Play without saving', value: true, primary: true }, { label: 'Cancel', value: false }],
+  });
+}
+
 /** Modal shown when the player has all 20 save slots occupied. */
 function slotsFullModal() {
   return modal({
@@ -466,13 +489,14 @@ async function showCreate() {
   });
   backBtn.addEventListener('click', showTitle);
   startBtn.addEventListener('click', async () => {
-    const slot = nextFreeSlot();
-    if (slot == null) { await slotsFullModal(); return; } // don't overwrite an existing save
+    const pick = await newAdventureSlot({ find: nextFreeSlot, onFull: slotsFullModal, askUnsaved: askPlayUnsaved });
+    if (!pick.go) return; // slots full (never overwrite one), or the player cancelled
     const name = nameInput.value.trim() || pregenFor(profession)?.name || 'Adventurer';
     state = GameState.create({ name, gender: genderSel.value, profession, book, adv });
-    state.slot = slot;
-    const persisted = state.save();
-    if (!persisted) surfaceSaveError(true); // storage blocked/full — warn, but let them play
+    // No readable slot: an unsaved adventure, kept in this tab like a preview (task 377).
+    if (pick.slot == null) state.ephemeral = true; else state.slot = pick.slot;
+    const persisted = pick.slot != null && state.save();
+    if (pick.slot != null && !persisted) surfaceSaveError(true); // storage blocked/full — warn, but let them play
     // Await the first navigation and handle BOTH of its failures (task 189): a rejected book
     // fetch used to escape this handler as an unhandled rejection, and a missing §1 returned
     // false and left the player on the empty story pane with no way out. Retrying re-opens
@@ -554,7 +578,12 @@ function showSaves() {
     card.appendChild(info);
     const btns = el('div', 'save-btns');
     const play = el('button', 'btn btn-primary', 'Play');
-    play.addEventListener('click', () => { state = GameState.load(slot); if (state) { loadCurrent(); } });
+    play.addEventListener('click', () => {
+      // null when the save cannot be read; keep whatever game was live rather than clear it (task 377)
+      const loaded = GameState.load(slot);
+      if (!loaded) { toast('This adventure could not be read. Your browser may be blocking storage.', 'warn'); return; }
+      state = loaded; loadCurrent();
+    });
     const exp = el('button', 'btn', 'Export');
     exp.title = 'Download this save as a file';
     exp.addEventListener('click', () => exportSave(slot, m));

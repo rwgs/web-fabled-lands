@@ -23,7 +23,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 377. `nextFreeSlot` and `GameState.load` leave storage reads unguarded, so a browser that blocks those reads throws before the intended save-failure recovery can run
+*(none open — file new MEDIUM work here)*
 
 **LOW**
 
@@ -418,6 +418,7 @@ this order.*
 - [x] 374. `buildGameScreen` released the update gate outright, so a new build could reload away an unkept `?demo=` preview or progress whose autosave had failed; the game screen's hold now follows the save-status channel (`holdUpdateWhileUnsaved`), a successful save or Keep applies the deferred update once, and Keep drops `?demo=` so that reload lands on the title
 - [x] 375. two tabs that loaded one slot each wrote complete snapshots, so the staler tab's autosave replaced the other's newer progress; `save()` now refuses to write over a blob that is not the one this game last loaded or wrote (first writer wins), reports a conflict, and the "Progress not saved" modal adds "Load the newer save"
 - [x] 376. the source gate skipped a missing `Adventurers.xml` and accepted `<adventurers/>`, so a published book could build with a New Adventure that threw; the gate now requires the file and the fields the creation path reads (`Test-AdventurersData`), and `suite-corpus` creates all six professions from each published book's own data
+- [x] 377. `nextFreeSlot` and `GameState.load` read storage unguarded, so a browser blocking reads threw out of New Adventure before any recovery; `nextFreeSlot` now throws `StorageReadError` rather than guess a slot is free, `GameState.load` returns null, and New Adventure offers to play without saving (`newAdventureSlot`)
 
 ---
 
@@ -516,36 +517,6 @@ removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first
 
 - `https://webfl.rwgs.net/web/` is served by the Worker (a `/README.md` request answers 404).
   An installed copy updates to the next build, and it opens `/web/index.html` offline.
-
----
-
-## 377. Recover when reading browser storage is blocked
-
-**Priority: MEDIUM.** New Adventure can fail before a character or recovery dialog exists.
-
-### What is wrong
-
-`nextFreeSlot` in [state.js](web/js/state.js) calls `localStorage.getItem` outside
-any guard, as does `GameState.load` before its `try`. A storage `SecurityError`
-therefore escapes to the app click handler. The New Adventure path calls
-`nextFreeSlot` before creating a character or reaching `surfaceSaveError`, so the
-documented ability to warn and continue playing when storage is blocked is not
-available in this case. Direct probes with a throwing storage reader reproduce
-the exception in both functions.
-
-### Steps
-
-1. Handle unavailable storage reads explicitly in slot discovery and loading.
-   Do not infer that unknown slots are free and overwrite adventures on recovery.
-2. Provide an actionable app response, retaining an exportable in-memory adventure
-   if the player chooses to play without persistence.
-3. Add owning-suite cases where reads, rather than writes, throw, then run the
-   documented test loop.
-
-### Validation
-
-- A blocked read produces a player-facing recovery action and no uncaught exception.
-- Storage recovery never overwrites an existing slot inferred to be empty.
 
 ---
 
@@ -684,6 +655,18 @@ repository.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 377): closed **377**, filed nothing. `nextFreeSlot` reads storage
+strictly and throws `StorageReadError` when a read fails, because an unreadable slot is not a
+free one. `loadSlotMeta` stays lenient for display, so the title still renders.
+`GameState.load` returns null for an unreadable save, and the saves screen's Play reports
+that. New Adventure picks its slot through `newAdventureSlot`, which offers "Play without
+saving" on a blocked read. That gives an unsaved in-tab adventure that can be exported, or
+kept once storage works. `suite-economy` gained 15 assertions with reads, not writes,
+throwing. In the real app, with reads of `fl_*` keys made to throw from page load, Begin
+Adventure showed the dialog. Playing without saving reached the game screen, and Keep
+reported the storage message with Export, with no uncaught error. The full suite reported
+`RESULT ALL PASS pass=3341 fail=0`.
 
 Worked 2026-10-01 (task 376): closed **376**, filed nothing. The source gate now fails a
 published book with no `Adventurers.xml` or with unusable creation data, through

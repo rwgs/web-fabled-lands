@@ -1358,10 +1358,12 @@ export class GameState {
     }
   }
 
+  /** The saved game in `slot`, or null when there is none or it cannot be read: a corrupt blob,
+   *  or storage refusing the read, which used to throw past the caller (task 377). */
   static load(slot) {
-    const raw = localStorage.getItem(SAVE_PREFIX + slot);
-    if (!raw) return null;
     try {
+      const raw = localStorage.getItem(SAVE_PREFIX + slot);
+      if (!raw) return null;
       const data = JSON.parse(raw);
       const gs = new GameState(migrate(data), slot);
       gs._seen = { slot, raw }; // what a later save must still find there (task 375)
@@ -1894,10 +1896,17 @@ export function sameAffliction(a, b) {
  *  JSON of any other shape used to come straight back — `null` threw in reconcileSlotMeta and
  *  left the title screen unrendered, and a junk entry listed a card with no adventure behind
  *  it. Whatever is dropped here is rebuilt from its blob by reconcileSlotMeta when the blob is
- *  readable, and nextFreeSlot still counts an unreadable blob as occupied. (task 371) */
+ *  readable, and nextFreeSlot still counts an unreadable blob as occupied. (task 371)
+ *
+ *  A storage READ that throws also yields {}, which is right for display: the title screen
+ *  still renders. It is not right for choosing a slot, so nextFreeSlot reads for itself. */
 export function loadSlotMeta() {
+  try { return slotMetaFrom(localStorage.getItem(META_KEY)); } catch { return {}; }
+}
+
+function slotMetaFrom(text) {
   let raw;
-  try { raw = JSON.parse(localStorage.getItem(META_KEY) || '{}'); } catch { return {}; }
+  try { raw = JSON.parse(text || '{}'); } catch { return {}; }
   const meta = {};
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return meta;
   for (const [k, v] of Object.entries(raw)) {
@@ -2014,9 +2023,27 @@ export function importSave(data, availableBooks = null) {
  *  handle null — previously this returned 0, silently overwriting the first save. A slot
  *  counts as occupied if it has a meta entry OR a raw blob: a blob can outlive its meta
  *  (a quota error between save()'s two writes), and that orphan must never be overwritten
- *  by the next New Adventure/import. (tasks 4, 137) */
+ *  by the next New Adventure/import. (tasks 4, 137)
+ *
+ *  Throws StorageReadError when storage refuses a read (task 377). An unreadable slot is not
+ *  a free one, and treating it as free is how a recovery would overwrite an adventure it could
+ *  not see. The read used to throw a raw SecurityError out of New Adventure's click handler. */
 export function nextFreeSlot() {
-  const meta = loadSlotMeta();
-  for (let i = 0; i < MAX_SLOTS; i++) if (!meta[i] && localStorage.getItem(SAVE_PREFIX + i) == null) return i;
+  try {
+    const meta = slotMetaFrom(localStorage.getItem(META_KEY));
+    for (let i = 0; i < MAX_SLOTS; i++) if (!meta[i] && localStorage.getItem(SAVE_PREFIX + i) == null) return i;
+  } catch (e) {
+    throw new StorageReadError(e);
+  }
   return null;
+}
+
+/** What nextFreeSlot throws when storage refuses a read (task 377); callers tell it apart by
+ *  name and offer play without saving rather than a slot. */
+export class StorageReadError extends Error {
+  constructor(cause) {
+    super('Your browser is blocking access to saved adventures, so a free save slot can’t be chosen without risking one you already have. Allow this site to use storage and try again.');
+    this.name = 'StorageReadError';
+    this.cause = cause;
+  }
 }

@@ -1,7 +1,7 @@
 // FL test suite — markets, rest, TTS, persistence, item effects, rewards, quantity/replace
 // Extracted verbatim from web/_test.html run() lines 3176-4349 (task 120).
 import * as data from '../js/data.js';
-import { GameState, readSlotData, importSave, loadSlotMeta, reconcileSlotMeta, deleteSlot, makeItem, nextFreeSlot, sanitizeData, currencyAward, splitItemName } from '../js/state.js';
+import { GameState, readSlotData, importSave, loadSlotMeta, reconcileSlotMeta, deleteSlot, makeItem, nextFreeSlot, sanitizeData, currencyAward, splitItemName, StorageReadError } from '../js/state.js';
 import * as eng from '../js/engine.js';
 import { fightRound } from '../js/combat.js';
 import { goodsFrom, buyTrade, sellTrade, sellPlan, applyInlineBuy, sellInlineItem, canUpgradeCrew, payChoiceCost, cargoBuyPlan, crewUpgradePlan, cargoSellPlan } from '../js/market.js';
@@ -11,7 +11,7 @@ import { renderGoto } from '../js/render-choices.js';
 import { renderMarket, renderRest } from '../js/render-market.js';
 // app.js only auto-boots when a #app element exists (task 65), so importing its exported
 // new-adventure recovery contract here is side-effect free. (task 189)
-import { openNewAdventure, saveOrKeep, installSheetDrawer, releaseSheetDrawer, toggleSheet, syncSheetBreakpoint, keepSheetFocus, makeUpdateGate, holdUpdateWhileUnsaved } from '../js/app.js';
+import { openNewAdventure, saveOrKeep, installSheetDrawer, releaseSheetDrawer, toggleSheet, syncSheetBreakpoint, keepSheetFocus, makeUpdateGate, holdUpdateWhileUnsaved, newAdventureSlot } from '../js/app.js';
 import { Narrator } from '../js/tts.js';
 import { renderSheet, renderStatic, modal } from '../js/ui.js';
 
@@ -961,6 +961,78 @@ export async function run(ctx) {
       ok('importSave() recovers with a real slot and named meta',
         impOkSlot != null && impOkMeta && impOkMeta.name === 'ImpFail');
       deleteSlot(impOkSlot);
+    }
+
+    // --- task 377: storage that refuses READS must not throw out, or hand over a used slot ---
+    // nextFreeSlot and GameState.load called getItem unguarded, so a SecurityError escaped the
+    // New Adventure click before any character or recovery dialog existed. A guard that read
+    // "unreadable" as "free" would be worse: the next write would overwrite an adventure.
+    {
+      const S = 'fl_save_', M = 'fl_meta';
+      const savedMeta = localStorage.getItem(M);
+      const savedBlobs = [];
+      for (let i = 0; i < 20; i++) { savedBlobs.push(localStorage.getItem(S + i)); localStorage.removeItem(S + i); }
+      localStorage.removeItem(M);
+      const g0 = GameState.create({ name: 'Held377', gender: 'f', profession: 'Mage', book: 1, adv });
+      g0.slot = 0; g0.save();
+      const blob0 = localStorage.getItem(S + 0);
+      const realGet = Storage.prototype.getItem, realSet = Storage.prototype.setItem;
+      const blockReads = (which) => { localStorage.getItem = function (k) { if (which(k)) { const e = new Error('denied'); e.name = 'SecurityError'; throw e; } return realGet.call(this, k); }; };
+      let writes = 0;
+      localStorage.setItem = function (k, v) { writes++; return realSet.call(this, k, v); };
+      const tryIt = (fn) => { try { return { value: fn() }; } catch (e) { return { error: e }; } };
+
+      blockReads(() => true);
+      const r1 = tryIt(() => nextFreeSlot());
+      ok('task377: with every read blocked, nextFreeSlot reports it instead of naming a slot',
+         !!r1.error && r1.error.name === 'StorageReadError' && /blocking access to saved adventures/.test(r1.error.message), String(r1.error || r1.value));
+      blockReads((k) => k === M);
+      const r2 = tryIt(() => nextFreeSlot());
+      ok('task377: an unreadable index is not read as empty (slot 0 holds an adventure)',
+         !!r2.error && r2.error.name === 'StorageReadError', String(r2.error || r2.value));
+      // Slot 1 has no index entry, so only its blob read can say whether it is free.
+      blockReads((k) => k === S + 1);
+      const r3 = tryIt(() => nextFreeSlot());
+      ok('task377: a slot whose blob cannot be read is not read as free', !!r3.error && r3.error.name === 'StorageReadError', String(r3.error || r3.value));
+
+      blockReads(() => true);
+      const r4 = tryIt(() => GameState.load(0));
+      ok('task377: GameState.load returns null for an unreadable save, without throwing', !r4.error && r4.value === null, String(r4.error));
+      const r5 = tryIt(() => reconcileSlotMeta());
+      ok('task377: the title\'s index read still renders (no throw)', !r5.error && Object.keys(r5.value).length === 0, String(r5.error));
+      const r6 = tryIt(() => importSave({ abilities: { combat: 5 }, stamina: 9, name: 'Imp377', book: 1, section: 1 }));
+      ok('task377: an import with blocked reads fails with the storage message', !!r6.error && r6.error.name === 'StorageReadError', String(r6.error));
+      const gp = GameState.create({ name: 'Preview377', gender: 'm', profession: 'Warrior', book: 1, adv });
+      gp.slot = 0; gp.ephemeral = true; gp.data.shards = 377;
+      const r7 = tryIt(() => gp.keep());
+      ok('task377: Keep with blocked reads fails and the preview stays live and exportable',
+         !!r7.error && gp.ephemeral === true && gp.data.shards === 377 && gp.data.name === 'Preview377', String(r7.error));
+      ok('task377: nothing was written while reads were blocked', writes === 0, 'writes=' + writes);
+      delete localStorage.getItem;
+      ok('task377: the adventure in slot 0 is untouched', localStorage.getItem(S + 0) === blob0);
+      ok('task377: once reads work, nextFreeSlot skips the held slot', nextFreeSlot() === 1, String(nextFreeSlot()));
+      delete localStorage.setItem;
+
+      // New Adventure's slot choice, with its dialogs injected.
+      const asked = [];
+      const fullCalls = [];
+      const pickWith = (find, answer) => newAdventureSlot({ find, onFull: async () => { fullCalls.push(1); }, askUnsaved: async (m) => { asked.push(m); return answer; } });
+      const blocked = () => { throw new StorageReadError(new Error('denied')); };
+      const p1 = await pickWith(blocked, true);
+      ok('task377: a blocked read offers play without saving, and accepting it plays unsaved',
+         p1.go === true && p1.slot === null && asked.length === 1 && /blocking access/.test(asked[0]), JSON.stringify(p1));
+      const p2 = await pickWith(blocked, false);
+      ok('task377: declining play without saving starts nothing', p2.go === false && asked.length === 2);
+      const p3 = await pickWith(() => 4, true);
+      ok('task377: a free slot is used with no question', p3.go === true && p3.slot === 4 && asked.length === 2);
+      const p4 = await pickWith(() => null, true);
+      ok('task377: full slots still show the slots-full dialog', p4.go === false && fullCalls.length === 1 && asked.length === 2);
+      let other = null;
+      try { await pickWith(() => { throw new TypeError('bug'); }, true); } catch (e) { other = e; }
+      ok('task377: any other error is not mistaken for blocked storage', other instanceof TypeError && asked.length === 2);
+
+      for (let i = 0; i < 20; i++) { if (savedBlobs[i] == null) localStorage.removeItem(S + i); else localStorage.setItem(S + i, savedBlobs[i]); }
+      if (savedMeta == null) localStorage.removeItem(M); else localStorage.setItem(M, savedMeta);
     }
 
     // --- task 375: two tabs playing one slot must not overwrite each other silently ---

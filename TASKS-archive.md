@@ -383,6 +383,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 374. Hold automatic update reloads while play is unsaved
 - [x] 375. Detect concurrent play of the same save slot
 - [x] 376. Require usable character-creation data for every published book
+- [x] 377. Recover when reading browser storage is blocked
 - [x] 380. Make late asynchronous failures fail the test runners
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
@@ -21863,5 +21864,64 @@ Checked:
   `git checkout`.
 - The real corpus passes the gate, and the rebuild changed nothing.
 - The full suite reported `RESULT ALL PASS pass=3326 fail=0`.
+
+---
+
+## 377. Recover when reading browser storage is blocked
+
+**Priority: MEDIUM.** New Adventure can fail before a character or recovery dialog exists.
+
+### What is wrong
+
+`nextFreeSlot` in [state.js](web/js/state.js) calls `localStorage.getItem` outside
+any guard, as does `GameState.load` before its `try`. A storage `SecurityError`
+therefore escapes to the app click handler. The New Adventure path calls
+`nextFreeSlot` before creating a character or reaching `surfaceSaveError`, so the
+documented ability to warn and continue playing when storage is blocked is not
+available in this case. Direct probes with a throwing storage reader reproduce
+the exception in both functions.
+
+### The fix
+
+- `web/js/state.js`:
+  - The index parsing moved into `slotMetaFrom`. `loadSlotMeta` still returns `{}` when the
+    read itself throws. That is right for display, since the title screen renders.
+  - `nextFreeSlot` reads for itself and throws the new exported `StorageReadError`, with a
+    player-facing message, when any read throws. An unknown slot is never reported as free.
+    So `importSave` and `keep()` fail with that message before writing anything; `keep()`
+    fails before it changes the preview.
+  - `GameState.load` moved its read inside the `try` and returns null when storage refuses
+    it, matching `readSlotData`.
+- `web/js/app.js`:
+  - New Adventure chooses its slot through the new exported `newAdventureSlot({ find,
+    onFull, askUnsaved })`. A free slot is used as before, and full slots still show the
+    slots-full dialog. A `StorageReadError` asks, in `askPlayUnsaved`, whether to "Play
+    without saving". Accepting creates the adventurer as an ephemeral game, which keeps the
+    preview machinery: "Keep this adventure", export, and the task 374 update hold.
+    Declining starts nothing, and any other error still propagates.
+  - The saves screen's Play button no longer assigns `state = null` when a load fails. It
+    keeps the live game and shows a warning toast.
+- `docs/Playing-the-Game.md` describes the blocked-read behavior under Saving.
+- `suite-economy` (task 377 block) makes `getItem` throw `SecurityError`:
+  - Every read blocked, only the index blocked (slot 0 holds an adventure), or only the blob
+    read of a slot with no index entry: `nextFreeSlot` throws `StorageReadError` each time
+    rather than naming a slot.
+  - `GameState.load` returns null and `reconcileSlotMeta` returns `{}`, without throwing.
+  - An import and a Keep fail, the preview stays live, and nothing was written.
+  - Once reads work, slot 0 is untouched and `nextFreeSlot` skips it.
+  - Five `newAdventureSlot` cases cover accept, decline, a free slot, full slots, and an
+    unrelated error.
+
+Checked:
+
+- The real app, driven headless over DevTools. A saved adventure was seeded, then reads of
+  `fl_*` keys were made to throw from page load (`Page.addScriptToEvaluateOnNewDocument`).
+  - New Adventure then Begin Adventure showed "Saved adventures can't be read".
+  - "Play without saving" opened the game screen with "Keep this adventure".
+  - Keep showed "Could not save" with the storage message and Export now.
+  - No uncaught page error throughout.
+- The old `state.js` lacks the `StorageReadError` export, so the new block cannot load
+  against it. The filing's direct probes reproduced the old throws.
+- The full suite reported `RESULT ALL PASS pass=3341 fail=0`, and `node-import.mjs` passed.
 
 ---
