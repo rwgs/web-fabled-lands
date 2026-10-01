@@ -750,55 +750,6 @@ this), but the message never says so.
 
 ---
 
-## What is wrong
-
-GitHub Pages serves `main` from the repository root under the root `CNAME`, so `books/`,
-`java-engine/` and the task files are public, and only Jekyll's `_`-prefix rule keeps
-`web/_test.html` off the site. The move has to keep the root layout and `/web/`. Installed
-copies are registered at `/web/`, and a service worker whose script moves or redirects can no
-longer update.
-
-Checked under `wrangler dev` (4.144.0), the asset server differs from Pages in one way that
-matters. It answers `/web/index.html` (and `?v=`) with a 307 to `/web/`. `FLCache.precache`
-fetched `./index.html` through that redirect and cached the response still marked redirected,
-and a browser refuses a redirected response as the answer to a navigation, so opening
-`/web/index.html` from the cache would fail.
-
-### Steps
-
-1. Add `wrangler.jsonc` (an assets-only Worker over `.`) and a root `.assetsignore` that
-   publishes only `index.html` and `web/`, less `web/_test.html`.
-2. Make `FLCache.precache` store a redirected response as a non-redirected copy, with a
-   `suite-economy` test that fails without it.
-3. Update README's deploy section; ignore `.wrangler/`.
-4. Deploy from CI: a `deploy` job in `smoke.yml` that needs the other three jobs, runs only
-   for a push to `main`, and runs a pinned `npx wrangler deploy`. `wrangler.jsonc` declares
-   `webfl.rwgs.net` as a custom-domain route, so the deploy creates the DNS record.
-5. *(Owner.)* Add the repository secrets `CLOUDFLARE_API_TOKEN` (the "Edit Cloudflare
-   Workers" template) and `CLOUDFLARE_ACCOUNT_ID`, remove the old DNS record for the hostname
-   (done 2026-09-29), push, and turn Pages off.
-6. Delete the root `CNAME` (the owner did, `ef568b4`), then close once the Validation below
-   holds.
-
-**Status 2026-09-29:** steps 1–3 are done. Under `wrangler dev`, `/`, `/?demo=1.10`, `/web/`,
-the data, the illustrations and `web/tests/` answer 200. `/web/_test.html`, `README.md`,
-`books/`, `java-engine/`, `.git/`, `CNAME`, `wrangler.jsonc` and `.assetsignore` answer 404,
-and `sw.js` is sent with `public, max-age=0, must-revalidate` and an ETag. So `.assetsignore`
-honours `!` negation. Running wrangler with its default `.wrangler/` state inside the assets
-directory reloads in a loop, and `--persist-to` outside the repository fixes that (README says
-so). `RESULT ALL PASS pass=3248 fail=0`. The new test fails on the old `precache`. Step 4 is done too.
-The owner chose GitHub Actions over Workers Builds, so a build CI rejects is never deployed.
-Wrangler runs through `npx` on Node 24 rather than `cloudflare/wrangler-action`, whose
-runtime we did not check against the runners' removal of Node 20 (task 361). The owner has
-removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first deploy.
-
-### Validation
-
-- `https://webfl.rwgs.net/web/` is served by the Worker (a `/README.md` request answers 404).
-  An installed copy updates to the next build, and it opens `/web/index.html` offline.
-
----
-
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
