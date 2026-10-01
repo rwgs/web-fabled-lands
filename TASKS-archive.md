@@ -391,6 +391,84 @@ every `Worked`/`Reviewed` entry older than the pass `TASKS.md` still leads with.
 adds its entries at the TOP of this section, so the section stays newest first. These are
 dated records: don't edit them.*
 
+Worked 2026-09-29 (task 370): filed and worked **370** on the owner's request: steps 1–3
+done, and it stays open until the owner does the dashboard cutover. An assets-only
+`wrangler.jsonc` and the root `.assetsignore` publish only `index.html` and `web/`. Checking
+under `wrangler dev` found the one real difference from Pages: the asset server 307s
+`index.html` to `./`. `FLCache.precache` now stores a redirected response without the redirect.
+`RESULT ALL PASS pass=3248 fail=0`. Then step 4: at the owner's choice, a CI `deploy` job
+gated on the other three, and a custom-domain route in `wrangler.jsonc`.
+
+Worked 2026-09-29 (task 368): closed **368** on the owner's go-ahead, filed nothing. The 123
+Review-log entries below the 2026-09-29 `Reviewed` pass now live, verbatim and newest first,
+in `TASKS-archive.md`'s "Review log (archived)" (`cmp` against the pre-move file: identical).
+This file dropped from 4,299 lines to about 540. The header says later passes move there
+too, and the closing pointer names both archives, since `REVIEW.md` already held the passes up
+to 2026-07-15.
+
+Worked 2026-09-29 (task 361): closed **361**, filed **369**. The owner pushed. Run 36564906180
+on `19ef915` was green in all three jobs on `actions/checkout@v7`, `actions/setup-node@v7`
+and Node 24, with no Node 20 deprecation annotation. Its one notice, that `ubuntu-latest`
+moves to Ubuntu 26 from 2026-10-19, is filed as 369, because the jobs depend on that image's
+preinstalled `pwsh`, `google-chrome` and `python3`.
+
+Worked 2026-09-29 (task 367): closed **367**, filed nothing. The six copies of the shipped
+section count now point at `docs/Corpus-Census.md`, which owns the per-book counts and now
+prints the command for them. `docs/Home.md`'s dated fact table names each fact's owner, and
+`PLAN.md`'s status carries no date. The sweep also retired two more copies of the 3,032 pass
+count that task 355 missed. Documentation only.
+
+Worked 2026-09-29 (task 366): closed **366**, filed nothing. README's deploy section now
+describes the Pages site served from the repository root behind Cloudflare, checked against
+the Pages API and the live site. That includes what it publishes: everything except
+underscore-prefixed files, since there is no `.nojekyll`. The file tree and the DOM-free module
+list are complete. Documentation only.
+
+Worked 2026-09-29 (task 365): closed **365**, filed nothing. Deleted the dead
+`adjustStaminaMax`. `RESULT ALL PASS pass=3246 fail=0`, unchanged.
+
+Worked 2026-09-29 (task 364): closed **364**, filed nothing. `sanitizeData` assigns the save's
+book and section before the lists that default to them, and drops a resurrection deal naming
+no section. Four of the five new import tests fail on the old code.
+`RESULT ALL PASS pass=3246 fail=0`.
+
+Worked 2026-09-29 (task 363): closed **363**, filed nothing. A `<difficulty>` in an effect body
+now reads `modifier=` through `engine.js`'s `difficultyModifier`, the rule the page widget
+uses. The gate refuses a dice-less body `<random>`, and any group fight with `playerFirst=` or
+sharing its section with a round rule. `suite-corpus` pins the 8 body roll nodes and 4
+group-fight sections by name. The census matched the filing exactly.
+`RESULT ALL PASS pass=3241 fail=0`.
+
+Worked 2026-09-29 (task 362): closed **362**, filed nothing. The source gate compares tag and
+attribute names exact-case, as the engine reads them, and §3.207's `<SECTION>`/`<P>` are
+lower-cased (markup only). The three new selftest fixtures fail against the old gate and pass
+against the new one. Re-running `docs/Corpus-Census.md`'s census command found four tag counts
+there had drifted after earlier tasks, and I corrected them with this task's two.
+`RESULT ALL PASS pass=3235 fail=0`. Task 361 stays open, waiting on a push, and work moves past it.
+
+Worked 2026-09-29 (task 360): closed **360**, filed nothing. The header's 💾 and the menu's
+entry now share `saveOrKeep` in `app.js`: a `?demo=` preview is kept and play continues (the
+header button says "Keep this adventure" until it is), and only a real slot saves and quits.
+`RESULT ALL PASS pass=3235 fail=0`.
+
+Worked 2026-09-29 (task 359): closed **359**, filed nothing. The install now precaches through
+`FLCache.precache`/`precacheOptional` in `sw-cache.js`, which fetch each entry at a build-unique
+`?v=` URL with `cache: 'reload'` and store it under the plain URL, so neither the browser's
+cache nor Cloudflare's edge can put the previous build's bytes into the new cache; the worker
+registers with `updateViaCache: 'none'`. `RESULT ALL PASS pass=3229 fail=0`. What remains is
+the by-hand check after the next deploy (an installed copy's `js/version.js` matches its cache
+key), which the suite cannot run.
+
+Reviewed 2026-09-29 (whole repository): filed **359–368**. The full write-up is in
+[`review-claude.md`](review-claude.md), which holds review text from this pass on. Baseline: the
+rebuild is a byte-for-byte no-op and `RESULT ALL PASS pass=3223 fail=0`. The rules layer held up
+under reading, and three suspicions were cleared (recorded in that file). The one HIGH is in the
+deployment path, not the rules: the service worker's precache can be served by the browser's
+cache or Cloudflare's edge (`max-age=14400`, `HIT`), so a new build can install the previous
+build's files (359). The two MEDIUMs are the header's "Save & quit" dropping a `?demo=` preview
+(360) and CI still pinning the Node 20 runtime GitHub removed on 2026-09-23 (361). `main` is 8
+commits ahead of `origin`, so the next push is also the first run on the new runners.
+
 Worked 2026-09-29 (task 358): filed and closed **358** together, on request. `TASKS-archive.md`'s
 header and Contents list had stopped at 336 while the file held sections to 357 — the close
 moved each section but never indexed it, and task 357's wording of the close in AGENTS.md

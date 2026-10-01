@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-370 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
+381 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
 the buckets below are open, and **all others are complete**. File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -19,14 +19,23 @@ there once the buckets below are clear.
 
 **HIGH**
 
-*(none open — file new HIGH work here)*
+- [ ] 380. A late asynchronous test failure preserves an earlier `ALL PASS` line below an unparsable failure header, so both the local runner and CI can incorrectly pass the failed page
 
 **MEDIUM**
 
-*(none open — file new MEDIUM work here)*
+- [ ] 371. `loadSlotMeta` accepts valid JSON of the wrong shape; `fl_meta = null` makes title/save recovery throw even when the save blobs are intact
+- [ ] 372. `sellPlan` treats ships with different crew/cargo and items with different effects as interchangeable, so a sale can silently remove the more valuable candidate
+- [ ] 373. `GameState.keep` leaves a partially written preview save behind when the metadata write fails; each retry claims another slot
+- [ ] 374. The service-worker update gate releases during unsaved play, so an automatic update can reload away a preview or progress whose autosave failed
+- [ ] 375. Two tabs can load the same save slot and silently overwrite each other's progress because autosave never checks whether the stored adventure changed
+- [ ] 376. The source gate accepts a missing or empty `Adventurers.xml`, allowing a published book whose character-creation screen throws
+- [ ] 377. `nextFreeSlot` and `GameState.load` leave storage reads unguarded, so a browser that blocks those reads throws before the intended save-failure recovery can run
 
 **LOW**
 
+- [ ] 378. The source gate omits the boolean `choice.pay`, `choice.flee` and `fightround.pre` values; a typo such as `pay="tru"` can silently waive a printed cost
+- [ ] 379. The source gate accepts enum casing and pipe lists that their rule readers do not support, including an inert `special="ATTACK"` and ignored `modifier="natural|noarmour"`
+- [ ] 381. Player documentation still promises the best carried equipment, says fight bonuses never survive a save, and overstates which tags support `modifier="current"`
 - [ ] 369. `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19 (CI notice); the `smoke` and `build-scripts` jobs rely on the image's preinstalled `pwsh` 7, `google-chrome` and `python3`, so the move could stop CI with no change here
 - [ ] 370. Move hosting from GitHub Pages to a Cloudflare Worker (owner's request), keeping the root layout and the `/web/` URLs; the Worker's asset server 307s `index.html` to `./`, which the service worker's precache stored as a redirected response that a navigation refuses
 
@@ -508,88 +517,359 @@ removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first
 
 ---
 
+## 371. Validate the save-slot metadata shape before recovery
+
+**Priority: MEDIUM.** A malformed index prevents access to otherwise intact adventures.
+
+### What is wrong
+
+`loadSlotMeta` in [state.js](web/js/state.js) catches JSON parse errors but returns any
+successfully parsed value. With `fl_meta` containing the literal `null`,
+`reconcileSlotMeta` throws while reading `meta[i]`. `showTitle` calls this during boot,
+so the title never finishes rendering. Strings, arrays and malformed slot entries
+also bypass the expected metadata-object contract. Existing blob reconciliation
+cannot recover when its starting index has the wrong shape.
+
+### Steps
+
+1. Validate the index as a plain metadata object; reject malformed index/entry shapes
+   and reconstruct readable slots from their blobs without overwriting those blobs.
+2. Add owning-suite cases for `null`, primitives, arrays and malformed entries, with
+   an intact adventure behind them. Keep unreadable blobs occupied.
+3. Verify the title and saves screens recover, then run the documented test loop.
+
+### Validation
+
+- `fl_meta = null` with an intact `fl_save_0` lists that adventure without throwing.
+- Invalid metadata shapes neither create ghost cards nor overwrite saved adventures.
+
+---
+
+## 372. Preserve meaningful differences when choosing a sale candidate
+
+**Priority: MEDIUM.** The implicit choice can discard upgraded crew or usable effects.
+
+### What is wrong
+
+`sameCandidate` in [market.js](web/js/market.js) compares ships by hull type, cargo
+count and name, excluding crew grade and cargo contents. Two empty barques named
+`Ship`, one with excellent crew and one with poor crew, yield
+`sellPlan(...).needsChoice === false`. `sellTrade` then sells the first, which can
+be the excellent vessel. Its item comparison similarly excludes `effects`, so
+otherwise identical possessions with different remaining uses need no picker.
+
+### Steps
+
+1. Include the meaningful ship and item state in the interchangeability decision.
+2. Verify the real sale widget asks when crew, cargo contents or item effects differ,
+   and still omits the picker for truly interchangeable candidates.
+3. Add owning-suite assertions and run the documented test loop.
+
+### Validation
+
+- Equal-name/equal-hull ships with different crew or cargo require a choice.
+- Equal-name items with different effects or remaining uses require a choice.
+- The chosen candidate alone is removed and proceeds are credited once.
+
+---
+
+## 373. Roll back a partially written preview promotion
+
+**Priority: MEDIUM.** Failed retries can consume every save slot with duplicate previews.
+
+### What is wrong
+
+`GameState.keep` in [state.js](web/js/state.js) restores the old slot and ephemeral
+flag when `save(true)` fails, but does not remove the new slot's partial write.
+If writing `fl_save_<slot>` succeeds and writing `fl_meta` throws, the blob stays.
+`nextFreeSlot` correctly counts it as occupied, so the next Keep attempt creates
+another blob. Three such attempts leave `fl_save_0`, `fl_save_1` and `fl_save_2`
+while the live adventure still reports that it is an ephemeral preview.
+
+### Steps
+
+1. Make preview promotion handle blob-success/meta-failure coherently, without
+   leaving duplicate claimed slots or reporting persistence that did not happen.
+2. Exercise failure between the two writes, repeat the attempt, and check recovery
+   once storage works again. Preserve the live preview and its export on failure.
+3. Add owning-suite assertions and run the documented test loop.
+
+### Validation
+
+- Repeated failed Keep attempts do not consume additional slots.
+- A later successful Keep produces one discoverable adventure with the current visit.
+
+---
+
+## 374. Hold automatic update reloads while play is unsaved
+
+**Priority: MEDIUM.** A background update can discard live progress without a player action.
+
+### What is wrong
+
+`buildGameScreen` in [app.js](web/js/app.js) unconditionally calls
+`swUpdateGate.hold(false)`. `registerSW` routes `controllerchange` straight through
+`makeUpdateGate.apply`, which reloads immediately when released. A `?demo=` game
+is intentionally ephemeral, and a normal adventure may have a failed autosave;
+both retain live progress that a reload cannot restore. The gate currently holds
+only the character-creation draft. Reloading a preview restarts its demo section;
+reloading after a failed save restores the older persisted state.
+
+### Steps
+
+1. Extend the update decision to live unsaved adventures and failed persistence,
+   using the existing gate and save-status channel where appropriate.
+2. Define when Keep, a successful save, or deliberate abandonment releases a pending
+   update. Do not reload before the current visit is coherently persisted.
+3. Add behavioral cases for preview play and failed-save recovery, then run the
+   documented test loop. Check controller-change behavior in the app shell.
+
+### Validation
+
+- An activated update does not discard an unkept preview or unsaved progress.
+- Once progress is saved or deliberately abandoned, the deferred update applies once.
+
+---
+
+## 375. Detect concurrent play of the same save slot
+
+**Priority: MEDIUM.** A stale autosave can replace newer progress without warning.
+
+### What is wrong
+
+`GameState.load` and `GameState.save` in [state.js](web/js/state.js) read and write
+complete independent snapshots. There is no ownership/conflict check or `storage`
+event handling in [app.js](web/js/app.js). If two tabs load a 100-Shard adventure,
+the first earns 50 Shards and saves 150; the second then loses one Stamina and
+saves its stale 100-Shard purse over the first tab's progress. A browser tab and
+an installed app on the same origin share these slots too.
+
+### Steps
+
+1. Choose a small conflict policy that prevents silent replacement of newer play,
+   such as refusing stale writes and offering reload/export recovery.
+2. Make the conflict visible to the player without discarding either live adventure.
+3. Exercise two independent loaded states and two actual tabs, then run the
+   documented test loop. Do not attempt to merge game-rule histories automatically.
+
+### Validation
+
+- A second tab's stale mutation cannot silently overwrite the first tab's newer save.
+- Both live snapshots remain exportable and a deliberate recovery resumes play.
+
+---
+
+## 376. Require usable character-creation data for every published book
+
+**Priority: MEDIUM.** An incomplete edition can build successfully and fail on New Adventure.
+
+### What is wrong
+
+`Test-SourceTree` in [validate-source.ps1](build/validate-source.ps1) skips an absent
+`Adventurers.xml` and accepts `<adventurers/>`. `build-data.ps1` then emits a null
+or structurally empty `adventurers` payload. `getAdvData` in
+[app.js](web/js/app.js) passes this to `showCreate`, whose creation path assumes
+professions and starting items exist, as does `GameState.create` in
+[state.js](web/js/state.js). A temporary book-2 fixture with
+one valid section and `Codewords=Bounty` returns zero validation errors both with
+no Adventurers file and with an empty one. Creating from the resulting absent data
+throws. The corpus scan initializes from book 1 and does not validate character
+creation for each published book.
+
+### Steps
+
+1. Require each published book's Adventurers file and validate the fields the creation
+   path reads: ability header/profession scores, starting stats, and item structure.
+2. Exercise missing and incomplete data in the gate's fixture self-test.
+3. Add creation checks driven by the published edition, with each book's own data.
+4. Run the documented build and test loop.
+
+### Validation
+
+- A missing or unusable Adventurers file fails the source gate before bundling.
+- Every published book supports creating its offered professions from its own data.
+
+---
+
+## 377. Recover when reading browser storage is blocked
+
+**Priority: MEDIUM.** New Adventure can fail before a character or recovery dialog exists.
+
+### What is wrong
+
+`nextFreeSlot` in [state.js](web/js/state.js) calls `localStorage.getItem` outside
+any guard, as does `GameState.load` before its `try`. A storage `SecurityError`
+therefore escapes to the app click handler. The New Adventure path calls
+`nextFreeSlot` before creating a character or reaching `surfaceSaveError`, so the
+documented ability to warn and continue playing when storage is blocked is not
+available in this case. Direct probes with a throwing storage reader reproduce
+the exception in both functions.
+
+### Steps
+
+1. Handle unavailable storage reads explicitly in slot discovery and loading.
+   Do not infer that unknown slots are free and overwrite adventures on recovery.
+2. Provide an actionable app response, retaining an exportable in-memory adventure
+   if the player chooses to play without persistence.
+3. Add owning-suite cases where reads, rather than writes, throw, then run the
+   documented test loop.
+
+### Validation
+
+- A blocked read produces a player-facing recovery action and no uncaught exception.
+- Storage recovery never overwrites an existing slot inferred to be empty.
+
+---
+
+## 378. Validate boolean values by tag where attribute meanings differ
+
+**Priority: LOW.** The current corpus is clean, but these typos can pass the gate.
+
+### What is wrong
+
+`Test-AttrValue` and `FL_BOOL_ATTRS` in
+[validate-source.ps1](build/validate-source.ps1) do not validate `pay`, `pre` or
+the choice form of `flee`. The gate accepts `choice.pay="tru"`,
+`choice.flee="tru"` and `fightround.pre="tru"`. `choiceGate` in
+[render-rules.js](web/js/render-rules.js) treats the first as explicit false:
+a 20-Shard choice still requires a 20-Shard purse but `payChoiceCost` takes
+nothing. The other two typos suppress fleeing and move a pre-round hook after
+the exchange. `fight.flee` is a numeric threshold, so adding `flee` to a global
+boolean list would reject valid fight markup.
+
+### Steps
+
+1. Validate these boolean attributes using their tag-specific meanings.
+2. Add mutation fixtures for invalid values and controls for all supported truth
+   spellings, plus a numeric fight-flee threshold.
+3. Run the source-gate self-test and documented build/test loop.
+
+### Validation
+
+- Invalid boolean values on these tags fail before bundling.
+- `fight.flee="5"` remains legal and retains its numeric meaning.
+
+---
+
+## 379. Make enum validation match each reader's case and list semantics
+
+**Priority: LOW.** Accepted authoring errors still become silent rule failures.
+
+### What is wrong
+
+`Test-AttrValue` in [validate-source.ps1](build/validate-source.ps1) lowercases
+all enum values and permits pipe unions generally. Several readers take a
+single case-sensitive token instead. The gate accepts `special="ATTACK"` and
+`special="difficultycurse"`, but `applySpecial` in
+[engine.js](web/js/engine.js) applies neither. It accepts `crew="EXCELLENT"`
+on an `if`, but `evaluateCondition` does not match an excellent crew. It also
+accepts `modifier="natural|noarmour"`, which `difficultyModifier` resolves as
+no mode and a zero addend, retaining the full affected score. These were
+confirmed with direct value-gate and engine probes; they are latent authoring
+failures, not mis-cased shipped nodes found during this pass.
+
+### Steps
+
+1. Define case and union rules per enum reader, retaining legitimate list selectors.
+2. Reject unsupported forms or canonicalize them consistently in the appropriate
+   reader; keep the vocabulary and runtime behavior aligned.
+3. Add mutation fixtures and runtime controls for these examples, then run the
+   documented build/test loop.
+
+### Validation
+
+- Every accepted enum casing/list shape has the behavior its reader promises.
+- Unsupported special, crew and modifier forms fail before bundling.
+
+---
+
+## 380. Make late asynchronous failures fail the test runners
+
+**Priority: HIGH.** The release gate can report success for a page it has marked failed.
+
+### What is wrong
+
+After `report` has passed, `flFatal` in [web/_test.html](web/_test.html) writes
+`RESULT FAILURES (async error after report) pass=? fail=1`, followed by the old
+results including `RESULT ALL PASS pass=N fail=0`, and sets the title to
+`TESTS_FAIL`. The failure header does not match the numeric verdict pattern in
+[run-tests.ps1](build/run-tests.ps1) or the `RESULT_LINE` extraction in
+[smoke.yml](.github/workflows/smoke.yml). Both therefore select the preserved
+`ALL PASS` line and succeed. An uncaught rejection or a failing `ok` after the
+report can bypass the sticky-fatal contract despite the DOM recording it.
+Executing the harness's own classic script with a completed passing result,
+then calling `flFatal`, reproduces `TESTS_FAIL` and an extracted `ALL PASS`.
+
+### Steps
+
+1. Emit an unambiguous machine-readable final failure verdict and ensure the
+   runners read the live result rather than an embedded earlier verdict.
+2. Drive a delayed rejection and a delayed failing assertion after a successful
+   report through the actual runner path; both must exit non-zero.
+3. Retain the distinctions between parse/bootstrap failure, ordinary assertion
+   failure and a cut-short run. Verify both local and CI extraction policies.
+4. Run the runner self-test and documented build/test loop.
+
+### Validation
+
+- A page marked failed after its report cannot yield an exit-zero `ALL PASS`.
+- A clean complete suite still passes, and unfinished runs still fail accurately.
+
+---
+
+## 381. Bring player rule summaries into line with the implemented rules
+
+**Priority: LOW.** The guides describe behavior that later rule changes replaced.
+
+### What is wrong
+
+The Combat summary in [README.md](README.md) and the Defence formula in
+[Game Rules](docs/Game-Rules.md) still say "best armour"; Game Rules and
+[Playing the Game](docs/Playing-the-Game.md) also say only the best bonus of a
+kind applies. `setEquipped`, `wieldedWeapon` and `wornArmour` in
+[state.js](web/js/state.js) honor the player's explicit selection, including
+weaker equipment, and use the strongest item only as a fallback.
+
+Game Rules says per-fight bonuses never survive a save, but `fightBonusSnapshot`
+and `restoreFightBonus` preserve them in the visit record for a mid-fight
+reload. Its Abilities section says all six modifier modes are honored by every
+reader, although `Test-AttrValue` in
+[validate-source.ps1](build/validate-source.ps1) accepts `current` only on
+`adjust` and `difficulty`.
+
+### Steps
+
+1. Correct the equipment claims everywhere they occur in living player docs,
+   preserving the separate rule that bonuses do not stack.
+2. Explain that fight bonuses expire on a fresh section but survive resuming the
+   same visit, and state the tag restriction for `current` accurately.
+3. Link the relevant symbols/files without line numbers and check sibling docs.
+
+### Validation
+
+- The guides agree with explicit equipment choice, visit-resume persistence and
+   the validator's supported modifier contexts.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
 
-Worked 2026-09-29 (task 370): filed and worked **370** on the owner's request: steps 1–3
-done, and it stays open until the owner does the dashboard cutover. An assets-only
-`wrangler.jsonc` and the root `.assetsignore` publish only `index.html` and `web/`. Checking
-under `wrangler dev` found the one real difference from Pages: the asset server 307s
-`index.html` to `./`. `FLCache.precache` now stores a redirected response without the redirect.
-`RESULT ALL PASS pass=3248 fail=0`. Then step 4: at the owner's choice, a CI `deploy` job
-gated on the other three, and a custom-domain route in `wrangler.jsonc`.
+Reviewed 2026-10-01 (Codex, whole repository): filed **371-381**, closed nothing.
+The full report is [review-codex.md](review-codex.md). **380** is HIGH: the harness's
+own late-fatal handler marks the page failed but both runners can extract its older
+`ALL PASS` line. Direct probes confirmed malformed metadata recovery, unequal sale
+candidates, partial preview promotion, conflicting save writers and blocked storage
+reads. Call-site review confirmed the unsaved-update gap; temporary source-gate
+fixtures confirmed missing/empty Adventurers data and unsupported attribute values
+passing validation. Player-rule documentation drift is **381**. The full browser
+suite reported `RESULT ALL PASS pass=3248 fail=0`; the Node/import, source-gate,
+release and Windows runner fixture checks also passed. The rebuild left generated
+output unchanged. Interactive browser and live-deployment checks were not completed.
+Tasks **369** and **370** retain their existing external validation requirements.
+The prior current Review log moved verbatim to the top of the archive's Review log.
 
-Worked 2026-09-29 (task 368): closed **368** on the owner's go-ahead, filed nothing. The 123
-Review-log entries below the 2026-09-29 `Reviewed` pass now live, verbatim and newest first,
-in `TASKS-archive.md`'s "Review log (archived)" (`cmp` against the pre-move file: identical).
-This file dropped from 4,299 lines to about 540. The header says later passes move there
-too, and the closing pointer names both archives, since `REVIEW.md` already held the passes up
-to 2026-07-15.
-
-Worked 2026-09-29 (task 361): closed **361**, filed **369**. The owner pushed. Run 36564906180
-on `19ef915` was green in all three jobs on `actions/checkout@v7`, `actions/setup-node@v7`
-and Node 24, with no Node 20 deprecation annotation. Its one notice, that `ubuntu-latest`
-moves to Ubuntu 26 from 2026-10-19, is filed as 369, because the jobs depend on that image's
-preinstalled `pwsh`, `google-chrome` and `python3`.
-
-Worked 2026-09-29 (task 367): closed **367**, filed nothing. The six copies of the shipped
-section count now point at `docs/Corpus-Census.md`, which owns the per-book counts and now
-prints the command for them. `docs/Home.md`'s dated fact table names each fact's owner, and
-`PLAN.md`'s status carries no date. The sweep also retired two more copies of the 3,032 pass
-count that task 355 missed. Documentation only.
-
-Worked 2026-09-29 (task 366): closed **366**, filed nothing. README's deploy section now
-describes the Pages site served from the repository root behind Cloudflare, checked against
-the Pages API and the live site. That includes what it publishes: everything except
-underscore-prefixed files, since there is no `.nojekyll`. The file tree and the DOM-free module
-list are complete. Documentation only.
-
-Worked 2026-09-29 (task 365): closed **365**, filed nothing. Deleted the dead
-`adjustStaminaMax`. `RESULT ALL PASS pass=3246 fail=0`, unchanged.
-
-Worked 2026-09-29 (task 364): closed **364**, filed nothing. `sanitizeData` assigns the save's
-book and section before the lists that default to them, and drops a resurrection deal naming
-no section. Four of the five new import tests fail on the old code.
-`RESULT ALL PASS pass=3246 fail=0`.
-
-Worked 2026-09-29 (task 363): closed **363**, filed nothing. A `<difficulty>` in an effect body
-now reads `modifier=` through `engine.js`'s `difficultyModifier`, the rule the page widget
-uses. The gate refuses a dice-less body `<random>`, and any group fight with `playerFirst=` or
-sharing its section with a round rule. `suite-corpus` pins the 8 body roll nodes and 4
-group-fight sections by name. The census matched the filing exactly.
-`RESULT ALL PASS pass=3241 fail=0`.
-
-Worked 2026-09-29 (task 362): closed **362**, filed nothing. The source gate compares tag and
-attribute names exact-case, as the engine reads them, and §3.207's `<SECTION>`/`<P>` are
-lower-cased (markup only). The three new selftest fixtures fail against the old gate and pass
-against the new one. Re-running `docs/Corpus-Census.md`'s census command found four tag counts
-there had drifted after earlier tasks, and I corrected them with this task's two.
-`RESULT ALL PASS pass=3235 fail=0`. Task 361 stays open, waiting on a push, and work moves past it.
-
-Worked 2026-09-29 (task 360): closed **360**, filed nothing. The header's 💾 and the menu's
-entry now share `saveOrKeep` in `app.js`: a `?demo=` preview is kept and play continues (the
-header button says "Keep this adventure" until it is), and only a real slot saves and quits.
-`RESULT ALL PASS pass=3235 fail=0`.
-
-Worked 2026-09-29 (task 359): closed **359**, filed nothing. The install now precaches through
-`FLCache.precache`/`precacheOptional` in `sw-cache.js`, which fetch each entry at a build-unique
-`?v=` URL with `cache: 'reload'` and store it under the plain URL, so neither the browser's
-cache nor Cloudflare's edge can put the previous build's bytes into the new cache; the worker
-registers with `updateViaCache: 'none'`. `RESULT ALL PASS pass=3229 fail=0`. What remains is
-the by-hand check after the next deploy (an installed copy's `js/version.js` matches its cache
-key), which the suite cannot run.
-
-Reviewed 2026-09-29 (whole repository): filed **359–368**. The full write-up is in
-[`review-claude.md`](review-claude.md), which holds review text from this pass on. Baseline: the
-rebuild is a byte-for-byte no-op and `RESULT ALL PASS pass=3223 fail=0`. The rules layer held up
-under reading, and three suspicions were cleared (recorded in that file). The one HIGH is in the
-deployment path, not the rules: the service worker's precache can be served by the browser's
-cache or Cloudflare's edge (`max-age=14400`, `HIT`), so a new build can install the previous
-build's files (359). The two MEDIUMs are the header's "Save & quit" dropping a `?demo=` preview
-(360) and CI still pinning the Node 20 runtime GitHub removed on 2026-09-23 (361). `main` is 8
-commits ahead of `origin`, so the next push is also the first run on the new runners.
-
-> Older passes are archived, verbatim and newest first: everything from 2026-09-29's task 358 back to the 2026-07-16 fourth full pass is in [`TASKS-archive.md`'s "Review log (archived)"](TASKS-archive.md#review-log-archived) (task 368), and the 2026-07-15 third full pass and everything before it is in [`REVIEW.md`](REVIEW.md), alongside the 2026-07-09 external repository review. The most recent `Reviewed` pass and the `Worked` entries since it stay above.
+> Earlier review passes are archived, verbatim and newest first, in [TASKS-archive.md's "Review log (archived)"](TASKS-archive.md#review-log-archived). Passes from 2026-07-15's third full pass and earlier are in [REVIEW.md](REVIEW.md). The most recent `Reviewed` pass and the `Worked` entries since it stay above.
