@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 388. Money-cache deposits cease to respect `multiples=` after clamping to the purse
 - [ ] 389. Transfer equivalence ignores item effects, tags, ability and provenance, silently choosing an unequal possession
 - [ ] 390. Immunity to Injury is awarded and displayed but cannot protect against any damage
 - [ ] 391. Combat replies land before the COMBAT-blessing reroll decision and can kill the player before a winning retry
@@ -429,36 +428,11 @@ this order.*
 - [x] 385. an explicit `<group force="t">` rendered as one button and held nothing, so book6/496's "turn to 149" kept the donation, and book1/370's lost equipment, book6/135's broken weapon and the forced outcome groups (book2/134's lost stake) were skippable too. A new `computeGroupGate` holds the exits after each forced action group, and the row exit of a branch it sits in, while it renders unrun. Earlier declines, the group's own navigation and unmarked groups stay free
 - [x] 386. a return frame kept the source visit's ctx and vars but not its fight bonus or equipment lock, so looking into book6/252's lacquer box at 6/624 lifted the -2 darkness penalty, at 6/135 freed the locked weapon slot, and let a detour's own bonus leak back. The frame now captures, serialises and coerces both, and `goBack` restores them before its autosave and render
 - [x] 387. book6/589's Forsaken result `<tick god=""/>` added a god named "", so a Sig initiate kept Sig, its +1 THIEVERY and a blank second god. An empty `god=` on a tick now renounces every current god through `removeGod`, which strips their effects and tied resurrection deals but bars no later initiation, and a load drops a blank god left by an older save
+- [x] 388. a money-cache Deposit rounded the request to `multiples=` and then clamped it to the purse, so book1/104 with 150 Shards invested all 150 of a requested 200. The new DOM-free `cacheDepositAmount` in `market.js` clamps first and rounds last. Withdrawals, which the spec does not constrain, are no longer rounded to the multiple
 
 ---
 
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The open tasks' detail sections follow, in filed order; the Review log comes after them.
-
----
-
-## 388. Purse clamping breaks investment multiples
-
-**Priority: MEDIUM.** The money-cache widget accepts investments forbidden by
-the section's rule.
-
-### What is wrong
-
-The Deposit callback in `renderMoneyCache` in
-[render-market.js](web/js/render-market.js) rounds the requested amount to
-`multiples=`, then clamps it to the purse and cache headroom without rounding
-again. In [book1/104](books/book1/104.xml), which prints "multiples of 100
-Shards", requesting 200 with a purse of 150 deposits all 150. A browser probe
-confirmed the resulting cache balance.
-
-### Steps
-
-1. Add a `suite-economy` widget regression using 1.104 with 150 Shards and a
-   requested deposit of 200; only 100 may move.
-2. Compute a legal multiple within all constraints, including purse and any
-   cache maximum, in the DOM-free rule layer; use that result in the widget.
-3. Cover less than one multiple, an exact multiple, partial headroom and a
-   cache with no `multiples=`. Check withdrawal behavior against the spec too.
-4. Run the complete build/test loop before closing.
 
 ---
 
@@ -665,6 +639,21 @@ cannot simply be honoured.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 388): closed **388**, filed nothing. `renderMoneyCache`'s Deposit
+now uses `cacheDepositAmount` in `market.js`, which clamps the request to the purse and the
+`max=` headroom and only then rounds down to `multiples=`. Withdraw now takes any whole amount.
+The XML spec says money "can only be deposited" in multiples. 1/104's page lets the player
+"withdraw a sum invested previously", and an investment's balance grows in odd amounts. Task
+388's block in `suite-economy` drives the real 1/104 widget:
+- with 150 Shards, a 200 request invests 100;
+- with 50 left, nothing moves;
+- a grown 150 balance withdraws whole;
+- 300 deposits exactly.
+
+It also covers a capped cache (`max="250"`), a cache with no `multiples=`, and the pure
+arithmetic. Against the old widget it reported 4 failures. `RESULT ALL PASS pass=3436 fail=0`,
+and `node-import.mjs` passed.
 
 Worked 2026-10-01 (task 387): closed **387**, filed nothing. `applyTick` in `engine.js` now
 treats an empty `god=` as the end of initiation. It calls `removeGod` for every current god,

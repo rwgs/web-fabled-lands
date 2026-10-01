@@ -440,3 +440,19 @@ export function sellCargo(state, cargoType, gain, opts = {}) {
   state.changed();
   return { ok: true, ship };
 }
+
+/** The Shards a <moneycache> Deposit of `requested` may move: the largest legal amount within
+ *  the request, the purse and the cache's headroom (`max` below 0 is unlimited, 0 bars
+ *  deposits). With `multiples` above 1 that amount is a whole multiple. The widget rounded the
+ *  request to the multiple and THEN clamped it to the purse, so book1/104's "multiples of 100
+ *  Shards" with 150 in the purse and 200 asked for invested all 150. (task 388)
+ *
+ *  Withdrawals are not constrained: the spec's multiples= reads "money can only be DEPOSITED in
+ *  multiples of this amount", and §1.104's page lets the player "withdraw a sum invested
+ *  previously". An investment's balance grows in odd amounts too. */
+export function cacheDepositAmount({ requested, multiples = 1, max = -1, balance = 0, purse = 0 }) {
+  let amt = Math.min(Math.floor(Number(requested) || 0), purse);
+  if (max >= 0) amt = Math.min(amt, max - balance);
+  if (multiples > 1) amt = Math.floor(amt / multiples) * multiples;
+  return Math.max(0, amt);
+}

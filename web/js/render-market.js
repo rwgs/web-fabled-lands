@@ -7,7 +7,7 @@
 // in market.js / engine.js; this only builds the widgets and wires the clicks.
 
 import { applyEffect, applyEffectBody, boolAttr, resolveValue, applyRest, buyResurrectionDeal, readItemEffects, filterMatches, transferPlan, isKeep } from './engine.js';
-import { shopKind, goodsFrom, ownsGoods, hasCargoSpace, buyTrade, sellTrade, sellPlan, applyInlineBuy, buyOptions, sellInlineItem, sellCargo, cargoBuyPlan, crewUpgradePlan, cargoSellPlan } from './market.js';
+import { shopKind, goodsFrom, ownsGoods, hasCargoSpace, buyTrade, sellTrade, sellPlan, applyInlineBuy, buyOptions, sellInlineItem, sellCargo, cargoBuyPlan, crewUpgradePlan, cargoSellPlan, cacheDepositAmount } from './market.js';
 import { normalize, parseTags, splitItemName, isShardsCurrency } from './state.js';
 import { canonCargo, NO_CREW } from './rules.js';
 import { modal } from './ui.js';
@@ -577,14 +577,13 @@ export function renderMoneyCache(story, container, node, path) {
   input.setAttribute('aria-label', `Shards to deposit or withdraw - ${text}`);
   controls.appendChild(input);
 
-  const roundMult = (n) => (mult > 1 ? Math.floor(n / mult) * mult : Math.floor(n));
   const dep = document.createElement('button');
   dep.className = 'btn-mini';
   dep.textContent = 'Deposit';
   dep.addEventListener('click', () => {
-    let amt = roundMult(Number(input.value) || 0);
-    if (max >= 0) amt = Math.min(amt, max - story.state.cacheMoney(name)); // 0 bars deposits; N caps the total
-    amt = Math.min(amt, story.state.data.shards);
+    // A legal multiple within the purse and the headroom (task 388).
+    const amt = cacheDepositAmount({ requested: input.value, multiples: mult, max,
+      balance: story.state.cacheMoney(name), purse: story.state.data.shards });
     if (amt > 0) {
       // A deposit moves money OFF the sheet on a click, so it books its taking at this node
       // (tasks 261, 263). A withdrawal is a GAIN, which the ledger deliberately leaves reading
@@ -599,7 +598,8 @@ export function renderMoneyCache(story, container, node, path) {
   wd.className = 'btn-mini';
   wd.textContent = charge ? `Withdraw (−${Math.round(charge * 100)}%)` : 'Withdraw';
   wd.addEventListener('click', () => {
-    const amt = roundMult(Number(input.value) || 0);
+    // Any amount: multiples= constrains deposits only (cacheDepositAmount, task 388).
+    const amt = Math.floor(Number(input.value) || 0);
     if (amt > 0 && story.state.cacheMoney(name) > 0) { story.state.withdrawCacheMoney(name, amt, charge); story.rerender(); }
   });
   controls.appendChild(dep); controls.appendChild(wd);

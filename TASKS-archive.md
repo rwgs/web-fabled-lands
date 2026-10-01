@@ -395,6 +395,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 385. Forced action groups can be skipped
 - [x] 386. Return frames drop visit-local bonuses and locks
 - [x] 387. Empty-god ticks retain initiation
+- [x] 388. Purse clamping breaks investment multiples
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
 
@@ -22770,5 +22771,65 @@ Checked:
 
 - Against the old two modules, the blocks reported 6 and 2 failures.
 - `RESULT ALL PASS pass=3429 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 388. Purse clamping breaks investment multiples
+
+**Priority: MEDIUM.** The money-cache widget accepts investments forbidden by
+the section's rule.
+
+### What is wrong
+
+The Deposit callback in `renderMoneyCache` in
+[render-market.js](web/js/render-market.js) rounds the requested amount to
+`multiples=`, then clamps it to the purse and cache headroom without rounding
+again. In [book1/104](books/book1/104.xml), which prints "multiples of 100
+Shards", requesting 200 with a purse of 150 deposits all 150. A browser probe
+confirmed the resulting cache balance.
+
+### Steps
+
+1. Add a `suite-economy` widget regression using 1.104 with 150 Shards and a
+   requested deposit of 200; only 100 may move.
+2. Compute a legal multiple within all constraints, including purse and any
+   cache maximum, in the DOM-free rule layer; use that result in the widget.
+3. Cover less than one multiple, an exact multiple, partial headroom and a
+   cache with no `multiples=`. Check withdrawal behavior against the spec too.
+4. Run the complete build/test loop before closing.
+
+### The fix
+
+- `web/js/market.js`: a new `cacheDepositAmount({ requested, multiples, max, balance,
+  purse })` clamps the request to the purse and, when `max` is 0 or more, to the headroom
+  `max - balance`. Only then does it round down to a whole multiple. It never returns less
+  than 0.
+- `web/js/render-market.js`: the Deposit button uses it, and the widget's `roundMult` is
+  gone.
+- Withdrawals, checked against the spec:
+  - `rules/JaFL-XML-Tags.md` reads "Money can only be deposited in multiples of this
+    amount", and 1/104's page says "withdraw a sum invested previously".
+  - The widget used to round a withdrawal to the multiple too. So once an investment had
+    grown to 150, exactly 50 could not be taken out.
+  - Withdraw now takes any whole amount, still clamped to the balance by
+    `withdrawCacheMoney`, with its `withdrawCharge=` fee.
+- 14 shipped caches carry `multiples=`: 13 investment boxes at 100, and 2/134's stake at 10.
+
+Tests:
+
+- Task 388's block in `suite-economy`, 7 assertions:
+  - The real 1/104 widget with 150 Shards: a 200 request invests 100. With 50 left, a
+    further 100 moves nothing. After a simulated 50 gain, a 150 withdrawal empties the box
+    to a purse of 150.
+  - With 300 Shards, 300 deposits in full.
+  - A synthetic `max="250"` cache deposits 200 of a 400 request.
+  - A cache with no `multiples=` takes all 37 of a 37-Shard purse.
+  - `cacheDepositAmount` is checked directly, including `max="0"` and a non-numeric
+    request.
+
+Checked:
+
+- Against the old `render-market.js`, 4 of the widget assertions failed.
+- `RESULT ALL PASS pass=3436 fail=0`, and `node-import.mjs` passed.
 
 ---

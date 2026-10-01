@@ -4,7 +4,7 @@ import * as data from '../js/data.js';
 import { GameState, readSlotData, importSave, loadSlotMeta, reconcileSlotMeta, deleteSlot, makeItem, nextFreeSlot, sanitizeData, currencyAward, splitItemName, StorageReadError } from '../js/state.js';
 import * as eng from '../js/engine.js';
 import { fightRound } from '../js/combat.js';
-import { goodsFrom, buyTrade, sellTrade, sellPlan, applyInlineBuy, sellInlineItem, canUpgradeCrew, payChoiceCost, cargoBuyPlan, crewUpgradePlan, cargoSellPlan } from '../js/market.js';
+import { goodsFrom, buyTrade, sellTrade, sellPlan, applyInlineBuy, sellInlineItem, canUpgradeCrew, payChoiceCost, cargoBuyPlan, crewUpgradePlan, cargoSellPlan, cacheDepositAmount } from '../js/market.js';
 import { Story } from '../js/render.js';
 import { isRollGate, isChooseOne, isPricedResurrection, rewardWasteReason, ownsSoleLinkedBlessing } from '../js/render-rules.js';
 import { renderGoto } from '../js/render-choices.js';
@@ -2185,6 +2185,59 @@ export async function run(ctx) {
     // asserted on the real DOM; the creation, narration and maps screens live inside app.js
     // functions the harness cannot call, so their wiring is asserted as a source contract (the
     // task also prescribes a manual pass over those three).
+    // --- task 388: a deposit is a legal multiple within the purse and the headroom ---
+    // The widget rounded the request to multiples= and then clamped it to the purse, so book1/104's
+    // "multiples of 100 Shards" with 150 in the purse and 200 asked for invested all 150.
+    {
+      const enter = async (shards, xml) => {
+        const g = GameState.create({ name: 'T388', gender: 'm', profession: 'Rogue', book: 1, adv });
+        g.data.shards = shards;
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate() {}, onDeath() {}, notify() {} });
+        if (xml) st.begin(parse(xml), 1, 'x388'); else st.begin(await data.getSection(1, '104'), 1, '104');
+        const act = (verb, amount) => {
+          c.querySelector('.cache-amount').value = String(amount);
+          Array.from(c.querySelectorAll('.money-cache .btn-mini')).find((b) => b.textContent.startsWith(verb)).click();
+        };
+        return { g, act };
+      };
+      {
+        const { g, act } = await enter(150);
+        act('Deposit', 200);
+        ok('task388: §1.104 with 150 Shards, a 200 deposit invests 100', g.cacheMoney('1104') === 100 && g.data.shards === 50,
+           `cache=${g.cacheMoney('1104')} purse=${g.data.shards}`);
+        act('Deposit', 100);
+        ok('task388: §1.104 less than one multiple left in the purse moves nothing', g.cacheMoney('1104') === 100 && g.data.shards === 50);
+        // An investment's balance grows in odd amounts, and multiples= binds deposits only.
+        g.depositCacheMoney('1104', 50); // stands in for a 50% gain
+        act('Withdraw', 150);
+        ok('task388: §1.104 withdrawing is any amount, as the spec reads', g.cacheMoney('1104') === 0 && g.data.shards === 150,
+           `cache=${g.cacheMoney('1104')} purse=${g.data.shards}`);
+      }
+      {
+        const { g, act } = await enter(300);
+        act('Deposit', 300);
+        ok('task388: §1.104 an exact multiple deposits in full', g.cacheMoney('1104') === 300 && g.data.shards === 0);
+      }
+      {
+        const { g, act } = await enter(500, '<section name="x388"><moneycache name="c388" multiples="100" max="250"/></section>');
+        act('Deposit', 400);
+        ok('task388: partial headroom (cap 250) deposits the largest multiple that fits', g.cacheMoney('c388') === 200 && g.data.shards === 300,
+           `cache=${g.cacheMoney('c388')}`);
+      }
+      {
+        const { g, act } = await enter(37, '<section name="x388"><moneycache name="c388b"/></section>');
+        act('Deposit', 50);
+        ok('task388: a cache with no multiples= takes the whole purse', g.cacheMoney('c388b') === 37 && g.data.shards === 0);
+      }
+      ok('task388: cacheDepositAmount is pure arithmetic over the constraints',
+         cacheDepositAmount({ requested: 200, multiples: 100, purse: 150 }) === 100
+         && cacheDepositAmount({ requested: 99, multiples: 100, purse: 500 }) === 0
+         && cacheDepositAmount({ requested: 400, multiples: 100, max: 250, balance: 0, purse: 500 }) === 200
+         && cacheDepositAmount({ requested: 10, max: 0, purse: 50 }) === 0
+         && cacheDepositAmount({ requested: 'x', purse: 50 }) === 0);
+    }
+
     { // block-scoped
       // 1. Cache amount spinners are named and labelled from their own cache.
       const g202 = GameState.create({ name: 'A202', gender: 'f', profession: 'Rogue', book: 1, adv });
