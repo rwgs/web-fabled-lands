@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-382 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
+391 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
 the buckets below are open, and **all others are complete**. File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -19,11 +19,18 @@ there once the buckets below are clear.
 
 **HIGH**
 
-*(none open — file new HIGH work here)*
+- [ ] 383. Failed Keep/import cleanup can delete the competing save that made the slot claim fail
 
 **MEDIUM**
 
-*(none open — file new MEDIUM work here)*
+- [ ] 384. A later destination roll can bypass an earlier mandatory survival check or possession-loss roll
+- [ ] 385. Explicitly forced action groups leave onward exits live before their costs or consequences run
+- [ ] 386. Returning from an item detour loses the source visit's fight bonuses and equipment locks
+- [ ] 387. `<tick god="">` adds an empty god instead of clearing initiation at book6/589
+- [ ] 388. Money-cache deposits cease to respect `multiples=` after clamping to the purse
+- [ ] 389. Transfer equivalence ignores item effects, tags, ability and provenance, silently choosing an unequal possession
+- [ ] 390. Immunity to Injury is awarded and displayed but cannot protect against any damage
+- [ ] 391. Combat replies land before the COMBAT-blessing reroll decision and can kill the player before a winning retry
 
 **LOW**
 
@@ -426,6 +433,287 @@ this order.*
 
 ---
 
+## 383. Failed slot claims can delete another tab's save
+
+**Priority: HIGH.** Data loss in the rollback of Keep and import, introduced by the
+interaction between tasks 373 and 375. See the engine pass in
+[review-codex.md](review-codex.md).
+
+### What is wrong
+
+`nextFreeSlot` in [state.js](web/js/state.js) can observe a free slot before
+another tab fills it. `GameState.save` correctly detects that competing blob and
+refuses the write. `GameState.keep` then unconditionally removes the blob, while
+`importSave` calls `deleteSlot`, removing its metadata and blob. Neither verifies
+that the failed attempt wrote or still owns what it removes.
+
+An isolated storage stub published a competing save between the slot search and
+the save precondition read. Both Keep and import reported a conflict and deleted
+the competing blob. This is a controlled interleaving, not a two-tab timing test.
+
+### Steps
+
+1. Add competing-slot-claim cases to `suite-economy` for Keep and import. Require
+   the other writer's blob and metadata to survive the refused claim.
+2. Track which partial write belongs to an attempt and condition rollback on
+   continued ownership. A conflict that wrote nothing must clean up nothing;
+   check the remembered `_keepSlot` retry path too.
+3. Retain task 373's repeated partial-write recovery and task 375's stale-writer
+   refusal. Cover a competing replacement before cleanup as well.
+4. Run the complete build/test loop before closing.
+
+---
+
+## 384. Destination rolls bypass earlier mandatory rolls
+
+**Priority: MEDIUM.** Shipped sections can skip death checks and forfeits.
+
+### What is wrong
+
+`computeRollGate` in [render-gates.js](web/js/render-gates.js) takes the first
+successful seed and holds ordinary navigation after its selected roll. It
+excludes outcome-table exits; it does not accumulate the earlier obligations a
+later roll and its exit depend on.
+
+In [book5/510](books/book5/510.xml), rolling the destination die first enables
+"Continue -> 539" and reaches that section without making the drowning
+Rank check. The same click order bypasses the SCOUTING check in
+[book5/76](books/book5/76.xml) and the possession-loss die in
+[book6/373](books/book6/373.xml). Browser probes exercised all three on the
+shipped bundles; the drowning exit also actually navigated.
+
+### Steps
+
+1. Add click-order regressions to `suite-combat`/`suite-actions` for those three
+   sections: a destination roll cannot enable an exit while an earlier required
+   roll or its required forfeit is unmade.
+2. Plan all applicable roll obligations, including prerequisites of later rolls
+   and exits synthesized from an outcome's `section=`. Keep conditional and
+   optional alternatives usable when their prerequisite has resolved that way.
+3. Verify success/failure routing, including drowning death, and a save/resume
+   with only one roll made. Preserve optional talk-or-fight and paid-repeat rolls.
+4. Run the complete build/test loop before closing.
+
+---
+
+## 385. Forced action groups can be skipped
+
+**Priority: MEDIUM.** Payments and narrative consequences are avoidable.
+
+### What is wrong
+
+`renderGroup` in [render-rewards.js](web/js/render-rewards.js) offers a button
+but never uses the group's `force=` to hold progression. `groupPlan` in
+[render-rules.js](web/js/render-rules.js) also omits that obligation.
+
+[book6/496](books/book6/496.xml) explicitly puts the donation in
+`<group force="t">`. With 100 Shards and a rope, its acceptance exit to 149 is
+live before the group runs; clicking it reaches 149 with all 100 Shards and the
+rope. The decline exit to 291 correctly stays live. Other explicit forced groups
+include [book1/370](books/book1/370.xml)'s equipment loss,
+[book6/135](books/book6/135.xml)'s weapon destruction, and forced outcome groups.
+The XML spec defaults an unmarked group to optional, so a blanket group gate
+would be wrong.
+
+### Steps
+
+1. Add a real-section regression to `suite-actions` for 6.496: decline is free,
+   acceptance waits, and the chosen possession plus the cash leave once.
+2. Carry explicit forced-group obligations through a DOM-free planner and gate
+   the applicable onward controls until the group has committed. Keep earlier
+   decline exits and the group's own navigation usable.
+3. Cover an unanswered bundled picker, a forced outcome group, a completed
+   group's resume, and an unmarked/explicitly optional group.
+4. Run the complete build/test loop before closing.
+
+---
+
+## 386. Return frames drop visit-local bonuses and locks
+
+**Priority: MEDIUM.** An item detour can remove a penalty or bypass destruction.
+
+### What is wrong
+
+`Story._captureReturnFrame` and `Story.goBack` in
+[render.js](web/js/render.js), and `serializeFrame`/`deserializeFrame` in
+[visit-state.js](web/js/visit-state.js), keep the source ctx and variables but
+omit its fight-bonus and equipment-lock snapshots. Entering the detour calls
+`Story.begin`, which clears both. Returning restores the granting ticks' memos,
+so those ticks never reapply.
+
+Browser probes used the lacquer box from [book6/252](books/book6/252.xml), which
+can be inspected at any time, and [book6/272](books/book6/272.xml)'s real return
+control. Returning to
+[book6/624](books/book6/624.xml) changed the darkness attack penalty from -2 to
+0; returning to [book6/135](books/book6/135.xml) left its previously locked
+weapon slot unlocked. Current-visit save/resume already carries both snapshots;
+the return frame does not.
+
+### Steps
+
+1. Add direct-return and detour-save/load/return cases to `suite-actions` or
+   `suite-inventory`, using the two source sections above.
+2. Capture and serialize the source visit's fight bonuses and equipment locks,
+   coerce them on load, and restore them before any return autosave or render.
+3. Keep source and detour snapshots distinct; verify the weapon cannot be
+   switched after return and that any detour bonus does not leak back.
+4. Run the complete build/test loop before closing.
+
+---
+
+## 387. Empty-god ticks retain initiation
+
+**Priority: MEDIUM.** The shipped Forsaken result applies the opposite state.
+
+### What is wrong
+
+The "lose initiate status" group in [book6/589](books/book6/589.xml) contains
+`<tick god=""/>`. `applyTick` in [engine.js](web/js/engine.js) forwards the empty
+string to `GameState.setGod` in [state.js](web/js/state.js), which appends it to
+the gods list. A Sig initiate receiving the result retains Sig and its +1
+THIEVERY effect, with an additional empty god entry. The player still fails the
+"worships no god" and safe-initiation tests. Browser and Node probes confirmed
+this even after explicitly committing the group; task 385 is a separate gap.
+
+### Steps
+
+1. Add a `suite-engine` regression for the empty-god tick and a
+   `suite-actions`/`suite-inventory` case that rolls 5 at 6.589 and commits the
+   Forsaken group as a Sig initiate.
+2. Make the empty-god form clear current initiation through the normal
+   renunciation path, including god effects and tied resurrection arrangements.
+   Preserve the ability to worship again; it is not `special="godless"`.
+3. Verify an already uninitiated player gains no empty deity, ordinary named
+   initiation still works, and save/load does not preserve a new bogus entry.
+4. Run the complete build/test loop before closing.
+
+---
+
+## 388. Purse clamping breaks investment multiples
+
+**Priority: MEDIUM.** The money-cache widget accepts investments forbidden by
+the section's rule.
+
+### What is wrong
+
+The Deposit callback in `renderMoneyCache` in
+[render-market.js](web/js/render-market.js) rounds the requested amount to
+`multiples=`, then clamps it to the purse and cache headroom without rounding
+again. In [book1/104](books/book1/104.xml), which prints "multiples of 100
+Shards", requesting 200 with a purse of 150 deposits all 150. A browser probe
+confirmed the resulting cache balance.
+
+### Steps
+
+1. Add a `suite-economy` widget regression using 1.104 with 150 Shards and a
+   requested deposit of 200; only 100 may move.
+2. Compute a legal multiple within all constraints, including purse and any
+   cache maximum, in the DOM-free rule layer; use that result in the widget.
+3. Cover less than one multiple, an exact multiple, partial headroom and a
+   cache with no `multiples=`. Check withdrawal behavior against the spec too.
+4. Run the complete build/test loop before closing.
+
+---
+
+## 389. Transfers silently select unequal possessions
+
+**Priority: MEDIUM.** A required "choose which" transfer can take a more useful
+item without asking.
+
+### What is wrong
+
+`itemsAllSame`, used by `transferPlan` and `applyTransfer` in
+[engine.js](web/js/engine.js), compares only kind, normalized name and bonus.
+It ignores ability, tags, effects/remaining uses and award provenance. Two
+same-named rings with three and one uses therefore report `needChoice: false`.
+The transfer takes the first and does not call a supplied chooser.
+
+The real [book2/105](books/book2/105.xml) pickpocket widget also offered no
+picker with those rings. [book6/635](books/book6/635.xml)'s weapon offering and
+[book4/456](books/book4/456.xml)'s +1 offering share the same planner. Task 372
+fixed sale equivalence, not transfer equivalence.
+
+### Steps
+
+1. Add `suite-engine`/`suite-economy` cases for equal-looking items with different
+   effect uses, tags, abilities and groups. Verify the selected item alone moves.
+2. Compare all gameplay-relevant identity when deciding whether transfers need
+   a choice; a genuinely interchangeable set can retain the one-button path.
+3. Update the real transfer picker in
+   [render-market.js](web/js/render-market.js) so the labels distinguish the
+   relevant differences, and verify selection through the 2.105 widget.
+4. Run the complete build/test loop before closing.
+
+---
+
+## 390. Immunity to Injury has no usable protection
+
+**Priority: MEDIUM.** A blessing granted by a shipped section is inert.
+
+### What is wrong
+
+[Book5/365](books/book5/365.xml) grants `blessing="injury"` and explains that it
+can prevent Stamina loss from one source once, or for one entire combat round.
+`GameState.damageStamina` in [state.js](web/js/state.js), `applyLose` in
+[engine.js](web/js/engine.js) and the combat damage paths in
+[combat.js](web/js/combat.js) offer no injury protection. The only readers of
+`injury` in the app are labels; `renderSheet` in [ui.js](web/js/ui.js) displays
+it as a chip, without an invocation control.
+
+A browser probe acquired it through the real 5.365 menu, then fought the
+Scorpion Shaman at [book1/105](books/book1/105.xml) with COMBAT 1. A low roll
+inflicted 5 Stamina damage, leaving the blessing held. Neither the sheet nor the
+fight offered a way to invoke protection before or after the wound.
+
+### Steps
+
+1. Add `suite-combat`/`suite-actions` regressions for a chosen invocation against
+   a standalone wound and a full combat round, including multiple enemy attacks.
+2. Implement the protection in the DOM-free rule layer and expose a player
+   decision at the appropriate damage boundary. Respect the printed choice of
+   when to use it; do not automatically spend it on the first minor wound.
+3. Consume the blessing once, preserve unrelated penalties/effects, and cover
+   declining protection, fatal damage and save/resume around the decision.
+4. Run the complete build/test loop before closing.
+
+---
+
+## 391. Combat rerolls are offered after the enemy has already struck
+
+**Priority: MEDIUM.** A promised reroll can become unavailable before the player
+gets the chance to use it.
+
+### What is wrong
+
+`fightRound` in [combat.js](web/js/combat.js) resolves the missed player-first
+strike and the enemy's reply together. `drawFight` in
+[render-combat.js](web/js/render-combat.js) offers the COMBAT reroll afterwards;
+`rerollAttack` rejects it when the player has already died. This also applies
+the reply's damage/effects even when a successful retry would have defeated the
+enemy before it could strike.
+
+[Book4/324](books/book4/324.xml) promises a retry when a COMBAT roll fails.
+At [book1/105](books/book1/105.xml), a character with COMBAT 5, 1 Stamina and
+that blessing rolls two ones: the attack total 7 misses Defence 8, then the
+enemy's total 7 beats player Defence 6 and kills the character. The probe's
+retry returns false with the enemy still at 9 Stamina. Rolling two sixes on
+the promised retry would score 17, deal 9 and win before the reply.
+
+### Steps
+
+1. Add `suite-combat` regressions for that fatal-reply case and a nonfatal reply
+   that a winning reroll should prevent. Existing task 91 tests use harmless
+   replies and cannot detect the ordering problem.
+2. Make a missed strike with an eligible reroll a decision boundary before
+   advancing to the next part of the round. Keeping the miss runs the pending
+   reply once; a retry resolves the new strike first.
+3. Preserve enemy-first initiative, group fights, multi-attack enemies,
+   wound/round hooks and once-per-round retry limits. Save/resume must not
+   repeat or bypass a pending reply or reopen a consumed blessing.
+4. Run the complete build/test loop before closing.
+
+---
+
 ## 369. CI's `ubuntu-latest` image moves to Ubuntu 26 on 2026-10-19
 
 **Priority: LOW.** Nothing is broken. But the move lands without any change to this repository,
@@ -521,151 +809,19 @@ removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
 
-Worked 2026-10-01 (task 370): closed **370**, filed nothing. The owner turned GitHub Pages
-off and confirmed an installed copy updated from the Worker site. Run 36883589919 deployed
-`26.10.01.d4f1cd3`, and `webfl.rwgs.net` serves it, with `/web/` answering 200 and
-`/README.md` 404, both from Cloudflare. Offline launch was checked in headless Chrome: a fresh
-profile installed the worker from the live site, and the browser was relaunched behind a dead
-proxy so no request could leave. The title screen and a `?demo=1.10` game still loaded from
-the cache. Step 5 had listed `CLOUDFLARE_ACCOUNT_ID` as required, but it was never set and
-every deploy succeeded (Wrangler resolves the account from the token). README and the
-`deploy` job's comment now say one secret.
-
-Worked 2026-10-01 (task 382): closed **382**, filed nothing. A cut-down probe isolated the
-trigger to `serve.py`'s `Cache-Control: no-store`. With it removed the worker installed;
-dropping `Pragma`, sharing the port or binding the stock server to 127.0.0.1 changed nothing.
-The cause was in `FLCache.precache`, which fetched every REQUIRED entry and read no body until
-all had answered. Over HTTP/1.x the browser allows six connections per host, and an unread
-no-store body is never drained by the HTTP cache, so the connections stayed taken. `fetchOk`
-now reads each body as it arrives and returns a fresh `Response`, which also does what
-`unredirect` did for task 370, so that helper is gone. A new `suite-economy` test holds one
-fetch back and requires the others' bodies to have been read; it fails on the old code. Under
-the unmodified `serve.py` the worker now activates after all 48 precache requests, and task
-374's full update probe passes on it. `docs/Testing.md` gained the recipe. The full suite
-reported `RESULT ALL PASS pass=3352 fail=0`.
-
-Worked 2026-10-01 (task 381): closed **381**, filed nothing. Documentation only. README's
-Combat summary and Game Rules' Defence formula now say worn armour, chosen on the sheet with
-the strongest as the default. Game Rules and Playing the Game keep the no-stacking rule as
-wielded weapon, worn armour and best tool. Game Rules says fight bonuses clear on a new
-section and survive a reload of the same visit, and that `current` is read only on `<adjust>`
-and `<difficulty>`. The sibling sweep found the same `current` claim in the XML Tag Reference,
-and README's Training line saying "current ability" where `rollTraining` reads the natural
-score; both are fixed. Three code comments in `state.js` still say "best armour" or "never
-survives a save". They are noted here, not changed.
-
-Worked 2026-10-01 (task 379): closed **379**, filed nothing. Each enum's reader was
-checked for case and list handling. `special` and `crew` compare exactly, so the gate now
-requires the listed spelling for them. Eight attributes take one value: `special`, `crew`,
-`modifier`, `gender`, `choose`, `family`, `blessing` and `abilityDamaged`. So does
-`profession` everywhere except `<tick>`, which the picker splits. A union stays legal for
-`ability`, `ship` and cargo. A corpus census found every shipped shape still legal. The
-gate selftest gained six mutations, which the old gate missed, and a control; it now reports
-`pass=89`. `suite-engine` gained runtime controls showing the accepted spellings act and the
-refused ones were inert. The full suite reported `RESULT ALL PASS pass=3350 fail=0`.
-
-Worked 2026-10-01 (task 378): closed **378**, filed nothing. `Test-AttrValue` now checks
-`pay` and `flee` on `<choice>` and `pre` on `<fightround>` against the truth set. It checks
-`<fight flee=>` as a whole number, the threshold `combat.js` parses. The gate selftest gained
-four mutation cases, which the old gate missed, and a control covering every supported
-spelling plus `flee="5"`; it now reports `pass=82`. The real corpus passes and the rebuild is a
-no-op. The full suite reported `RESULT ALL PASS pass=3341 fail=0`.
-
-Worked 2026-10-01 (task 377): closed **377**, filed nothing. `nextFreeSlot` reads storage
-strictly and throws `StorageReadError` when a read fails, because an unreadable slot is not a
-free one. `loadSlotMeta` stays lenient for display, so the title still renders.
-`GameState.load` returns null for an unreadable save, and the saves screen's Play reports
-that. New Adventure picks its slot through `newAdventureSlot`, which offers "Play without
-saving" on a blocked read. That gives an unsaved in-tab adventure that can be exported, or
-kept once storage works. `suite-economy` gained 15 assertions with reads, not writes,
-throwing. In the real app, with reads of `fl_*` keys made to throw from page load, Begin
-Adventure showed the dialog. Playing without saving reached the game screen, and Keep
-reported the storage message with Export, with no uncaught error. The full suite reported
-`RESULT ALL PASS pass=3341 fail=0`.
-
-Worked 2026-10-01 (task 376): closed **376**, filed nothing. The source gate now fails a
-published book with no `Adventurers.xml` or with unusable creation data, through
-`Test-AdventurersData` in `validate-source.ps1`. `validate-selftest.ps1` gained 10 mutation
-cases, none of which the old gate caught. Its fixture and `release-selftest.ps1`'s now carry
-full creation data. `suite-corpus` creates all six professions from each published book's own
-data. With book 2's Wayfarer row stripped from a probe copy of `meta.json`, the check named
-the gap; the file was restored with `git checkout`. The real corpus passes the gate and the
-rebuild is a no-op. Validate selftest `pass=77`, release selftest `pass=59`, and the full
-suite `RESULT ALL PASS pass=3326 fail=0`.
-
-Worked 2026-10-01 (task 375): closed **375**, filed nothing. First writer wins.
-`GameState` remembers the exact blob it last loaded or wrote, and `save()` refuses to write
-over any other blob. That sets `saveConflict`, and the failure is reported through the
-existing save-failure path. The "Progress not saved" modal then also offers "Load the newer
-save". `suite-economy` gained 11 assertions over two states loaded from one slot. Against the
-old `save()`, 6 of them failed, and the stale write replaced the 150-Shard save with 100, as
-filed. Two real tabs were driven in headless Chrome over DevTools. Tab 1 moved first and
-stayed saved. Tab 2's move was refused and it showed the modal. "Load the newer save" resumed
-tab 2 from tab 1's section, and it then played on and saved normally. The full suite reported
-`RESULT ALL PASS pass=3314 fail=0`.
-
-Worked 2026-10-01 (task 374): closed **374**, filed **382**. The game screen's update hold
-now follows the save-status channel through `holdUpdateWhileUnsaved` in `app.js`. An unkept
-preview or a failed save holds, a successful save releases, and `GameState.keep` now
-publishes save status on success. Keep also drops `?demo=` from the URL. Otherwise the
-deferred reload booted a fresh preview over the adventure just kept. `suite-economy` gained
-13 behavioral assertions with real `GameState`s, plus an updated source contract. A real
-controller change was driven in headless Chrome over a scratch copy of `web/`. The update
-waited out preview play, Keep applied it once and landed on the title, and an update during
-kept play reloaded at once. That check needed `python -m http.server`, because under
-`build/serve.py` the worker never finishes installing. That is filed as **382**. The full
-suite reported `RESULT ALL PASS pass=3303 fail=0`.
-
-Worked 2026-10-01 (task 373): closed **373**, filed nothing. A failed `keep()` now removes
-the blob its attempt wrote to the slot it had just claimed, which was free when claimed. If
-storage refuses that removal too, the next attempt reuses the same slot, so failures never
-claim a second one. `suite-economy` gained 8 assertions. They make `fl_meta` writes fail
-three times, refuse the clean-up, then let storage recover. Against the old code they left
-blobs in slots `0,1,2`, the bug as filed. The full suite reported
-`RESULT ALL PASS pass=3291 fail=0`.
-
-Worked 2026-10-01 (task 372): closed **372**, filed nothing. `sameCandidate` in
-`market.js` now also compares crew grade, cargo contents (order-free) and item effects, using
-`sanitizeEffect`'s defaults so a live item and its reloaded copy still match. The sale
-picker's labels now name each ship's crew and each item's uses left; otherwise the new
-prompt would have shown two identical buttons. `suite-economy` gained 12 assertions, which
-cover the plan and the real widget: it asks, removes only the pick and credits the price
-once, and two truly identical barques still sell with no picker. Against the old code, 6
-of them failed. The full suite reported `RESULT ALL PASS pass=3283 fail=0`.
-
-Worked 2026-10-01 (task 371): closed **371**, filed nothing. `loadSlotMeta` now validates
-the index's shape and drops malformed entries, which `reconcileSlotMeta` rebuilds from a
-readable blob. `suite-economy` gained 23 assertions; against the old function the `null`
-case threw exactly as filed. The real app, driven headless over DevTools with `fl_meta` set
-to `null`, `[]` and an object of junk entries over an intact `fl_save_3`, rendered the title
-with Continue and listed the adventure, with its blob unchanged and no page error. A
-well-formed entry with no blob behind it still lists a card. That is the ghost task 198
-prevents by deleting meta first, and only a hand edit of storage produces it now, so it was
-left alone. The full suite reported `RESULT ALL PASS pass=3271 fail=0`.
-
-Worked 2026-10-01 (task 380): closed **380**, filed nothing. A failure captured after a
-passing report now re-runs the reporter, so the verdict line itself reads `RESULT FAILURES
-pass=N fail=M`, and both runners pass only an `ALL PASS` line whose page title is `TESTS_OK`.
-`run-tests-selftest.ps1` gained cases 6 and 7 (a late rejection and a late failing assertion,
-via the runner's new `-LateFailure` and the harness's `?latefail=`) and reported
-`pass=33 fail=0`. With the old `flFatal` restored, the runner's title check alone failed the
-page while the HEAD `smoke.yml` verdict step, run on the same dump, exited 0 and the new one 1.
-A cut-short run and a bootstrap parse error kept their own diagnoses. The full suite reported
-`RESULT ALL PASS pass=3248 fail=0`. CI's verdict step was exercised locally on saved dumps,
-not on a pushed run.
-
-Reviewed 2026-10-01 (Codex, whole repository): filed **371-381**, closed nothing.
-The full report is [review-codex.md](review-codex.md). **380** is HIGH: the harness's
-own late-fatal handler marks the page failed but both runners can extract its older
-`ALL PASS` line. Direct probes confirmed malformed metadata recovery, unequal sale
-candidates, partial preview promotion, conflicting save writers and blocked storage
-reads. Call-site review confirmed the unsaved-update gap; temporary source-gate
-fixtures confirmed missing/empty Adventurers data and unsupported attribute values
-passing validation. Player-rule documentation drift is **381**. The full browser
-suite reported `RESULT ALL PASS pass=3248 fail=0`; the Node/import, source-gate,
-release and Windows runner fixture checks also passed. The rebuild left generated
-output unchanged. Interactive browser and live-deployment checks were not completed.
-Tasks **369** and **370** retain their existing external validation requirements.
+Reviewed 2026-10-01 (Codex, engine follow-up): filed **383-391**, closed nothing.
+The full engine report is [review-codex.md](review-codex.md). **383** is HIGH:
+failed Keep/import rollback can delete the competing save that caused the conflict.
+Browser probes confirmed skipped sequential survival/forfeit rolls (**384**),
+ungated forced groups (**385**), lost fight bonuses and equipment locks on return
+(**386**), retained initiation after an empty-god tick (**387**), illegal investment
+multiples (**388**), missing unequal-item transfer choices (**389**), inert injury
+immunity (**390**) and fatal enemy replies preceding COMBAT rerolls (**391**). The
+unchanged full suite passed with `RESULT ALL PASS pass=3352 fail=0`; DOM-free
+imports passed with `pass=35 fail=0`. An isolated browser probe intentionally
+asserting the correct behavior reported `pass=12 fail=17`, with no fatal error.
 The prior current Review log moved verbatim to the top of the archive's Review log.
+Existing **369** keeps its external validation requirement. This pass files fixes;
+it does not implement or close them.
 
 > Earlier review passes are archived, verbatim and newest first, in [TASKS-archive.md's "Review log (archived)"](TASKS-archive.md#review-log-archived). Passes from 2026-07-15's third full pass and earlier are in [REVIEW.md](REVIEW.md). The most recent `Reviewed` pass and the `Worked` entries since it stay above.

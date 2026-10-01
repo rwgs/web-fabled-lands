@@ -1,5 +1,261 @@
 # Fabled Lands - Repository Review (Codex)
 
+## Engine follow-up review of 2026-10-01
+
+Reviewed commit `f77dfb5`, starting from a clean working tree. Filed nine new
+defects as **383-391** in [TASKS.md](TASKS.md). The earlier repository review below
+is retained as a dated record; its findings 371-381 and the subsequent task 382
+are now marked complete. Task 369 remains open pending its external CI check.
+
+The highest-priority finding is data loss during a failed save-slot claim:
+Keep/import correctly refuse another tab's save, then their rollback deletes it.
+The remaining findings affect mandatory actions, return-state restoration,
+initiation, investment limits, possession selection and blessing protection.
+
+### Scope and method
+
+Read all seven DOM-free engine modules:
+[engine.js](web/js/engine.js), [state.js](web/js/state.js),
+[combat.js](web/js/combat.js), [market.js](web/js/market.js),
+[render-rules.js](web/js/render-rules.js),
+[render-gates.js](web/js/render-gates.js) and
+[visit-state.js](web/js/visit-state.js), plus constants in
+[rules.js](web/js/rules.js). Traced their renderer callers across the section
+lifecycle and roll, reward, choice, combat and economy views. Checked relevant
+tests, the XML tag contract, current tasks and prior fixes before filing.
+
+The review focused on whether a planner and its mutation agree, whether
+mandatory work can be bypassed by click order, whether visit state survives
+detours and persistence, and whether item/ship selection preserves the player's
+choice. Candidate findings were checked against numeric section files of the
+published books declared in [books.ini](books/books.ini), excluding `temp/`
+copies and non-section XML. This is an engine review, not a fresh transcription
+comparison against the printed books.
+
+Ran the normal browser suite and DOM-free import check on the unchanged tree.
+For behavioral reproductions, copied the current JS and bundled data into an
+isolated temporary tree and used a small review harness through the unchanged
+[run-tests.ps1](build/run-tests.ps1). It used real shipped sections, real renderer
+controls, deterministic dice and ephemeral states. No application, corpus,
+generated data or standard test source was edited.
+
+### Validation
+
+| Check | Result |
+|---|---|
+| `pwsh -ExecutionPolicy Bypass -File build/run-tests.ps1` | `RESULT ALL PASS pass=3352 fail=0`, exit 0 |
+| `node web/tests/node-import.mjs` | `RESULT ALL PASS pass=35 fail=0`, exit 0 |
+| Isolated browser reproductions, asserting correct behavior | `RESULT FAILURES pass=12 fail=17`, exit 1; no fatal error |
+| Node probes of rollback, transfer equivalence and empty-god mutation | Confirmed the reported failures directly |
+
+The passing assertion totals are dated observations, not a fixed expectation.
+The failing review assertions deliberately demonstrate missing regression
+coverage; they do not indicate that the existing suite failed. Controls included
+the free decline exit, the initial darkness penalty and weapon lock, and entry
+into and return from the real item detour. Both speculative antique-roll checks passed and were
+not filed. The slot-claim race was reproduced with a controlled storage
+interleaving; simultaneous real browser tabs were not stress-tested.
+
+### Findings by priority
+
+| Task | Priority | Finding |
+|---|---|---|
+| 383 | HIGH | Failed Keep/import rollback deletes a competing save |
+| 384 | MEDIUM | Later destination rolls bypass earlier mandatory checks and losses |
+| 385 | MEDIUM | Explicitly forced groups leave onward exits live before committing |
+| 386 | MEDIUM | Item detours shed source fight bonuses and equipment locks on return |
+| 387 | MEDIUM | Empty-god ticks retain initiation and append an empty deity |
+| 388 | MEDIUM | Purse clamping defeats money-cache investment multiples |
+| 389 | MEDIUM | Transfers treat materially different possessions as interchangeable |
+| 390 | MEDIUM | Immunity to Injury cannot be invoked against damage |
+| 391 | MEDIUM | Enemy replies land before the COMBAT-blessing retry decision |
+
+### 383 - A refused slot claim deletes the save it protected
+
+**Evidence.** `nextFreeSlot` in [state.js](web/js/state.js) observes a free
+slot. Another tab can claim it before `GameState.save` reads its precondition.
+The conflict check correctly refuses to write. `GameState.keep` then
+unconditionally removes `fl_save_<slot>`; `importSave` instead calls
+`deleteSlot`, removing both metadata and the blob. Cleanup does not establish
+that this attempt wrote or still owns the record.
+
+**Reproduction.** An isolated storage stub returned null for the slot search
+and published a competing blob before the next read of that same key.
+Both Keep and import threw the conflict message, and both left the competing
+blob absent. No write by the losing attempt was needed.
+
+**Impact and correction.** A normal concurrent slot claim can destroy the other
+adventure despite the newly added first-writer protection. Condition rollback
+on ownership of a partial write; a refusal before writing must delete nothing.
+Cover Keep, import, remembered Keep retries and replacement before cleanup while
+retaining tasks 373/375's recovery cases.
+
+### 384 - A destination die skips the survival or forfeit die
+
+**Evidence.** `computeRollGate` in
+[render-gates.js](web/js/render-gates.js) selects its first successful seed,
+rather than accumulating prerequisite rolls. Navigation from outcome-table
+rows is excluded from that gate. `revealBranch` in
+[render-rolls.js](web/js/render-rolls.js) therefore exposes a later roll's
+destination without holding it for the earlier obligation.
+
+**Reproduction.** At [book5/510](books/book5/510.xml), rolled the destination
+die before the drowning Rank check. "Continue -> 539" was enabled and clicking
+it reached 539 with the survival check unmade. The same ordering enabled a fog
+destination at [book5/76](books/book5/76.xml) before SCOUTING, and a landing
+destination at [book6/373](books/book6/373.xml) before the possession-loss roll.
+
+**Impact and correction.** Players can bypass a death check or retain possessions
+the encounter must take. Plan the prerequisites of later rolls and their exits,
+including synthesized outcome exits, with each resolved success/failure
+alternative releasing only its own path. Test both click orders and partial
+save/resume; avoid forcing optional talk-or-fight alternatives.
+
+### 385 - A forced group is still an optional button
+
+**Evidence.** `renderGroup` in
+[render-rewards.js](web/js/render-rewards.js) and `groupPlan` in
+[render-rules.js](web/js/render-rules.js) do not make `force="t"` an onward
+obligation. The XML contract explicitly distinguishes optional unmarked groups
+from forced groups.
+
+**Reproduction.** At [book6/496](books/book6/496.xml), started with 100 Shards
+and a rope. The "if you agree" exit to 149 was live before the forced donation
+group. Clicking it reached 149 with the purse at 100 and the rope still carried.
+The intended price is 10 Shards plus one chosen possession. The decline exit to
+291 was also live, correctly.
+
+**Impact and correction.** Explicit mandatory prices and consequences can be
+skipped. The same markup occurs on equipment confiscation, weapon destruction
+and rolled outcome groups. Gate applicable onward actions until the forced group
+commits; keep earlier declines, the group's own navigation and optional groups
+usable. Test an unanswered picker and completed-group resume.
+
+### 386 - Returning keeps the memo but loses the state it guards
+
+**Evidence.** `Story._captureReturnFrame`/`Story.goBack` in
+[render.js](web/js/render.js) and `serializeFrame`/`deserializeFrame` in
+[visit-state.js](web/js/visit-state.js) omit fight-bonus and equipment-lock
+snapshots. The detour's `Story.begin` clears both. Returning restores the
+source ctx, whose granting ticks are already applied and will not re-fire.
+The current-visit save format already handles these snapshots; the return frame
+does not.
+
+**Reproduction.** Inspected the lacquer box from
+[book6/252](books/book6/252.xml), which permits inspection at any time, and clicked
+the real return control at [book6/272](books/book6/272.xml). Both source identities
+were restored correctly. Returning to
+[book6/624](books/book6/624.xml) changed the darkness attack penalty from -2 to
+0. Returning to [book6/135](books/book6/135.xml) left the weapon slot unlocked
+after its entry had locked it.
+
+**Impact and correction.** A detour can erase a combat penalty or allow switching
+to a disposable weapon before destruction. Capture, serialize, coerce and restore
+the source snapshots before return autosaves or renders. Test direct return and
+save/load during the detour, keeping detour-local state separate.
+
+### 387 - Forsaken leaves the god and its benefit in place
+
+**Evidence.** The "lose initiate status" group in
+[book6/589](books/book6/589.xml) contains `<tick god=""/>`.
+`applyTick` in [engine.js](web/js/engine.js) passes the empty string to
+`GameState.setGod` in [state.js](web/js/state.js), which appends it.
+
+**Reproduction.** As a Sig initiate, rolled 5 and explicitly clicked the Forsaken
+group. The resulting gods were `["Sig", ""]`, and Sig's +1 THIEVERY effect
+remained. A direct Node mutation confirmed the same result. The group was
+committed, so this defect is independent of finding 385.
+
+**Impact and correction.** The punishment retains initiation benefits, and the
+empty entry prevents the "worships no god"/safe-initiation gates from opening.
+Clear initiation through the normal renunciation path, including associated
+effects and tied deals. Preserve future worship; the printed instruction does
+not impose permanent godlessness. Cover an already uninitiated player too.
+
+### 388 - An investment accepts a forbidden fractional lot
+
+**Evidence.** The Deposit callback in `renderMoneyCache` in
+[render-market.js](web/js/render-market.js) rounds the request to `multiples=`
+before clamping it to available funds and maximum capacity. Those clamps can
+turn the result into a nonmultiple.
+
+**Reproduction.** [Book1/104](books/book1/104.xml) prints "multiples of 100
+Shards" and carries `multiples="100"`. With a purse of 150, entering 200 and
+clicking Deposit moved all 150 into cache `1104`.
+
+**Impact and correction.** The investment violates its printed lot size.
+Compute a legal multiple within every constraint in the rule layer and use it
+in the widget. Test partial purse/headroom, less than one lot, exact lots and
+unconstrained caches; check withdrawal semantics against the contract.
+
+### 389 - Transfer identity omits what makes the item valuable
+
+**Evidence.** `itemsAllSame` in [engine.js](web/js/engine.js), shared by
+`transferPlan` and `applyTransfer`, compares only kind, normalized name and
+bonus. Ability, tags, effects/uses and provenance are omitted. Task 372 repaired
+sale identity in [market.js](web/js/market.js), not this predicate.
+
+**Reproduction.** Two same-named rings with three and one uses produced
+`needChoice: false`. Applying the one-item transfer did not invoke the supplied
+chooser and moved the three-use ring first. The real
+[book2/105](books/book2/105.xml) pickpocket widget also rendered no item picker.
+Weapon and +1-item offerings share this planner.
+
+**Impact and correction.** A "choose which" loss or offering can silently
+remove a more useful possession. Compare all gameplay-relevant identity and
+honor the chosen item. The transfer picker also needs labels that expose those
+differences; two identical names would not let the player choose safely.
+
+### 390 - Injury immunity is granted but cannot be invoked
+
+**Evidence.** [Book5/365](books/book5/365.xml) explicitly grants Immunity to
+Injury and says it can prevent Stamina loss from one source once, or one entire
+combat round. `GameState.damageStamina` in [state.js](web/js/state.js),
+`applyLose` in [engine.js](web/js/engine.js) and the damage paths in
+[combat.js](web/js/combat.js) offer no injury protection. `renderSheet` in
+[ui.js](web/js/ui.js) only displays its blessing chip; the combat widgets offer
+other blessings but have no injury invocation.
+
+**Reproduction.** Acquired the blessing through the real chapel menu. With it
+held, fought the Scorpion Shaman at [book1/105](books/book1/105.xml) with COMBAT
+1. One low-roll exchange took 5 Stamina while the blessing remained held. Neither
+the sheet nor the fight offered an injury action before or after the round.
+
+**Impact and correction.** A printed reward has no usable benefit. Implement
+the damage protection and a player decision for when to invoke it, covering a
+standalone wound and a whole round's multiple attacks. Do not silently consume
+it on the first minor wound. Verify decline, consumption, fatal damage and
+save/resume at the decision.
+
+### 391 - A COMBAT retry arrives after the fatal reply
+
+**Evidence.** `fightRound` in [combat.js](web/js/combat.js) resolves a missed
+player-first strike and the enemy's reply together. `drawFight` in
+[render-combat.js](web/js/render-combat.js) offers the COMBAT blessing afterwards;
+`rerollAttack` refuses when that reply has already killed the player.
+[Book4/324](books/book4/324.xml) promises a retry when a COMBAT roll fails.
+
+**Reproduction.** At [book1/105](books/book1/105.xml), gave the character COMBAT
+5, 1 Stamina and the blessing. Two ones made an attack total of 7, missing Defence
+8. The enemy's total of 7 then beat player Defence 6 and killed the character.
+The retry returned false with the enemy at 9 Stamina. Two sixes on that retry
+would score 17, deal 9 and defeat the enemy before its reply.
+
+**Impact and correction.** The player can lose the promised retry, or take a
+reply that a winning retry should have prevented. Pause a missed strike at the
+reroll decision before advancing the round. Keep runs the pending reply once;
+retry resolves the new strike first. Cover initiative, groups, multi-attacks,
+round/wound hooks and persisted pending rounds. Existing task 91 tests use
+harmless enemy replies, so they do not detect this ordering failure.
+
+### Follow-up boundary
+
+These findings are filed for implementation, with owning-suite regressions and
+completion checks in [TASKS.md](TASKS.md). No fix has been implemented or marked
+complete by this review.
+
+---
+
 ## Review of 2026-10-01
 
 Reviewed commit `5f0de66`, starting from a clean working tree. This pass records

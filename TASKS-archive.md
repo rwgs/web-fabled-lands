@@ -404,6 +404,153 @@ every `Worked`/`Reviewed` entry older than the pass `TASKS.md` still leads with.
 adds its entries at the TOP of this section, so the section stays newest first. These are
 dated records: don't edit them.*
 
+Worked 2026-10-01 (task 370): closed **370**, filed nothing. The owner turned GitHub Pages
+off and confirmed an installed copy updated from the Worker site. Run 36883589919 deployed
+`26.10.01.d4f1cd3`, and `webfl.rwgs.net` serves it, with `/web/` answering 200 and
+`/README.md` 404, both from Cloudflare. Offline launch was checked in headless Chrome: a fresh
+profile installed the worker from the live site, and the browser was relaunched behind a dead
+proxy so no request could leave. The title screen and a `?demo=1.10` game still loaded from
+the cache. Step 5 had listed `CLOUDFLARE_ACCOUNT_ID` as required, but it was never set and
+every deploy succeeded (Wrangler resolves the account from the token). README and the
+`deploy` job's comment now say one secret.
+
+Worked 2026-10-01 (task 382): closed **382**, filed nothing. A cut-down probe isolated the
+trigger to `serve.py`'s `Cache-Control: no-store`. With it removed the worker installed;
+dropping `Pragma`, sharing the port or binding the stock server to 127.0.0.1 changed nothing.
+The cause was in `FLCache.precache`, which fetched every REQUIRED entry and read no body until
+all had answered. Over HTTP/1.x the browser allows six connections per host, and an unread
+no-store body is never drained by the HTTP cache, so the connections stayed taken. `fetchOk`
+now reads each body as it arrives and returns a fresh `Response`, which also does what
+`unredirect` did for task 370, so that helper is gone. A new `suite-economy` test holds one
+fetch back and requires the others' bodies to have been read; it fails on the old code. Under
+the unmodified `serve.py` the worker now activates after all 48 precache requests, and task
+374's full update probe passes on it. `docs/Testing.md` gained the recipe. The full suite
+reported `RESULT ALL PASS pass=3352 fail=0`.
+
+Worked 2026-10-01 (task 381): closed **381**, filed nothing. Documentation only. README's
+Combat summary and Game Rules' Defence formula now say worn armour, chosen on the sheet with
+the strongest as the default. Game Rules and Playing the Game keep the no-stacking rule as
+wielded weapon, worn armour and best tool. Game Rules says fight bonuses clear on a new
+section and survive a reload of the same visit, and that `current` is read only on `<adjust>`
+and `<difficulty>`. The sibling sweep found the same `current` claim in the XML Tag Reference,
+and README's Training line saying "current ability" where `rollTraining` reads the natural
+score; both are fixed. Three code comments in `state.js` still say "best armour" or "never
+survives a save". They are noted here, not changed.
+
+Worked 2026-10-01 (task 379): closed **379**, filed nothing. Each enum's reader was
+checked for case and list handling. `special` and `crew` compare exactly, so the gate now
+requires the listed spelling for them. Eight attributes take one value: `special`, `crew`,
+`modifier`, `gender`, `choose`, `family`, `blessing` and `abilityDamaged`. So does
+`profession` everywhere except `<tick>`, which the picker splits. A union stays legal for
+`ability`, `ship` and cargo. A corpus census found every shipped shape still legal. The
+gate selftest gained six mutations, which the old gate missed, and a control; it now reports
+`pass=89`. `suite-engine` gained runtime controls showing the accepted spellings act and the
+refused ones were inert. The full suite reported `RESULT ALL PASS pass=3350 fail=0`.
+
+Worked 2026-10-01 (task 378): closed **378**, filed nothing. `Test-AttrValue` now checks
+`pay` and `flee` on `<choice>` and `pre` on `<fightround>` against the truth set. It checks
+`<fight flee=>` as a whole number, the threshold `combat.js` parses. The gate selftest gained
+four mutation cases, which the old gate missed, and a control covering every supported
+spelling plus `flee="5"`; it now reports `pass=82`. The real corpus passes and the rebuild is a
+no-op. The full suite reported `RESULT ALL PASS pass=3341 fail=0`.
+
+Worked 2026-10-01 (task 377): closed **377**, filed nothing. `nextFreeSlot` reads storage
+strictly and throws `StorageReadError` when a read fails, because an unreadable slot is not a
+free one. `loadSlotMeta` stays lenient for display, so the title still renders.
+`GameState.load` returns null for an unreadable save, and the saves screen's Play reports
+that. New Adventure picks its slot through `newAdventureSlot`, which offers "Play without
+saving" on a blocked read. That gives an unsaved in-tab adventure that can be exported, or
+kept once storage works. `suite-economy` gained 15 assertions with reads, not writes,
+throwing. In the real app, with reads of `fl_*` keys made to throw from page load, Begin
+Adventure showed the dialog. Playing without saving reached the game screen, and Keep
+reported the storage message with Export, with no uncaught error. The full suite reported
+`RESULT ALL PASS pass=3341 fail=0`.
+
+Worked 2026-10-01 (task 376): closed **376**, filed nothing. The source gate now fails a
+published book with no `Adventurers.xml` or with unusable creation data, through
+`Test-AdventurersData` in `validate-source.ps1`. `validate-selftest.ps1` gained 10 mutation
+cases, none of which the old gate caught. Its fixture and `release-selftest.ps1`'s now carry
+full creation data. `suite-corpus` creates all six professions from each published book's own
+data. With book 2's Wayfarer row stripped from a probe copy of `meta.json`, the check named
+the gap; the file was restored with `git checkout`. The real corpus passes the gate and the
+rebuild is a no-op. Validate selftest `pass=77`, release selftest `pass=59`, and the full
+suite `RESULT ALL PASS pass=3326 fail=0`.
+
+Worked 2026-10-01 (task 375): closed **375**, filed nothing. First writer wins.
+`GameState` remembers the exact blob it last loaded or wrote, and `save()` refuses to write
+over any other blob. That sets `saveConflict`, and the failure is reported through the
+existing save-failure path. The "Progress not saved" modal then also offers "Load the newer
+save". `suite-economy` gained 11 assertions over two states loaded from one slot. Against the
+old `save()`, 6 of them failed, and the stale write replaced the 150-Shard save with 100, as
+filed. Two real tabs were driven in headless Chrome over DevTools. Tab 1 moved first and
+stayed saved. Tab 2's move was refused and it showed the modal. "Load the newer save" resumed
+tab 2 from tab 1's section, and it then played on and saved normally. The full suite reported
+`RESULT ALL PASS pass=3314 fail=0`.
+
+Worked 2026-10-01 (task 374): closed **374**, filed **382**. The game screen's update hold
+now follows the save-status channel through `holdUpdateWhileUnsaved` in `app.js`. An unkept
+preview or a failed save holds, a successful save releases, and `GameState.keep` now
+publishes save status on success. Keep also drops `?demo=` from the URL. Otherwise the
+deferred reload booted a fresh preview over the adventure just kept. `suite-economy` gained
+13 behavioral assertions with real `GameState`s, plus an updated source contract. A real
+controller change was driven in headless Chrome over a scratch copy of `web/`. The update
+waited out preview play, Keep applied it once and landed on the title, and an update during
+kept play reloaded at once. That check needed `python -m http.server`, because under
+`build/serve.py` the worker never finishes installing. That is filed as **382**. The full
+suite reported `RESULT ALL PASS pass=3303 fail=0`.
+
+Worked 2026-10-01 (task 373): closed **373**, filed nothing. A failed `keep()` now removes
+the blob its attempt wrote to the slot it had just claimed, which was free when claimed. If
+storage refuses that removal too, the next attempt reuses the same slot, so failures never
+claim a second one. `suite-economy` gained 8 assertions. They make `fl_meta` writes fail
+three times, refuse the clean-up, then let storage recover. Against the old code they left
+blobs in slots `0,1,2`, the bug as filed. The full suite reported
+`RESULT ALL PASS pass=3291 fail=0`.
+
+Worked 2026-10-01 (task 372): closed **372**, filed nothing. `sameCandidate` in
+`market.js` now also compares crew grade, cargo contents (order-free) and item effects, using
+`sanitizeEffect`'s defaults so a live item and its reloaded copy still match. The sale
+picker's labels now name each ship's crew and each item's uses left; otherwise the new
+prompt would have shown two identical buttons. `suite-economy` gained 12 assertions, which
+cover the plan and the real widget: it asks, removes only the pick and credits the price
+once, and two truly identical barques still sell with no picker. Against the old code, 6
+of them failed. The full suite reported `RESULT ALL PASS pass=3283 fail=0`.
+
+Worked 2026-10-01 (task 371): closed **371**, filed nothing. `loadSlotMeta` now validates
+the index's shape and drops malformed entries, which `reconcileSlotMeta` rebuilds from a
+readable blob. `suite-economy` gained 23 assertions; against the old function the `null`
+case threw exactly as filed. The real app, driven headless over DevTools with `fl_meta` set
+to `null`, `[]` and an object of junk entries over an intact `fl_save_3`, rendered the title
+with Continue and listed the adventure, with its blob unchanged and no page error. A
+well-formed entry with no blob behind it still lists a card. That is the ghost task 198
+prevents by deleting meta first, and only a hand edit of storage produces it now, so it was
+left alone. The full suite reported `RESULT ALL PASS pass=3271 fail=0`.
+
+Worked 2026-10-01 (task 380): closed **380**, filed nothing. A failure captured after a
+passing report now re-runs the reporter, so the verdict line itself reads `RESULT FAILURES
+pass=N fail=M`, and both runners pass only an `ALL PASS` line whose page title is `TESTS_OK`.
+`run-tests-selftest.ps1` gained cases 6 and 7 (a late rejection and a late failing assertion,
+via the runner's new `-LateFailure` and the harness's `?latefail=`) and reported
+`pass=33 fail=0`. With the old `flFatal` restored, the runner's title check alone failed the
+page while the HEAD `smoke.yml` verdict step, run on the same dump, exited 0 and the new one 1.
+A cut-short run and a bootstrap parse error kept their own diagnoses. The full suite reported
+`RESULT ALL PASS pass=3248 fail=0`. CI's verdict step was exercised locally on saved dumps,
+not on a pushed run.
+
+Reviewed 2026-10-01 (Codex, whole repository): filed **371-381**, closed nothing.
+The full report is [review-codex.md](review-codex.md). **380** is HIGH: the harness's
+own late-fatal handler marks the page failed but both runners can extract its older
+`ALL PASS` line. Direct probes confirmed malformed metadata recovery, unequal sale
+candidates, partial preview promotion, conflicting save writers and blocked storage
+reads. Call-site review confirmed the unsaved-update gap; temporary source-gate
+fixtures confirmed missing/empty Adventurers data and unsupported attribute values
+passing validation. Player-rule documentation drift is **381**. The full browser
+suite reported `RESULT ALL PASS pass=3248 fail=0`; the Node/import, source-gate,
+release and Windows runner fixture checks also passed. The rebuild left generated
+output unchanged. Interactive browser and live-deployment checks were not completed.
+Tasks **369** and **370** retain their existing external validation requirements.
+The prior current Review log moved verbatim to the top of the archive's Review log.
+
 Worked 2026-09-29 (task 370): filed and worked **370** on the owner's request: steps 1–3
 done, and it stays open until the owner does the dashboard cutover. An assets-only
 `wrangler.jsonc` and the root `.assetsignore` publish only `index.html` and `web/`. Checking
