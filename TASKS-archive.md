@@ -381,6 +381,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 372. Preserve meaningful differences when choosing a sale candidate
 - [x] 373. Roll back a partially written preview promotion
 - [x] 374. Hold automatic update reloads while play is unsaved
+- [x] 375. Detect concurrent play of the same save slot
 - [x] 380. Make late asynchronous failures fail the test runners
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
@@ -21748,5 +21749,63 @@ Checked:
   behavior is the unconditional `hold(false)` that the updated source contract no longer
   matches.
 - The full suite reported `RESULT ALL PASS pass=3303 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 375. Detect concurrent play of the same save slot
+
+**Priority: MEDIUM.** A stale autosave can replace newer progress without warning.
+
+### What is wrong
+
+`GameState.load` and `GameState.save` in [state.js](web/js/state.js) read and write
+complete independent snapshots. There is no ownership/conflict check or `storage`
+event handling in [app.js](web/js/app.js). If two tabs load a 100-Shard adventure,
+the first earns 50 Shards and saves 150; the second then loses one Stamina and
+saves its stale 100-Shard purse over the first tab's progress. A browser tab and
+an installed app on the same origin share these slots too.
+
+### The fix
+
+The policy is first writer wins, with no merging. A tab whose stored adventure changed under
+it stops writing and says so. Both live snapshots stay intact, and the player chooses what
+happens next.
+
+- `web/js/state.js`: `GameState` keeps `_seen`, the exact blob string and slot it last loaded
+  (`GameState.load`) or wrote (`save()`, set straight after the blob write, so a failure of
+  the meta write still matches what is stored). Before writing, `save()` re-reads
+  `fl_save_<slot>`. If that differs from `_seen`, or from nothing for a game that never wrote
+  the slot, it writes nothing, sets `saveConflict` and a `lastSaveError` message, and returns
+  false. A successful write clears `saveConflict`. Consequences:
+  - A slot deleted from another tab is not resurrected by a stale autosave.
+  - A fresh game, an import or a Keep claims a free slot and saves as before.
+  - `keep()` resets `_seen` when it removes its partial blob (task 373), so a retry into the
+    same slot is not mistaken for a conflict.
+  - Ephemeral probe clones never write.
+- `web/js/app.js`: when `saveConflict` is set, `surfaceSaveError`'s "Progress not saved"
+  modal adds "Load the newer save" beside "Export now" and "Continue". It loads the slot
+  afresh and resumes play from it, or opens the saves screen if the slot is gone. Export
+  still downloads this tab's live snapshot. The failure also holds a deferred update
+  (task 374).
+- `docs/Playing-the-Game.md` describes the two-tab behavior under Saving.
+- `suite-economy` (task 375 block) loads one slot into two states.
+  - The first to write saves. The stale one's autosave and explicit save are both refused,
+    the stored save keeps the first tab's Shards and Stamina, and the stale state keeps its
+    own snapshot with the reason.
+  - The first tab keeps saving. A fresh load of the slot resumes play that saves, and then the
+    tab it overtook is the stale one.
+  - After `deleteSlot`, a stale autosave does not bring the slot back.
+  - A fresh game still saves to a free slot repeatedly.
+
+Checked:
+
+- Against the old `save()`, 6 of the 11 assertions failed, and the stale write left the slot at
+  100 Shards over the first tab's 150.
+- Two real tabs were driven in headless Chrome over DevTools, both playing slot 0 at §1.1.
+  - Tab 1 moved to §20 and saved.
+  - Tab 2's move left storage at tab 1's §20 and showed the conflict modal with "Export now",
+    "Load the newer save" and "Continue". Tab 1 showed nothing.
+  - "Load the newer save" put tab 2 at §20, and its next move saved §192 with no modal.
+- The full suite reported `RESULT ALL PASS pass=3314 fail=0`, and `node-import.mjs` passed.
 
 ---

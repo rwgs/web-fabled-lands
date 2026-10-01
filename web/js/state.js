@@ -161,6 +161,11 @@ export class GameState {
     // last save() failed (storage full, or blocked in private-browsing mode). The
     // UI watches this to warn that progress is no longer being saved (task 7).
     this.lastSaveError = null;
+    // The exact blob this game last loaded or wrote, and its slot (task 375). save() refuses to
+    // write over a blob that differs from it, because another tab or window wrote that one;
+    // saveConflict then says so, and stays set until a write succeeds.
+    this._seen = null;
+    this.saveConflict = false;
     this._listeners = new Set();
     // Save-status observers, distinct from _listeners (the change/sheet-refresh channel).
     // Fired after EVERY persistence attempt — both changed()'s full mutations and the
@@ -1319,7 +1324,20 @@ export class GameState {
       this.lastSaveError = null; return true;
     }
     try {
-      localStorage.setItem(SAVE_PREFIX + this.slot, JSON.stringify(this.data));
+      // First writer wins (task 375). Two tabs that loaded one slot each saved complete
+      // snapshots, so the staler tab's next autosave replaced the other's newer progress. A
+      // stored blob that is not the one this game last saw was written elsewhere, and is left
+      // alone; a deleted one is not resurrected either.
+      const key = SAVE_PREFIX + this.slot;
+      const expected = this._seen && this._seen.slot === this.slot ? this._seen.raw : null;
+      if (localStorage.getItem(key) !== expected) {
+        this.saveConflict = true;
+        this.lastSaveError = SAVE_CONFLICT;
+        return false;
+      }
+      const raw = JSON.stringify(this.data);
+      localStorage.setItem(key, raw);
+      this._seen = { slot: this.slot, raw };
       const meta = loadSlotMeta();
       meta[this.slot] = {
         name: this.data.name,
@@ -1331,6 +1349,7 @@ export class GameState {
       };
       localStorage.setItem(META_KEY, JSON.stringify(meta));
       this.lastSaveError = null;
+      this.saveConflict = false;
       return true;
     } catch (e) {
       this.lastSaveError = describeSaveError(e);
@@ -1344,7 +1363,9 @@ export class GameState {
     if (!raw) return null;
     try {
       const data = JSON.parse(raw);
-      return new GameState(migrate(data), slot);
+      const gs = new GameState(migrate(data), slot);
+      gs._seen = { slot, raw }; // what a later save must still find there (task 375)
+      return gs;
     } catch (e) {
       console.error('load failed', e);
       return null;
@@ -1372,7 +1393,7 @@ export class GameState {
     if (!this.save(true)) { // explicit: a suppressed txn must not fake this promotion write (task 168)
       this.slot = prevSlot;
       this.ephemeral = true;
-      try { localStorage.removeItem(SAVE_PREFIX + slot); this._keepSlot = null; } catch (_) { this._keepSlot = slot; }
+      try { localStorage.removeItem(SAVE_PREFIX + slot); this._keepSlot = null; this._seen = null; } catch (_) { this._keepSlot = slot; }
       throw new Error(this.lastSaveError || 'Could not save this adventure.');
     }
     this._keepSlot = null;
@@ -1677,6 +1698,9 @@ function migrate(data) {
 // Turn a thrown localStorage error into a player-facing explanation. A full
 // store throws QuotaExceededError (code 22, or Firefox's 1014); other failures
 // are almost always private-browsing / disabled storage.
+// Shown when save() finds the slot rewritten by another tab or window (task 375).
+const SAVE_CONFLICT = 'This adventure has been saved from another tab or window since this one loaded it, so this tab’s progress was not written over it. Export this tab’s adventure to keep it, or load the newer save to continue from there.';
+
 function describeSaveError(e) {
   const quota = e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014);
   if (quota) {

@@ -70,6 +70,10 @@ validated and migrated, so a save from an older build still loads.
 If a write fails - storage full, or private-browsing mode blocking it - the game says so
 rather than silently discarding progress.
 
+Two tabs or windows playing the same adventure do not overwrite each other. The first one to
+save keeps saving. The other is told its progress was not written, and can export its own
+copy or load the newer save and continue from there.
+
 A session-only **undo** holds the state as it was on entering each of the last 30
 sections. It is deliberately not persisted.
 

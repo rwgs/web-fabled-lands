@@ -722,11 +722,19 @@ function surfaceSaveError(force = false) {
   if (!state || !state.lastSaveError) { _saveErrorNotified = false; return; }
   if (_saveErrorNotified && !force) return;
   _saveErrorNotified = true;
+  // Another tab or window saved this slot since it was loaded (task 375). Either adventure can
+  // be kept: this one by exporting it, the stored one by loading it here, which discards this
+  // tab's unsaved play only because the player chose to.
+  const conflict = state.saveConflict ? [{ label: 'Load the newer save', value: 'reload' }] : [];
+  const slot = state.slot;
   modal({
     title: 'Progress not saved',
     body: `<p>${escapeHtml(state.lastSaveError)}</p>`,
-    buttons: [{ label: 'Export now', value: 'export', primary: true }, { label: 'Continue', value: null }],
-  }).then((v) => { if (v === 'export') exportSave(null, null); });
+    buttons: [{ label: 'Export now', value: 'export', primary: true }, ...conflict, { label: 'Continue', value: null }],
+  }).then((v) => {
+    if (v === 'export') exportSave(null, null);
+    if (v === 'reload') { const newer = GameState.load(slot); if (newer) { state = newer; loadCurrent(); } else showSaves(); }
+  });
 }
 
 function iconBtn(glyph, title, fn, cls) { const b = el('button', cls ? 'icon-btn ' + cls : 'icon-btn', glyph); b.title = title; b.setAttribute('aria-label', title); b.addEventListener('click', fn); return b; }

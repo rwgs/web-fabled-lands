@@ -963,6 +963,49 @@ export async function run(ctx) {
       deleteSlot(impOkSlot);
     }
 
+    // --- task 375: two tabs playing one slot must not overwrite each other silently ---
+    // Each loaded state wrote its complete snapshot, so the staler tab's next autosave replaced
+    // the other's newer progress. First writer wins now: a stale write is refused and reported.
+    {
+      const S = 'fl_save_', M = 'fl_meta';
+      const savedMeta = localStorage.getItem(M);
+      const slot = nextFreeSlot();
+      const g0 = GameState.create({ name: 'Twin375', gender: 'f', profession: 'Priest', book: 1, adv });
+      g0.slot = slot; g0.data.shards = 100; g0.save();
+      const tabA = GameState.load(slot), tabB = GameState.load(slot);
+      const staminaB = tabB.data.stamina;
+      tabA.data.shards = 150; tabA.changed();
+      ok('task375: the first tab to write saves normally', !tabA.lastSaveError && readSlotData(slot).shards === 150);
+      tabB.data.stamina = staminaB - 1; tabB.changed();
+      ok('task375: the stale tab\'s autosave does not replace the newer save',
+         readSlotData(slot).shards === 150 && readSlotData(slot).stamina === staminaB, JSON.stringify({ shards: readSlotData(slot).shards }));
+      ok('task375: the stale tab is told why', tabB.saveConflict === true && /another tab or window/.test(tabB.lastSaveError || ''), tabB.lastSaveError);
+      ok('task375: an explicit save from the stale tab reports failure', tabB.save(true) === false && readSlotData(slot).shards === 150);
+      ok('task375: the stale tab keeps its own live snapshot to export',
+         tabB.data.shards === 100 && tabB.data.stamina === staminaB - 1 && tabB.data.name === 'Twin375');
+      tabA.data.shards = 160; tabA.changed();
+      ok('task375: the tab that owns the newest save keeps saving', !tabA.lastSaveError && readSlotData(slot).shards === 160);
+      // Deliberate recovery: load the newer save, and play resumes from it.
+      const resumed = GameState.load(slot);
+      resumed.data.shards = 170; resumed.changed();
+      ok('task375: loading the newer save resumes play that saves normally',
+         !resumed.lastSaveError && resumed.saveConflict === false && readSlotData(slot).shards === 170);
+      tabA.data.shards = 999; tabA.changed();
+      ok('task375: the tab it overtook is now the stale one', tabA.saveConflict === true && readSlotData(slot).shards === 170);
+      // A slot deleted from another tab is not resurrected by a stale autosave.
+      ok('task375: deleting the slot succeeds', deleteSlot(slot) === null);
+      resumed.data.shards = 180; resumed.changed();
+      ok('task375: a stale autosave does not resurrect a deleted save',
+         readSlotData(slot) === null && !loadSlotMeta()[slot] && resumed.saveConflict === true);
+      // A new adventure and a kept preview still claim and save a free slot.
+      const fresh = GameState.create({ name: 'Fresh375', gender: 'm', profession: 'Warrior', book: 1, adv });
+      fresh.slot = nextFreeSlot(); fresh.data.shards = 5; fresh.changed(); fresh.data.shards = 6; fresh.changed();
+      ok('task375: a fresh game saves to a free slot and keeps saving', !fresh.lastSaveError && readSlotData(fresh.slot).shards === 6);
+      deleteSlot(fresh.slot);
+      if (savedMeta == null) localStorage.removeItem(M); else localStorage.setItem(M, savedMeta);
+      localStorage.removeItem(S + slot);
+    }
+
     // --- task 373: a Keep that fails BETWEEN save()'s two writes must not claim a slot ---
     // The blob landed, fl_meta threw, and keep() restored the preview but left the blob, which
     // nextFreeSlot counts as occupied — so each retry claimed one more slot.

@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 375. Two tabs can load the same save slot and silently overwrite each other's progress because autosave never checks whether the stored adventure changed
 - [ ] 376. The source gate accepts a missing or empty `Adventurers.xml`, allowing a published book whose character-creation screen throws
 - [ ] 377. `nextFreeSlot` and `GameState.load` leave storage reads unguarded, so a browser that blocks those reads throws before the intended save-failure recovery can run
 
@@ -418,6 +417,7 @@ this order.*
 - [x] 372. `sameCandidate` compared ships by hull, load count and name and items without their effects, so an excellent crew, a different cargo or a potion with uses left could be sold with no picker; it now compares crew, cargo contents (order-free) and effects, and the picker's labels name the crew and the uses left
 - [x] 373. `GameState.keep` restored the preview when `save(true)` failed but left the blob a failed `fl_meta` write had already landed, so each retry claimed another slot; it now removes that blob, and if storage refuses the removal it reuses the same slot next time
 - [x] 374. `buildGameScreen` released the update gate outright, so a new build could reload away an unkept `?demo=` preview or progress whose autosave had failed; the game screen's hold now follows the save-status channel (`holdUpdateWhileUnsaved`), a successful save or Keep applies the deferred update once, and Keep drops `?demo=` so that reload lands on the title
+- [x] 375. two tabs that loaded one slot each wrote complete snapshots, so the staler tab's autosave replaced the other's newer progress; `save()` now refuses to write over a blob that is not the one this game last loaded or wrote (first writer wins), reports a conflict, and the "Progress not saved" modal adds "Load the newer save"
 
 ---
 
@@ -516,34 +516,6 @@ removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first
 
 - `https://webfl.rwgs.net/web/` is served by the Worker (a `/README.md` request answers 404).
   An installed copy updates to the next build, and it opens `/web/index.html` offline.
-
----
-
-## 375. Detect concurrent play of the same save slot
-
-**Priority: MEDIUM.** A stale autosave can replace newer progress without warning.
-
-### What is wrong
-
-`GameState.load` and `GameState.save` in [state.js](web/js/state.js) read and write
-complete independent snapshots. There is no ownership/conflict check or `storage`
-event handling in [app.js](web/js/app.js). If two tabs load a 100-Shard adventure,
-the first earns 50 Shards and saves 150; the second then loses one Stamina and
-saves its stale 100-Shard purse over the first tab's progress. A browser tab and
-an installed app on the same origin share these slots too.
-
-### Steps
-
-1. Choose a small conflict policy that prevents silent replacement of newer play,
-   such as refusing stale writes and offering reload/export recovery.
-2. Make the conflict visible to the player without discarding either live adventure.
-3. Exercise two independent loaded states and two actual tabs, then run the
-   documented test loop. Do not attempt to merge game-rule histories automatically.
-
-### Validation
-
-- A second tab's stale mutation cannot silently overwrite the first tab's newer save.
-- Both live snapshots remain exportable and a deliberate recovery resumes play.
 
 ---
 
@@ -744,6 +716,17 @@ repository.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 375): closed **375**, filed nothing. First writer wins.
+`GameState` remembers the exact blob it last loaded or wrote, and `save()` refuses to write
+over any other blob. That sets `saveConflict`, and the failure is reported through the
+existing save-failure path. The "Progress not saved" modal then also offers "Load the newer
+save". `suite-economy` gained 11 assertions over two states loaded from one slot. Against the
+old `save()`, 6 of them failed, and the stale write replaced the 150-Shard save with 100, as
+filed. Two real tabs were driven in headless Chrome over DevTools. Tab 1 moved first and
+stayed saved. Tab 2's move was refused and it showed the modal. "Load the newer save" resumed
+tab 2 from tab 1's section, and it then played on and saved normally. The full suite reported
+`RESULT ALL PASS pass=3314 fail=0`.
 
 Worked 2026-10-01 (task 374): closed **374**, filed **382**. The game screen's update hold
 now follows the save-status channel through `holdUpdateWhileUnsaved` in `app.js`. An unkept
