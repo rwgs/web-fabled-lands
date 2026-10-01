@@ -85,12 +85,19 @@ function slotsFullModal() {
 
 /** Persist the current ephemeral (preview) game into a real save slot. True once kept. */
 function keepDemo() {
+  // A kept preview is a saved adventure, so a reload must not boot ?demo= into a fresh preview
+  // over it. The parameter goes before keep(), whose success can apply a deferred update at
+  // once (task 374), and comes back if the Keep fails and the preview is still live.
+  const href = location.href;
+  const plain = new URL(href); plain.searchParams.delete('demo');
+  try { history.replaceState(history.state, '', plain); } catch (_) { /* cosmetic */ }
   try {
     state.keep();
     toast('Adventure saved.');
     syncSaveBtn();
     return true;
   } catch (e) {
+    try { history.replaceState(history.state, '', href); } catch (_) { /* cosmetic */ }
     // keep() reverts to an ephemeral preview on failure, so the adventure is
     // still in memory and can be exported; offer that alongside the message.
     modal({
@@ -170,6 +177,24 @@ export function makeUpdateGate(reload) {
 }
 const swUpdateGate = makeUpdateGate(() => location.reload());
 
+/** Does the live game hold progress a reload cannot restore? A ?demo= preview is never
+ *  written until kept, and after a failed save storage holds an older state than the screen.
+ *  (task 374) */
+export function playIsUnsaved(gs) { return !!gs && (gs.ephemeral || !!gs.lastSaveError); }
+
+/** The game screen's share of the gate (task 374). buildGameScreen used to release it
+ *  outright, so an update could reload away an unkept preview or progress whose autosave had
+ *  failed. The hold now follows the save-status channel instead: a failed save takes it, and a
+ *  successful save or Keep releases it, which applies a deferred update once. Leaving the
+ *  game screen is the deliberate abandonment, and the next screen releases it. Returns the
+ *  unsubscribe. */
+export function holdUpdateWhileUnsaved(gate, gs) {
+  const sync = () => gate.hold(playIsUnsaved(gs));
+  sync();
+  return gs.onSaveStatus(sync);
+}
+let releaseUpdateHold = null;
+
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   // If a worker already controls this page, a later controllerchange means a
@@ -233,6 +258,7 @@ function creditsHtml() {
 function releaseGameScreen() {
   if (story) story.dispose();
   releaseSheetDrawer(); // the mobile drawer's body class and isolation must go with the shell (task 210)
+  if (releaseUpdateHold) { releaseUpdateHold(); releaseUpdateHold = null; } // the next screen sets the gate (task 374)
 }
 
 // ---- Title screen ----------------------------------------------------------
@@ -559,9 +585,10 @@ function showSaves() {
 // ---- Game screen -----------------------------------------------------------
 function buildGameScreen() {
   releaseGameScreen(); // retire the outgoing Story before its pane is replaced (task 182)
-  // Play is autosaved, so a deferred update may land from here on: Begin Adventure has already
-  // written the character to its slot by the time this runs (task 201).
-  swUpdateGate.hold(false);
+  // Autosaved play may take a deferred update: Begin Adventure has already written the
+  // character to its slot by the time this runs (task 201). An unkept preview or a failed save
+  // holds it until the progress is written (task 374).
+  releaseUpdateHold = holdUpdateWhileUnsaved(swUpdateGate, state);
   const app = $('#app');
   app.className = 'screen-game';
   app.innerHTML = '';

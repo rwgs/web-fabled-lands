@@ -380,6 +380,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 371. Validate the save-slot metadata shape before recovery
 - [x] 372. Preserve meaningful differences when choosing a sale candidate
 - [x] 373. Roll back a partially written preview promotion
+- [x] 374. Hold automatic update reloads while play is unsaved
 - [x] 380. Make late asynchronous failures fail the test runners
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
@@ -21683,5 +21684,69 @@ Checked:
 - Against the old `keep()`, 5 of the 8 assertions failed. Three failures left blobs in
   `0,1,2`, the bug as filed, and the eventual success left seven listed adventures.
 - The full suite reported `RESULT ALL PASS pass=3291 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 374. Hold automatic update reloads while play is unsaved
+
+**Priority: MEDIUM.** A background update can discard live progress without a player action.
+
+### What is wrong
+
+`buildGameScreen` in [app.js](web/js/app.js) unconditionally calls
+`swUpdateGate.hold(false)`. `registerSW` routes `controllerchange` straight through
+`makeUpdateGate.apply`, which reloads immediately when released. A `?demo=` game
+is intentionally ephemeral, and a normal adventure may have a failed autosave;
+both retain live progress that a reload cannot restore. The gate currently holds
+only the character-creation draft. Reloading a preview restarts its demo section;
+reloading after a failed save restores the older persisted state.
+
+### The fix
+
+- `web/js/app.js`: `playIsUnsaved(gs)` is true for an ephemeral preview or a set
+  `lastSaveError`. `holdUpdateWhileUnsaved(gate, gs)` sets the existing `makeUpdateGate` hold
+  from that and re-syncs it on every `onSaveStatus` publish. `buildGameScreen` subscribes to
+  it in place of the unconditional `swUpdateGate.hold(false)`, and `releaseGameScreen`
+  unsubscribes. The release rules:
+  - A failed autosave takes the hold.
+  - A save that succeeds releases it. `save()` has already written the blob, meta and the
+    refreshed `data.visit`, so the deferred update applies once, after the current visit is
+    persisted.
+  - A Keep that succeeds releases it. `GameState.keep` now calls `_publishSaveStatus` on
+    success only; a failure throws to `keepDemo`, whose own modal reports it.
+  - Leaving the game screen is the deliberate abandonment. The title and saves screens
+    already call `hold(false)`.
+- `keepDemo` drops `?demo=` from the URL with `history.replaceState` before `keep()`, and
+  restores it if the Keep fails. The release reloads synchronously inside `keep()`, and a
+  reload still at `?demo=1.1` booted a fresh Wanderer preview over the adventure just kept.
+  Without the parameter it lands on the title, as any autosaved game's update does.
+- `suite-economy` (task 374 block) uses real `GameState`s and the real gate.
+  - Preview play holds through `changed()` and through a failed Keep, then a Keep applies the
+    update once and never again.
+  - A failed autosave holds through a second failure, and the save that recovers applies the
+    update once, after the blob holds the new progress and the current visit.
+  - Unsubscribing and then the title's `hold(false)` applies the update for an abandoned
+    preview, and the old game no longer moves the gate.
+  - The task 201 source contract now pins the subscription and the unsubscribe.
+- `docs/FAQ-and-Troubleshooting.md` says an update waits for an unkept preview or a failed
+  save.
+
+Checked:
+
+- App shell. A scratch copy of `web/` was served, and `?demo=1.1` opened in headless Chrome
+  over DevTools under a controlling worker. A new `sw.js` was then deployed under it:
+  - During preview play, the new worker activated (its cache key changed) and the page did
+    not reload.
+  - Clicking "Keep this adventure" reloaded once, onto the title with no `?demo=`, and the
+    adventure was saved in slot 0.
+  - Playing it from the saves screen showed "Save & quit to title", and a further update
+    reloaded at once.
+  - The first run, before the `?demo=` fix, showed the reload landing on a new preview.
+- That check needed `python -m http.server`: under `build/serve.py` the worker never finished
+  installing, which is filed as task 382.
+- The old `app.js` lacks the new exports, so the new block cannot run against it. Its
+  behavior is the unconditional `hold(false)` that the updated source contract no longer
+  matches.
+- The full suite reported `RESULT ALL PASS pass=3303 fail=0`, and `node-import.mjs` passed.
 
 ---

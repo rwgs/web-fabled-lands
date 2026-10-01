@@ -43,6 +43,8 @@ code change.
 **I am still seeing an old version after an update.**
 The service worker caches the whole game for offline play. A hard reload, or closing every
 tab of the site and reopening, picks up the new build.
+An update that arrives during an unkept preview, or after a save has failed, waits until the
+adventure is kept or saved, so the reload cannot lose progress.
 
 ---
 

@@ -1376,6 +1376,9 @@ export class GameState {
       throw new Error(this.lastSaveError || 'Could not save this adventure.');
     }
     this._keepSlot = null;
+    // The game is now persisted, which the update gate learns through the save-status channel
+    // (task 374). Only on success: a failure throws to keepDemo, whose own modal reports it.
+    this._publishSaveStatus();
     return slot;
   }
 }

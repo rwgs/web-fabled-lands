@@ -11,7 +11,7 @@ import { renderGoto } from '../js/render-choices.js';
 import { renderMarket, renderRest } from '../js/render-market.js';
 // app.js only auto-boots when a #app element exists (task 65), so importing its exported
 // new-adventure recovery contract here is side-effect free. (task 189)
-import { openNewAdventure, saveOrKeep, installSheetDrawer, releaseSheetDrawer, toggleSheet, syncSheetBreakpoint, keepSheetFocus, makeUpdateGate } from '../js/app.js';
+import { openNewAdventure, saveOrKeep, installSheetDrawer, releaseSheetDrawer, toggleSheet, syncSheetBreakpoint, keepSheetFocus, makeUpdateGate, holdUpdateWhileUnsaved } from '../js/app.js';
 import { Narrator } from '../js/tts.js';
 import { renderSheet, renderStatic, modal } from '../js/ui.js';
 
@@ -1853,10 +1853,84 @@ export async function run(ctx) {
          && !/addEventListener\('controllerchange'[\s\S]{0,200}location\.reload\(\)/.test(appSrc201));
       ok('task201: showCreate holds the update while its draft is on screen',
          /async function showCreate\(\)[\s\S]{0,400}?swUpdateGate\.hold\(true\)/.test(appSrc201));
-      ok('task201: the title, saves and game screens release it',
+      ok('task201: the title and saves screens release it; the game screen follows its save status',
          [/function showTitle\(\)[\s\S]{0,200}?swUpdateGate\.hold\(false\)/,
           /function showSaves\(\)[\s\S]{0,200}?swUpdateGate\.hold\(false\)/,
-          /function buildGameScreen\(\)[\s\S]{0,400}?swUpdateGate\.hold\(false\)/].every((re) => re.test(appSrc201)));
+          /function buildGameScreen\(\)[\s\S]{0,500}?releaseUpdateHold = holdUpdateWhileUnsaved\(swUpdateGate, state\)/,
+          /function releaseGameScreen\(\)[\s\S]{0,200}?releaseUpdateHold\(\)/].every((re) => re.test(appSrc201)));
+    }
+
+    // --- task 374: an update must not reload away an unkept preview or unsaved progress -------
+    // buildGameScreen released the gate outright, so a controllerchange during a ?demo= preview
+    // (never written until kept) or after a failed autosave reloaded onto older storage.
+    { // block-scoped
+      const S = 'fl_save_', M = 'fl_meta';
+      const savedMeta = localStorage.getItem(M);
+      const savedBlobs = [];
+      for (let i = 0; i < 20; i++) savedBlobs.push(localStorage.getItem(S + i));
+      const quota = () => { localStorage.setItem = () => { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }; };
+
+      // 1. A preview holds until it is kept; Keep applies the deferred update once.
+      let reloads = 0;
+      const gate = makeUpdateGate(() => { reloads++; });
+      const gp = GameState.create({ name: 'Preview374', gender: 'm', profession: 'Warrior', book: 1, adv });
+      gp.ephemeral = true;
+      const offP = holdUpdateWhileUnsaved(gate, gp);
+      gate.apply();
+      ok('task374: an update during preview play does not reload', reloads === 0 && gate.pending === true && gate.held === true);
+      gp.changed(); // preview autosave: a no-op write that still publishes
+      ok('task374: preview play keeps holding as it changes', reloads === 0 && gate.held === true);
+      quota();
+      try { gp.keep(); } catch (_) { /* keepDemo's modal reports it */ }
+      delete localStorage.setItem;
+      ok('task374: a failed Keep still holds the update', reloads === 0 && gate.held === true && gp.ephemeral === true);
+      const keptP = gp.keep();
+      ok('task374: Keep releases the hold and applies the deferred update once',
+         reloads === 1 && gate.held === false && readSlotData(keptP) && readSlotData(keptP).name === 'Preview374', 'reloads=' + reloads);
+      gp.changed(); gate.apply();
+      ok('task374: nothing reloads a second time', reloads === 1, 'reloads=' + reloads);
+      offP();
+      deleteSlot(keptP);
+
+      // 2. A failed autosave holds until a save succeeds with the current visit.
+      let reloads2 = 0;
+      const gate2 = makeUpdateGate(() => { reloads2++; });
+      const gs = GameState.create({ name: 'Unsaved374', gender: 'f', profession: 'Mage', book: 1, adv });
+      gs.slot = nextFreeSlot(); gs.save();
+      gs.setVisitProvider(() => ({ v: 1, book: gs.data.book, section: gs.data.section, mark: 'v374-' + gs.data.shards }));
+      const off2 = holdUpdateWhileUnsaved(gate2, gs);
+      ok('task374: saved play does not hold', gate2.held === false);
+      quota();
+      gs.data.shards = 374; gs.changed();
+      ok('task374: a failed autosave takes the hold', gate2.held === true && !!gs.lastSaveError);
+      gate2.apply();
+      ok('task374: an update after a failed autosave does not reload', reloads2 === 0 && gate2.pending === true);
+      gs.changed();
+      ok('task374: a second failed autosave keeps holding', reloads2 === 0 && gate2.held === true);
+      delete localStorage.setItem;
+      gs.changed();
+      const stored = readSlotData(gs.slot);
+      ok('task374: the recovering save applies the update once, after writing the current visit',
+         reloads2 === 1 && !!stored && stored.shards === 374 && !!stored.visit && stored.visit.mark === 'v374-374',
+         JSON.stringify({ reloads2, shards: stored && stored.shards, visit: stored && stored.visit }));
+      off2();
+
+      // 3. Leaving the game screen is deliberate abandonment: unsubscribed, a later publish
+      //    from the old game no longer moves the gate the next screen set.
+      let reloads3 = 0;
+      const gate3 = makeUpdateGate(() => { reloads3++; });
+      const gq = GameState.create({ name: 'Quit374', gender: 'm', profession: 'Warrior', book: 1, adv });
+      gq.ephemeral = true;
+      const off3 = holdUpdateWhileUnsaved(gate3, gq);
+      gate3.apply();
+      off3();
+      gate3.hold(false); // showTitle
+      ok('task374: abandoning a preview for the title applies the deferred update once', reloads3 === 1, 'reloads=' + reloads3);
+      gq.changed();
+      ok('task374: the abandoned game no longer holds the gate', gate3.held === false);
+
+      for (let i = 0; i < 20; i++) { if (savedBlobs[i] == null) localStorage.removeItem(S + i); else localStorage.setItem(S + i, savedBlobs[i]); }
+      if (savedMeta == null) localStorage.removeItem(M); else localStorage.setItem(M, savedMeta);
     }
 
     // --- task 202: labels, selection state and progress semantics -------------------------

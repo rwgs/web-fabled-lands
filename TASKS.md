@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-381 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
+382 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
 the buckets below are open, and **all others are complete**. File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 374. The service-worker update gate releases during unsaved play, so an automatic update can reload away a preview or progress whose autosave failed
 - [ ] 375. Two tabs can load the same save slot and silently overwrite each other's progress because autosave never checks whether the stored adventure changed
 - [ ] 376. The source gate accepts a missing or empty `Adventurers.xml`, allowing a published book whose character-creation screen throws
 - [ ] 377. `nextFreeSlot` and `GameState.load` leave storage reads unguarded, so a browser that blocks those reads throws before the intended save-failure recovery can run
@@ -33,6 +32,7 @@ there once the buckets below are clear.
 - [ ] 378. The source gate omits the boolean `choice.pay`, `choice.flee` and `fightround.pre` values; a typo such as `pay="tru"` can silently waive a printed cost
 - [ ] 379. The source gate accepts enum casing and pipe lists that their rule readers do not support, including an inert `special="ATTACK"` and ignored `modifier="natural|noarmour"`
 - [ ] 381. Player documentation still promises the best carried equipment, says fight bonuses never survive a save, and overstates which tags support `modifier="current"`
+- [ ] 382. `build/serve.py` stalls a service worker's install precache (3 of ~48 requests reach it), so the offline path and a real update cannot be exercised against the repo's own dev server; `python -m http.server` serves the same tree fine
 - [ ] 369. `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19 (CI notice); the `smoke` and `build-scripts` jobs rely on the image's preinstalled `pwsh` 7, `google-chrome` and `python3`, so the move could stop CI with no change here
 - [ ] 370. Move hosting from GitHub Pages to a Cloudflare Worker (owner's request), keeping the root layout and the `/web/` URLs; the Worker's asset server 307s `index.html` to `./`, which the service worker's precache stored as a redirected response that a navigation refuses
 
@@ -417,6 +417,7 @@ this order.*
 - [x] 371. `loadSlotMeta` returned any parsed JSON, so `fl_meta = null` threw in `reconcileSlotMeta` before the title screen rendered and a junk entry listed a ghost card; it now keeps only a plain object of slot-number keys whose entries are objects with a string `name`, and what it drops is rebuilt from a readable blob or left occupied behind an unreadable one
 - [x] 372. `sameCandidate` compared ships by hull, load count and name and items without their effects, so an excellent crew, a different cargo or a potion with uses left could be sold with no picker; it now compares crew, cargo contents (order-free) and effects, and the picker's labels name the crew and the uses left
 - [x] 373. `GameState.keep` restored the preview when `save(true)` failed but left the blob a failed `fl_meta` write had already landed, so each retry claimed another slot; it now removes that blob, and if storage refuses the removal it reuses the same slot next time
+- [x] 374. `buildGameScreen` released the update gate outright, so a new build could reload away an unkept `?demo=` preview or progress whose autosave had failed; the game screen's hold now follows the save-status channel (`holdUpdateWhileUnsaved`), a successful save or Keep applies the deferred update once, and Keep drops `?demo=` so that reload lands on the title
 
 ---
 
@@ -515,36 +516,6 @@ removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first
 
 - `https://webfl.rwgs.net/web/` is served by the Worker (a `/README.md` request answers 404).
   An installed copy updates to the next build, and it opens `/web/index.html` offline.
-
----
-
-## 374. Hold automatic update reloads while play is unsaved
-
-**Priority: MEDIUM.** A background update can discard live progress without a player action.
-
-### What is wrong
-
-`buildGameScreen` in [app.js](web/js/app.js) unconditionally calls
-`swUpdateGate.hold(false)`. `registerSW` routes `controllerchange` straight through
-`makeUpdateGate.apply`, which reloads immediately when released. A `?demo=` game
-is intentionally ephemeral, and a normal adventure may have a failed autosave;
-both retain live progress that a reload cannot restore. The gate currently holds
-only the character-creation draft. Reloading a preview restarts its demo section;
-reloading after a failed save restores the older persisted state.
-
-### Steps
-
-1. Extend the update decision to live unsaved adventures and failed persistence,
-   using the existing gate and save-status channel where appropriate.
-2. Define when Keep, a successful save, or deliberate abandonment releases a pending
-   update. Do not reload before the current visit is coherently persisted.
-3. Add behavioral cases for preview play and failed-save recovery, then run the
-   documented test loop. Check controller-change behavior in the app shell.
-
-### Validation
-
-- An activated update does not discard an unkept preview or unsaved progress.
-- Once progress is saved or deliberately abandoned, the deferred update applies once.
 
 ---
 
@@ -735,11 +706,56 @@ reader, although `Test-AttrValue` in
 
 ---
 
+## 382. Let the dev server complete a service worker's install
+
+**Priority: LOW.** Local tooling only. The shipped site and the test runner are unaffected, and
+the runner's page registers no worker.
+
+### What is wrong
+
+Task 374's app-shell check served a scratch copy of `web/` with `build/serve.py` and opened
+`?demo=1.1` in headless Chrome over DevTools. The worker stayed `installing` for over three
+minutes with an empty cache. The server logged only `sw.js`, `js/sw-cache.js` and three
+`?v=` precache requests, and the rest of the required list never arrived. The same probe
+against `python -m http.server` on the same tree installed, activated and controlled the
+page within seconds (48 `?v=` requests). Under `serve.py`, a real update and the offline
+path therefore cannot be checked locally. The cause is not diagnosed. Candidates are
+`NoStoreHandler`'s `Cache-Control: no-store`/`Pragma` headers on the `cache: 'reload'`
+fetches, and the IPv4-only bind. The scratch probe was `sw-probe.mjs`, not kept in the
+repository.
+
+### Steps
+
+1. Reproduce with a minimal page that registers `web/sw.js` against `serve.py`, and confirm
+   which difference from `http.server` stalls the parallel precache fetches.
+2. Fix `serve.py` without losing either property its docstring defends: no-store for the
+   test loop, and refusing to share a port.
+3. Record a repeatable way to drive a real update in `docs/Testing.md`.
+
+### Validation
+
+- A worker registered against `serve.py` installs and controls the page.
+- The test runner's verdicts are unchanged.
+
+---
+
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 374): closed **374**, filed **382**. The game screen's update hold
+now follows the save-status channel through `holdUpdateWhileUnsaved` in `app.js`. An unkept
+preview or a failed save holds, a successful save releases, and `GameState.keep` now
+publishes save status on success. Keep also drops `?demo=` from the URL. Otherwise the
+deferred reload booted a fresh preview over the adventure just kept. `suite-economy` gained
+13 behavioral assertions with real `GameState`s, plus an updated source contract. A real
+controller change was driven in headless Chrome over a scratch copy of `web/`. The update
+waited out preview play, Keep applied it once and landed on the title, and an update during
+kept play reloaded at once. That check needed `python -m http.server`, because under
+`build/serve.py` the worker never finishes installing. That is filed as **382**. The full
+suite reported `RESULT ALL PASS pass=3303 fail=0`.
 
 Worked 2026-10-01 (task 373): closed **373**, filed nothing. A failed `keep()` now removes
 the blob its attempt wrote to the slot it had just claimed, which was free when claimed. If
