@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-391 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
+392 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
 the buckets below are open, and **all others are complete**. File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -19,7 +19,7 @@ there once the buckets below are clear.
 
 **HIGH**
 
-- [ ] 383. Failed Keep/import cleanup can delete the competing save that made the slot claim fail
+*(none open — file new HIGH work here)*
 
 **MEDIUM**
 
@@ -35,6 +35,7 @@ there once the buckets below are clear.
 **LOW**
 
 - [ ] 369. `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19 (CI notice); the `smoke` and `build-scripts` jobs rely on the image's preinstalled `pwsh` 7, `google-chrome` and `python3`, so the move could stop CI with no change here
+- [ ] 392. A Keep or import refused because another tab claimed the slot first tells the player "this adventure has been saved from another tab" and to load the newer save, which is somebody else's adventure; retrying works
 
 **Done**
 
@@ -426,41 +427,11 @@ this order.*
 - [x] 381. README, Game Rules and Playing the Game still said the best armour/weapon counts, Game Rules that fight bonuses never survive a save, and Game Rules and the XML Tag Reference that all six `modifier=` modes work on every tag; they now describe the wielded/worn choice, the visit-resume persistence and `current`'s two tags, and README's Training line says natural, not current
 - [x] 382. a service worker never finished installing under `build/serve.py`. The cause was `FLCache.precache`, not the server: it read no body until every fetch had answered, so unread no-store bodies held the browser's six HTTP/1.x connections. `fetchOk` now reads each body as it arrives and stores a fresh copy (which also strips a redirect, as task 370's `unredirect` did), and `docs/Testing.md` records how to drive a real update
 - [x] 370. the site moved from GitHub Pages to an assets-only Cloudflare Worker at `webfl.rwgs.net`, deployed by CI after every job passes; the precache strips the Worker's `index.html` redirect, only `CLOUDFLARE_API_TOKEN` turned out to be needed, Pages is off, and an installed copy updated and opens offline
+- [x] 383. a Keep or import refused because another tab filled the chosen slot first deleted that tab's save: Keep removed the blob, and import's `deleteSlot` removed its meta too. The rollback now removes a blob only while it is still the one this attempt wrote, and import no longer touches meta, which a failed save never writes. That also fixes an import whose meta write failed, which used to leave its own blob behind
 
 ---
 
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The open tasks' detail sections follow, in filed order; the Review log comes after them.
-
----
-
-## 383. Failed slot claims can delete another tab's save
-
-**Priority: HIGH.** Data loss in the rollback of Keep and import, introduced by the
-interaction between tasks 373 and 375. See the engine pass in
-[review-codex.md](review-codex.md).
-
-### What is wrong
-
-`nextFreeSlot` in [state.js](web/js/state.js) can observe a free slot before
-another tab fills it. `GameState.save` correctly detects that competing blob and
-refuses the write. `GameState.keep` then unconditionally removes the blob, while
-`importSave` calls `deleteSlot`, removing its metadata and blob. Neither verifies
-that the failed attempt wrote or still owns what it removes.
-
-An isolated storage stub published a competing save between the slot search and
-the save precondition read. Both Keep and import reported a conflict and deleted
-the competing blob. This is a controlled interleaving, not a two-tab timing test.
-
-### Steps
-
-1. Add competing-slot-claim cases to `suite-economy` for Keep and import. Require
-   the other writer's blob and metadata to survive the refused claim.
-2. Track which partial write belongs to an attempt and condition rollback on
-   continued ownership. A conflict that wrote nothing must clean up nothing;
-   check the remembered `_keepSlot` retry path too.
-3. Retain task 373's repeated partial-write recovery and task 375's stale-writer
-   refusal. Cover a competing replacement before cleanup as well.
-4. Run the complete build/test loop before closing.
 
 ---
 
@@ -754,6 +725,31 @@ pushed run on the new image validates it.
 
 ---
 
+## 392. A refused slot claim reports a two-tab conflict over the player's own adventure
+
+**Priority: LOW.** Wording only, and nothing is lost. Found while fixing task 383.
+
+### What is wrong
+
+When `GameState.keep` or `importSave` in [state.js](web/js/state.js) picks a free slot
+that another tab fills before `GameState.save` reads it, save() refuses the write with
+`SAVE_CONFLICT`: "This adventure has been saved from another tab or window since this
+one loaded it ... Export this tab's adventure to keep it, or load the newer save to
+continue from there." For a preview being kept, or a file being imported, that is wrong.
+The newer save in the slot is somebody else's adventure, not a newer copy of this one.
+Retrying Keep or the import picks the next free slot and succeeds (task 383's tests show
+this), but the message never says so.
+
+### Steps
+
+1. Give the refused claim its own message, for example "Another tab saved an adventure
+   into that slot first. Please try again.". It could be set by `keep` and `importSave`
+   when save() reports `saveConflict`. Leave the two-tab message for a loaded game.
+2. Assert the wording in task 383's block in `suite-economy`.
+3. Run the complete build/test loop before closing.
+
+---
+
 ## What is wrong
 
 GitHub Pages serves `main` from the repository root under the root `CNAME`, so `books/`,
@@ -808,6 +804,18 @@ removed the old DNS record, so `webfl.rwgs.net` does not resolve until the first
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 383): closed **383**, filed **392**. `keep` and `importSave` now roll
+back through `removeOwnBlob` in `state.js`. It removes the slot's blob only while it is still
+the one this attempt wrote, and import no longer calls `deleteSlot`. Task 383's new block in
+`suite-economy` uses a storage stub to publish a rival save, blob only or blob and meta,
+between the slot search and save()'s re-read. It also covers a rival replacing a partial write
+before clean-up, and a rival filling the slot that task 373 holds after a refused clean-up.
+Against the old `state.js`, 11 of its 19 assertions failed. One of those was a further bug:
+an import whose meta write failed left its own blob behind, because `deleteSlot` gave up when
+its own meta write failed. **392** (LOW) records that the refused claim reports the two-tab
+message, which wrongly calls the rival's save a newer copy of this adventure.
+`RESULT ALL PASS pass=3371 fail=0`, and `node-import.mjs` passed.
 
 Reviewed 2026-10-01 (Codex, engine follow-up): filed **383-391**, closed nothing.
 The full engine report is [review-codex.md](review-codex.md). **383** is HIGH:

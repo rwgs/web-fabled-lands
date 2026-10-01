@@ -390,6 +390,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 381. Bring player rule summaries into line with the implemented rules
 - [x] 382. Let the dev server complete a service worker's install
 - [x] 380. Make late asynchronous failures fail the test runners
+- [x] 383. Failed slot claims can delete another tab's save
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
 
@@ -22337,5 +22338,72 @@ publishes the whole repository, and Cloudflare already sits in front of it.
     `/web/?demo=1.10` the game screen, all from the cache.
   - Page-level network emulation was tried first and did not reach the worker's fetches,
     so it proved nothing. The dead proxy is the check that counts.
+
+---
+
+## 383. Failed slot claims can delete another tab's save
+
+**Priority: HIGH.** Data loss in the rollback of Keep and import, introduced by the
+interaction between tasks 373 and 375. See the engine pass in
+[review-codex.md](review-codex.md).
+
+### What is wrong
+
+`nextFreeSlot` in [state.js](web/js/state.js) can observe a free slot before
+another tab fills it. `GameState.save` correctly detects that competing blob and
+refuses the write. `GameState.keep` then unconditionally removes the blob, while
+`importSave` calls `deleteSlot`, removing its metadata and blob. Neither verifies
+that the failed attempt wrote or still owns what it removes.
+
+An isolated storage stub published a competing save between the slot search and
+the save precondition read. Both Keep and import reported a conflict and deleted
+the competing blob. This is a controlled interleaving, not a two-tab timing test.
+
+### Steps
+
+1. Add competing-slot-claim cases to `suite-economy` for Keep and import. Require
+   the other writer's blob and metadata to survive the refused claim.
+2. Track which partial write belongs to an attempt and condition rollback on
+   continued ownership. A conflict that wrote nothing must clean up nothing;
+   check the remembered `_keepSlot` retry path too.
+3. Retain task 373's repeated partial-write recovery and task 375's stale-writer
+   refusal. Cover a competing replacement before cleanup as well.
+4. Run the complete build/test loop before closing.
+
+### The fix
+
+save() writes the blob first and `fl_meta` last. So a save that returns false never wrote
+meta, and at most wrote its own blob. It records that blob in `_seen` as soon as it is
+written.
+
+- `web/js/state.js`: a new `removeOwnBlob(seen, slot)` removes the slot's blob only while
+  it still equals the `raw` that `seen` records for that slot. Both rollbacks use it:
+  - `keep` calls it in place of an unconditional `removeItem`. If storage refuses the
+    removal, the slot is held for the retry as before (task 373).
+  - `importSave` calls it in place of `deleteSlot`, so a refused import no longer deletes
+    the rival's meta entry.
+- `deleteSlot` also had a bug of its own here. It writes meta first and gives up if that
+  write fails, so an import whose meta write failed left its own blob behind, and
+  reconcileSlotMeta then listed that blob as an adventure. `removeOwnBlob` writes no meta,
+  so the blob is now removed.
+- `web/tests/suite-economy.js` (task 383 block, 19 assertions). A `getItem` stub publishes
+  a rival save into slot 0 between the slot search's read and save()'s re-read. It runs
+  once with the rival's blob and meta, and once with the blob only.
+  - Keep and import both report the conflict, and the rival survives.
+  - The preview stays live, and a retried Keep takes slot 1.
+  - A rival that replaces a partial write before clean-up is left alone, by Keep and by
+    import, and Keep does not hold its slot afterwards.
+  - An import that fails after its blob write leaves no blob.
+  - Task 373's held slot: clean-up is refused, then a rival replaces the orphan without
+    claiming meta. The retry is refused, the rival survives, and the next Keep moves on.
+
+Checked:
+
+- Against the old `state.js`, 11 of the new assertions failed. Task 373's and task 375's
+  blocks still pass.
+- `RESULT ALL PASS pass=3371 fail=0` (3352 before, plus the 19 new), and `node-import.mjs`
+  passed.
+- Filed task 392: the refused claim reports the two-tab message, which calls the rival's
+  save a newer copy of this adventure.
 
 ---

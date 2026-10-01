@@ -1382,9 +1382,12 @@ export class GameState {
    *
    *  save() writes the blob and then fl_meta, so a failure between the two left the blob in
    *  the claimed slot. nextFreeSlot rightly counts a blob as occupied, so every retry claimed
-   *  another slot. The slot was free when claimed, so whatever is in it now is this attempt's
-   *  write and is removed; if storage refuses that too, the slot is remembered and the next
-   *  attempt reuses it while no meta entry has claimed it. (task 373) */
+   *  another slot. That blob is removed; if storage refuses that too, the slot is remembered
+   *  and the next attempt reuses it while no meta entry has claimed it. (task 373)
+   *
+   *  Only this attempt's own blob is removed. The slot was free when chosen, but another tab can
+   *  fill it before save() reads it, and save() then refuses the write; removing whatever was
+   *  there deleted that tab's save. (task 383) */
   keep() {
     const own = this._keepSlot;
     const slot = own != null && !loadSlotMeta()[own] ? own : nextFreeSlot();
@@ -1395,7 +1398,7 @@ export class GameState {
     if (!this.save(true)) { // explicit: a suppressed txn must not fake this promotion write (task 168)
       this.slot = prevSlot;
       this.ephemeral = true;
-      try { localStorage.removeItem(SAVE_PREFIX + slot); this._keepSlot = null; this._seen = null; } catch (_) { this._keepSlot = slot; }
+      try { removeOwnBlob(this._seen, slot); this._keepSlot = null; this._seen = null; } catch (_) { this._keepSlot = slot; }
       throw new Error(this.lastSaveError || 'Could not save this adventure.');
     }
     this._keepSlot = null;
@@ -2012,11 +2015,21 @@ export function importSave(data, availableBooks = null) {
     // The write failed (storage full/blocked). Don't claim the slot or report
     // success: roll back any partial write and raise the storage error so the
     // UI shows it instead of toasting `Imported "undefined"`.
-    deleteSlot(slot); // best-effort rollback; reports rather than throws (task 198)
+    // Not deleteSlot: a failed save() wrote no meta, so any entry is another tab's (task 383).
+    try { removeOwnBlob(gs._seen, slot); } catch (_) { /* best effort: an orphan blob is re-listed (task 137) */ }
     throw new Error(gs.lastSaveError || 'Could not save the imported adventure.');
   }
   const meta = loadSlotMeta()[slot];
   return { slot, meta };
+}
+
+/** Roll back a failed claim of `slot`: remove its blob only while it is still the one `seen`
+ *  records this game writing there. save() writes fl_meta last, so a failed save wrote no meta,
+ *  and at most its own blob; a refused claim wrote nothing, and a blob another tab wrote or
+ *  replaced since is theirs. Throws when storage refuses. (task 383) */
+function removeOwnBlob(seen, slot) {
+  const mine = seen && seen.slot === slot ? seen.raw : null;
+  if (mine != null && localStorage.getItem(SAVE_PREFIX + slot) === mine) localStorage.removeItem(SAVE_PREFIX + slot);
 }
 
 /** First unoccupied save slot (0..MAX_SLOTS-1), or null if all are full. Callers must

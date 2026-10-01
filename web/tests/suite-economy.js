@@ -1128,6 +1128,101 @@ export async function run(ctx) {
       if (savedMeta == null) localStorage.removeItem(M); else localStorage.setItem(M, savedMeta);
     }
 
+    // --- task 383: a refused slot claim must not delete the save that beat it ---
+    // Another tab can fill the slot nextFreeSlot chose before save() reads it. save() refused the
+    // write, and then keep() removed the blob and importSave deleteSlot()ed it, meta and all.
+    {
+      const S = 'fl_save_', M = 'fl_meta';
+      const savedMeta = localStorage.getItem(M);
+      const savedBlobs = [];
+      for (let i = 0; i < 20; i++) { savedBlobs.push(localStorage.getItem(S + i)); localStorage.removeItem(S + i); }
+      localStorage.removeItem(M);
+      const realGet = Storage.prototype.getItem, realSet = Storage.prototype.setItem;
+      const rival = JSON.stringify({ name: 'Rival383', abilities: {}, stamina: 9 });
+      const rivalMeta = JSON.stringify({ 0: { name: 'Rival383' } });
+      const reset = () => { delete localStorage.getItem; delete localStorage.setItem; delete localStorage.removeItem; for (let i = 0; i < 20; i++) localStorage.removeItem(S + i); localStorage.removeItem(M); };
+      // The rival publishes between the slot search's read of slot 0 and save()'s re-read of it.
+      const rivalAtSecondRead = (withMeta) => {
+        let reads = 0;
+        localStorage.getItem = function (k) {
+          if (k === S + 0 && ++reads === 2) { realSet.call(this, S + 0, rival); if (withMeta) realSet.call(this, M, rivalMeta); }
+          return realGet.call(this, k);
+        };
+      };
+      const rivalSurvives = (withMeta) => realGet.call(localStorage, S + 0) === rival
+        && (!withMeta || (loadSlotMeta()[0] && loadSlotMeta()[0].name === 'Rival383'));
+      const tryIt = (fn) => { try { return { value: fn() }; } catch (e) { return { error: e }; } };
+      const preview = () => { const g = GameState.create({ name: 'Keep383', gender: 'f', profession: 'Rogue', book: 1, adv }); g.slot = 0; g.ephemeral = true; g.data.shards = 383; return g; };
+      const imp = { abilities: { combat: 5 }, stamina: 9, name: 'Imp383', book: 1, section: 1 };
+
+      for (const withMeta of [true, false]) {
+        const tag = withMeta ? 'blob and meta' : 'blob only';
+        const gk = preview();
+        rivalAtSecondRead(withMeta);
+        const rk = tryIt(() => gk.keep());
+        delete localStorage.getItem;
+        ok(`task383: Keep refused by a rival claim (${tag}) reports the conflict`, !!rk.error && /another tab or window/.test(rk.error.message), String(rk.error || rk.value));
+        ok(`task383: the rival's save survives the refused Keep (${tag})`, rivalSurvives(withMeta), realGet.call(localStorage, S + 0));
+        ok(`task383: the preview stays live after the refused Keep (${tag})`, gk.ephemeral === true && gk.data.shards === 383);
+        const kept = tryIt(() => gk.keep());
+        ok(`task383: a retried Keep takes another slot and leaves the rival (${tag})`,
+           kept.value === 1 && readSlotData(1).shards === 383 && rivalSurvives(withMeta), String(kept.error || kept.value));
+        reset();
+
+        rivalAtSecondRead(withMeta);
+        const ri = tryIt(() => importSave(imp));
+        delete localStorage.getItem;
+        ok(`task383: an import refused by a rival claim (${tag}) reports failure`, !!ri.error && /another tab or window/.test(ri.error.message), String(ri.error || ri.value));
+        ok(`task383: the rival's save survives the refused import (${tag})`, rivalSurvives(withMeta), realGet.call(localStorage, S + 0));
+        reset();
+      }
+
+      // A partial write (blob landed, fl_meta refused) that the rival replaces before clean-up.
+      const metaFailsAfterRival = () => {
+        localStorage.setItem = function (k, v) {
+          if (k === M) { realSet.call(this, S + 0, rival); const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }
+          return realSet.call(this, k, v);
+        };
+      };
+      const gr = preview();
+      metaFailsAfterRival();
+      const rr = tryIt(() => gr.keep());
+      delete localStorage.setItem;
+      ok('task383: a Keep whose blob was replaced before clean-up leaves the replacement', !!rr.error && realGet.call(localStorage, S + 0) === rival);
+      ok('task383: ...and does not hold the rival\'s slot for its retry', tryIt(() => gr.keep()).value === 1 && realGet.call(localStorage, S + 0) === rival);
+      reset();
+      metaFailsAfterRival();
+      const ir = tryIt(() => importSave(imp));
+      delete localStorage.setItem;
+      ok('task383: an import whose blob was replaced before clean-up leaves the replacement', !!ir.error && realGet.call(localStorage, S + 0) === rival);
+      reset();
+
+      // The import's own partial write is still rolled back (the task 373 case, for import).
+      localStorage.setItem = function (k, v) { if (k === M) { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; } return realSet.call(this, k, v); };
+      const ip = tryIt(() => importSave(imp));
+      delete localStorage.setItem;
+      ok('task383: an import failing after its blob write leaves no blob', !!ip.error && realGet.call(localStorage, S + 0) == null && nextFreeSlot() === 0);
+      reset();
+
+      // The remembered slot (task 373): clean-up was refused, then a rival replaced the orphan
+      // without claiming meta. The retry reuses the slot, is refused, and must leave the rival.
+      const gh = preview();
+      localStorage.setItem = function (k, v) { if (k === M) { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; } return realSet.call(this, k, v); };
+      localStorage.removeItem = function () { throw new Error('blocked'); };
+      tryIt(() => gh.keep());
+      delete localStorage.removeItem;
+      ok('task383: (setup) the refused clean-up holds slot 0', realGet.call(localStorage, S + 0) != null && realGet.call(localStorage, S + 0) !== rival);
+      realSet.call(localStorage, S + 0, rival);
+      const rh = tryIt(() => gh.keep());
+      delete localStorage.setItem;
+      ok('task383: the held-slot retry refused by a rival leaves the rival', !!rh.error && realGet.call(localStorage, S + 0) === rival, String(rh.error));
+      ok('task383: ...and the next Keep moves on to a free slot', tryIt(() => gh.keep()).value === 1 && realGet.call(localStorage, S + 0) === rival);
+      reset();
+
+      for (let i = 0; i < 20; i++) { if (savedBlobs[i] != null) localStorage.setItem(S + i, savedBlobs[i]); }
+      if (savedMeta != null) localStorage.setItem(M, savedMeta);
+    }
+
     // --- task 176: unavailable-book input rejects inside the recovery UI ---
     // An import whose current book isn't bundled must be rejected BEFORE a slot is claimed or
     // written, so Play can never build a game screen that then strands on the rejected fetch.
