@@ -1398,6 +1398,9 @@ export class GameState {
     if (!this.save(true)) { // explicit: a suppressed txn must not fake this promotion write (task 168)
       this.slot = prevSlot;
       this.ephemeral = true;
+      // A refused claim is not a two-tab conflict over THIS adventure: the slot's save is another
+      // one, so neither the two-tab message nor its "Load the newer save" applies (task 392).
+      if (this.saveConflict) { this.saveConflict = false; this.lastSaveError = SLOT_TAKEN; }
       try { removeOwnBlob(this._seen, slot); this._keepSlot = null; this._seen = null; } catch (_) { this._keepSlot = slot; }
       throw new Error(this.lastSaveError || 'Could not save this adventure.');
     }
@@ -1706,6 +1709,9 @@ function migrate(data) {
 // are almost always private-browsing / disabled storage.
 // Shown when save() finds the slot rewritten by another tab or window (task 375).
 const SAVE_CONFLICT = 'This adventure has been saved from another tab or window since this one loaded it, so this tab’s progress was not written over it. Export this tab’s adventure to keep it, or load the newer save to continue from there.';
+// A Keep or import whose free slot another tab filled first (tasks 383, 392). Nothing was lost,
+// and a retry picks the next free slot.
+const SLOT_TAKEN = 'Another tab or window saved an adventure into that save slot first, so nothing was written. Please try again.';
 
 function describeSaveError(e) {
   const quota = e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014);
@@ -2039,7 +2045,7 @@ export function importSave(data, availableBooks = null) {
     // UI shows it instead of toasting `Imported "undefined"`.
     // Not deleteSlot: a failed save() wrote no meta, so any entry is another tab's (task 383).
     try { removeOwnBlob(gs._seen, slot); } catch (_) { /* best effort: an orphan blob is re-listed (task 137) */ }
-    throw new Error(gs.lastSaveError || 'Could not save the imported adventure.');
+    throw new Error(gs.saveConflict ? SLOT_TAKEN : (gs.lastSaveError || 'Could not save the imported adventure.'));
   }
   const meta = loadSlotMeta()[slot];
   return { slot, meta };

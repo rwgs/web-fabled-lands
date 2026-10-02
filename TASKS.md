@@ -28,7 +28,6 @@ there once the buckets below are clear.
 **LOW**
 
 - [ ] 369. `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19 (CI notice); the `smoke` and `build-scripts` jobs rely on the image's preinstalled `pwsh` 7, `google-chrome` and `python3`, so the move could stop CI with no change here
-- [ ] 392. A Keep or import refused because another tab claimed the slot first tells the player "this adventure has been saved from another tab" and to load the newer save, which is somebody else's adventure; retrying works
 - [ ] 394. Immunity to Injury is offered for walk wounds and enemy blows only; the 15 flee parting wounds, 4 group-bundled wounds and 2 `<fightround>` wounds still land without asking
 
 **Done**
@@ -431,6 +430,7 @@ this order.*
 - [x] 390. book5/365's Immunity to Injury was displayed and never usable. While it is held, a walk `<lose stamina>` is now rolled and waits for "Take the wound" or "Use Immunity to Injury", and so does each enemy blow that would cost Stamina. A fight's round now runs as resumable steps in `combat.js`, and blocking a blow covers the rest of that round. The exits wait meanwhile, and both decisions survive a reload without rerolling
 - [x] 391. the COMBAT-blessing retry was offered only after the enemy's reply, so at book1/105 a fatal reply made the promised retry unusable, and a winning retry came after the wound it should have prevented. A missed strike with an eligible retry now pauses the resumable round before the reply. A retry strikes first, and keeping the miss lets the reply land once. Enemy-first fights keep the end-of-round retry
 - [x] 393. a forced `<group>` bundling a roll held nothing, so book3/273's and book3/629's "lose 1-6 of your possessions" could be walked past with the die unrolled. `computeGroupGate` now counts such groups, settled by their roll. The 1/91 and 2/134 bets, which lock a stake cache, are exempt: 1/91 says "If you want to gamble", and a zero stake would satisfy a gate at 2/134 anyway
+- [x] 392. a Keep or import refused because another tab filled the slot first reported the two-tab message, "load the newer save", which here names somebody else's adventure. It now says another tab saved an adventure into that slot first and to try again. A failed Keep also no longer leaves the preview flagged `saveConflict`, whose "Load the newer save" button would have loaded the preview's old slot
 
 ---
 
@@ -478,31 +478,6 @@ pushed run on the new image validates it.
 
 ---
 
-## 392. A refused slot claim reports a two-tab conflict over the player's own adventure
-
-**Priority: LOW.** Wording only, and nothing is lost. Found while fixing task 383.
-
-### What is wrong
-
-When `GameState.keep` or `importSave` in [state.js](web/js/state.js) picks a free slot
-that another tab fills before `GameState.save` reads it, save() refuses the write with
-`SAVE_CONFLICT`: "This adventure has been saved from another tab or window since this
-one loaded it ... Export this tab's adventure to keep it, or load the newer save to
-continue from there." For a preview being kept, or a file being imported, that is wrong.
-The newer save in the slot is somebody else's adventure, not a newer copy of this one.
-Retrying Keep or the import picks the next free slot and succeeds (task 383's tests show
-this), but the message never says so.
-
-### Steps
-
-1. Give the refused claim its own message, for example "Another tab saved an adventure
-   into that slot first. Please try again.". It could be set by `keep` and `importSave`
-   when save() reports `saveConflict`. Leave the two-tab message for a loaded game.
-2. Assert the wording in task 383's block in `suite-economy`.
-3. Run the complete build/test loop before closing.
-
----
-
 ## 394. Immunity to Injury does not reach every wound
 
 **Priority: LOW.** The blessing protects most wounds now; these still land without asking.
@@ -537,6 +512,14 @@ directly and never ask:
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 392): closed **392**, filed nothing. `state.js` gains `SLOT_TAKEN`:
+"Another tab or window saved an adventure into that save slot first, so nothing was written.
+Please try again." `keep` sets it in place of the conflict and clears `saveConflict` on the
+restored preview, because `surfaceSaveError` offers "Load the newer save" for that flag.
+`importSave` throws `SLOT_TAKEN` on a conflict. Task 383's four refused-claim assertions in
+`suite-economy` now assert the wording and the cleared flag. Against the old `state.js` they
+reported 4 failures. `RESULT ALL PASS pass=3502 fail=0`, and `node-import.mjs` passed.
 
 Worked 2026-10-01 (task 393): closed **393**, filed nothing. `computeGroupGate` in
 `render-gates.js` now includes a forced `<group>` that bundles a roll. It still excludes one

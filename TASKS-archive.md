@@ -400,6 +400,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 390. Immunity to Injury has no usable protection
 - [x] 391. Combat rerolls are offered after the enemy has already struck
 - [x] 393. Forced roll groups can be walked past unrolled
+- [x] 392. A refused slot claim reports a two-tab conflict over the player's own adventure
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
 
@@ -23186,6 +23187,56 @@ Tests:
 
 Checked:
 
+- `RESULT ALL PASS pass=3502 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 392. A refused slot claim reports a two-tab conflict over the player's own adventure
+
+**Priority: LOW.** Wording only, and nothing is lost. Found while fixing task 383.
+
+### What is wrong
+
+When `GameState.keep` or `importSave` in [state.js](web/js/state.js) picks a free slot
+that another tab fills before `GameState.save` reads it, save() refuses the write with
+`SAVE_CONFLICT`: "This adventure has been saved from another tab or window since this
+one loaded it ... Export this tab's adventure to keep it, or load the newer save to
+continue from there." For a preview being kept, or a file being imported, that is wrong.
+The newer save in the slot is somebody else's adventure, not a newer copy of this one.
+Retrying Keep or the import picks the next free slot and succeeds (task 383's tests show
+this), but the message never says so.
+
+### Steps
+
+1. Give the refused claim its own message, for example "Another tab saved an adventure
+   into that slot first. Please try again.". It could be set by `keep` and `importSave`
+   when save() reports `saveConflict`. Leave the two-tab message for a loaded game.
+2. Assert the wording in task 383's block in `suite-economy`.
+3. Run the complete build/test loop before closing.
+
+### The fix
+
+- `web/js/state.js`:
+  - A new `SLOT_TAKEN` message sits beside `SAVE_CONFLICT`: "Another tab or window saved
+    an adventure into that save slot first, so nothing was written. Please try again."
+  - When `keep`'s save is refused with `saveConflict`, it now sets `lastSaveError` to
+    `SLOT_TAKEN` and clears `saveConflict` on the restored preview, then throws as before.
+  - `importSave` throws `SLOT_TAKEN` when its save reports a conflict.
+  - The two-tab message is left for a loaded game.
+- Clearing the flag matters beyond wording. `surfaceSaveError` in `app.js` offers "Load
+  the newer save" whenever `saveConflict` is set, and loads `state.slot`. After a failed
+  Keep, that is the preview's own previous slot, which holds a different adventure.
+
+Tests:
+
+- Task 383's block in `suite-economy`: the four refused-claim assertions now require
+  `SLOT_TAKEN`'s wording, for Keep and import, rival blob only and blob with meta. For Keep
+  they also require that the preview's `saveConflict` is false and its `lastSaveError` is
+  that message.
+
+Checked:
+
+- Against the old `state.js`, the four assertions failed.
 - `RESULT ALL PASS pass=3502 fail=0`, and `node-import.mjs` passed.
 
 ---

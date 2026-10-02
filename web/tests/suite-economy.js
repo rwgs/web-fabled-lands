@@ -1161,7 +1161,11 @@ export async function run(ctx) {
         rivalAtSecondRead(withMeta);
         const rk = tryIt(() => gk.keep());
         delete localStorage.getItem;
-        ok(`task383: Keep refused by a rival claim (${tag}) reports the conflict`, !!rk.error && /another tab or window/.test(rk.error.message), String(rk.error || rk.value));
+        // Its own message, not the two-tab one, and the preview is not left flagged as a two-tab
+        // conflict, whose "Load the newer save" would load somebody else's adventure (task 392).
+        ok(`task383: Keep refused by a rival claim (${tag}) reports the slot was taken`,
+           !!rk.error && /saved an adventure into that save slot first/.test(rk.error.message) && /try again/.test(rk.error.message)
+           && gk.saveConflict === false && gk.lastSaveError === rk.error.message, String(rk.error || rk.value));
         ok(`task383: the rival's save survives the refused Keep (${tag})`, rivalSurvives(withMeta), realGet.call(localStorage, S + 0));
         ok(`task383: the preview stays live after the refused Keep (${tag})`, gk.ephemeral === true && gk.data.shards === 383);
         const kept = tryIt(() => gk.keep());
@@ -1172,7 +1176,8 @@ export async function run(ctx) {
         rivalAtSecondRead(withMeta);
         const ri = tryIt(() => importSave(imp));
         delete localStorage.getItem;
-        ok(`task383: an import refused by a rival claim (${tag}) reports failure`, !!ri.error && /another tab or window/.test(ri.error.message), String(ri.error || ri.value));
+        ok(`task383: an import refused by a rival claim (${tag}) reports the slot was taken`,
+           !!ri.error && /saved an adventure into that save slot first/.test(ri.error.message), String(ri.error || ri.value));
         ok(`task383: the rival's save survives the refused import (${tag})`, rivalSurvives(withMeta), realGet.call(localStorage, S + 0));
         reset();
       }
