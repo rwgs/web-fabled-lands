@@ -398,6 +398,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 388. Purse clamping breaks investment multiples
 - [x] 389. Transfers silently select unequal possessions
 - [x] 390. Immunity to Injury has no usable protection
+- [x] 391. Combat rerolls are offered after the enemy has already struck
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
 
@@ -23027,5 +23028,97 @@ Checked:
 - `RESULT ALL PASS pass=3480 fail=0`, and `node-import.mjs` passed.
 - Filed task 394: 21 shipped wounds still land without asking. They are 15 `<flee>`
   parting wounds, 4 in `<group>` actions and 2 in `<fightround>` bodies.
+
+---
+
+## 391. Combat rerolls are offered after the enemy has already struck
+
+**Priority: MEDIUM.** A promised reroll can become unavailable before the player
+gets the chance to use it.
+
+### What is wrong
+
+`fightRound` in [combat.js](web/js/combat.js) resolves the missed player-first
+strike and the enemy's reply together. `drawFight` in
+[render-combat.js](web/js/render-combat.js) offers the COMBAT reroll afterwards;
+`rerollAttack` rejects it when the player has already died. This also applies
+the reply's damage/effects even when a successful retry would have defeated the
+enemy before it could strike.
+
+[Book4/324](books/book4/324.xml) promises a retry when a COMBAT roll fails.
+At [book1/105](books/book1/105.xml), a character with COMBAT 5, 1 Stamina and
+that blessing rolls two ones: the attack total 7 misses Defence 8, then the
+enemy's total 7 beats player Defence 6 and kills the character. The probe's
+retry returns false with the enemy still at 9 Stamina. Rolling two sixes on
+the promised retry would score 17, deal 9 and win before the reply.
+
+### Steps
+
+1. Add `suite-combat` regressions for that fatal-reply case and a nonfatal reply
+   that a winning reroll should prevent. Existing task 91 tests use harmless
+   replies and cannot detect the ordering problem.
+2. Make a missed strike with an eligible reroll a decision boundary before
+   advancing to the next part of the round. Keeping the miss runs the pending
+   reply once; a retry resolves the new strike first.
+3. Preserve enemy-first initiative, group fights, multi-attack enemies,
+   wound/round hooks and once-per-round retry limits. Save/resume must not
+   repeat or bypass a pending reply or reopen a consumed blessing.
+4. Run the complete build/test loop before closing.
+
+### The fix
+
+Task 390 had already turned a combat round into resumable steps (`runRound` in
+`combat.js`), so this is a second kind of pause.
+
+- `web/js/combat.js`:
+  - After a `player` step, `runRound` stops when four things hold: the strike missed, the
+    COMBAT blessing is held, the round's retry is unspent (`attackRerolled` false), and
+    another step remains, either an enemy reply or a `<fightround>` body. It records
+    `pending = { kind: 'reroll', fi }` with the cursor already past the strike.
+  - A miss with nothing after it, under enemy-first initiative, does not pause. That case
+    keeps the end-of-round retry, which is safe because no reply follows.
+  - `pendingReroll(fights)` reports the wait.
+  - `resolveReroll(state, fights, retry, dmgNode, roundNode)` clears the wait and then
+    either retries through `rerollAttack` or marks the round's retry spent
+    (`attackRerolled`). It then runs the rest of the round.
+  - The usual stop rules then apply. A retry that wins ends a lone fight before its reply.
+    In a group, a felled foe's reply is skipped while the others still reply.
+  - `rerollAttack` refuses while a round is paused, so the round cannot be left stuck.
+  - `restoreFight` accepts a `reroll` wait only directly after a `player` step of the same
+    foe. Since `attackRerolled` is saved, a reload neither repeats nor skips the reply and
+    does not reopen a spent retry.
+- `web/js/render-combat.js`: `appendRerollDecision` stands "Your blow misses the X." with
+  "Use COMBAT blessing (retry your attack)" and "Keep the miss" in place of the fight
+  controls. In a group with several foes standing, the retry button names the target, and
+  both widgets end through their `finish` tail.
+- `web/js/render.js`: a fight waiting on either decision sets the new `pendingRound` flag.
+  `applyWoundGate` then holds every exit, flee included, with "Finish the combat round
+  above first.", because the reply is still owed.
+
+Tests:
+
+- Task 391's block in `suite-combat`, 17 assertions:
+  - On the real 1/105 `<fight>`, the filing's case: two ones miss and the round stops with
+    the player alive and no reply. Two sixes on the retry then win, the reply never comes,
+    and the player keeps 1 Stamina.
+  - A winning retry spares a nonfatal wound.
+  - Keeping the miss lands the reply once and keeps the blessing, and no retry is offered
+    afterwards. A missed retry is still followed by its one reply.
+  - With `attacks="2"`, both replies land after a kept miss.
+  - Enemy-first: there is no pause, and the end-of-round retry still works.
+  - A post-exchange `<fightround>` body runs once, after the decision.
+  - A group: the retry fells the Orc before it can reply, and the Goblin still replies.
+  - With both blessings, a kept miss leads to the Immunity to Injury question.
+  - A save mid-decision restores the wait with its reply owed, and a forged position
+    drops.
+- The task 91 tests now answer the paused round through `resolveReroll`. Their dice let the
+  retry hit and the round's one reply miss, and they assert that the reply came exactly
+  once.
+
+Checked:
+
+- The block cannot run against the old `combat.js`, which has no `resolveReroll` or
+  `pendingReroll`. The filing's browser probe is the evidence for the old ordering.
+- `RESULT ALL PASS pass=3497 fail=0`, and `node-import.mjs` passed.
 
 ---

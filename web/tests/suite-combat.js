@@ -4,7 +4,7 @@ import * as data from '../js/data.js';
 import { GameState, makeItem, sanitizeData, readSlotData, deleteSlot } from '../js/state.js';
 import * as eng from '../js/engine.js';
 import { fightRound, makeFight, groupFightRound, isDefeated, useWrathBlessing, useDefenceBlessing, rerollAttack, restoreFight,
-  pendingWound, resolveInjury } from '../js/combat.js';
+  pendingWound, resolveInjury, pendingReroll, resolveReroll } from '../js/combat.js';
 import { buyTrade, sellTrade, applyInlineBuy, sellCargo } from '../js/market.js';
 import { Story } from '../js/render.js';
 import { renderChoice } from '../js/render-choices.js';
@@ -410,10 +410,15 @@ export async function run(ctx) {
       fightRound(g91, f91, null);
       Math.random = rnd91;
       ok('§91 a failed strike is flagged for the blessing retry', f91.lastStrikeMissed === true && f91.stamina === 12);
-      Math.random = () => 0.99; // retry: 18 vs 15 → −3
-      const did91 = rerollAttack(g91, f91);
+      // The miss pauses the round before the reply (task 391): the retry is answered there, and
+      // the round's one reply follows it. Two dice of 6 for the retry, then the reply misses.
+      let n91 = 0;
+      Math.random = () => (n91++ < 2 ? 0.99 : 0); // retry: 18 vs 15 → −3
+      const did91 = resolveReroll(g91, f91, true);
       Math.random = rnd91;
-      ok('§91 the COMBAT blessing retries the strike (12→9), consumed, no enemy reply', did91 === true && f91.stamina === 9 && !g91.hasBlessing('combat') && g91.data.stamina === 30, `en=${f91.stamina} st=${g91.data.stamina}`);
+      ok('§91 the COMBAT blessing retries the strike (12→9), consumed, with the round\'s one reply after it',
+         did91 === true && f91.stamina === 9 && !g91.hasBlessing('combat') && g91.data.stamina === 30
+         && f91.log.filter((l) => /^Duellist rolls/.test(l)).length === 1, `en=${f91.stamina} st=${g91.data.stamina}`);
       ok('§91 no second retry in the same round', rerollAttack(g91, f91) === false);
       // A HIT is not retryable, blessing or not.
       const g91h = GameState.create({ name:'CB91h', gender:'m', profession:'Warrior', book:4, adv });
@@ -429,10 +434,10 @@ export async function run(ctx) {
       const f91p = makeFight(parse('<fight name="Wall" combat="1" defence="30" stamina="12"/>'), g91p);
       Math.random = () => 0;
       fightRound(g91p, f91p, null);
-      const r1p = rerollAttack(g91p, f91p); // retry also misses (Def 30)
+      const r1p = resolveReroll(g91p, f91p, true); // retry also misses (Def 30); the round ends
       const r2p = rerollAttack(g91p, f91p);
       fightRound(g91p, f91p, null); // a NEW round re-arms the retry
-      const r3p = rerollAttack(g91p, f91p);
+      const r3p = resolveReroll(g91p, f91p, true);
       Math.random = rnd91;
       ok('§91 a permanent COMBAT blessing survives and re-arms next round (not twice a round)', r1p === true && r2p === false && r3p === true && g91p.hasBlessing('combat'));
 
@@ -464,7 +469,9 @@ export async function run(ctx) {
       await settle42();
       Math.random = rnd91;
       ok('§91 a missed attack offers the COMBAT-blessing retry', !!retryBtn91());
-      Math.random = () => 0.99; // retry hits: 12→9
+      // The retry comes before the reply now (task 391): two 6s for it, then the reply misses.
+      let nr91 = 0;
+      Math.random = () => (nr91++ < 2 ? 0.99 : 0); // retry hits: 12→9
       retryBtn91().click();
       Math.random = rnd91;
       ok('§91 the retry strikes again (12→9), no extra enemy blow, blessing spent', /Stamina 9\/12/.test(cdr91.querySelector('.en-stam').textContent) && gdr91.data.stamina === 30 && !gdr91.hasBlessing('combat') && !retryBtn91(), cdr91.querySelector('.en-stam').textContent);
@@ -481,8 +488,9 @@ export async function run(ctx) {
       Math.random = rnd91;
       const gRetry91 = Array.from(cdg91.querySelectorAll('button')).find((b) => /retry your attack on Orc/.test(b.textContent));
       ok('§91 a missed group strike offers the retry against that foe', !!gRetry91);
-      Math.random = () => 0.99; // retry: 18 vs 15 → Orc 12→9; Goblin untouched
-      gRetry91.click();
+      let ng91 = 0;
+      Math.random = () => (ng91++ < 2 ? 0.99 : 0); // retry: 18 vs 15 → Orc 12→9; then both foes miss back
+      if (gRetry91) gRetry91.click();
       Math.random = rnd91;
       const orc91 = Array.from(cdg91.querySelectorAll('.fight-stats:not(.you)')).find((x) => /Orc/.test(x.textContent));
       const gob91 = Array.from(cdg91.querySelectorAll('.fight-stats:not(.you)')).find((x) => /Goblin/.test(x.textContent));
@@ -1988,6 +1996,122 @@ export async function run(ctx) {
         Math.random = () => 0.5;
         const forged = restoreFight(node, { ...JSON.parse(JSON.stringify(f)), round: { steps: [{ who: 'boom', fi: 0 }], at: 0 } });
         ok('task390: a malformed saved round drops', forged.round === null && forged.pending === null);
+      }
+      Math.random = rnd;
+    }
+
+    // --- task 391: the COMBAT-blessing retry comes before the enemy's reply ---
+    // fightRound resolved the missed strike and the reply together, and the retry was offered
+    // afterwards, so a fatal reply made it unusable and a winning retry came after the wound it
+    // should have prevented. The task 91 tests above used harmless replies.
+    {
+      const rnd = Math.random;
+      // Each call hands out the next value, then repeats the last.
+      const dice = (...vals) => { let i = 0; return () => vals[Math.min(i++, vals.length - 1)]; };
+      const ONE = 0, SIX = 0.99;
+      const shaman = (await data.getSection(1, '105')).querySelector('fight');
+      const mk = (stamina) => {
+        const g = GameState.create({ name: 'T391', gender: 'm', profession: 'Warrior', book: 1, adv });
+        g.data.abilities.combat = 5; g.data.stamina = stamina; g.data.staminaMax = 20;
+        g.data.items = []; // Defence 6 at Rank 1 with COMBAT 5 and no armour
+        g.addBlessing('combat');
+        return g;
+      };
+      const replies = (f) => f.log.filter((l) => /^Scorpion Shaman rolls/.test(l)).length;
+
+      // The filing's case: COMBAT 5, 1 Stamina, two ones (7 misses Defence 8); the Shaman's two
+      // ones would score 7 against Defence 6 and kill. Two sixes on the retry score 17: 9 damage.
+      {
+        const g = mk(1), f = makeFight(shaman, g);
+        Math.random = dice(ONE, ONE);
+        fightRound(g, f, null);
+        ok('task391: §1.105 a missed strike stops the round before the Shaman replies',
+           !!pendingReroll(f) && !g.isDead() && replies(f) === 0 && f.stamina === 9);
+        Math.random = dice(SIX, SIX, ONE, ONE);
+        resolveReroll(g, f, true);
+        ok('task391: §1.105 the retry wins before the reply, which never comes',
+           f.outcome === 'win' && !g.isDead() && g.data.stamina === 1 && replies(f) === 0 && !g.hasBlessing('combat'),
+           `out=${f.outcome} st=${g.data.stamina} log=${f.log.join(' | ')}`);
+      }
+      // A nonfatal reply the winning retry prevents.
+      {
+        const g = mk(12), f = makeFight(shaman, g);
+        Math.random = dice(ONE, ONE); fightRound(g, f, null);
+        Math.random = dice(SIX, SIX, SIX, SIX); resolveReroll(g, f, true);
+        ok('task391: a winning retry spares the wound its reply would have dealt', f.outcome === 'win' && g.data.stamina === 12 && replies(f) === 0);
+      }
+      // Keeping the miss: the reply lands once, and the round's retry is gone.
+      {
+        const g = mk(12), f = makeFight(shaman, g);
+        Math.random = dice(ONE, ONE); fightRound(g, f, null);
+        Math.random = dice(ONE, ONE); resolveReroll(g, f, false);
+        ok('task391: keeping the miss runs the reply once and keeps the blessing',
+           replies(f) === 1 && g.data.stamina === 11 && g.hasBlessing('combat') && f.round == null, `st=${g.data.stamina} replies=${replies(f)}`);
+        ok('task391: ...and no retry is offered after the reply', rerollAttack(g, f) === false && pendingReroll(f) === null);
+      }
+      // A retry that misses again: the reply still comes, once.
+      {
+        const g = mk(12), f = makeFight(shaman, g);
+        Math.random = dice(ONE, ONE); fightRound(g, f, null);
+        Math.random = dice(ONE); resolveReroll(g, f, true);
+        ok('task391: a missed retry is followed by the one reply', replies(f) === 1 && !g.hasBlessing('combat') && f.attackRerolled === true);
+      }
+      // Two attacks a round: keeping the miss lets both land.
+      {
+        const node = parse('<fight name="Scorpion Shaman" combat="5" defence="8" stamina="9" attacks="2"/>');
+        const g = mk(12), f = makeFight(node, g);
+        Math.random = dice(ONE, ONE); fightRound(g, f, null);
+        Math.random = dice(ONE); resolveReroll(g, f, false);
+        ok('task391: with two attacks a round, both land after the kept miss', replies(f) === 2 && g.data.stamina === 10);
+      }
+      // Enemy-first initiative: nothing follows the player's strike, so the end-of-round retry stands.
+      {
+        const node = parse('<fight name="Scorpion Shaman" combat="5" defence="8" stamina="9" playerFirst="f"/>');
+        const g = mk(12), f = makeFight(node, g);
+        Math.random = dice(ONE); fightRound(g, f, null);
+        ok('task391: enemy-first, the reply came first and the miss ends the round', pendingReroll(f) === null && f.lastStrikeMissed && replies(f) === 1);
+        Math.random = dice(SIX);
+        ok('task391: ...and the end-of-round retry still works', rerollAttack(g, f) === true && f.stamina === 0 && replies(f) === 1);
+      }
+      // A <fightround> body after the exchange runs once, after the decision.
+      {
+        const roundNode = parse('<fightround><tick codeword="Round391" hidden="t"/></fightround>');
+        const g = mk(12), f = makeFight(parse('<fight name="Scorpion Shaman" combat="0" defence="20" stamina="9"/>'), g);
+        Math.random = dice(ONE); fightRound(g, f, null, roundNode);
+        ok('task391: the round body waits behind the decision', !!pendingReroll(f) && !g.hasCodeword('Round391'));
+        resolveReroll(g, f, false, null, roundNode);
+        ok('task391: ...and runs once after it', g.hasCodeword('Round391') && f.round == null);
+      }
+      // A group: the retry against the missed foe comes before every reply.
+      {
+        const g = mk(30);
+        const fights = [makeFight(parse('<fight group="g" name="Orc" combat="9" defence="15" stamina="2"/>'), g),
+                        makeFight(parse('<fight group="g" name="Goblin" combat="0" defence="14" stamina="10"/>'), g)];
+        Math.random = dice(ONE); groupFightRound(g, fights, null, fights[0]);
+        ok('task391: a missed group strike stops before any foe replies', pendingReroll(fights) && pendingReroll(fights).name === 'Orc' && g.data.stamina === 30);
+        Math.random = dice(SIX, SIX, ONE);
+        resolveReroll(g, fights, true);
+        ok('task391: the retry fells the Orc first, so only the Goblin replies',
+           isDefeated(fights[0]) && fights[0].log.every((l) => !/^Orc rolls/.test(l)) && fights[1].log.some((l) => /^Goblin rolls/.test(l)));
+      }
+      // Both blessings: the kept miss is followed by the blow, which then asks about the wound.
+      {
+        const g = mk(12); g.addBlessing('injury');
+        const f = makeFight(shaman, g);
+        Math.random = dice(ONE, ONE); fightRound(g, f, null);
+        Math.random = dice(SIX, SIX); resolveReroll(g, f, false);
+        ok('task391: after a kept miss, a wounding reply asks about Immunity to Injury', !!pendingWound(f) && g.data.stamina === 12);
+      }
+      // A save while the retry is on offer: the decision, and the reply still owed, survive.
+      {
+        const g = mk(12), f = makeFight(shaman, g);
+        Math.random = dice(ONE, ONE); fightRound(g, f, null);
+        const back = restoreFight(shaman, JSON.parse(JSON.stringify(f)));
+        ok('task391: a saved retry decision restores with its reply still owed', !!pendingReroll(back) && back.round.at === f.round.at && replies(back) === 0);
+        Math.random = dice(ONE, ONE); resolveReroll(g, back, false);
+        ok('task391: ...and keeping the miss after the reload lands the reply once', replies(back) === 1);
+        const forged = restoreFight(shaman, { ...JSON.parse(JSON.stringify(f)), round: { steps: [{ who: 'enemy', fi: 0 }, { who: 'player', fi: 0 }], at: 1 } });
+        ok('task391: a retry decision not just after the player\'s strike drops', forged.pending === null && forged.round === null);
       }
       Math.random = rnd;
     }

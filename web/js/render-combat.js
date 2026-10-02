@@ -7,7 +7,7 @@
 // clicks.
 
 import { makeFight, fightRound, groupFightRound, isDefeated, useWrathBlessing, useDefenceBlessing, rerollAttack, playerFightDefence,
-  pendingWound, resolveInjury } from './combat.js';
+  pendingWound, resolveInjury, pendingReroll, resolveReroll } from './combat.js';
 import { applyEffectBody } from './engine.js';
 import { aggregateFightOutcome } from './render-gates.js';
 import { animateDice } from './ui.js';
@@ -224,7 +224,7 @@ function afterAction(story, resolved, redraw) {
 // else may be done until one is chosen. `answer` ends in the widget's own end-of-round tail, so
 // either answer completes the round exactly as an Attack click would.
 function appendWoundDecision(story, box, wound, answer) {
-  if (!story.inactive) story.pendingWound = true; // the exits wait (applyWoundGate)
+  if (!story.inactive) story.pendingRound = true; // the exits wait (applyWoundGate)
   const note = document.createElement('div');
   note.className = 'roll-outcome bad';
   note.textContent = `The ${wound.name}'s blow would cost you ${wound.dmg} Stamina.`;
@@ -240,6 +240,30 @@ function appendWoundDecision(story, box, wound, answer) {
   take.textContent = `Take the wound (−${wound.dmg} Stamina)`;
   take.addEventListener('click', () => answer(false));
   controls.appendChild(use); controls.appendChild(take);
+  box.appendChild(controls);
+}
+
+// The COMBAT-blessing decision (§4.324, task 391): the player's blow missed and the blessing
+// promises a retry, so the round stops before the reply. A retry strikes first; keeping the miss
+// lets the round go on. Like the wound decision, it stands in place of the fight's controls, and
+// the exits wait: leaving now would skip the reply still owed.
+function appendRerollDecision(story, box, miss, answer, named = false) {
+  if (!story.inactive) story.pendingRound = true;
+  const note = document.createElement('div');
+  note.className = 'roll-outcome';
+  note.textContent = `Your blow misses the ${miss.name}.`;
+  box.appendChild(note);
+  const controls = document.createElement('div');
+  controls.className = 'fight-controls';
+  const retry = document.createElement('button');
+  retry.className = 'btn-secondary blessing-combat';
+  retry.textContent = `Use COMBAT blessing (retry your attack${named ? ` on ${miss.name}` : ''})`;
+  retry.addEventListener('click', () => answer(true));
+  const keep = document.createElement('button');
+  keep.className = 'btn-secondary keep-miss';
+  keep.textContent = 'Keep the miss';
+  keep.addEventListener('click', () => answer(false));
+  controls.appendChild(retry); controls.appendChild(keep);
   box.appendChild(controls);
 }
 
@@ -284,6 +308,12 @@ function drawGroupFight(story, box, fights, dmgNode, group, fleeNode = null) {
   const wound = pendingWound(fights);
   if (wound) {
     appendWoundDecision(story, box, wound, (use) => { resolveInjury(story.state, fights, use, dmgNode); finish(); });
+    return;
+  }
+  const miss = pendingReroll(fights);
+  if (miss) {
+    appendRerollDecision(story, box, miss, (retry) => { resolveReroll(story.state, fights, retry, dmgNode); finish(); },
+      fights.filter((f) => !isDefeated(f)).length > 1); // name the target among several, as Attack does
     return;
   }
 
@@ -423,6 +453,11 @@ function drawFight(story, box, fight, node, dmgNode, fleeNode, key, locked = fal
   const wound = pendingWound(fight);
   if (wound) {
     appendWoundDecision(story, box, wound, (use) => { resolveInjury(story.state, fight, use, dmgNode, roundNode); finish(); });
+    return;
+  }
+  const miss = pendingReroll(fight);
+  if (miss) {
+    appendRerollDecision(story, box, miss, (retry) => { resolveReroll(story.state, fight, retry, dmgNode, roundNode); finish(); });
     return;
   }
 

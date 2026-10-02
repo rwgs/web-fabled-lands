@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 391. Combat replies land before the COMBAT-blessing reroll decision and can kill the player before a winning retry
 - [ ] 393. A forced `<group>` that bundles a roll holds nothing, so book3/273's and book3/629's "lose 1-6 of your possessions" can be walked past with the die unrolled
 
 **LOW**
@@ -430,46 +429,11 @@ this order.*
 - [x] 388. a money-cache Deposit rounded the request to `multiples=` and then clamped it to the purse, so book1/104 with 150 Shards invested all 150 of a requested 200. The new DOM-free `cacheDepositAmount` in `market.js` clamps first and rounds last. Withdrawals, which the spec does not constrain, are no longer rounded to the multiple
 - [x] 389. a transfer's equivalence compared kind, name and bonus only, so two same-named rings with three and one charges moved without asking which (book2/105's pickpocket, 6/635's and 4/456's offerings). Task 372's sale identity is now `sameItem` in `state.js`, shared by the sale and transfer planners. The transfer picker labels name the bonus's ability, the uses left and the tags, and number any picks still alike
 - [x] 390. book5/365's Immunity to Injury was displayed and never usable. While it is held, a walk `<lose stamina>` is now rolled and waits for "Take the wound" or "Use Immunity to Injury", and so does each enemy blow that would cost Stamina. A fight's round now runs as resumable steps in `combat.js`, and blocking a blow covers the rest of that round. The exits wait meanwhile, and both decisions survive a reload without rerolling
+- [x] 391. the COMBAT-blessing retry was offered only after the enemy's reply, so at book1/105 a fatal reply made the promised retry unusable, and a winning retry came after the wound it should have prevented. A missed strike with an eligible retry now pauses the resumable round before the reply. A retry strikes first, and keeping the miss lets the reply land once. Enemy-first fights keep the end-of-round retry
 
 ---
 
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The open tasks' detail sections follow, in filed order; the Review log comes after them.
-
----
-
-## 391. Combat rerolls are offered after the enemy has already struck
-
-**Priority: MEDIUM.** A promised reroll can become unavailable before the player
-gets the chance to use it.
-
-### What is wrong
-
-`fightRound` in [combat.js](web/js/combat.js) resolves the missed player-first
-strike and the enemy's reply together. `drawFight` in
-[render-combat.js](web/js/render-combat.js) offers the COMBAT reroll afterwards;
-`rerollAttack` rejects it when the player has already died. This also applies
-the reply's damage/effects even when a successful retry would have defeated the
-enemy before it could strike.
-
-[Book4/324](books/book4/324.xml) promises a retry when a COMBAT roll fails.
-At [book1/105](books/book1/105.xml), a character with COMBAT 5, 1 Stamina and
-that blessing rolls two ones: the attack total 7 misses Defence 8, then the
-enemy's total 7 beats player Defence 6 and kills the character. The probe's
-retry returns false with the enemy still at 9 Stamina. Rolling two sixes on
-the promised retry would score 17, deal 9 and win before the reply.
-
-### Steps
-
-1. Add `suite-combat` regressions for that fatal-reply case and a nonfatal reply
-   that a winning reroll should prevent. Existing task 91 tests use harmless
-   replies and cannot detect the ordering problem.
-2. Make a missed strike with an eligible reroll a decision boundary before
-   advancing to the next part of the round. Keeping the miss runs the pending
-   reply once; a retry resolves the new strike first.
-3. Preserve enemy-first initiative, group fights, multi-attack enemies,
-   wound/round hooks and once-per-round retry limits. Save/resume must not
-   repeat or bypass a pending reply or reopen a consumed blessing.
-4. Run the complete build/test loop before closing.
 
 ---
 
@@ -606,6 +570,28 @@ cannot simply be honoured.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 391): closed **391**, filed nothing. The fix builds on task 390's
+resumable round in `combat.js`:
+- After a player strike, `runRound` now stops as a `reroll` pending when the strike missed,
+  the COMBAT blessing is held, the round's retry is unspent, and another step remains.
+- `resolveReroll` retries through `rerollAttack`, or declines and spends the round's retry,
+  then runs the rest of the round. `pendingReroll` reports the wait.
+- `rerollAttack` refuses while a round is paused, and stays as the end-of-round retry for
+  enemy-first fights.
+- `restoreFight` restores a `reroll` wait only directly after a player step.
+- In `render-combat.js`, the new `appendRerollDecision` offers "Use COMBAT blessing (retry
+  your attack)" or "Keep the miss" in place of the fight controls.
+- In `render.js`, `applyWoundGate` holds the exits through the new `pendingRound` flag, since
+  the reply is still owed.
+
+Task 391's block in `suite-combat` covers 1/105's fatal case, where the retry wins with no
+reply, and a nonfatal reply prevented. It also covers keeping the miss, a missed retry, two
+attacks a round, enemy-first initiative, a post-round `<fightround>` body, a group, both
+blessings together, and a save mid-decision with a forged position. The task 91 tests now
+answer the paused round through `resolveReroll`, with dice that leave the round's one reply
+harmless. The block cannot run against the old code, which has no `resolveReroll`.
+`RESULT ALL PASS pass=3497 fail=0`, and `node-import.mjs` passed.
 
 Worked 2026-10-01 (task 390): closed **390**, filed **394**. The owner chose to ask at each
 wound.

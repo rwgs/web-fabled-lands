@@ -93,17 +93,22 @@ export function restoreFight(node, saved) {
   fight.attackRerolled = !!s.attackRerolled;
   fight.log = (Array.isArray(s.log) ? s.log : []).filter((l) => typeof l === 'string')
     .slice(-MAX_LOG_LINES).map((l) => l.slice(0, MAX_LOG_CHARS));
-  // A round paused on an Immunity to Injury decision (task 390), with the blow's dice already
-  // rolled. Both or neither: a round is only ever at rest while it waits, and a malformed one
-  // drops, so the fight resumes between rounds rather than replaying a forged step list.
+  // A round paused on a decision (tasks 390, 391): an Immunity to Injury blow, its dice already
+  // rolled, at the cursor; or a COMBAT-blessing retry, with the missed strike just before it.
+  // Both or neither: a round is only ever at rest while it waits, and a malformed one drops, so
+  // the fight resumes between rounds rather than replaying a forged step list.
   const steps = s.round && Array.isArray(s.round.steps) ? s.round.steps : null;
   const p = s.pending;
-  if (steps && steps.length <= 64 && steps.every((st) => st && ROUND_STEPS.has(st.who) && Number.isInteger(st.fi) && st.fi >= 0 && st.fi < 32)
-      && p && p.kind === 'injury' && Number.isInteger(s.round.at) && s.round.at >= 0 && s.round.at < steps.length
-      && steps[s.round.at].who === 'enemy' && Number.isInteger(p.fi) && p.fi === steps[s.round.at].fi) {
-    fight.round = { steps: steps.map((st) => ({ who: st.who, fi: st.fi })), at: s.round.at, immune: s.round.immune === true };
-    fight.pending = { kind: 'injury', fi: p.fi, roll: int(p.roll, 2, 2, 12), total: int(p.total, 0, -99, 199),
-      def: int(p.def, 0, -99, 199), dmg: int(p.dmg, 1, 1, 199), replace: false };
+  const at = steps && Number.isInteger(s.round.at) ? s.round.at : -1;
+  const wellFormed = steps && steps.length <= 64 && at >= 0 && at < steps.length && p && Number.isInteger(p.fi)
+    && steps.every((st) => st && ROUND_STEPS.has(st.who) && Number.isInteger(st.fi) && st.fi >= 0 && st.fi < 32);
+  const injury = wellFormed && p.kind === 'injury' && steps[at].who === 'enemy' && steps[at].fi === p.fi;
+  const reroll = wellFormed && p.kind === 'reroll' && at > 0 && steps[at - 1].who === 'player' && steps[at - 1].fi === p.fi;
+  if (injury || reroll) {
+    fight.round = { steps: steps.map((st) => ({ who: st.who, fi: st.fi })), at, immune: s.round.immune === true };
+    fight.pending = reroll ? { kind: 'reroll', fi: p.fi }
+      : { kind: 'injury', fi: p.fi, roll: int(p.roll, 2, 2, 12), total: int(p.total, 0, -99, 199),
+          def: int(p.def, 0, -99, 199), dmg: int(p.dmg, 1, 1, 199), replace: false };
   }
   // roundGoto (a <fightdamage>/<fightround> redirect) is deliberately NOT restored: the view
   // consumes and clears it before the round commits, so a saved one could only be forged.
@@ -214,6 +219,9 @@ function playerStrike(state, fight) {
  *  (its result lands on the fight as usual). Headless. (task 91) */
 export function rerollAttack(state, fight) {
   if (!fight || fight.outcome || state.isDead()) return false;
+  // A round paused on this decision is answered by resolveReroll, which then runs the reply;
+  // retrying here would leave the round stuck (task 391). resolveReroll clears `pending` first.
+  if (fight.pending) return false;
   if (!fight.lastStrikeMissed || fight.attackRerolled) return false;
   if (!state.useBlessing('combat')) return false;
   fight.attackRerolled = true; // once per round, even for a permanent blessing
@@ -313,8 +321,20 @@ function runRound(state, fights, dmgNode, roundNode, group) {
     if (group && st.who === 'enemy' && state.isDead()) break;
     if (!(group && st.who === 'enemy' && isDefeated(f))) {
       if (st.who === 'pre' || st.who === 'post') runRoundNode(state, holder, roundNode);
-      else if (st.who === 'player') playerStrike(state, f);
-      else {
+      else if (st.who === 'player') {
+        playerStrike(state, f);
+        // A miss the COMBAT blessing may retry (§4.324) is the player's decision, and it comes
+        // BEFORE the rest of the round: the reply used to land first, so a fatal one made the
+        // promised retry unusable, and a retry that would have won came after a wound it should
+        // have prevented. A retry strikes first; keeping the miss lets the reply land once. A
+        // miss with nothing after it (enemy-first initiative) keeps the end-of-round retry
+        // (rerollAttack). (task 391)
+        if (f.lastStrikeMissed && !f.attackRerolled && state.hasBlessing('combat') && rd.at + 1 < rd.steps.length) {
+          rd.at++;
+          holder.pending = { kind: 'reroll', fi: st.fi };
+          return;
+        }
+      } else {
         const s = rollEnemyStrike(state, f, dmgNode);
         if (strikeWounds(f, s) && !rd.immune && state.hasBlessing('injury')) {
           holder.pending = { kind: 'injury', fi: st.fi, ...s };
@@ -335,6 +355,31 @@ export function pendingWound(fights) {
   const p = list[0] && list[0].pending;
   if (!p || p.kind !== 'injury') return null;
   return { name: (list[p.fi] || list[0]).name, dmg: p.dmg };
+}
+
+/** The missed strike waiting on a COMBAT-blessing retry decision, as { name }, or null. */
+export function pendingReroll(fights) {
+  const list = Array.isArray(fights) ? fights : [fights];
+  const p = list[0] && list[0].pending;
+  if (!p || p.kind !== 'reroll') return null;
+  return { name: (list[p.fi] || list[0]).name };
+}
+
+/** Answer the waiting COMBAT-blessing decision and finish the round. `retry` strikes again
+ *  (rerollAttack, consuming the blessing unless permanent) before the rest of the round runs;
+ *  otherwise the miss stands and the round's one retry is gone. Returns false when nothing was
+ *  waiting. Headless. (task 391) */
+export function resolveReroll(state, fights, retry, dmgNode = null, roundNode = null) {
+  const group = Array.isArray(fights);
+  const list = group ? fights : [fights];
+  const holder = list[0];
+  const p = holder && holder.pending;
+  if (!p || p.kind !== 'reroll' || !holder.round) return false;
+  holder.pending = null;
+  const f = list[p.fi] || holder;
+  if (!(retry && rerollAttack(state, f))) f.attackRerolled = true; // the round's one retry is declined
+  runRound(state, list, dmgNode, roundNode, group);
+  return true;
 }
 
 /** Answer the waiting Immunity to Injury decision and finish the round. `use` spends the blessing

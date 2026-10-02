@@ -866,10 +866,12 @@ export class Story {
     // on the picker actually RENDERING so a forfeit inside a grayed branch — or one already
     // answered this visit — can never lock a section with no way to settle it.
     this.pendingChoice = false;
-    // Wound gating (task 390): a wound the player may block with Immunity to Injury, already
-    // sized, waits on that decision — in the walk (renderWoundChoice) or in a fight's round
-    // (appendWoundDecision). applyWoundGate holds every exit while one stands. Reset per render.
+    // Wound gating (tasks 390, 391): a wound the player may block with Immunity to Injury, already
+    // sized, waits on that decision in the walk (renderWoundChoice, pendingWound); a fight's round
+    // waits on a decision mid-round, a blow to block or a miss to retry (pendingRound).
+    // applyWoundGate holds every exit while either stands. Reset per render.
     this.pendingWound = false;
+    this.pendingRound = false;
     // Visit-box redirect gating (tasks 214 + 217): a matched <if ticks=…> redirect is JaFL's
     // forced <goto> — it blocked the rest of the section, which is what made the once-only
     // reward below it one-time and left only one of the two printed exits live.
@@ -2110,19 +2112,21 @@ export class Story {
     });
   }
 
-  // ---- wound gating (task 390) ---------------------------------------------
+  // ---- wound gating (tasks 390, 391) ---------------------------------------
   // A wound waiting on the Immunity to Injury decision has already been sized: the dice for a
-  // "1-6 Stamina" loss or an enemy's blow are rolled. Leaving now would dodge it, so every exit
-  // waits, a flee exit too, unlike the other gates: giving up is not a way out of a blow that
-  // has already landed. The decision's own two buttons are the way to settle it, and the
-  // dead-end fallback reads them as live controls. Only ADDS a disable.
+  // "1-6 Stamina" loss or an enemy's blow are rolled. Leaving now would dodge it, and a round
+  // paused on a COMBAT-blessing retry still owes its reply, so every exit waits, a flee exit
+  // too, unlike the other gates: giving up is not a way out of a blow already rolled or owed.
+  // The decision's own two buttons are the way to settle it, and the dead-end fallback reads
+  // them as live controls. Only ADDS a disable.
   applyWoundGate(flow) {
-    if (!this.pendingWound) return;
+    if (!this.pendingWound && !this.pendingRound) return;
+    const title = this.pendingRound ? 'Finish the combat round above first.' : 'Decide about the wound first.';
     flow.querySelectorAll('.goto, .choice').forEach((btn) => {
       if (btn.disabled) return; // already gated for another reason — keep its own reason
       btn.disabled = true;
       btn.classList.add('gated');
-      btn.title = 'Decide about the wound first.';
+      btn.title = title;
     });
   }
 
