@@ -651,8 +651,11 @@ export function computeBuyGate(sectionEl) {
 // skippable the same way, and so was every forced outcome group (book2/134's lost stake).
 //
 // Explicit force="t" only: the XML spec defaults a group to optional, so a blanket group gate
-// would be wrong. A group bundling a roll is not one of these, since the roll is its action
-// (groupPlan's kind 'roll'). Each group holds the exits written after it, and the "Continue → N"
+// would be wrong. A group bundling a roll counts too, settled by its roll (task 393): §3.273's
+// and §3.629's "lose 1-6 of your possessions" could be walked past with the die unrolled. A bet
+// does not: a roll group that locks a stake cache (§1.91, §2.134) is a wager, which §1.91's page
+// makes optional ("If you want to gamble"), and a zero stake would satisfy any gate at §2.134
+// anyway. Each group holds the exits written after it, and the "Continue → N"
 // of a branch it sits in, but never its own navigation, which is its button's, nor a decline
 // written before it (§6.496's "if you refuse, turn to 291"). The view records which groups
 // render unrun this pass (pendingGroups), so one in an untaken branch holds nothing.
@@ -661,7 +664,8 @@ export function computeGroupGate(sectionEl) {
   if (!sectionEl) return null;
   const groups = new Map();
   sectionEl.querySelectorAll('group').forEach((g) => {
-    if (!boolAttr(g.getAttribute('force')) || g.querySelector('difficulty, random, rankcheck')) return;
+    if (!boolAttr(g.getAttribute('force'))) return;
+    if (g.querySelector('difficulty, random, rankcheck') && g.querySelector('tick[special="lock"][cache]')) return; // a bet
     const nav = new Set();
     sectionEl.querySelectorAll('choice, goto, return, ' + BRANCH_EXIT_SELECTOR).forEach((n) => {
       if (g.contains(n) || boolAttr(n.getAttribute('flee'))) return;

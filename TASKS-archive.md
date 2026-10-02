@@ -399,6 +399,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 389. Transfers silently select unequal possessions
 - [x] 390. Immunity to Injury has no usable protection
 - [x] 391. Combat rerolls are offered after the enemy has already struck
+- [x] 393. Forced roll groups can be walked past unrolled
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
 
@@ -23120,5 +23121,71 @@ Checked:
 - The block cannot run against the old `combat.js`, which has no `resolveReroll` or
   `pendingReroll`. The filing's browser probe is the evidence for the old ordering.
 - `RESULT ALL PASS pass=3497 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 393. Forced roll groups can be walked past unrolled
+
+**Priority: MEDIUM.** A printed forfeit is avoidable. Found while fixing task 385, from
+reading the gates; not yet probed in the browser.
+
+### What is wrong
+
+Task 385's `computeGroupGate` in [render-gates.js](web/js/render-gates.js) leaves out a
+group that bundles a roll, because the roll is that group's action (`groupPlan` in
+[render-rules.js](web/js/render-rules.js) returns kind `roll`). Nothing else holds one
+either. `isMandatoryRoll` refuses a roll under `<group>` (`ROLLGATE_OPTIONAL_WRAP`), so
+the roll gate never awaits it.
+
+[book3/273](books/book3/273.xml) and [book3/629](books/book3/629.xml) each put "lose 1-6
+of your possessions" in `<group force="t">`, around `<random dice="1" var="x"/>` and
+`<lose item="?" multiple="x"/>`. Their exits (2.120 and 190) appear to be live with the die
+unrolled, so the player leaves with every possession.
+
+The census in task 385 found two more forced roll groups that are bets the page makes
+optional. [book1/91](books/book1/91.xml) says "If you want to gamble", and
+[book2/134](books/book2/134.xml)'s wager is the reason for visiting. Their `force="t"`
+cannot simply be honoured.
+
+### Steps
+
+1. Probe 3/273 and 3/629 in the browser and add `suite-actions` regressions: the exit
+   waits for the die, and the possessions it names leave once.
+2. Hold the exits after a forced roll group until its roll resolves. Decide what 1/91
+   and 2/134 need: an exemption justified by their prose, or a gate that a zero stake
+   satisfies.
+3. Run the complete build/test loop before closing.
+
+### The fix
+
+- Step 1: the probe is a `suite-actions` regression run on the real sections, against the
+  unchanged gate. Both exits were live with the die unrolled (two failures). The rolls
+  themselves already worked: a die of 2 took two of four possessions.
+- `web/js/render-gates.js`: `computeGroupGate` now includes a forced group that bundles a
+  roll. The exception is a group that also holds a `<tick special="lock" cache>`, which is a
+  bet.
+- 1/91's exemption is justified by its prose, "If you want to gamble". At 2/134 the wager
+  is the point of the visit, but the stake cache can hold 0, so a gate there would be
+  satisfied by an empty roll and would only add a click. The task offered both options;
+  the exemption is the one that changes no bet.
+- `web/js/render-rewards.js`: `renderGroupWithRoll` calls `noteForcedGroup` while a forced
+  group's roll is not yet stored. A provisional reroll decision is already held by
+  `applyPendingRerollGate`.
+- The four forced roll groups in the shipped corpus therefore end up with 3/273 and 3/629
+  gated, and the 1/91 and 2/134 bets exempt.
+
+Tests:
+
+- In task 385's block in `suite-actions`, 5 new assertions:
+  - 3/273 and 3/629 (no cargo, so 3/629's `<else>` is live) hold their exits with "Carry
+    out the action above first." while the die is unrolled. A roll of 2 takes two
+    possessions and releases the exit.
+  - 1/91's bet leaves 109 live unrolled.
+- The task 385 `computeGroupGate` assertion now pairs an unmarked group with a bet, instead
+  of a bare roll group.
+
+Checked:
+
+- `RESULT ALL PASS pass=3502 fail=0`, and `node-import.mjs` passed.
 
 ---

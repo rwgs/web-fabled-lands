@@ -8,7 +8,7 @@
 
 import {
   applyEffect, applyRest, resolveValue, reviveWithResurrection, readItemEffects,
-  losePaymentPlan, abilityChoiceOptions, grantChosenReward, staminaWound,
+  losePaymentPlan, abilityChoiceOptions, grantChosenReward, staminaWound, boolAttr,
 } from './engine.js';
 import { makeItem, parseTags, currencyAward, splitItemName } from './state.js';
 import { applyInlineBuy, buyOptions, cargoBuyPlan, crewUpgradePlan, shipCapacity } from './market.js';
@@ -223,6 +223,8 @@ function renderGroupWithRoll(story, container, node, path, rollNode) {
   const kids = Array.from(node.childNodes);
   const rollKey = 'roll@' + path + '.' + kids.indexOf(rollNode);
   const rollResolved = story.ctx.rolls.has(rollKey);
+  // A forced roll group's exits wait for its roll (computeGroupGate, task 393).
+  if (!rollResolved && boolAttr(node.getAttribute('force'))) story.noteForcedGroup(node);
   const deferred = [];
   kids.forEach((k, i) => {
     const kp = path + '.' + i;

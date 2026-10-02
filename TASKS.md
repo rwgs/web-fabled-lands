@@ -23,7 +23,7 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 393. A forced `<group>` that bundles a roll holds nothing, so book3/273's and book3/629's "lose 1-6 of your possessions" can be walked past with the die unrolled
+*(none open — file new MEDIUM work here)*
 
 **LOW**
 
@@ -430,6 +430,7 @@ this order.*
 - [x] 389. a transfer's equivalence compared kind, name and bonus only, so two same-named rings with three and one charges moved without asking which (book2/105's pickpocket, 6/635's and 4/456's offerings). Task 372's sale identity is now `sameItem` in `state.js`, shared by the sale and transfer planners. The transfer picker labels name the bonus's ability, the uses left and the tags, and number any picks still alike
 - [x] 390. book5/365's Immunity to Injury was displayed and never usable. While it is held, a walk `<lose stamina>` is now rolled and waits for "Take the wound" or "Use Immunity to Injury", and so does each enemy blow that would cost Stamina. A fight's round now runs as resumable steps in `combat.js`, and blocking a blow covers the rest of that round. The exits wait meanwhile, and both decisions survive a reload without rerolling
 - [x] 391. the COMBAT-blessing retry was offered only after the enemy's reply, so at book1/105 a fatal reply made the promised retry unusable, and a winning retry came after the wound it should have prevented. A missed strike with an eligible retry now pauses the resumable round before the reply. A retry strikes first, and keeping the miss lets the reply land once. Enemy-first fights keep the end-of-round retry
+- [x] 393. a forced `<group>` bundling a roll held nothing, so book3/273's and book3/629's "lose 1-6 of your possessions" could be walked past with the die unrolled. `computeGroupGate` now counts such groups, settled by their roll. The 1/91 and 2/134 bets, which lock a stake cache, are exempt: 1/91 says "If you want to gamble", and a zero stake would satisfy a gate at 2/134 anyway
 
 ---
 
@@ -531,45 +532,21 @@ directly and never ask:
 
 ---
 
-## 393. Forced roll groups can be walked past unrolled
-
-**Priority: MEDIUM.** A printed forfeit is avoidable. Found while fixing task 385, from
-reading the gates; not yet probed in the browser.
-
-### What is wrong
-
-Task 385's `computeGroupGate` in [render-gates.js](web/js/render-gates.js) leaves out a
-group that bundles a roll, because the roll is that group's action (`groupPlan` in
-[render-rules.js](web/js/render-rules.js) returns kind `roll`). Nothing else holds one
-either. `isMandatoryRoll` refuses a roll under `<group>` (`ROLLGATE_OPTIONAL_WRAP`), so
-the roll gate never awaits it.
-
-[book3/273](books/book3/273.xml) and [book3/629](books/book3/629.xml) each put "lose 1-6
-of your possessions" in `<group force="t">`, around `<random dice="1" var="x"/>` and
-`<lose item="?" multiple="x"/>`. Their exits (2.120 and 190) appear to be live with the die
-unrolled, so the player leaves with every possession.
-
-The census in task 385 found two more forced roll groups that are bets the page makes
-optional. [book1/91](books/book1/91.xml) says "If you want to gamble", and
-[book2/134](books/book2/134.xml)'s wager is the reason for visiting. Their `force="t"`
-cannot simply be honoured.
-
-### Steps
-
-1. Probe 3/273 and 3/629 in the browser and add `suite-actions` regressions: the exit
-   waits for the die, and the possessions it names leave once.
-2. Hold the exits after a forced roll group until its roll resolves. Decide what 1/91
-   and 2/134 need: an exemption justified by their prose, or a gate that a zero stake
-   satisfies.
-3. Run the complete build/test loop before closing.
-
----
-
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 393): closed **393**, filed nothing. `computeGroupGate` in
+`render-gates.js` now includes a forced `<group>` that bundles a roll. It still excludes one
+that also locks a stake cache, which is a bet. `renderGroupWithRoll` notes such a group as
+pending until its roll is stored. Task 393's regressions in `suite-actions` (in task 385's
+block) first confirmed the bypass: on the old gate, both 3/273's exit to 2.120 and 3/629's to
+190 were live with the die unrolled. Both now wait, and a roll of 2 takes two possessions and
+releases the exit. 1/91's bet still leaves 109 live unrolled. The forced-group census therefore
+gates 3/273 and 3/629 and exempts the 1/91 and 2/134 bets. `RESULT ALL PASS pass=3502 fail=0`,
+and `node-import.mjs` passed.
 
 Worked 2026-10-01 (task 391): closed **391**, filed nothing. The fix builds on task 390's
 resumable round in `combat.js`:

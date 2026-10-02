@@ -4495,8 +4495,34 @@ export async function run(ctx) {
           `<section name="x385"><group${force}><text>Take the coin</text><gain shards="5"/></group> <goto section="9"/></section>`);
         ok(`task385: a group with${force || ' no force='} leaves the exit live`, exitTo(c, 9).disabled === false);
       }
-      ok('task385: computeGroupGate ignores an unmarked group and a roll group',
-         gates.computeGroupGate(parse('<section><group><text>a</text><gain shards="1"/></group><group force="t"><text>b</text><random/></group><goto section="9"/></section>')) === null);
+      ok('task385: computeGroupGate ignores an unmarked group and a bet',
+         gates.computeGroupGate(parse('<section><group><text>a</text><gain shards="1"/></group><group force="t"><text>b</text><random/><tick special="lock" cache="c" hidden="t"/></group><goto section="9"/></section>')) === null);
+
+      // Task 393: a forced group that bundles a roll holds its exits until the roll is made.
+      // §3.273's "lose the first 1-6 possessions" could be walked past with the die unrolled.
+      for (const [book, sec, setup, exit] of [
+        [3, '273', null, 120],
+        [3, '629', null, 190], // no cargo, so the <else> with the possession loss is the live branch
+      ]) {
+        const { g, c } = await enter(book, sec, (g) => {
+          g.data.ships = [];
+          ['rope', 'lantern', 'flask', 'candle'].forEach((n) => g.addItem(makeItem('item', n)));
+          if (setup) setup(g);
+        });
+        const before = g.data.items.length;
+        ok(`task393: §${book}.${sec} holds its exit while the 1-6 die is unrolled`,
+           exitTo(c, exit).disabled === true && /Carry out the action/.test(exitTo(c, exit).title), exitTo(c, exit).title);
+        Math.random = () => 0.2; // one die: 2
+        Array.from(c.querySelectorAll('.btn-roll')).find((b) => !b.disabled).click(); await settle();
+        Math.random = rnd;
+        ok(`task393: §${book}.${sec} the roll takes 2 possessions and releases the exit`,
+           g.data.items.length === before - 2 && exitTo(c, exit).disabled === false, `items ${before}→${g.data.items.length}`);
+      }
+      // The bets stay optional: §1.91's "If you want to gamble" leaves its exits live unrolled.
+      {
+        const { c } = await enter(1, '91', (g) => { g.data.shards = 50; });
+        ok('task393: §1.91 a bet is not forced: leaving needs no roll', exitTo(c, 109).disabled === false);
+      }
 
       Math.random = rnd;
       window.__FL_INSTANT_DICE__ = false;
