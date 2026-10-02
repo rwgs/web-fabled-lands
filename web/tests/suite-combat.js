@@ -3,7 +3,8 @@
 import * as data from '../js/data.js';
 import { GameState, makeItem, sanitizeData, readSlotData, deleteSlot } from '../js/state.js';
 import * as eng from '../js/engine.js';
-import { fightRound, makeFight, groupFightRound, isDefeated, useWrathBlessing, useDefenceBlessing, rerollAttack, restoreFight } from '../js/combat.js';
+import { fightRound, makeFight, groupFightRound, isDefeated, useWrathBlessing, useDefenceBlessing, rerollAttack, restoreFight,
+  pendingWound, resolveInjury } from '../js/combat.js';
 import { buyTrade, sellTrade, applyInlineBuy, sellCargo } from '../js/market.js';
 import { Story } from '../js/render.js';
 import { renderChoice } from '../js/render-choices.js';
@@ -1851,6 +1852,144 @@ export async function run(ctx) {
       deleteSlot(31);
 
       delete window.__FL_DICE_GATE__;
+    }
+
+    // --- task 390: Immunity to Injury blocks a wound, or a whole round's, when the player says ---
+    // book5/365 grants it: "not to lose Stamina points when you would otherwise be wounded, from
+    // one source of damage once only, or the damage you take in a single combat round". Nothing
+    // read it, so a held blessing never protected anything.
+    {
+      const rnd = Math.random;
+      Math.random = () => 0.5; // every die a 4; the foes below hit and the player misses
+      const mk = (setup) => {
+        const g = GameState.create({ name: 'T390', gender: 'm', profession: 'Warrior', book: 1, adv });
+        g.data.stamina = 60; g.data.staminaMax = 60;
+        g.addBlessing('injury');
+        if (setup) setup(g);
+        return g;
+      };
+      const foe = (attrs = '') => makeFight(parse(`<fight name="Ogre" combat="20" defence="99" stamina="10"${attrs}/>`));
+
+      // One blow: it waits, and blocking it costs nothing but the blessing.
+      {
+        const g = mk(), f = foe();
+        const stam = g.data.stamina;
+        fightRound(g, f, null);
+        const w = pendingWound(f);
+        ok('task390: a blow that would wound waits on the decision, Stamina untouched',
+           !!w && w.dmg > 0 && g.data.stamina === stam && f.round != null, JSON.stringify(w));
+        ok('task390: a waiting round refuses to start another', (fightRound(g, f, null), pendingWound(f) && pendingWound(f).dmg === w.dmg));
+        resolveInjury(g, f, true);
+        ok('task390: using it blocks the wound and spends the blessing',
+           g.data.stamina === stam && !g.hasBlessing('injury') && f.pending == null && f.round == null
+           && /no wound \(Immunity to Injury\)/.test(f.log[f.log.length - 1]), f.log.slice(-1)[0]);
+        fightRound(g, f, null);
+        ok('task390: once spent, the next round wounds as before', g.data.stamina === stam - w.dmg && pendingWound(f) === null);
+      }
+      // Taking it: exactly the rolled wound lands, and the blessing is kept.
+      {
+        const g = mk(), f = foe();
+        fightRound(g, f, null);
+        const w = pendingWound(f);
+        resolveInjury(g, f, false);
+        ok('task390: taking the wound costs exactly the rolled damage and keeps the blessing',
+           g.data.stamina === 60 - w.dmg && g.hasBlessing('injury') && f.round == null);
+      }
+      // Three blows a round (Tripling): one answer covers the whole round.
+      {
+        const g = mk(), f = foe(' attacks="3"');
+        fightRound(g, f, null);
+        const w = pendingWound(f);
+        resolveInjury(g, f, true);
+        ok('task390: blocking the first of three blows blocks the round, with no further question',
+           g.data.stamina === 60 && pendingWound(f) === null && f.round == null
+           && f.log.filter((l) => /no wound/.test(l)).length === 3, f.log.join(' | '));
+        void w;
+      }
+      // Declining the first blow leaves the choice open for the next one in the same round.
+      {
+        const g = mk(), f = foe(' attacks="2"');
+        fightRound(g, f, null);
+        const w1 = pendingWound(f);
+        resolveInjury(g, f, false);
+        const w2 = pendingWound(f);
+        ok('task390: after taking one blow, the round\'s next blow asks again', !!w2 && g.data.stamina === 60 - w1.dmg);
+        resolveInjury(g, f, true);
+        ok('task390: ...and blocking it spares only the rest of the round', g.data.stamina === 60 - w1.dmg && f.round == null);
+      }
+      // A fatal blow waits with the player alive; blocking it saves them, taking it kills.
+      {
+        const g = mk((g) => { g.data.stamina = 1; }), f = foe();
+        fightRound(g, f, null);
+        ok('task390: a fatal blow waits with the player still alive', !!pendingWound(f) && !g.isDead());
+        resolveInjury(g, f, true);
+        ok('task390: blocking the fatal blow keeps them alive', !g.isDead() && g.data.stamina === 1);
+        const g2 = mk((g) => { g.data.stamina = 1; }), f2 = foe();
+        fightRound(g2, f2, null);
+        resolveInjury(g2, f2, false);
+        ok('task390: taking it is death, as before', g2.isDead());
+      }
+      // A group fight: every foe's blow in the round is covered by the one answer.
+      {
+        const g = mk();
+        const fights = [foe(), makeFight(parse('<fight name="Troll" combat="20" defence="99" stamina="10"/>'))];
+        groupFightRound(g, fights, null, fights[0]);
+        const w = pendingWound(fights);
+        ok('task390: a group round waits on the first foe\'s blow', !!w && w.name === 'Ogre' && g.data.stamina === 60);
+        resolveInjury(g, fights, true);
+        ok('task390: blocking it blocks the Troll\'s blow too', g.data.stamina === 60 && fights[0].round == null
+           && fights[1].log.some((l) => /no wound/.test(l)));
+      }
+      // A wound's <fightdamage> body (a sting) fires only when the wound lands.
+      {
+        const dmgNode = parse('<fightdamage type="add"><tick codeword="Stung390" hidden="t"/></fightdamage>');
+        const g = mk(), f = foe();
+        fightRound(g, f, dmgNode);
+        resolveInjury(g, f, true, dmgNode);
+        ok('task390: a blocked wound does not sting', !g.hasCodeword('Stung390'));
+        const g2 = mk(), f2 = foe();
+        fightRound(g2, f2, dmgNode);
+        resolveInjury(g2, f2, false, dmgNode);
+        ok('task390: a taken wound does', g2.hasCodeword('Stung390'));
+      }
+      // Unrelated penalties stand: a per-fight attack penalty survives the decision.
+      {
+        const g = mk(), f = foe();
+        g.addFightBonus('attack', -2);
+        fightRound(g, f, null);
+        resolveInjury(g, f, true);
+        ok('task390: the decision leaves an unrelated fight penalty in place', g.fightAttackBonus() === -2);
+      }
+      // No blessing, an ability-damaging foe, or a replaced blow: nothing to ask.
+      {
+        const gNo = mk((g) => { g.data.blessings = []; }), fNo = foe();
+        fightRound(gNo, fNo, null);
+        ok('task390: without the blessing a round runs straight through', pendingWound(fNo) === null && gNo.data.stamina < 60);
+        const gAb = mk(), fAb = foe(' abilityDamaged="combat"');
+        fightRound(gAb, fAb, null);
+        ok('task390: an abilityDamaged= blow is not a Stamina wound and asks nothing', pendingWound(fAb) === null && gAb.hasBlessing('injury'));
+        const rep = parse('<fightdamage type="replace"><lose ability="charisma" amount="1"/></fightdamage>');
+        const gRe = mk(), fRe = foe();
+        fightRound(gRe, fRe, rep);
+        ok('task390: a replaced blow is not a Stamina wound and asks nothing', pendingWound(fRe) === null && gRe.hasBlessing('injury'));
+      }
+      // A save mid-decision: the rolled blow is restored, not rerolled or skipped.
+      {
+        const node = parse('<fight name="Ogre" combat="20" defence="99" stamina="10" attacks="2"/>');
+        const g = mk(), f = makeFight(node);
+        fightRound(g, f, null);
+        const w = pendingWound(f);
+        const back = restoreFight(node, JSON.parse(JSON.stringify(f)));
+        ok('task390: a saved round restores the waiting blow and its size', !!pendingWound(back) && pendingWound(back).dmg === w.dmg && back.round.at === f.round.at);
+        Math.random = () => 0.99; // a reroll would change the size; there must be none
+        resolveInjury(g, back, false);
+        const w2 = pendingWound(back);
+        ok('task390: the restored blow lands as rolled, and the round goes on', g.data.stamina === 60 - w.dmg && !!w2);
+        Math.random = () => 0.5;
+        const forged = restoreFight(node, { ...JSON.parse(JSON.stringify(f)), round: { steps: [{ who: 'boom', fi: 0 }], at: 0 } });
+        ok('task390: a malformed saved round drops', forged.round === null && forged.pending === null);
+      }
+      Math.random = rnd;
     }
 
 }

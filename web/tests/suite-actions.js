@@ -4526,6 +4526,85 @@ export async function run(ctx) {
       window.__FL_INSTANT_DICE__ = false;
     }
 
+    // --- task 390: Immunity to Injury is offered where the wound lands, and holds the exits ---
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const settle = () => new Promise((r) => setTimeout(r, 30));
+      const rnd = Math.random;
+      const btn = (c, cls) => c.querySelector('.' + cls);
+      const exitTo = (c, n) => Array.from(c.querySelectorAll('.goto, .choice'))
+        .find((b) => new RegExp('(^|\\D)' + n + '(\\D|$)').test(b.textContent));
+      const enter = async (book, sec, setup) => {
+        const g = GameState.create({ name: 'T390', gender: 'm', profession: 'Warrior', book, adv });
+        g.data.stamina = 30; g.data.staminaMax = 30;
+        g.addBlessing('injury');
+        if (setup) setup(g);
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate() {}, onDeath() {}, notify() {} });
+        g.setVisitProvider(() => st.serializeVisit());
+        g.goTo(book, sec); st.begin(await data.getSection(book, sec), book, sec);
+        return { g, c, st };
+      };
+      const reload = async (g, book, sec) => {
+        const g2 = new GameState(sanitizeData(JSON.parse(JSON.stringify(g.data))));
+        const c2 = document.createElement('div');
+        const s2 = new Story(c2, g2, { navigate() {}, onDeath() {}, notify() {} });
+        s2.resume(await data.getSection(book, sec), book, sec, g2.data.visit, null);
+        return { g: g2, c: c2 };
+      };
+
+      // §2.555's "Lose 1-6 Stamina points": the die is rolled, then the player decides.
+      {
+        Math.random = () => 0.5; // the die: 4
+        const { g, c } = await enter(2, '555');
+        const take = btn(c, 'take-wound');
+        ok('task390: §2.555 sizes the wound and asks, Stamina untouched',
+           !!take && /−4 Stamina/.test(take.textContent) && !!btn(c, 'blessing-injury') && g.data.stamina === 30, take ? take.textContent : 'no decision');
+        ok('task390: §2.555 both exits wait on the decision',
+           exitTo(c, 505).disabled === true && /Decide about the wound/.test(exitTo(c, 505).title));
+        Math.random = () => 0.99; // a reload must not reroll the die
+        const r = await reload(g, 2, '555');
+        ok('task390: §2.555 a reload keeps the same wound waiting', /−4 Stamina/.test(btn(r.c, 'take-wound').textContent) && r.g.data.stamina === 30);
+        btn(r.c, 'blessing-injury').click();
+        ok('task390: §2.555 blocking it costs no Stamina, spends the blessing and frees the exit',
+           r.g.data.stamina === 30 && !r.g.hasBlessing('injury') && exitTo(r.c, 505).disabled === false && !btn(r.c, 'take-wound'));
+      }
+      {
+        Math.random = () => 0.5;
+        const { g, c } = await enter(2, '555');
+        btn(c, 'take-wound').click();
+        ok('task390: §2.555 taking it costs the 4 and keeps the blessing', g.data.stamina === 26 && g.hasBlessing('injury') && exitTo(c, 505).disabled === false);
+      }
+      {
+        Math.random = () => 0.5;
+        const { g, c } = await enter(2, '555', (g) => { g.data.stamina = 3; });
+        btn(c, 'take-wound').click();
+        ok('task390: §2.555 a fatal wound taken kills, and the dead="t" exit is the one left', g.isDead() && exitTo(c, 560).disabled === false);
+      }
+      {
+        Math.random = () => 0.5;
+        const { g, c } = await enter(2, '555', (g) => { g.data.blessings = []; });
+        ok('task390: §2.555 without the blessing the wound lands on entry, as before', g.data.stamina === 26 && !btn(c, 'take-wound'));
+      }
+
+      // §1.105's Scorpion Shaman: the decision replaces the fight controls, and blocks the sting.
+      {
+        const { g, c } = await enter(1, '105', (g) => { g.data.abilities.combat = 1; });
+        Math.random = () => 0.5; // 4+4+1 misses Defence 8; the Shaman's 4+4+5 hits
+        c.querySelector('.fight .btn-roll').click(); await settle();
+        const use = btn(c, 'blessing-injury');
+        ok('task390: §1.105 a wounding blow stands the decision in place of Attack',
+           !!use && !c.querySelector('.fight .btn-roll') && g.data.stamina === 30, c.querySelector('.fight').textContent.slice(0, 120));
+        const r = await reload(g, 1, '105');
+        ok('task390: §1.105 a reload resumes the decision, not the round', !!btn(r.c, 'blessing-injury') && r.g.data.stamina === 30);
+        btn(r.c, 'blessing-injury').click(); await settle();
+        ok('task390: §1.105 blocking the blow spares the Stamina and the sting, and Attack returns',
+           r.g.data.stamina === 30 && !r.g.hasCodeword('ScorpionSting') && !r.g.hasBlessing('injury') && !!r.c.querySelector('.fight .btn-roll'));
+      }
+      Math.random = rnd;
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
     // --- task 258: a branch's section= exit is held by the gates its section is under ---
     // The "Continue → N" revealBranch draws from a branch's section= attribute has no XML node, so
     // every node-keyed nav gate missed it. §2.105's pickpocket is a forced <transfer> and the page

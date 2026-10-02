@@ -397,6 +397,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 387. Empty-god ticks retain initiation
 - [x] 388. Purse clamping breaks investment multiples
 - [x] 389. Transfers silently select unequal possessions
+- [x] 390. Immunity to Injury has no usable protection
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
 
@@ -22905,5 +22906,126 @@ Checked:
 
 - Against the old four modules, the block reported 11 failures.
 - `RESULT ALL PASS pass=3448 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 390. Immunity to Injury has no usable protection
+
+**Priority: MEDIUM.** A blessing granted by a shipped section is inert.
+
+### What is wrong
+
+[Book5/365](books/book5/365.xml) grants `blessing="injury"` and explains that it
+can prevent Stamina loss from one source once, or for one entire combat round.
+`GameState.damageStamina` in [state.js](web/js/state.js), `applyLose` in
+[engine.js](web/js/engine.js) and the combat damage paths in
+[combat.js](web/js/combat.js) offer no injury protection. The only readers of
+`injury` in the app are labels; `renderSheet` in [ui.js](web/js/ui.js) displays
+it as a chip, without an invocation control.
+
+A browser probe acquired it through the real 5.365 menu, then fought the
+Scorpion Shaman at [book1/105](books/book1/105.xml) with COMBAT 1. A low roll
+inflicted 5 Stamina damage, leaving the blessing held. Neither the sheet nor the
+fight offered a way to invoke protection before or after the wound.
+
+### Steps
+
+1. Add `suite-combat`/`suite-actions` regressions for a chosen invocation against
+   a standalone wound and a full combat round, including multiple enemy attacks.
+2. Implement the protection in the DOM-free rule layer and expose a player
+   decision at the appropriate damage boundary. Respect the printed choice of
+   when to use it; do not automatically spend it on the first minor wound.
+3. Consume the blessing once, preserve unrelated penalties/effects, and cover
+   declining protection, fatal damage and save/resume around the decision.
+4. Run the complete build/test loop before closing.
+
+### The fix
+
+The owner chose the decision boundary from three options: ask at each wound, arm the
+blessing in advance, or undo the last wound. Asking at each wound is the reading of
+"allowing you not to lose Stamina points when you would otherwise be wounded" that lets the
+player see the wound first. Only a holder of the blessing is ever asked.
+
+A wound in the walk:
+
+- `web/js/engine.js`: the new export `staminaWound(el, state)` gives the size of a
+  `<lose stamina>` wound, with its `<adjust>` children. `applyLose` uses it, so the two
+  cannot disagree.
+- `web/js/render-rules.js`: `needsWoundDecision` is true for a `<lose stamina>` that loses
+  nothing else (not `staminato=`, `price=` or `flag=`) while the blessing is held.
+  `classifyPassive` returns `wound-choice` for it, after the fight gate and the deferrals,
+  so a wound on an untaken branch is never sized.
+- `web/js/render-rewards.js`: `renderWoundChoice` prints the words and sizes the wound once,
+  rolling "1-6" now. It keeps the size in `ctx.rolls` under `wound@<path>`, so neither a
+  rerender nor a reload rerolls it.
+  - "Take the wound (−N Stamina)" calls `damageStamina(N)`. "Use Immunity to Injury" spends
+    the blessing.
+  - Both mark the `fx@` memo.
+
+A blow in a fight (`web/js/combat.js`):
+
+- `fightRound` and `groupFightRound` build a list of steps on the fight that holds the
+  round (a lone fight, or a group's first member): `pre`/`player`/`enemy`/`post`.
+- `runRound` runs the steps. Its stop rules reproduce the old loops exactly.
+- `enemyStrike` is split into `rollEnemyStrike` and `landEnemyStrike`.
+- A blow that would cost Stamina, while the blessing is held and the round is not yet
+  immune, stops the round as `pending`, with its dice kept. A replaced blow and an
+  `abilityDamaged=` fight do not count.
+- `pendingWound` reports the waiting blow.
+- `resolveInjury(state, fights, use, …)` either lands the blow as rolled or spends the
+  blessing and marks the round immune, then runs the rest of the round.
+  - An immune blow logs "no wound (Immunity to Injury)" and skips its `<fightdamage>` body,
+    since all 14 shipped bodies fire on being wounded.
+  - Declining leaves the next blow in the same round free to ask.
+- `restoreFight` restores `round` and `pending` only together and only well-formed: known
+  step names, in-range indices, the cursor on an enemy step of the pending foe. Anything
+  else drops, so the fight resumes between rounds.
+
+The view:
+
+- `web/js/render-combat.js`: `appendWoundDecision` replaces the fight's controls with
+  "The X's blow would cost you N Stamina", "Use Immunity to Injury (no wounds this round)"
+  and "Take the wound".
+  - Both lone and group widgets end the round through one `finish` closure, shared with
+    Attack.
+  - `afterAction` redraws the whole section while any fight is waiting, so the exits are
+    held.
+- `web/js/render.js`: `pendingWound` is set per render, and `applyWoundGate` disables
+  every `.goto`/`.choice`. That includes a flee exit, because the blow has already been
+  rolled.
+- `docs/Game-Rules.md`: the Blessings paragraph now describes the decision.
+
+Tests:
+
+- `suite-combat`, task 390's block (22 assertions):
+  - A blow waits with Stamina untouched, and a second Attack cannot start a round.
+  - Blocking spends the blessing and costs nothing, and the next round wounds as before.
+  - Taking a blow costs exactly the rolled damage.
+  - Tripling: one answer covers all three blows.
+  - Declining the first of two blows leaves the second free to ask.
+  - A fatal blow waits with the player alive: blocking it saves them, and taking it kills
+    them.
+  - A group round's block covers the second foe's blow too.
+  - A blocked wound does not sting, and a taken one does.
+  - A per-fight attack penalty survives the decision.
+  - Nothing is asked without the blessing, for an `abilityDamaged=` foe, or for a replaced
+    blow.
+  - A mid-decision save restores the blow and its size, and a forged round drops.
+- `suite-actions`, task 390's block (10 assertions):
+  - 2/555, with its die fixed at 4: the wound is sized and asked about, and both exits
+    wait. A reload with a different die shows the same 4. Blocking it frees the exit.
+    Taking it costs 4. Taken at 3 Stamina it kills, and leaves the `dead="t"` exit.
+    Without the blessing it lands on entry, as before.
+  - 1/105: a wounding blow stands the decision in place of Attack, and a reload resumes it.
+    Blocking spares the Stamina and the `ScorpionSting` codeword.
+
+Checked:
+
+- Against the old six modules, the `suite-actions` block reported 2 failures and a fatal.
+  `suite-combat`'s block cannot run there at all, because `pendingWound` and
+  `resolveInjury` did not exist.
+- `RESULT ALL PASS pass=3480 fail=0`, and `node-import.mjs` passed.
+- Filed task 394: 21 shipped wounds still land without asking. They are 15 `<flee>`
+  parting wounds, 4 in `<group>` actions and 2 in `<fightround>` bodies.
 
 ---

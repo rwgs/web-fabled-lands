@@ -8,7 +8,7 @@
 
 import {
   applyEffect, applyRest, resolveValue, reviveWithResurrection, readItemEffects,
-  losePaymentPlan, abilityChoiceOptions, grantChosenReward,
+  losePaymentPlan, abilityChoiceOptions, grantChosenReward, staminaWound,
 } from './engine.js';
 import { makeItem, parseTags, currencyAward, splitItemName } from './state.js';
 import { applyInlineBuy, buyOptions, cargoBuyPlan, crewUpgradePlan, shipCapacity } from './market.js';
@@ -342,6 +342,7 @@ export function renderPassive(story, container, node, path) {
     case 'blessing-choice':   return renderBlessingChoice(story, container, node, path);
     case 'affliction-choice': return renderAfflictionChoice(story, container, node, path);
     case 'profession-choice': return renderProfessionChoice(story, container, node, path);
+    case 'wound-choice':      return renderWoundChoice(story, container, node, path);
     default: { // 'apply' — the plain effect, memoised per-visit
       const key = 'fx@' + path;
       if (!verdict.rollOwned && (verdict.rerunnable || !story.ctx.applied.has(key))) {
@@ -362,6 +363,41 @@ export function renderPassive(story, container, node, path) {
       return null;
     }
   }
+}
+
+// A wound the player may block with Immunity to Injury (task 390): print its words, size it once
+// (a "1-6 Stamina" die is rolled now and kept in the visit's roll memo, so neither a rerender nor
+// a reload rerolls it), then ask. Taking it costs exactly that size; blocking it spends the
+// blessing (unless permanent) and costs nothing. The memo is the plain path's fx@ key, so a
+// wound already answered this visit stays answered, and the exits wait while it stands.
+function renderWoundChoice(story, container, node, path) {
+  const memo = 'fx@' + path;
+  appendFxWords(story, container, node, path);
+  if (story.ctx.applied.has(memo)) return null;
+  const key = 'wound@' + path;
+  let n = story.ctx.rolls.get(key);
+  if (!Number.isInteger(n) || n < 0) { n = staminaWound(node, story.state); story.ctx.rolls.set(key, n); }
+  if (n === 0) { story.ctx.applied.add(memo); return null; } // nothing to block
+  story.pendingWound = true;
+  const box = document.createElement('span');
+  box.className = 'ability-choice wound-choice';
+  const answer = (use) => {
+    story.ctx.applied.add(memo);
+    if (use && story.state.useBlessing('injury')) story.notify('Immunity to Injury: no wound');
+    else { story.state.damageStamina(n); story.notify(`−${n} Stamina`); }
+    story.rerender();
+  };
+  const use = document.createElement('button');
+  use.className = 'btn-mini blessing-injury';
+  use.textContent = 'Use Immunity to Injury';
+  use.addEventListener('click', () => answer(true));
+  const take = document.createElement('button');
+  take.className = 'btn-mini take-wound';
+  take.textContent = `Take the wound (−${n} Stamina)`;
+  take.addEventListener('click', () => answer(false));
+  box.appendChild(use); box.appendChild(take);
+  container.appendChild(box);
+  return box;
 }
 
 // Render an ability-choice effect as a row of pick buttons; applying it only on

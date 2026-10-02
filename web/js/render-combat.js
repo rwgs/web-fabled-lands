@@ -6,7 +6,8 @@
 // helpers. The combat RULES live in combat.js; this only builds the widget and wires the
 // clicks.
 
-import { makeFight, fightRound, groupFightRound, isDefeated, useWrathBlessing, useDefenceBlessing, rerollAttack, playerFightDefence } from './combat.js';
+import { makeFight, fightRound, groupFightRound, isDefeated, useWrathBlessing, useDefenceBlessing, rerollAttack, playerFightDefence,
+  pendingWound, resolveInjury } from './combat.js';
 import { applyEffectBody } from './engine.js';
 import { aggregateFightOutcome } from './render-gates.js';
 import { animateDice } from './ui.js';
@@ -207,12 +208,39 @@ function makeFleeButton(story, fleeNode, markFled) {
 // redraw the widget in place and persist the round, so a reload resumes it rather than rewinding
 // to the pre-round state (task 162). `resolved` and `redraw` are supplied per widget.
 function afterAction(story, resolved, redraw) {
-  if (resolved || story.state.isDead()) { story.rerender(); return; }
+  // A blow now waiting on the Immunity to Injury decision also redraws the whole section, so the
+  // wound gate holds every exit while it stands (task 390).
+  const waiting = [...story.ctx.fights.values()].some((f) => f && f.pending);
+  if (resolved || story.state.isDead() || waiting) { story.rerender(); return; }
   // The in-place redraw replaces the Attack button the player just used — and the pane freeze
   // has already blurred it — so route through keepFocus to put them back on the rebuilt one
   // instead of on <body> for every round of a long fight. (task 194)
   story.keepFocus(redraw);
   story.state.commitVisit();
+}
+
+// The Immunity to Injury decision (task 390): a blow has been rolled and would cost Stamina, and
+// the player holds the blessing. Stand the two answers where the fight's controls were; nothing
+// else may be done until one is chosen. `answer` ends in the widget's own end-of-round tail, so
+// either answer completes the round exactly as an Attack click would.
+function appendWoundDecision(story, box, wound, answer) {
+  if (!story.inactive) story.pendingWound = true; // the exits wait (applyWoundGate)
+  const note = document.createElement('div');
+  note.className = 'roll-outcome bad';
+  note.textContent = `The ${wound.name}'s blow would cost you ${wound.dmg} Stamina.`;
+  box.appendChild(note);
+  const controls = document.createElement('div');
+  controls.className = 'fight-controls';
+  const use = document.createElement('button');
+  use.className = 'btn-secondary blessing-injury';
+  use.textContent = 'Use Immunity to Injury (no wounds this round)';
+  use.addEventListener('click', () => answer(true));
+  const take = document.createElement('button');
+  take.className = 'btn-secondary take-wound';
+  take.textContent = `Take the wound (−${wound.dmg} Stamina)`;
+  take.addEventListener('click', () => answer(false));
+  controls.appendChild(use); controls.appendChild(take);
+  box.appendChild(controls);
 }
 
 function drawGroupFight(story, box, fights, dmgNode, group, fleeNode = null) {
@@ -241,6 +269,24 @@ function drawGroupFight(story, box, fights, dmgNode, group, fleeNode = null) {
     return;
   }
 
+  // The end of a round, whether it ran straight through or waited on a wound decision.
+  const finish = () => {
+    // A <fightdamage> body's <goto> (a wound redirect) ends the combat by
+    // navigation, exactly as in a single fight. (tasks 99, 169)
+    const redirected = fights.find((f) => f.roundGoto);
+    if (redirected && !story.state.isDead()) {
+      const g = redirected.roundGoto; fights.forEach((f) => { f.roundGoto = null; });
+      story.navigate(g.book != null ? g.book : story.book, g.section, { durable: true });
+      return;
+    }
+    afterAction(story, groupResolved(), redraw);
+  };
+  const wound = pendingWound(fights);
+  if (wound) {
+    appendWoundDecision(story, box, wound, (use) => { resolveInjury(story.state, fights, use, dmgNode); finish(); });
+    return;
+  }
+
   const controls = document.createElement('div');
   controls.className = 'fight-controls';
   // One Attack button PER still-standing foe: the player chooses their target
@@ -256,15 +302,7 @@ function drawGroupFight(story, box, fights, dmgNode, group, fleeNode = null) {
       if (!action) return; // left the visit or the shell mid-animation — drop the strike
       try {
         groupFightRound(story.state, fights, dmgNode, target);
-        // A <fightdamage> body's <goto> (a wound redirect) ends the combat by
-        // navigation, exactly as in a single fight. (tasks 99, 169)
-        const redirected = fights.find((f) => f.roundGoto);
-        if (redirected && !story.state.isDead()) {
-          const g = redirected.roundGoto; fights.forEach((f) => { f.roundGoto = null; });
-          story.navigate(g.book != null ? g.book : story.book, g.section, { durable: true });
-          return;
-        }
-        afterAction(story, groupResolved(), redraw);
+        finish();
       } finally {
         action.end();
       }
@@ -367,6 +405,27 @@ function drawFight(story, box, fight, node, dmgNode, fleeNode, key, locked = fal
     return;
   }
 
+  // The end of a round, whether it ran straight through or waited on a wound decision.
+  const finish = () => {
+    // A <fightround>/<fightdamage> body can end the fight by navigation — §5.689
+    // "dragged you under" (→7), §4.238 "if you get wounded" (→184). The round is durable, so a
+    // failed target arms a retry rather than dropping the redirect and re-showing Attack. (tasks 99, 169)
+    if (fight.roundGoto && !story.state.isDead()) {
+      const g = fight.roundGoto; fight.roundGoto = null;
+      story.navigate(g.book != null ? g.book : story.book, g.section, { durable: true });
+      return;
+    }
+    // Reduced to 0 Stamina: if the section has an "if you lose…" branch, that's
+    // a (non-death) loss — route to it; otherwise it's death.
+    if (story.state.isDead() && story.fightGate && story.fightGate.hasLosePath) fight.outcome = 'lose';
+    afterAction(story, fight.outcome, redraw);
+  };
+  const wound = pendingWound(fight);
+  if (wound) {
+    appendWoundDecision(story, box, wound, (use) => { resolveInjury(story.state, fight, use, dmgNode, roundNode); finish(); });
+    return;
+  }
+
   const controls = document.createElement('div');
   controls.className = 'fight-controls';
   const attack = document.createElement('button');
@@ -377,18 +436,7 @@ function drawFight(story, box, fight, node, dmgNode, fleeNode, key, locked = fal
     if (!action) return; // left the visit or the shell mid-animation — drop the strike
     try {
       fightRound(story.state, fight, dmgNode, roundNode);
-      // A <fightround>/<fightdamage> body can end the fight by navigation — §5.689
-      // "dragged you under" (→7), §4.238 "if you get wounded" (→184). The round is durable, so a
-      // failed target arms a retry rather than dropping the redirect and re-showing Attack. (tasks 99, 169)
-      if (fight.roundGoto && !story.state.isDead()) {
-        const g = fight.roundGoto; fight.roundGoto = null;
-        story.navigate(g.book != null ? g.book : story.book, g.section, { durable: true });
-        return;
-      }
-      // Reduced to 0 Stamina: if the section has an "if you lose…" branch, that's
-      // a (non-death) loss — route to it; otherwise it's death.
-      if (story.state.isDead() && story.fightGate && story.fightGate.hasLosePath) fight.outcome = 'lose';
-      afterAction(story, fight.outcome, redraw);
+      finish();
     } finally {
       action.end();
     }

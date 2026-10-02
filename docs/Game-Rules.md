@@ -139,7 +139,10 @@ Marquis/Marchioness, Duke/Duchess, and Hero/Heroine at 11th and above.
 
 **Blessings** are a small fixed set - the six abilities plus defence, disease/poison,
 injury, luck, storm(s), travel and wrath. Some are permanent; most are spent on use. A
-blessing can be vetoed by the player rather than auto-spent.
+blessing can be vetoed by the player rather than auto-spent. While **Immunity to Injury** is
+held, a section's Stamina loss is rolled and then waits for the player to take it or block it.
+So does each blow in a fight that would cost Stamina, and blocking a blow covers the rest of
+that combat round. The exits wait until the player has decided.
 
 ---
 

@@ -3,7 +3,7 @@
 Backlog of recommended improvements. Open tasks are filed under priority buckets
 (**HIGH** / **MEDIUM** / **LOW**) — work the first open (`- [ ]`) item top-down;
 each task's detail section carries the same stable ID. Every filed task through
-393 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
+394 appears below: 207 and 326 are withdrawn as misdiagnoses, the `- [ ]` items in
 the buckets below are open, and **all others are complete**. File new work
 under the priority bucket that fits, and record the pass in the Review log.
 Completed detail sections are archived in
@@ -23,7 +23,6 @@ there once the buckets below are clear.
 
 **MEDIUM**
 
-- [ ] 390. Immunity to Injury is awarded and displayed but cannot protect against any damage
 - [ ] 391. Combat replies land before the COMBAT-blessing reroll decision and can kill the player before a winning retry
 - [ ] 393. A forced `<group>` that bundles a roll holds nothing, so book3/273's and book3/629's "lose 1-6 of your possessions" can be walked past with the die unrolled
 
@@ -31,6 +30,7 @@ there once the buckets below are clear.
 
 - [ ] 369. `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19 (CI notice); the `smoke` and `build-scripts` jobs rely on the image's preinstalled `pwsh` 7, `google-chrome` and `python3`, so the move could stop CI with no change here
 - [ ] 392. A Keep or import refused because another tab claimed the slot first tells the player "this adventure has been saved from another tab" and to load the newer save, which is somebody else's adventure; retrying works
+- [ ] 394. Immunity to Injury is offered for walk wounds and enemy blows only; the 15 flee parting wounds, 4 group-bundled wounds and 2 `<fightround>` wounds still land without asking
 
 **Done**
 
@@ -429,42 +429,11 @@ this order.*
 - [x] 387. book6/589's Forsaken result `<tick god=""/>` added a god named "", so a Sig initiate kept Sig, its +1 THIEVERY and a blank second god. An empty `god=` on a tick now renounces every current god through `removeGod`, which strips their effects and tied resurrection deals but bars no later initiation, and a load drops a blank god left by an older save
 - [x] 388. a money-cache Deposit rounded the request to `multiples=` and then clamped it to the purse, so book1/104 with 150 Shards invested all 150 of a requested 200. The new DOM-free `cacheDepositAmount` in `market.js` clamps first and rounds last. Withdrawals, which the spec does not constrain, are no longer rounded to the multiple
 - [x] 389. a transfer's equivalence compared kind, name and bonus only, so two same-named rings with three and one charges moved without asking which (book2/105's pickpocket, 6/635's and 4/456's offerings). Task 372's sale identity is now `sameItem` in `state.js`, shared by the sale and transfer planners. The transfer picker labels name the bonus's ability, the uses left and the tags, and number any picks still alike
+- [x] 390. book5/365's Immunity to Injury was displayed and never usable. While it is held, a walk `<lose stamina>` is now rolled and waits for "Take the wound" or "Use Immunity to Injury", and so does each enemy blow that would cost Stamina. A fight's round now runs as resumable steps in `combat.js`, and blocking a blow covers the rest of that round. The exits wait meanwhile, and both decisions survive a reload without rerolling
 
 ---
 
 > **Every completed task's detail is archived** in [`TASKS-archive.md`](TASKS-archive.md), under the same `## <N>.` heading it had here, so this file stays focused on open work. The checklist above carries every task's stable ID and status. **Status is one of three markers — `- [x]` done, `- [ ]` open, `- [~]` withdrawn — so a census reconciling the checklist against the detail headings must match all three: matching only `- [x]` drops the withdrawn rows (207 and 326) and reports them as missing, which is what filed task 326.** The open tasks' detail sections follow, in filed order; the Review log comes after them.
-
----
-
-## 390. Immunity to Injury has no usable protection
-
-**Priority: MEDIUM.** A blessing granted by a shipped section is inert.
-
-### What is wrong
-
-[Book5/365](books/book5/365.xml) grants `blessing="injury"` and explains that it
-can prevent Stamina loss from one source once, or for one entire combat round.
-`GameState.damageStamina` in [state.js](web/js/state.js), `applyLose` in
-[engine.js](web/js/engine.js) and the combat damage paths in
-[combat.js](web/js/combat.js) offer no injury protection. The only readers of
-`injury` in the app are labels; `renderSheet` in [ui.js](web/js/ui.js) displays
-it as a chip, without an invocation control.
-
-A browser probe acquired it through the real 5.365 menu, then fought the
-Scorpion Shaman at [book1/105](books/book1/105.xml) with COMBAT 1. A low roll
-inflicted 5 Stamina damage, leaving the blessing held. Neither the sheet nor the
-fight offered a way to invoke protection before or after the wound.
-
-### Steps
-
-1. Add `suite-combat`/`suite-actions` regressions for a chosen invocation against
-   a standalone wound and a full combat round, including multiple enemy attacks.
-2. Implement the protection in the DOM-free rule layer and expose a player
-   decision at the appropriate damage boundary. Respect the printed choice of
-   when to use it; do not automatically spend it on the first minor wound.
-3. Consume the blessing once, preserve unrelated penalties/effects, and cover
-   declining protection, fatal damage and save/resume around the decision.
-4. Run the complete build/test loop before closing.
 
 ---
 
@@ -569,6 +538,35 @@ this), but the message never says so.
 
 ---
 
+## 394. Immunity to Injury does not reach every wound
+
+**Priority: LOW.** The blessing protects most wounds now; these still land without asking.
+Found while fixing task 390.
+
+### What is wrong
+
+Task 390 offers the decision in two places:
+- `renderWoundChoice` in [render-rewards.js](web/js/render-rewards.js), for a walk
+  `<lose stamina>`;
+- `runRound` in [combat.js](web/js/combat.js), for an enemy blow.
+
+A census of the 247 shipped `<lose stamina>` found 226 in the walk. The other 21 apply
+directly and never ask:
+- 15 are `<flee>` parting wounds (2/207 among them), applied by the Flee button through
+  `applyEffectBody`;
+- 4 are in `<group>` actions (1/514 among them), applied by the group's click;
+- 2 are in `<fightround>` bodies (5/24 among them), applied by `runRoundNode` mid-round.
+
+### Steps
+
+1. Add regressions for one of each in `suite-combat`/`suite-actions`, holding the blessing.
+2. Route each through the same decision: the flee wound before the escape navigates, the
+   group's wound inside its commit, and a round-body wound as a round step. A round that is
+   already immune covers its round body too.
+3. Run the complete build/test loop before closing.
+
+---
+
 ## 393. Forced roll groups can be walked past unrolled
 
 **Priority: MEDIUM.** A printed forfeit is avoidable. Found while fixing task 385, from
@@ -608,6 +606,31 @@ cannot simply be honoured.
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 390): closed **390**, filed **394**. The owner chose to ask at each
+wound.
+- Walk: `needsWoundDecision` in `render-rules.js` classifies a plain `<lose stamina>` as
+  `wound-choice` while the blessing is held. `renderWoundChoice` sizes it once with the new
+  `staminaWound` in `engine.js`, keeps that size in the visit's roll memo, and offers "Take the
+  wound" or "Use Immunity to Injury".
+- Combat: `fightRound` and `groupFightRound` in `combat.js` now build a list of steps that
+  `runRound` runs. A blow that would cost Stamina stops it as `pending`, its dice already
+  rolled. `resolveInjury` lands the blow or blocks it, and blocking makes the rest of the round
+  immune. A blocked blow skips its `<fightdamage>` body, since every shipped one fires on being
+  wounded. `restoreFight` restores a paused round, and drops a malformed one.
+- View: `render-combat.js` stands the decision in place of the fight controls, and both
+  answers end the round through the widget's usual tail. The new `applyWoundGate` in
+  `render.js` holds every exit while a decision stands, a flee exit too.
+- Docs: `docs/Game-Rules.md` describes the blessing.
+
+Task 390's block in `suite-combat` covers a single blow, taking it, Tripling, declining then
+blocking, fatal blows, a group round, the sting, an unrelated penalty, the cases that never
+ask, and a mid-decision save. In `suite-actions`, 2/555's 1-6 wound covers blocking after a
+reload, taking it, a fatal take and no blessing. 1/105's Scorpion Shaman covers the in-fight
+decision, a reload, and blocking the sting. Against the old code the `suite-actions` block
+reported 2 failures and a fatal. **394** records the 21 shipped wounds that still land without
+asking: flee, group and round-body ones. `RESULT ALL PASS pass=3480 fail=0`, and
+`node-import.mjs` passed.
 
 Worked 2026-10-01 (task 389): closed **389**, filed nothing.
 - Task 372's item identity, `sameCandidate`'s carried-goods half, moved to `state.js` as

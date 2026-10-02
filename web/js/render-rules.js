@@ -346,6 +346,20 @@ export function isEconomicPayment(node) {
   return hasShards || hasItem || hasCargo || hasShip;
 }
 
+// Immunity to Injury (book5/365) "protects you by allowing you not to lose Stamina points when you
+// would otherwise be wounded, from one source of damage once only". So while it is held, a wound
+// is the player's to block or take: a <lose stamina="…"> that loses nothing else (every shipped one
+// but a priced and a flag-linked cost, which are payments and are classified before this). A
+// staminato= is a reset rather than a wound, and is left alone. The fight's own blows ask in
+// combat.js (runRound). (task 390)
+const WOUND_ONLY_ATTRS = ['shards', 'item', 'weapon', 'armour', 'tool', 'cargo', 'ship', 'codeword', 'ability',
+  'blessing', 'curse', 'disease', 'poison', 'god', 'title', 'resurrection', 'staminato', 'price', 'flag'];
+export function needsWoundDecision(node, state) {
+  return node.tagName.toLowerCase() === 'lose' && node.getAttribute('stamina') != null
+    && WOUND_ONLY_ATTRS.every((a) => node.getAttribute(a) == null)
+    && state.hasBlessing('injury');
+}
+
 // ---- group classification (tasks 42/61/96/98/107/125/126 — task 119 phase 3) --
 
 // Classify a <group> — the books' "optional bundle of effects behind one opt-in" —
@@ -1182,6 +1196,12 @@ export function classifyPassive(node, view) {
   // purpose — the corpus's three PAID open cures (§1.338, §5.105, §5.674) hang off a payment,
   // whose own picker (openAfflictionNode) asks before the money moves. (task 343)
   if (!hidden && needsAfflictionChoice(node, view.state)) return { mode: 'affliction-choice' };
+
+  // A wound the player can block: a plain <lose stamina> while Immunity to Injury is held is
+  // the player's decision, not an automatic cost. Below the fight gate and the deferrals above
+  // for the forfeits' reason: a wound must not be sized, let alone blocked, on a branch that is
+  // not yet taken. (task 390)
+  if (!hidden && needsWoundDecision(node, view.state)) return { mode: 'wound-choice' };
 
   const setVarName = tag === 'set' ? node.getAttribute('var') : null;
   // A roll this visit has taken ownership of this var: freeze the <set> so it can

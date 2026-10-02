@@ -598,6 +598,15 @@ function walkEffectBody(parent, state, ctx) {
   }
 }
 
+/** The Stamina a `<lose stamina="…">` wound costs, rolled now when it is dice: never negative.
+ *  <adjust> children reduce (or raise) it: "subtract your armour from the roll" (book4/679,
+ *  book6/306/527/696/742) or "−1 if you worship the Three Fortunes" (book4/556). childAdjustment
+ *  is 0 when there are none. Exported so a wound the player may block with Immunity to Injury
+ *  is sized once, before the decision, and then lands at exactly that size (task 390). */
+export function staminaWound(el, state) {
+  return Math.max(0, resolveValue(state, el.getAttribute('stamina')) + childAdjustment(el, state));
+}
+
 function applyLose(el, state, opts) {
   const get = (a) => el.getAttribute(a);
   const notes = [];
@@ -616,7 +625,6 @@ function applyLose(el, state, opts) {
   }
   if (get('stamina') != null || get('staminato') != null) {
     let n;
-    const s = get('stamina');
     // staminato="N" SETS the score to N, so its delta is SIGNED: usually "beaten
     // down TO N Stamina" (§570 "wake up on 1 Stamina"), but the tag is documented to
     // "actually restore stamina, if it is currently lower than the value given" —
@@ -624,10 +632,7 @@ function applyLose(el, state, opts) {
     // and a wound left in place there kills the loser at §370 (task 289). It carries no
     // stamina= attribute, so it must gate the block on its own (task 71).
     if (get('staminato') != null) n = state.data.stamina - resolveValue(state, get('staminato'));
-    // <adjust> children reduce (or raise) the wound: "subtract your armour from
-    // the roll" (book4/679, book6/306/527/696/742) or "−1 if you worship the
-    // Three Fortunes" (book4/556). childAdjustment is 0 when there are none.
-    else n = Math.max(0, resolveValue(state, s) + childAdjustment(el, state));
+    else n = staminaWound(el, state);
     // A restore clamps at effectiveStaminaMax(), the right ceiling while an aura or a
     // Stamina-cutting affliction is in play; the note has to say which way it moved.
     if (n < 0) { state.healStamina(-n); notes.push(`+${-n} Stamina`); }

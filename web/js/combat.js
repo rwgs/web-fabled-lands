@@ -42,6 +42,8 @@ export function makeFight(node, state = null) {
     fleeTo: null,
     outcome: null, // 'win' | 'lose' | 'fled'
     log: [],
+    round: null,   // a round paused for the player (runRound, task 390)
+    pending: null, // the decision it waits on
   };
   if (state) startFight(fight, node, state);
   return fight;
@@ -49,6 +51,8 @@ export function makeFight(node, state = null) {
 
 /** The only outcomes a fight can hold — the whitelist restoreFight validates against. */
 const FIGHT_OUTCOMES = new Set(['win', 'lose', 'fled']);
+/** The steps a round is made of (runRound, task 390). */
+const ROUND_STEPS = new Set(['pre', 'player', 'enemy', 'post']);
 // Generous bounds on a restored fight log: the widget shows only the last six lines, and no
 // real slugfest approaches these, so they cost a legitimate resume nothing while keeping an
 // imported save from carrying an unbounded blob into the DOM. (task 180)
@@ -89,6 +93,18 @@ export function restoreFight(node, saved) {
   fight.attackRerolled = !!s.attackRerolled;
   fight.log = (Array.isArray(s.log) ? s.log : []).filter((l) => typeof l === 'string')
     .slice(-MAX_LOG_LINES).map((l) => l.slice(0, MAX_LOG_CHARS));
+  // A round paused on an Immunity to Injury decision (task 390), with the blow's dice already
+  // rolled. Both or neither: a round is only ever at rest while it waits, and a malformed one
+  // drops, so the fight resumes between rounds rather than replaying a forged step list.
+  const steps = s.round && Array.isArray(s.round.steps) ? s.round.steps : null;
+  const p = s.pending;
+  if (steps && steps.length <= 64 && steps.every((st) => st && ROUND_STEPS.has(st.who) && Number.isInteger(st.fi) && st.fi >= 0 && st.fi < 32)
+      && p && p.kind === 'injury' && Number.isInteger(s.round.at) && s.round.at >= 0 && s.round.at < steps.length
+      && steps[s.round.at].who === 'enemy' && Number.isInteger(p.fi) && p.fi === steps[s.round.at].fi) {
+    fight.round = { steps: steps.map((st) => ({ who: st.who, fi: st.fi })), at: s.round.at, immune: s.round.immune === true };
+    fight.pending = { kind: 'injury', fi: p.fi, roll: int(p.roll, 2, 2, 12), total: int(p.total, 0, -99, 199),
+      def: int(p.def, 0, -99, 199), dmg: int(p.dmg, 1, 1, 199), replace: false };
+  }
   // roundGoto (a <fightdamage>/<fightround> redirect) is deliberately NOT restored: the view
   // consumes and clears it before the round commits, so a saved one could only be forged.
   return fight;
@@ -206,22 +222,37 @@ export function rerollAttack(state, fight) {
   return true;
 }
 
-/** One enemy strike against the player (2 dice + Combat vs the player's Defence),
- *  honouring <fightdamage type="replace"|"add"> and abilityDamaged=. */
-function enemyStrike(state, fight, dmgNode) {
+/** One enemy strike against the player (2 dice + Combat vs the player's Defence), rolled but
+ *  not yet landed, so a wound can wait on the player's Immunity to Injury decision (task 390).
+ *  <fightdamage type="replace"> substitutes its own effect for the Stamina loss (§5.356: lose an
+ *  ability instead); type="add"/none applies it ON TOP (§1.105). */
+function rollEnemyStrike(state, fight, dmgNode) {
   const r = rollDice(2);
   const total = r.total + fight.combat;
   const def = playerDefenceFor(state, fight);
   const dmg = Math.max(0, total - def);
-  // <fightdamage type="replace"> substitutes its own effect for the Stamina loss
-  // (§5.356: lose an ability instead); type="add"/none applies it ON TOP (§1.105).
-  const replace = dmg > 0 && dmgNode && (dmgNode.getAttribute('type') || '').toLowerCase() === 'replace';
-  if (dmg > 0 && !replace) applyEnemyDamage(state, fight, dmg);
-  fight.log.push(`${fight.name} rolls ${r.total}+${fight.combat}=${total} vs your Def ${def} → ${dmg ? (replace ? 'a telling blow' : '−' + dmg + ' your Stamina') : 'miss'}`);
+  const replace = !!(dmg > 0 && dmgNode && (dmgNode.getAttribute('type') || '').toLowerCase() === 'replace');
+  return { roll: r.total, total, def, dmg, replace };
+}
+
+/** Does this rolled strike wound — cost the player Stamina — so Immunity to Injury can block it?
+ *  A replaced blow and an abilityDamaged= fight take something else instead. */
+function strikeWounds(fight, s) {
+  return s.dmg > 0 && !s.replace && !fight.abilityDamaged;
+}
+
+/** Land a rolled strike, honouring abilityDamaged=. `immune` blocks a wound outright: no
+ *  Stamina lost, and no <fightdamage> body, since every shipped one fires on being wounded
+ *  ("each time you are wounded", a sting, §4.238's "if you get wounded"). (task 390) */
+function landEnemyStrike(state, fight, dmgNode, s, immune = false) {
+  const head = `${fight.name} rolls ${s.roll}+${fight.combat}=${s.total} vs your Def ${s.def} → `;
+  if (immune) { fight.log.push(head + 'no wound (Immunity to Injury)'); return; }
+  if (s.dmg > 0 && !s.replace) applyEnemyDamage(state, fight, s.dmg);
+  fight.log.push(head + (s.dmg ? (s.replace ? 'a telling blow' : '−' + s.dmg + ' your Stamina') : 'miss'));
   // Apply the whole <fightdamage> body (all children, rolls + branches) when the
   // blow lands — never on render. A <goto> inside redirects the fight ("If you
   // get wounded, →184" — §4.238): record it for the view to navigate. (task 99)
-  if (dmg > 0 && dmgNode) {
+  if (s.dmg > 0 && dmgNode) {
     const res = applyEffectBody(dmgNode, state, fight.log);
     if (res.goto) fight.roundGoto = res.goto;
   }
@@ -245,21 +276,83 @@ function runRoundNode(state, fight, roundNode) {
  * the player (Stamina damage) or record a fight.roundGoto redirect (§5.689).
  */
 export function fightRound(state, fight, dmgNode, roundNode = null) {
+  if (fight.pending) return; // the round already in progress waits on the player (task 390)
   fight.attackRerolled = false; fight.lastStrikeMissed = false; // fresh round, fresh reroll (task 91)
   const pre = roundNode != null && boolAttr(roundNode.getAttribute('pre'));
-  if (roundNode && pre) {
-    runRoundNode(state, fight, roundNode);
-    if (fight.outcome || fight.roundGoto || state.isDead()) return; // choked out before the exchange
+  const steps = [];
+  if (roundNode && pre) steps.push({ who: 'pre', fi: 0 });
+  for (const who of (fight.playerFirst ? ['player', 'enemy'] : ['enemy', 'player'])) {
+    if (who === 'player') steps.push({ who, fi: 0 });
+    else for (let k = 0; k < (fight.attacks || 1); k++) steps.push({ who, fi: 0 });
   }
-  const order = fight.playerFirst ? ['player', 'enemy'] : ['enemy', 'player'];
-  for (const who of order) {
-    if (fight.outcome || fight.roundGoto || state.isDead()) break;
-    if (who === 'player') playerStrike(state, fight);
-    else { const n = fight.attacks || 1; for (let k = 0; k < n && !state.isDead() && !fight.outcome && !fight.roundGoto; k++) enemyStrike(state, fight, dmgNode); }
+  if (roundNode && !pre) steps.push({ who: 'post', fi: 0 });
+  fight.round = { steps, at: 0, immune: false };
+  runRound(state, [fight], dmgNode, roundNode, false);
+}
+
+// ---- the resumable round (task 390) ---------------------------------------
+// A round runs as a list of steps kept on the fight that holds it (a lone fight, or a group's
+// first member): `round = { steps, at, immune }`. A step can stop for the player's decision,
+// recorded as `pending`, and resolveInjury carries on from that step once it is answered. The
+// decision is Immunity to Injury (book5/365): "not to lose Stamina points when you would
+// otherwise be wounded, from one source of damage once only, or the damage you take in a single
+// combat round". So each blow that would cost Stamina asks while the blessing is held, the dice
+// already rolled, and using it blocks that blow and every later one in the round. Both fields
+// are null between rounds, and both are saved, so a reload neither rerolls nor skips the blow.
+//
+// The steps reproduce the old loops exactly. A lone fight stops before any step once it is
+// decided, redirected or the player is dead; a group stops its foes' blows at death and skips a
+// defeated foe, as groupFightRound always did.
+function runRound(state, fights, dmgNode, roundNode, group) {
+  const holder = fights[0];
+  const rd = holder.round;
+  while (rd && rd.at < rd.steps.length) {
+    const st = rd.steps[rd.at];
+    const f = fights[st.fi] || holder;
+    if (!group && (holder.outcome || holder.roundGoto || state.isDead())) break;
+    if (group && st.who === 'enemy' && state.isDead()) break;
+    if (!(group && st.who === 'enemy' && isDefeated(f))) {
+      if (st.who === 'pre' || st.who === 'post') runRoundNode(state, holder, roundNode);
+      else if (st.who === 'player') playerStrike(state, f);
+      else {
+        const s = rollEnemyStrike(state, f, dmgNode);
+        if (strikeWounds(f, s) && !rd.immune && state.hasBlessing('injury')) {
+          holder.pending = { kind: 'injury', fi: st.fi, ...s };
+          return;
+        }
+        landEnemyStrike(state, f, dmgNode, s, strikeWounds(f, s) && rd.immune);
+      }
+    }
+    rd.at++;
   }
-  if (roundNode && !pre && !fight.outcome && !fight.roundGoto && !state.isDead()) {
-    runRoundNode(state, fight, roundNode);
-  }
+  holder.round = null;
+}
+
+/** The blow waiting on an Immunity to Injury decision, as { name, dmg }, or null. `fights` is a
+ *  lone fight or a group's members. */
+export function pendingWound(fights) {
+  const list = Array.isArray(fights) ? fights : [fights];
+  const p = list[0] && list[0].pending;
+  if (!p || p.kind !== 'injury') return null;
+  return { name: (list[p.fi] || list[0]).name, dmg: p.dmg };
+}
+
+/** Answer the waiting Immunity to Injury decision and finish the round. `use` spends the blessing
+ *  (unless permanent) to block this blow and the rest of the round's wounds; otherwise the blow
+ *  lands as rolled. Returns false when nothing was waiting. Headless. (task 390) */
+export function resolveInjury(state, fights, use, dmgNode = null, roundNode = null) {
+  const group = Array.isArray(fights);
+  const list = group ? fights : [fights];
+  const holder = list[0];
+  const p = holder && holder.pending;
+  if (!p || p.kind !== 'injury' || !holder.round) return false;
+  holder.pending = null;
+  const immune = !!use && state.useBlessing('injury');
+  if (immune) holder.round.immune = true;
+  landEnemyStrike(state, list[p.fi] || holder, dmgNode, p, immune);
+  holder.round.at++;
+  runRound(state, list, dmgNode, roundNode, group);
+  return true;
 }
 
 /** True when an enemy in a group has been beaten (Stamina at/under its threshold). */
@@ -304,13 +397,11 @@ export function useDefenceBlessing(state, fight, bonus = 3, members = null) {
  * shared `state`. (task 48)
  */
 export function groupFightRound(state, fights, dmgNode, target = null) {
+  if (!fights.length || fights[0].pending) return; // a blow waits on the player (task 390)
   fights.forEach((f) => { f.attackRerolled = false; f.lastStrikeMissed = false; }); // task 91
   const chosen = (target && !isDefeated(target)) ? target : fights.find((f) => !isDefeated(f));
-  if (chosen) playerStrike(state, chosen);
-  for (const f of fights) {
-    if (state.isDead()) break;
-    if (isDefeated(f)) continue;
-    const n = f.attacks || 1;
-    for (let k = 0; k < n && !state.isDead(); k++) enemyStrike(state, f, dmgNode);
-  }
+  const steps = chosen ? [{ who: 'player', fi: fights.indexOf(chosen) }] : [];
+  fights.forEach((f, i) => { for (let k = 0; k < (f.attacks || 1); k++) steps.push({ who: 'enemy', fi: i }); });
+  fights[0].round = { steps, at: 0, immune: false };
+  runRound(state, fights, dmgNode, null, true);
 }
