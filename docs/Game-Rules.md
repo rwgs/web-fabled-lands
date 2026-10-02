@@ -141,8 +141,11 @@ Marquis/Marchioness, Duke/Duchess, and Hero/Heroine at 11th and above.
 injury, luck, storm(s), travel and wrath. Some are permanent; most are spent on use. A
 blessing can be vetoed by the player rather than auto-spent. While **Immunity to Injury** is
 held, a section's Stamina loss is rolled and then waits for the player to take it or block it.
-So does each blow in a fight that would cost Stamina, and blocking a blow covers the rest of
-that combat round. The exits wait until the player has decided.
+So does each blow in a fight that would cost Stamina, and so does a wound from a fight's
+round-by-round rules. Blocking any of these covers the rest of that combat round. A group
+action that wounds asks before it applies. Fleeing past a parting blow asks first: flee using
+the blessing, flee taking the blow, or stay and fight. The exits wait until the player has
+decided.
 
 ---
 

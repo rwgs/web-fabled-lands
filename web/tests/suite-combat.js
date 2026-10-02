@@ -2116,4 +2116,98 @@ export async function run(ctx) {
       Math.random = rnd;
     }
 
+    // --- task 394: Immunity to Injury reaches a round body's wound, a parting blow and a group's ---
+    {
+      window.__FL_INSTANT_DICE__ = true;
+      const settle = () => new Promise((r) => setTimeout(r, 30));
+      const rnd = Math.random;
+      const mk = (setup) => {
+        const g = GameState.create({ name: 'T394', gender: 'm', profession: 'Warrior', book: 5, adv });
+        g.data.stamina = 30; g.data.staminaMax = 30; g.data.abilities.magic = 1;
+        g.addBlessing('injury');
+        if (setup) setup(g);
+        return g;
+      };
+      // §5.383's lightning: a MAGIC 12 check each round, "If you fail the roll, you lose 1-6 points
+      // of Stamina". The foe here neither hits nor is hit, so the body's wound is the round's only one.
+      const lightning = (await data.getSection(5, '383')).querySelector('fightround');
+      const still = () => makeFight(parse('<fight name="Golem" combat="0" defence="99" stamina="10"/>'));
+      {
+        const g = mk(), f = still();
+        Math.random = () => 0; // every die a 1: the MAGIC roll fails and the lightning does 1
+        fightRound(g, f, null, lightning);
+        const w = pendingWound(f);
+        ok('task394: §5.383 the round body\'s wound waits on the decision', !!w && w.body && w.dmg === 1 && g.data.stamina === 30, JSON.stringify(w));
+        const back = restoreFight(parse('<fight name="Golem" combat="0" defence="99" stamina="10"/>'), JSON.parse(JSON.stringify(f)));
+        ok('task394: ...a save restores it as a body wound', !!pendingWound(back) && pendingWound(back).body === true);
+        resolveInjury(g, f, true, null, lightning);
+        ok('task394: ...and blocking it costs nothing and spends the blessing', g.data.stamina === 30 && !g.hasBlessing('injury') && f.round == null);
+        const g2 = mk(), f2 = still();
+        fightRound(g2, f2, null, lightning);
+        resolveInjury(g2, f2, false, null, lightning);
+        ok('task394: §5.383 taking it costs the 1', g2.data.stamina === 29 && g2.hasBlessing('injury'));
+      }
+      // An immune round covers its body too: the blow is blocked, then the lightning asks nothing.
+      {
+        const g = mk(), f = makeFight(parse('<fight name="Golem" combat="20" defence="99" stamina="10"/>'));
+        Math.random = () => 0;
+        fightRound(g, f, null, lightning);
+        resolveInjury(g, f, true, null, lightning);
+        ok('task394: a round made immune by a blocked blow blocks its body\'s wound without asking',
+           g.data.stamina === 30 && pendingWound(f) === null && f.round == null && f.log.filter((l) => /no wound/.test(l)).length === 2, f.log.join(' | '));
+      }
+
+      // A parting blow: §2.581's "lose 1-6 Stamina points" as you run.
+      const flee581 = async (pick) => {
+        const g = mk(); g.data.book = 2;
+        const c = document.createElement('div');
+        const st = new Story(c, g, { navigate() {}, onDeath() {}, notify() {} });
+        g.goTo(2, '581'); st.begin(await data.getSection(2, '581'), 2, '581');
+        Array.from(c.querySelectorAll('.fight button')).find((b) => b.textContent === 'Flee').click();
+        const opts = Array.from(c.querySelectorAll('.fight button')).map((b) => b.textContent);
+        Math.random = () => 0.5; // the parting die: 4
+        const b = Array.from(c.querySelectorAll('.fight button')).find((x) => x.classList.contains(pick));
+        if (b) b.click();
+        await settle();
+        return { g, c, opts };
+      };
+      {
+        const { g, opts } = await flee581('blessing-injury');
+        ok('task394: §2.581 fleeing with the blessing asks first, with a way to stay',
+           opts.length === 3 && opts.some((t) => /Stay and fight/.test(t)), opts.join(' | '));
+        ok('task394: §2.581 fleeing behind the blessing takes no wound and still flees',
+           g.data.stamina === 30 && !g.hasBlessing('injury') && g.hasCodeword('2.581.1'));
+      }
+      {
+        const { g } = await flee581('take-wound');
+        ok('task394: §2.581 fleeing and taking the blow costs the die', g.data.stamina === 26 && g.hasBlessing('injury') && g.hasCodeword('2.581.1'));
+      }
+      {
+        const { g, c } = await flee581('stay-fight');
+        ok('task394: §2.581 staying changes nothing', g.data.stamina === 30 && g.hasBlessing('injury') && !g.hasCodeword('2.581.1')
+           && !!Array.from(c.querySelectorAll('.fight button')).find((b) => b.textContent === 'Flee'));
+      }
+
+      // A group that wounds: one answer for the group, sized on the click.
+      const group394 = (pick) => {
+        const g = mk(); g.data.shards = 20;
+        const c = document.createElement('div');
+        new Story(c, g, { navigate() {}, onDeath() {}, notify() {} })
+          .begin(parse('<section name="x394"><group><text>pay and be struck</text><lose shards="5"/><lose stamina="1"/></group> <goto section="9"/></section>'), 1, 'x394');
+        c.querySelector('.group-action').click();
+        const asked = !!c.querySelector('.take-wound') && g.data.shards === 20;
+        c.querySelector('.' + pick).click();
+        return { g, asked };
+      };
+      {
+        const { g, asked } = group394('blessing-injury');
+        ok('task394: a wounding group asks before it commits', asked);
+        ok('task394: ...blocking it still pays the Shards but takes no wound', g.data.shards === 15 && g.data.stamina === 30 && !g.hasBlessing('injury'));
+        const t = group394('take-wound');
+        ok('task394: ...taking it costs the 1 too', t.g.data.shards === 15 && t.g.data.stamina === 29 && t.g.hasBlessing('injury'));
+      }
+      Math.random = rnd;
+      window.__FL_INSTANT_DICE__ = false;
+    }
+
 }

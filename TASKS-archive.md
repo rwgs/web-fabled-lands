@@ -401,6 +401,7 @@ Every task archived in this file, in numeric order — one line per `## <N>.` se
 - [x] 391. Combat rerolls are offered after the enemy has already struck
 - [x] 393. Forced roll groups can be walked past unrolled
 - [x] 392. A refused slot claim reports a two-tab conflict over the player's own adventure
+- [x] 394. Immunity to Injury does not reach every wound
 
 Also here, and not a task: [Review log (archived)](#review-log-archived), the older `TASKS.md` Review-log passes (task 368).
 
@@ -23238,5 +23239,85 @@ Checked:
 
 - Against the old `state.js`, the four assertions failed.
 - `RESULT ALL PASS pass=3502 fail=0`, and `node-import.mjs` passed.
+
+---
+
+## 394. Immunity to Injury does not reach every wound
+
+**Priority: LOW.** The blessing protects most wounds now; these still land without asking.
+Found while fixing task 390.
+
+### What is wrong
+
+Task 390 offers the decision in two places:
+- `renderWoundChoice` in [render-rewards.js](web/js/render-rewards.js), for a walk
+  `<lose stamina>`;
+- `runRound` in [combat.js](web/js/combat.js), for an enemy blow.
+
+A census of the 247 shipped `<lose stamina>` found 226 in the walk. The other 21 apply
+directly and never ask:
+- 15 are `<flee>` parting wounds (2/207 among them), applied by the Flee button through
+  `applyEffectBody`;
+- 4 are in `<group>` actions (1/514 among them), applied by the group's click;
+- 2 are in `<fightround>` bodies (5/24 among them), applied by `runRoundNode` mid-round.
+
+### Steps
+
+1. Add regressions for one of each in `suite-combat`/`suite-actions`, holding the blessing.
+2. Route each through the same decision: the flee wound before the escape navigates, the
+   group's wound inside its commit, and a round-body wound as a round step. A round that is
+   already immune covers its round body too.
+3. Run the complete build/test loop before closing.
+
+### The fix
+
+- `web/js/engine.js`:
+  - `isPlainWound(node)` is the shared test for a `<lose stamina>` that loses nothing else.
+    It moved from task 390's `render-rules.js` list, and `needsWoundDecision` now calls it.
+  - `applyEffectBody(parent, state, log, opts)` accepts `opts.wound(n)`. The hook is asked
+    about every plain wound the walk reaches, already sized by `staminaWound`, and returns
+    how much lands.
+- Round bodies (`web/js/combat.js`):
+  - `runRoundNode` passes a hook. In an immune round it blocks the wound and logs it.
+    Otherwise, while the blessing is held, it holds the wound back and returns it.
+  - `runRound` turns a held amount into `pending = { kind: 'injury', body: true, dmg }` on
+    the round's `pre`/`post` step.
+  - `resolveInjury` blocks or lands a body wound directly, since the body has already run.
+  - `restoreFight` accepts a body wound only on a `pre`/`post` step.
+  - Asking after the body keeps the printed order. Both shipped wounds (5/24's noose, 5/383's
+    lightning) are their body's last effect, inside its `<failure>`.
+- Groups (`web/js/render-rewards.js`):
+  - When the blessing is held and a group bundles plain wounds, `renderGroup` sizes them on
+    the click and offers "Use Immunity to Injury" or "Take the wound (−N Stamina)".
+  - The group is one source, so one answer covers all its wounds.
+  - The commit then lands each wound at its size, or 0 if blocked, and applies everything
+    else as usual. The answer comes before any forfeit picker the group also asks.
+- Flee (`web/js/render-combat.js`):
+  - `makeFleeButton` offers three choices when the blessing is held and the flee body has a
+    plain wound: "Flee, using Immunity to Injury against the parting blow", "Flee and take
+    the parting blow" and "Stay and fight".
+  - Blocking spends the blessing once, for the whole flee.
+  - The flee body rolls its own size as it runs, so this is the one decision made before the
+    number is seen. That keeps "Stay" honest: no size is ever rolled and thrown away.
+- `appendWoundDecision` reads "This round would cost you N Stamina" for a body wound.
+- `docs/Game-Rules.md`: the Blessings paragraph covers the new cases.
+
+Tests:
+
+- Task 394's block in `suite-combat`, 12 assertions:
+  - 5/383's real `<fightround>`, against a foe that neither hits nor is hit: the failed MAGIC
+    roll's 1 waits as a body wound. A save restores it as one. Blocking it costs nothing,
+    and taking it costs 1.
+  - A blocked blow makes the round immune, and the lightning is then blocked without asking.
+  - The real 2/581: Flee offers three answers. Fleeing behind the blessing takes no wound
+    and still ticks `2.581.1`. Taking the blow costs the die. Staying changes nothing and
+    gives the Flee button back.
+  - A synthetic group, "pay and be struck", asks before committing. Blocking still pays the
+    5 Shards, and taking it costs the 1 too.
+
+Checked:
+
+- Against the code before this change, the block reported 7 failures and a fatal.
+- `RESULT ALL PASS pass=3514 fail=0`, and `node-import.mjs` passed.
 
 ---

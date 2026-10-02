@@ -102,13 +102,15 @@ export function restoreFight(node, saved) {
   const at = steps && Number.isInteger(s.round.at) ? s.round.at : -1;
   const wellFormed = steps && steps.length <= 64 && at >= 0 && at < steps.length && p && Number.isInteger(p.fi)
     && steps.every((st) => st && ROUND_STEPS.has(st.who) && Number.isInteger(st.fi) && st.fi >= 0 && st.fi < 32);
-  const injury = wellFormed && p.kind === 'injury' && steps[at].who === 'enemy' && steps[at].fi === p.fi;
+  const bodyWound = p && p.body === true;
+  const injury = wellFormed && p.kind === 'injury' && steps[at].fi === p.fi
+    && (bodyWound ? (steps[at].who === 'pre' || steps[at].who === 'post') : steps[at].who === 'enemy');
   const reroll = wellFormed && p.kind === 'reroll' && at > 0 && steps[at - 1].who === 'player' && steps[at - 1].fi === p.fi;
   if (injury || reroll) {
     fight.round = { steps: steps.map((st) => ({ who: st.who, fi: st.fi })), at, immune: s.round.immune === true };
     fight.pending = reroll ? { kind: 'reroll', fi: p.fi }
       : { kind: 'injury', fi: p.fi, roll: int(p.roll, 2, 2, 12), total: int(p.total, 0, -99, 199),
-          def: int(p.def, 0, -99, 199), dmg: int(p.dmg, 1, 1, 199), replace: false };
+          def: int(p.def, 0, -99, 199), dmg: int(p.dmg, 1, 1, 199), replace: false, body: bodyWound };
   }
   // roundGoto (a <fightdamage>/<fightround> redirect) is deliberately NOT restored: the view
   // consumes and clears it before the round commits, so a saved one could only be forged.
@@ -269,9 +271,17 @@ function landEnemyStrike(state, fight, dmgNode, s, immune = false) {
 /** Execute a <fightround> body (task 99): its rolls/branches/effects run in this
  *  round's context, once, with any outcome lines joining the fight log. A <goto>
  *  (§5.689 "dragged you under") is recorded on the fight for the view to follow. */
-function runRoundNode(state, fight, roundNode) {
-  const res = applyEffectBody(roundNode, state, fight.log);
+function runRoundNode(state, fight, roundNode, rd = null) {
+  // A wound the body deals is part of the round's damage (task 394): an immune round blocks it,
+  // and while the blessing is held it is held back and returned, for runRound to ask about once
+  // the body has run. Both shipped ones (§5.24's noose, §5.383's lightning) are the body's last
+  // effect, so asking after the body keeps the printed order.
+  let held = 0;
+  const wound = rd && rd.immune ? (n) => { if (n > 0) fight.log.push('no wound (Immunity to Injury)'); return 0; }
+    : state.hasBlessing('injury') ? (n) => { held += n; return 0; } : null;
+  const res = applyEffectBody(roundNode, state, fight.log, wound ? { wound } : {});
   if (res.goto) fight.roundGoto = res.goto;
+  return held;
 }
 
 /**
@@ -320,8 +330,10 @@ function runRound(state, fights, dmgNode, roundNode, group) {
     if (!group && (holder.outcome || holder.roundGoto || state.isDead())) break;
     if (group && st.who === 'enemy' && state.isDead()) break;
     if (!(group && st.who === 'enemy' && isDefeated(f))) {
-      if (st.who === 'pre' || st.who === 'post') runRoundNode(state, holder, roundNode);
-      else if (st.who === 'player') {
+      if (st.who === 'pre' || st.who === 'post') {
+        const held = runRoundNode(state, holder, roundNode, rd);
+        if (held > 0) { holder.pending = { kind: 'injury', fi: st.fi, dmg: held, body: true, roll: 0, total: 0, def: 0, replace: false }; return; }
+      } else if (st.who === 'player') {
         playerStrike(state, f);
         // A miss the COMBAT blessing may retry (§4.324) is the player's decision, and it comes
         // BEFORE the rest of the round: the reply used to land first, so a fatal one made the
@@ -354,7 +366,7 @@ export function pendingWound(fights) {
   const list = Array.isArray(fights) ? fights : [fights];
   const p = list[0] && list[0].pending;
   if (!p || p.kind !== 'injury') return null;
-  return { name: (list[p.fi] || list[0]).name, dmg: p.dmg };
+  return { name: (list[p.fi] || list[0]).name, dmg: p.dmg, body: !!p.body };
 }
 
 /** The missed strike waiting on a COMBAT-blessing retry decision, as { name }, or null. */
@@ -394,7 +406,10 @@ export function resolveInjury(state, fights, use, dmgNode = null, roundNode = nu
   holder.pending = null;
   const immune = !!use && state.useBlessing('injury');
   if (immune) holder.round.immune = true;
-  landEnemyStrike(state, list[p.fi] || holder, dmgNode, p, immune);
+  if (p.body) { // a round body's wound (task 394): the body itself has already run
+    if (immune) holder.log.push('no wound (Immunity to Injury)');
+    else { state.damageStamina(p.dmg); holder.log.push(`−${p.dmg} Stamina`); }
+  } else landEnemyStrike(state, list[p.fi] || holder, dmgNode, p, immune);
   holder.round.at++;
   runRound(state, list, dmgNode, roundNode, group);
   return true;

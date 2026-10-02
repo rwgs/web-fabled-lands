@@ -526,8 +526,12 @@ const ROLL_BODY_TAGS = new Set(['random', 'rankcheck', 'difficulty']);
  *  (§5.689), a wound can redirect the fight (§4.238). `log`, when given, collects
  *  human-readable lines (the fight log). Used at wound-time (fightdamage), on
  *  fleeing, and between combat rounds (<fightround> — task 99); never on render. */
-export function applyEffectBody(parent, state, log = null) {
-  const ctx = { log, goto: null, lastRoll: null };
+//
+// `opts.wound(n)`, when given, is asked about every plain Stamina wound the walk reaches
+// (isPlainWound), already sized, and returns how much of it lands: the Immunity to Injury hook
+// for a flee, a round body or a group (task 394).
+export function applyEffectBody(parent, state, log = null, opts = {}) {
+  const ctx = { log, goto: null, lastRoll: null, wound: opts.wound || null };
   walkEffectBody(parent, state, ctx);
   return { goto: ctx.goto };
 }
@@ -590,6 +594,11 @@ function walkEffectBody(parent, state, ctx) {
       }
       continue;
     }
+    if (ctx.wound && isPlainWound(node)) {
+      const take = ctx.wound(staminaWound(node, state));
+      if (take > 0) { state.damageStamina(take); if (ctx.log) ctx.log.push(`−${take} Stamina`); }
+      continue;
+    }
     if (PASSIVE_BODY_TAGS.has(tag)) { const note = applyEffect(node, state); if (note && ctx.log) ctx.log.push(note); continue; }
     // A <rest> inside an effect body (potion of restoration heals all Stamina —
     // task 41): a bare/blank stamina= restores to full (task 31), else that amount.
@@ -605,6 +614,16 @@ function walkEffectBody(parent, state, ctx) {
  *  is sized once, before the decision, and then lands at exactly that size (task 390). */
 export function staminaWound(el, state) {
   return Math.max(0, resolveValue(state, el.getAttribute('stamina')) + childAdjustment(el, state));
+}
+
+// Is this a plain Stamina wound, which Immunity to Injury can block: a <lose stamina="…"> that
+// loses nothing else? A staminato= is a reset rather than a wound, and a priced or flag-linked
+// one is a payment. Every shipped <lose stamina> but those two is this shape. (tasks 390, 394)
+const NOT_A_PLAIN_WOUND = ['shards', 'item', 'weapon', 'armour', 'tool', 'cargo', 'ship', 'codeword', 'ability',
+  'blessing', 'curse', 'disease', 'poison', 'god', 'title', 'resurrection', 'staminato', 'price', 'flag'];
+export function isPlainWound(node) {
+  return node.tagName.toLowerCase() === 'lose' && node.getAttribute('stamina') != null
+    && NOT_A_PLAIN_WOUND.every((a) => node.getAttribute(a) == null);
 }
 
 function applyLose(el, state, opts) {

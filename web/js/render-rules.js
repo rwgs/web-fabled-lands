@@ -7,7 +7,7 @@
 // attributes / running querySelectorAll on it is fine (the same thing engine.js does);
 // only DOM *construction* belongs in the view. Unit-tested headlessly.
 
-import { afflictionOwnOnly, boolAttr, isDiceExpr, resolveValue, matchRange, losePaymentPlan, PASSIVE_BODY_TAGS } from './engine.js';
+import { afflictionOwnOnly, boolAttr, isDiceExpr, resolveValue, matchRange, losePaymentPlan, PASSIVE_BODY_TAGS, isPlainWound } from './engine.js';
 import { normalize, canonBlessing, currencyAward, isShardsCurrency, splitItemName } from './state.js';
 import { bookAvailable } from './edition.js'; // the DOM-free registry, never data.js (task 195)
 import { blessingLabel } from './render-util.js'; // pure label formatting, no DOM (task 218)
@@ -347,17 +347,11 @@ export function isEconomicPayment(node) {
 }
 
 // Immunity to Injury (book5/365) "protects you by allowing you not to lose Stamina points when you
-// would otherwise be wounded, from one source of damage once only". So while it is held, a wound
-// is the player's to block or take: a <lose stamina="…"> that loses nothing else (every shipped one
-// but a priced and a flag-linked cost, which are payments and are classified before this). A
-// staminato= is a reset rather than a wound, and is left alone. The fight's own blows ask in
+// would otherwise be wounded, from one source of damage once only". So while it is held, a plain
+// wound (engine.js isPlainWound) is the player's to block or take. The fight's own blows ask in
 // combat.js (runRound). (task 390)
-const WOUND_ONLY_ATTRS = ['shards', 'item', 'weapon', 'armour', 'tool', 'cargo', 'ship', 'codeword', 'ability',
-  'blessing', 'curse', 'disease', 'poison', 'god', 'title', 'resurrection', 'staminato', 'price', 'flag'];
 export function needsWoundDecision(node, state) {
-  return node.tagName.toLowerCase() === 'lose' && node.getAttribute('stamina') != null
-    && WOUND_ONLY_ATTRS.every((a) => node.getAttribute(a) == null)
-    && state.hasBlessing('injury');
+  return isPlainWound(node) && state.hasBlessing('injury');
 }
 
 // ---- group classification (tasks 42/61/96/98/107/125/126 — task 119 phase 3) --

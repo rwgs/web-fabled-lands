@@ -8,7 +8,7 @@
 
 import { makeFight, fightRound, groupFightRound, isDefeated, useWrathBlessing, useDefenceBlessing, rerollAttack, playerFightDefence,
   pendingWound, resolveInjury, pendingReroll, resolveReroll } from './combat.js';
-import { applyEffectBody } from './engine.js';
+import { applyEffectBody, isPlainWound } from './engine.js';
 import { aggregateFightOutcome } from './render-gates.js';
 import { animateDice } from './ui.js';
 
@@ -194,11 +194,32 @@ function makeFleeButton(story, fleeNode, markFled) {
   const flee = document.createElement('button');
   flee.className = 'btn-secondary';
   flee.textContent = 'Flee';
-  flee.addEventListener('click', () => {
-    applyEffectBody(fleeNode, story.state);
+  // `immune` (task 394): null asks nothing; true blocks the parting wound with Immunity to Injury
+  // (spent once, for the whole flee, the one source of damage); false lets it land.
+  const run = (immune) => {
+    let covered = false;
+    const wound = immune == null ? null : (n) => {
+      if (!immune || n <= 0) return n;
+      covered = covered || story.state.useBlessing('injury');
+      return covered ? 0 : n;
+    };
+    applyEffectBody(fleeNode, story.state, null, wound ? { wound } : {});
     markFled();
     if (story.state.isDead()) { story.rerender(); return; } // a fatal parting wound
     fleeNavigate(story, fleeNode);
+  };
+  flee.addEventListener('click', () => {
+    // A parting wound the player may block (task 394). The flee body rolls its own size as it
+    // runs, so this asks before the escape rather than after: "Stay and fight" changes nothing,
+    // and no size is ever rolled and then thrown away.
+    const wounds = Array.from(fleeNode.querySelectorAll('lose')).some(isPlainWound);
+    if (!wounds || !story.state.hasBlessing('injury')) { run(null); return; }
+    const controls = flee.parentNode;
+    controls.innerHTML = '';
+    const opt = (label, cls, fn) => { const b = document.createElement('button'); b.className = 'btn-secondary ' + cls; b.textContent = label; b.addEventListener('click', fn); controls.appendChild(b); };
+    opt('Flee, using Immunity to Injury against the parting blow', 'blessing-injury', () => run(true));
+    opt('Flee and take the parting blow', 'take-wound', () => run(false));
+    opt('Stay and fight', 'stay-fight', () => story.rerender());
   });
   return flee;
 }
@@ -227,7 +248,8 @@ function appendWoundDecision(story, box, wound, answer) {
   if (!story.inactive) story.pendingRound = true; // the exits wait (applyWoundGate)
   const note = document.createElement('div');
   note.className = 'roll-outcome bad';
-  note.textContent = `The ${wound.name}'s blow would cost you ${wound.dmg} Stamina.`;
+  note.textContent = wound.body ? `This round would cost you ${wound.dmg} Stamina.`
+    : `The ${wound.name}'s blow would cost you ${wound.dmg} Stamina.`;
   box.appendChild(note);
   const controls = document.createElement('div');
   controls.className = 'fight-controls';

@@ -8,7 +8,7 @@
 
 import {
   applyEffect, applyRest, resolveValue, reviveWithResurrection, readItemEffects,
-  losePaymentPlan, abilityChoiceOptions, grantChosenReward, staminaWound, boolAttr,
+  losePaymentPlan, abilityChoiceOptions, grantChosenReward, staminaWound, boolAttr, isPlainWound,
 } from './engine.js';
 import { makeItem, parseTags, currencyAward, splitItemName } from './state.js';
 import { applyInlineBuy, buyOptions, cargoBuyPlan, crewUpgradePlan, shipCapacity } from './market.js';
@@ -154,11 +154,17 @@ export function renderGroup(story, container, node, path) {
     // frees the slot its reward needs), because the whole body simply moves behind the pick.
     // (tasks 229, 286)
     const forfeit = groupBundledChoice(story, plan); // the chooser's target node, whichever kind asked
+    // A bundled plain wound's size and fate (task 394): sized on the click, then the amount that
+    // lands, 0 when Immunity to Injury blocks it. Null when the group asks nothing.
+    let wounds = null;
     const commit = (chooser) => {
       // The whole body applies on the CLICK, not during the walk, so the group books its taking
       // at its own node — the button is the position a bundled price was paid at (task 261).
       const mark = story.spendMark();
-      plan.effects.forEach((fx) => applyEffect(fx, story.state, chooser && fx === forfeit.node ? { chooser } : {}));
+      plan.effects.forEach((fx) => {
+        if (wounds && wounds.has(fx)) { const n = wounds.get(fx); if (n > 0) story.state.damageStamina(n); return; }
+        applyEffect(fx, story.state, chooser && fx === forfeit.node ? { chooser } : {});
+      });
       plan.buyNodes.forEach((b) => runBuyNode(story, b, chooser && forfeit && forfeit.node === b ? chooser : null));
       plan.itemNodes.forEach((n) => grantItemNode(story, n));
       // The linked award is granted here and its flag consumed, but its own Take button is
@@ -196,13 +202,42 @@ export function renderGroup(story, container, node, path) {
         story.rerender();
       }
     };
-    btn.addEventListener('click', () => {
+    const proceed = () => {
       if (!forfeit) { commit(null); return; }
       btn.disabled = true; // the pick replaces the button — never let a second click re-run it
       if (forfeit.kind === 'ability') showAbilityPicker(story, container, forfeit.node, commit);
       else if (forfeit.kind === 'affliction') showAfflictionPicker(story, container, forfeit.node, commit);
       else if (forfeit.kind === 'vessel') showVesselPicker(story, container, forfeit.plan, commit, 'Load onto which ship?');
       else showForfeitPicker(story, container, forfeit.plan, commit);
+    };
+    btn.addEventListener('click', () => {
+      // A group that wounds (§1.514's "smashes you across the jaw", §6.628's "lose 1 Stamina")
+      // asks first, while Immunity to Injury is held: the group is one source of damage, so one
+      // answer covers every wound in it. The size is rolled here, on the click. (task 394)
+      const hits = plan.effects.filter(isPlainWound);
+      if (!hits.length || !story.state.hasBlessing('injury')) { proceed(); return; }
+      btn.disabled = true;
+      const sizes = new Map(hits.map((fx) => [fx, staminaWound(fx, story.state)]));
+      const total = [...sizes.values()].reduce((a, b) => a + b, 0);
+      if (total === 0) { wounds = sizes; proceed(); return; }
+      const box = document.createElement('span');
+      box.className = 'ability-choice wound-choice';
+      const answer = (use) => {
+        box.remove();
+        if (use && story.state.useBlessing('injury')) hits.forEach((fx) => sizes.set(fx, 0));
+        wounds = sizes;
+        proceed();
+      };
+      const use = document.createElement('button');
+      use.className = 'btn-mini blessing-injury';
+      use.textContent = 'Use Immunity to Injury';
+      use.addEventListener('click', () => answer(true));
+      const take = document.createElement('button');
+      take.className = 'btn-mini take-wound';
+      take.textContent = `Take the wound (−${total} Stamina)`;
+      take.addEventListener('click', () => answer(false));
+      box.appendChild(use); box.appendChild(take);
+      container.appendChild(box);
     });
   }
   container.appendChild(btn);

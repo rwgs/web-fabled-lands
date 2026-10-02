@@ -28,7 +28,6 @@ there once the buckets below are clear.
 **LOW**
 
 - [ ] 369. `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19 (CI notice); the `smoke` and `build-scripts` jobs rely on the image's preinstalled `pwsh` 7, `google-chrome` and `python3`, so the move could stop CI with no change here
-- [ ] 394. Immunity to Injury is offered for walk wounds and enemy blows only; the 15 flee parting wounds, 4 group-bundled wounds and 2 `<fightround>` wounds still land without asking
 
 **Done**
 
@@ -431,6 +430,7 @@ this order.*
 - [x] 391. the COMBAT-blessing retry was offered only after the enemy's reply, so at book1/105 a fatal reply made the promised retry unusable, and a winning retry came after the wound it should have prevented. A missed strike with an eligible retry now pauses the resumable round before the reply. A retry strikes first, and keeping the miss lets the reply land once. Enemy-first fights keep the end-of-round retry
 - [x] 393. a forced `<group>` bundling a roll held nothing, so book3/273's and book3/629's "lose 1-6 of your possessions" could be walked past with the die unrolled. `computeGroupGate` now counts such groups, settled by their roll. The 1/91 and 2/134 bets, which lock a stake cache, are exempt: 1/91 says "If you want to gamble", and a zero stake would satisfy a gate at 2/134 anyway
 - [x] 392. a Keep or import refused because another tab filled the slot first reported the two-tab message, "load the newer save", which here names somebody else's adventure. It now says another tab saved an adventure into that slot first and to try again. A failed Keep also no longer leaves the preview flagged `saveConflict`, whose "Load the newer save" button would have loaded the preview's old slot
+- [x] 394. Immunity to Injury now reaches the 21 wounds task 390 left out. A `<fightround>` body's wound waits as a round decision (an immune round blocks it unasked). A wounding group asks on its click, and Flee asks before the escape: flee using the blessing, flee taking the blow, or stay. The shared `isPlainWound` and an `applyEffectBody` wound hook in `engine.js` carry the rule
 
 ---
 
@@ -478,40 +478,33 @@ pushed run on the new image validates it.
 
 ---
 
-## 394. Immunity to Injury does not reach every wound
-
-**Priority: LOW.** The blessing protects most wounds now; these still land without asking.
-Found while fixing task 390.
-
-### What is wrong
-
-Task 390 offers the decision in two places:
-- `renderWoundChoice` in [render-rewards.js](web/js/render-rewards.js), for a walk
-  `<lose stamina>`;
-- `runRound` in [combat.js](web/js/combat.js), for an enemy blow.
-
-A census of the 247 shipped `<lose stamina>` found 226 in the walk. The other 21 apply
-directly and never ask:
-- 15 are `<flee>` parting wounds (2/207 among them), applied by the Flee button through
-  `applyEffectBody`;
-- 4 are in `<group>` actions (1/514 among them), applied by the group's click;
-- 2 are in `<fightround>` bodies (5/24 among them), applied by `runRoundNode` mid-round.
-
-### Steps
-
-1. Add regressions for one of each in `suite-combat`/`suite-actions`, holding the blessing.
-2. Route each through the same decision: the flee wound before the escape navigates, the
-   group's wound inside its commit, and a round-body wound as a round step. A round that is
-   already immune covers its round body too.
-3. Run the complete build/test loop before closing.
-
----
-
 ## Review log
 
 *Running audit log of the backlog — each pass re-verifies the open items against
 the current code and records what was filed, split, or re-confirmed. Task
 numbers refer to the contents checklist at the top of the file.*
+
+Worked 2026-10-01 (task 394): closed **394**, filed nothing.
+- `engine.js` gains `isPlainWound`, which `needsWoundDecision` now uses, and an
+  `opts.wound(n)` hook on `applyEffectBody`.
+- Round bodies: `runRoundNode` holds back a body's wound, and `runRound` turns it into a
+  `body` injury wait, which `resolveInjury` and `restoreFight` handle. An immune round blocks
+  the wound without asking.
+- Groups: `renderGroup` sizes a bundled wound on the click and asks before it commits. Its
+  other effects still apply.
+- Flee: `makeFleeButton` asks before the escape. The flee body rolls its own size, so this is
+  the one decision made before the number is seen. "Stay and fight" changes nothing and rolls
+  nothing.
+- Docs: `docs/Game-Rules.md` updated.
+
+Task 394's block in `suite-combat` covers:
+- 5/383's lightning: waiting, restored as a body wound, blocked and taken;
+- a blocked blow covering the body;
+- 2/581's three flee answers;
+- a synthetic wounding group.
+
+Against the code before this change it reported 7 failures and a fatal.
+`RESULT ALL PASS pass=3514 fail=0`, and `node-import.mjs` passed.
 
 Worked 2026-10-01 (task 392): closed **392**, filed nothing. `state.js` gains `SLOT_TAKEN`:
 "Another tab or window saved an adventure into that save slot first, so nothing was written.
